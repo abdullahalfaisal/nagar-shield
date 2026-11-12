@@ -78,6 +78,39 @@ npx supabase start          # the local stack must report healthy
 **Pass condition:** `adb install` succeeds, the Maestro panic-path flow
 passes, and the local stack is healthy.
 
+#### The Maestro panic-path flow
+
+`maestro/panic-path.yaml` is the smoke subset the nightly build runs against
+the preview APK on an emulator. It signs in, walks the home grid → Help
+Alert → the OS dialer → Capture, and asserts the controls on each screen.
+
+It needs two environment variables:
+
+| Variable           | Value                                    | Why                                            |
+| ------------------ | ---------------------------------------- | ---------------------------------------------- |
+| `MAESTRO_EMAIL`    | a seeded account, e.g. `citizen@nagar.local` | the `(app)` group redirects a signed-out user |
+| `MAESTRO_PASSWORD` | `nagar-local-dev`                        | the seeded dev password                        |
+
+```bash
+MAESTRO_EMAIL=citizen@nagar.local MAESTRO_PASSWORD=nagar-local-dev \
+  maestro test maestro/panic-path.yaml
+```
+
+The flow **does not place a call** and **does not submit a report** — it
+asserts that the dialler opened and that the capture screen renders, so a
+smoke run leaves no test data behind.
+
+Validate the flow before building an APK:
+
+```bash
+pnpm maestro:check
+```
+
+The check parses the YAML, verifies every command is a real Maestro command,
+confirms the `appId` matches the EAS package, and resolves every selector
+against the app — a `testID` that no longer exists, or a Bengali string that
+was renamed in `bn.ts`, fails here rather than on the emulator.
+
 ### 3. Verify
 
 ```bash

@@ -1,0 +1,202 @@
+# =============================================================================
+# Nagar Shield — the Maestro panic-path flow
+#
+# The nightly build (`.github/workflows/build.yml`) runs this against the
+# preview APK on an emulator. It is the **smoke subset**: the path a person
+# takes when something is happening right now.
+#
+#   1. sign in
+#   2. the home screen — the help grid is the first thing on it
+#   3. the Help Alert screen — the four emergency tiles and the More Help sheet
+#   4. the dialer — the Police tile hands 999 to the OS dialler
+#   5. back home, into Capture — the report screen renders
+#   6. the capture screen's controls are all present
+#
+# What it deliberately does NOT do:
+#   * it does not place a call. The tile hands the number to the OS dialler
+#     and the flow asserts the dialler opened, then goes back. The app never
+#     places a call (constraint C-1) — the OS does.
+#   * it does not submit a report. Submitting writes a row to the database
+#     and uploads media; a smoke run must not leave test reports behind. The
+#     flow asserts the capture screen renders and that its controls exist.
+#   * it does not touch the moderation or admin surfaces.
+#
+# Locale
+# ------
+# The app picks its language from the device locale and falls back to
+# **Bengali** (`DEFAULT_LOCALE` in `packages/shared`). The emulator's locale
+# is therefore not guaranteed to be English. Every text assertion below
+# matches BOTH languages with a regex alternation, so the flow passes either
+# way. The Bengali side of each alternation is the literal string from
+# `apps/mobile/src/shared/i18n/bn.ts`.
+#
+# The selectors prefer `testID` where the screen provides one — only the auth
+# screens do today (`login-identifier`, `login-password`). The panic screens
+# expose their visible label as the `accessibilityLabel`, so those assertions
+# match on text.
+#
+# Credentials
+# -----------
+# The dev accounts are seeded by `20261105000010_seed_dev_accounts.sql`, and
+# the password is the same for all of them. The values are overridable with
+# MAESTRO_* environment variables, which is how a staging run points the flow
+# at a staging account instead of the local seed.
+# =============================================================================
+
+appId: com.nagarshield.app
+---
+- launchApp:
+    clearState: false
+
+# -----------------------------------------------------------------------------
+# 1. Sign in
+#
+# The `(app)` group redirects a signed-out user to the auth flow, so the flow
+# has to sign in before it can reach the home screen.
+# -----------------------------------------------------------------------------
+
+- extendedWaitUntil:
+    visible:
+      id: "login-identifier"
+    timeout: 30000
+- tapOn:
+    id: "login-identifier"
+- inputText: "${MAESTRO_EMAIL}"
+- tapOn:
+    id: "login-password"
+- inputText: "${MAESTRO_PASSWORD}"
+- hideKeyboard
+- tapOn:
+    text: "সাইন ইন|Sign in"
+    index: 0
+
+# -----------------------------------------------------------------------------
+# 2. The home screen
+#
+# The help grid is the whole point of the home screen: the quick actions
+# carry their visible label as the accessibility label.
+# -----------------------------------------------------------------------------
+
+- extendedWaitUntil:
+    visible:
+      text: "পুলিশ|Police"
+    timeout: 30000
+
+- assertVisible:
+    text: "ক্যাপচার|Capture"
+- assertVisible:
+    text: "লোকেশন শেয়ার|Location sharing"
+
+# -----------------------------------------------------------------------------
+# 3. The Help Alert screen
+#
+# Four emergency tiles, each with its number in the accessibility label, then
+# the dashed "More help" card that opens the bottom sheet.
+# -----------------------------------------------------------------------------
+
+- tapOn:
+    text: "পুলিশ|Police"
+    index: 0
+
+- extendedWaitUntil:
+    visible:
+      text: "আরও সাহায্য|More help"
+    timeout: 15000
+
+# The four tiles. Police is 999, Medical is 999, Fire is **102** (PRD fact
+# A-7 — Fire is not 999 and not 16123).
+- assertVisible:
+    text: ".*পুলিশ.*999|.*Police.*999"
+- assertVisible:
+    text: ".*মেডিকেল.*999|.*Medical.*999"
+- assertVisible:
+    text: ".*ফায়ার.*102|.*Fire.*102"
+
+# The More Help sheet.
+- tapOn:
+    text: "আরও সাহায্য|More help"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      text: "আরও জরুরি নম্বর|More emergency numbers"
+    timeout: 10000
+- assertVisible:
+    text: ".*109"
+- assertVisible:
+    text: ".*16116"
+
+- tapOn:
+    text: "বন্ধ করুন|Close"
+    index: 0
+
+# -----------------------------------------------------------------------------
+# 4. The dialer
+#
+# The Police tile hands 999 to the OS dialler. The flow asserts the dialler
+# opened and then goes back — it never presses call.
+# -----------------------------------------------------------------------------
+
+- tapOn:
+    text: ".*পুলিশ.*999|.*Police.*999"
+    index: 0
+
+# The OS dialler takes over the foreground. The dialer is an emulator
+# system app, so the assertion is on the dialler's own affordance rather
+# than on anything in the Nagar Shield app.
+- extendedWaitUntil:
+    visible:
+      text: ".*999|.*Call|.*ডায়াল|.*কল"
+    timeout: 15000
+
+- back
+
+- extendedWaitUntil:
+    visible:
+      text: "আরও সাহায্য|More help"
+    timeout: 15000
+
+# -----------------------------------------------------------------------------
+# 5. Back to the home screen, then into Capture
+# -----------------------------------------------------------------------------
+
+- back
+
+- extendedWaitUntil:
+    visible:
+      text: "ক্যাপচার|Capture"
+    timeout: 15000
+
+- tapOn:
+    text: "ক্যাপচার|Capture"
+    index: 0
+
+# -----------------------------------------------------------------------------
+# 6. The capture screen
+#
+# The screen must render with its controls. The flow stops here — submitting
+# would write a real report row and upload media.
+# -----------------------------------------------------------------------------
+
+- extendedWaitUntil:
+    visible:
+      text: "ঘটনা ক্যাপচার করুন|Capture an incident"
+    timeout: 15000
+
+# The three media sources.
+- assertVisible:
+    text: "ছবি তুলুন|Take a photo"
+- assertVisible:
+    text: "ভিডিও ক্যাপচার করুন|Capture a video"
+- assertVisible:
+    text: "ফাইল আপলোড করুন|Upload a file"
+
+# The anonymity toggle — the default state is "stay anonymous", and the
+# switch is the app's privacy control (FR-CAPTURE-1).
+- assertVisible:
+    text: "নাম প্রকাশ না করে|Stay anonymous"
+- assertVisible:
+    text: "কী ঘটেছে\\?|What happened"
+
+# The submit control exists, even though this flow does not press it.
+- assertVisible:
+    text: "রিপোর্ট পাঠান|Send report"

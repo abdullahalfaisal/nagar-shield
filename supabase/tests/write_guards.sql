@@ -386,4 +386,254 @@ select 'Test F5: the restore still works' as test,
 select 'Test F6: the account is no longer deleted' as test,
        (select deleted_at is null from public.profiles where id = '11111111-1111-1111-1111-111111111106') as passed;
 
+-- =============================================================================
+-- Test G — a disabled account cannot write (DEFECT F)
+-- =============================================================================
+--
+-- `002-identity / 005-remote-account-disable` AC #2: when an account is
+-- disabled, "any API write is attempted → rejected with `AUTH_DISABLED`
+-- (HTTP 403)".
+--
+-- The Edge Function honoured that, but the DATABASE is the real boundary and
+-- PostgREST is a door the Edge Function does not own. Every write below
+-- SUCCEEDED for a disabled account before migration 019:
+--
+--   contacts, location_shares, wrong_number_reports, reports, report_media,
+--   the `finalize_capture` RPC, the `update_category` RPC and the Storage
+--   insert policy.
+--
+-- The guard is now `public.assert_account_not_disabled()`, applied to the
+-- write policies and to the SECURITY DEFINER RPCs a client may call.
+--
+-- The fixture is the disabled account `...1103` from the top of this file: a
+-- moderator disabled it 60 days ago.
+-- -----------------------------------------------------------------------------
+
+-- A contact owned by the disabled account, so the UPDATE and DELETE paths
+-- have a row to act on.
+insert into public.contacts (id, user_id, name, phone)
+values ('44444444-4444-4444-4444-444444444401', '11111111-1111-1111-1111-111111111103',
+        'a contact of the disabled account', '+8801711009999');
+
+-- A report authored by the disabled account, so `update_category` has a row.
+insert into public.reports (
+  id, author_id, client_request_id, lat, lng, captured_at, description,
+  category, public_visibility, moderation_status
+)
+values (
+  '22222222-2222-2222-2222-222222222202',
+  '11111111-1111-1111-1111-111111111103',
+  '33333333-3333-3333-3333-333333333302',
+  23.7461, 90.3774, now(), 'a report by the disabled account', 'theft',
+  'anonymous', 'visible'
+);
+
+-- --- The table write paths -------------------------------------------------
+
+select 'Test G1: a disabled account cannot insert a contact' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$insert into public.contacts (user_id, name, phone)
+           values ('11111111-1111-1111-1111-111111111103', 'forbidden', '+8801711009998')$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G2: a disabled account cannot update a contact' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$update public.contacts set name = 'rewritten'
+          where id = '44444444-4444-4444-4444-444444444401'$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G3: a disabled account cannot delete a contact' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$delete from public.contacts
+          where id = '44444444-4444-4444-4444-444444444401'$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G4: the contact was not rewritten' as test,
+       (select name from public.contacts where id = '44444444-4444-4444-4444-444444444401')
+       = 'a contact of the disabled account' as passed;
+
+select 'Test G5: a disabled account cannot share a location' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$insert into public.location_shares (sender_id, lat, lng)
+           values ('11111111-1111-1111-1111-111111111103', 23.7461, 90.3774)$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G6: no location share row landed' as test,
+       (select count(*) from public.location_shares where sender_id = '11111111-1111-1111-1111-111111111103') = 0 as passed;
+
+select 'Test G7: a disabled account cannot file a wrong-number report' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111103', 'station', 'gulshan', 'the number is wrong')$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G8: a disabled account cannot insert a report' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$insert into public.reports (author_id, client_request_id, lat, lng, captured_at, description, category, public_visibility)
+           values ('11111111-1111-1111-1111-111111111103',
+                   '33333333-3333-3333-3333-333333333303',
+                   23.7461, 90.3774, now(), 'forbidden', 'theft', 'anonymous')$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G9: a disabled account cannot insert a media row' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$insert into public.report_media (report_id, storage_path, media_type, byte_size)
+           values ('22222222-2222-2222-2222-222222222202',
+                   'reports/11111111-1111-1111-1111-111111111103/x/y.jpg',
+                   'photo', 100)$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G10: no media row landed' as test,
+       (select count(*) from public.report_media where report_id = '22222222-2222-2222-2222-222222222202') = 0 as passed;
+
+-- --- The RPC paths ----------------------------------------------------------
+--
+-- These are SECURITY DEFINER, so the policies above do not cover the writes
+-- they perform. `finalize_capture` was the widest hole that was measured:
+-- it landed a full report row AND its media row.
+
+select 'Test G11: finalize_capture refuses a disabled account' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select public.finalize_capture(
+              '33333333-3333-3333-3333-333333333304',
+              'reports/11111111-1111-1111-1111-111111111103/a/b.jpg',
+              'photo', 100, null, null, null,
+              23.7461, 90.3774, now(), 'forbidden', 'anonymous', 'theft')$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G12: finalize_capture landed no report row' as test,
+       (select count(*) from public.reports where client_request_id = '33333333-3333-3333-3333-333333333304') = 0 as passed;
+
+select 'Test G13: finalize_capture landed no media row' as test,
+       (select count(*) from public.report_media
+         where storage_path = 'reports/11111111-1111-1111-1111-111111111103/a/b.jpg') = 0 as passed;
+
+select 'Test G14: update_category refuses a disabled account' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select public.update_category('22222222-2222-2222-2222-222222222202', 'harassment')$w$
+       ) = 'ACCOUNT_DISABLED' as passed;
+
+select 'Test G15: the category was not changed' as test,
+       (select category from public.reports where id = '22222222-2222-2222-2222-222222222202') = 'theft' as passed;
+
+-- --- The reads are still allowed --------------------------------------------
+--
+-- The disable is a WRITE restriction. A disabled user must still be able to
+-- READ their own rows, because the app has to show them why they are locked
+-- out and to offer them the account deletion.
+
+select 'Test G16: a disabled account can still read its own profile' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select count(*) from public.profiles where id = '11111111-1111-1111-1111-111111111103'$w$
+       ) = '' as passed;
+
+select 'Test G17: a disabled account can still read its own contacts' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select count(*) from public.contacts where user_id = '11111111-1111-1111-1111-111111111103'$w$
+       ) = '' as passed;
+
+-- --- The account lifecycle is still reachable -------------------------------
+--
+-- A disabled user must be able to ask for their own data to be deleted, and
+-- must be able to recover an account they deleted. Guarding these would
+-- make the disable a permanent imprisonment with no exit — so they are
+-- deliberately NOT guarded.
+
+select 'Test G18: a disabled account can still soft-delete itself' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select public.soft_delete_account()$w$
+       ) = '' as passed;
+
+select 'Test G19: the account is marked deleted' as test,
+       (select deleted_at is not null from public.profiles where id = '11111111-1111-1111-1111-111111111103') as passed;
+
+select 'Test G20: a disabled account can still restore itself' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111103',
+         $w$select public.restore_account()$w$
+       ) = '' as passed;
+
+-- --- The server is never refused --------------------------------------------
+--
+-- The disable itself, and the PII purge that scrubs a disabled account's
+-- tombstone, are server writes. A guard that refused them would make the
+-- account permanently un-purgeable (the DEFECT D shape).
+
+select 'Test G21: the server can still disable an account' as test,
+       pg_temp.as_service(
+         $w$update public.profiles set disabled_at = now() - interval '60 days'
+          where id = '11111111-1111-1111-1111-111111111106'$w$
+       ) = '' as passed;
+
+select 'Test G22: the server can still scrub a disabled account' as test,
+       pg_temp.as_service(
+         $w$update public.profiles set phone = 'purged-11111111-1111-1111-1111-111111111106', email = 'purged-11111111-1111-1111-1111-111111111106', full_name = null
+          where id = '11111111-1111-1111-1111-111111111106'$w$
+       ) = '' as passed;
+
+select 'Test G23: the tombstone was written' as test,
+       (select phone from public.profiles where id = '11111111-1111-1111-1111-111111111106') = 'purged-11111111-1111-1111-1111-111111111106'
+   and (select email from public.profiles where id = '11111111-1111-1111-1111-111111111106') = 'purged-11111111-1111-1111-1111-111111111106' as passed;
+
+-- --- An enabled account is unaffected ---------------------------------------
+--
+-- The guard must not fire for a healthy account. This is the regression that
+-- catches a guard written too strictly.
+
+select 'Test G24: an enabled account can still insert a contact' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.contacts (user_id, name, phone)
+           values ('11111111-1111-1111-1111-111111111101', 'allowed', '+8801711009997')$w$
+       ) = '' as passed;
+
+select 'Test G25: the contact landed' as test,
+       (select count(*) from public.contacts
+         where user_id = '11111111-1111-1111-1111-111111111101' and name = 'allowed') = 1 as passed;
+
+select 'Test G26: an enabled account can still file a wrong-number report' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'gulshan', 'the number is wrong')$w$
+       ) = '' as passed;
+
+select 'Test G27: an enabled account can still finalize a capture' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$select public.finalize_capture(
+              '33333333-3333-3333-3333-333333333305',
+              'reports/11111111-1111-1111-1111-111111111101/c/d.jpg',
+              'photo', 100, null, null, null,
+              23.7461, 90.3774, now(), 'allowed', 'anonymous', 'theft')$w$
+       ) = '' as passed;
+
+select 'Test G28: the capture landed a report row' as test,
+       (select count(*) from public.reports where client_request_id = '33333333-3333-3333-3333-333333333305') = 1 as passed;
+
+select 'Test G29: the capture landed a media row' as test,
+       (select count(*) from public.report_media
+         where storage_path = 'reports/11111111-1111-1111-1111-111111111101/c/d.jpg') = 1 as passed;
+
+select 'Test G30: an enabled account can still edit its report category' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$select public.update_category('22222222-2222-2222-2222-222222222201', 'harassment')$w$
+       ) = '' as passed;
+
+select 'Test G31: the category was changed' as test,
+       (select category from public.reports where id = '22222222-2222-2222-2222-222222222201') = 'harassment' as passed;
+
 rollback;

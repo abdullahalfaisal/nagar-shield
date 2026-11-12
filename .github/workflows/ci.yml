@@ -10,12 +10,15 @@
 #   typecheck ─┼─> shared-test ─> unit-test-mobile ─┐
 #               │                 unit-test-admin  ─┼─> migration-dry-run ─> rls-integration ─> secret-scan
 #               │                 unit-test-functions ─┘
+#   maestro-flow ────────────────────────────────────┘ (independent — validates the nightly flow)
 #
 # `shared-test` gates every other test job: the shared contracts are the
 # source of truth, so a broken contract fails the PR before any consumer
 # runs. `migration-dry-run` precedes `rls-integration` because the RLS tests
 # need a schema with the migrations applied. `secret-scan` runs last because
-# it inspects the **built** bundles.
+# it inspects the **built** bundles. `maestro-flow` is independent: it
+# validates the nightly emulator flow, so a typo there fails the PR instead
+# of the nightly build.
 #
 # Fork PRs get no secrets and no write permissions. The migration, RLS, and
 # secret jobs run entirely against a local Supabase stack and a pattern list,
@@ -261,6 +264,40 @@ jobs:
         run: npx supabase status || docker logs supabase_db_nagar-shield || true
 
   # ---------------------------------------------------------------------------
+  # The Maestro flow check.
+  #
+  # The nightly build runs `maestro/panic-path.yaml` against an emulator. A
+  # typo in that file only fails the nightly job — after a full APK build,
+  # which is slow and burns the free-tier build quota. This job validates
+  # the flow up front: the YAML parses, the commands are real Maestro
+  # commands, the `appId` matches the EAS package, and every selector
+  # refers to a `testID` or a string the app actually renders.
+  #
+  # It needs no database and no emulator, so it runs early and cheap.
+  # ---------------------------------------------------------------------------
+
+  maestro-flow:
+    name: maestro-flow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: the Maestro flows are valid
+        run: pnpm maestro:check
+
+  # ---------------------------------------------------------------------------
   # The RLS integration tests. They exercise the policies as an **anon**
   # client and as an **authenticated** client, including the negative tests:
   # an anon client cannot read a private row, a citizen cannot moderate, and
@@ -297,6 +334,13 @@ jobs:
       # anon, citizen, and moderator roles against the local stack.
       - name: the REST read models and RPCs
         run: pnpm db:smoke
+
+      # The disabled-account write guard, proved over the real PostgREST path
+      # rather than only inside Postgres. The SQL suite proves the guard in
+      # the database; this proves the door the Edge Function does not own is
+      # actually closed.
+      - name: a disabled account cannot write
+        run: pnpm guard:check
 
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the

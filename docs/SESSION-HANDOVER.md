@@ -3,7 +3,7 @@
 > Read this first in a fresh session. It says what is **done**, what is
 > **broken**, and what to do **next**, in that order.
 >
-> Last updated: 2026-11-06 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
+> Last updated: 2026-11-13 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 62 stories / 27 bolts
 
 ---
@@ -12,11 +12,14 @@
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified. **55 of 62 stories still carry `implemented: false`** — the
-gaps are concentrated in the mobile app's interactive surfaces and in one
-server-side security defect.
+gaps are concentrated in the mobile app's interactive surfaces.
 
-**Nothing is committed.** There is no git repository (see §5). The working
-tree is the only copy.
+**The repository now exists** (see §5). The working tree is committed and
+pushed-ready, and there is a baseline commit to fall back to.
+
+**The security defect is closed.** The disabled-account write bypass (defect
+F) was fixed in migration `20261105000019_disabled_account_write_guard.sql`,
+covered by 31 new SQL assertions and an 8-check live API probe. See §3.
 
 ---
 
@@ -24,24 +27,25 @@ tree is the only copy.
 
 Every command below was run green against the local Supabase stack.
 
-| Area               | Evidence                                                                                                                                        |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo           | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config                                          |
-| Shared contracts   | `packages/shared` — schemas, enums, errors, jobs, reference data; **72 unit tests**                                                             |
-| Database           | **19 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs                                         |
-| RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 5 probed defects (A–E)                                                                 |
-| SQL test suites    | **133 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (35)                                |
-| REST smoke         | `tools/smoke-rpc.cjs` — **11/11**                                                                                                               |
-| Edge Functions     | 7 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture |
-| Function smoke     | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run)                                                         |
-| Mobile screens     | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html`                |
-| Admin console      | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes**                                                  |
-| i18n               | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED`                                                                              |
-| CI                 | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → migration-dry-run → rls-integration → secret-scan                    |
-| Nightly build      | `.github/workflows/build.yml` — preview APK + emulator smoke                                                                                    |
-| EAS profiles       | `eas.json` — dev / preview / production, APK, cert-pinning, SMS flag off                                                                        |
-| Operations         | `docs/operations/runbook.md` (8-stage release ladder), `docs/operations/secrets.md` (matrix + rotation)                                         |
-| Release harness    | `tools/release-verify.cjs` — 5 assertions, `pnpm release:verify` green on `local`                                                               |
+| Area | Evidence |
+|---|---|
+| Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **72 unit tests** |
+| Database | **20 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs |
+| RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
+| SQL test suites | **163 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (65) |
+| REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
+| Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
+| Edge Functions | 7 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture |
+| Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
+| Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html` |
+| Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
+| i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
+| CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
+| Nightly build | `.github/workflows/build.yml` — preview APK + emulator smoke (`maestro/panic-path.yaml`) |
+| EAS profiles | `eas.json` — dev / preview / production, APK, cert-pinning, SMS flag off |
+| Operations | `docs/operations/runbook.md` (8-stage release ladder), `docs/operations/secrets.md` (matrix + rotation) |
+| Release harness | `tools/release-verify.cjs` — 5 assertions, `pnpm release:verify` green on `local` |
 
 ### Verification commands
 
@@ -49,12 +53,14 @@ Every command below was run green against the local Supabase stack.
 pnpm typecheck        # 3 workspaces
 pnpm lint
 pnpm test             # 121 tests
-pnpm db:test          # 133 SQL assertions
+pnpm db:test          # 163 SQL assertions
 pnpm db:smoke         # 11 REST checks
+pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
 pnpm shared:check     # Edge Functions mirror
+pnpm maestro:check    # the nightly emulator flow
 pnpm secret:scan
 pnpm release:verify
 ```
@@ -66,72 +72,102 @@ Edge Functions must be served for `fn:smoke`: `pnpm fn:serve`.
 
 ## 3. What is BROKEN — fix these first
 
-### 🔴 B1 — A disabled account can still write (security defect)
+### ✅ B1 — A disabled account can still write (security defect) — FIXED
 
 **Story:** `002-identity / 005-remote-account-disable`, AC #2 — "any API write
 is attempted → rejected with `AUTH_DISABLED` (HTTP 403)".
 
-Probed on the running database as the `authenticated` role with a
-`profiles.disabled_at` set:
-
-| Write path                    | Result                                        |
-| ----------------------------- | --------------------------------------------- |
-| `profiles` update             | ✅ refused — `ACCOUNT_DISABLED`               |
-| `contacts` insert             | ❌ **succeeded**                              |
-| `location_shares` insert      | ❌ **succeeded**                              |
-| `wrong_number_reports` insert | ❌ **succeeded**                              |
-| direct `reports` insert       | ❌ **succeeded**                              |
-| direct `report_media` insert  | ❌ **succeeded**                              |
-| `finalize_capture` RPC        | ❌ **succeeded** — report + media rows landed |
-| `update_category` RPC         | ❌ **succeeded**                              |
-| `soft_delete_account` RPC     | ❌ **succeeded**                              |
-| `flag_report` RPC             | ✅ refused (report not found, unrelated)      |
-
-**Why it matters:** the Edge Function refuses a disabled caller
+**The defect.** The Edge Function refused a disabled caller
 (`_shared/auth.ts` → `authenticateCaller` → `AUTH_DISABLED` → 403), but the
-**database is the real boundary**. Direct PostgREST writes bypass it. The
-`profiles` guard is the only table that checks `disabled_at`.
+**database is the real boundary**. A client holding a valid citizen JWT talks
+to PostgREST directly, and PostgREST applies the RLS policies and nothing
+else. The `profiles` guard was the only table that checked `disabled_at`, so
+every other write path stayed open:
 
-**Fix shape:**
+| Write path | Before | After |
+|---|---|---|
+| `profiles` update | ✅ refused | ✅ refused |
+| `contacts` insert / update / delete | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
+| `location_shares` insert | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
+| `wrong_number_reports` insert | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
+| direct `reports` insert | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
+| direct `report_media` insert | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
+| Storage `report_media_insert_own` | ❌ succeeded | ✅ refused |
+| `finalize_capture` RPC | ❌ succeeded — report + media rows landed | ✅ `ACCOUNT_DISABLED` |
+| `update_category` RPC | ❌ succeeded | ✅ `ACCOUNT_DISABLED` |
 
-1. Add `public.account_is_disabled(uuid)` (SECURITY DEFINER, reads `profiles.disabled_at`).
-2. Add the check to the write policies: `contacts`, `location_shares`,
-   `wrong_number_reports`, `reports`, `report_media`, and the Storage insert
-   policy `report_media_insert_own`.
-3. Add the check at the top of `finalize_capture`, `update_category`,
-   `soft_delete_account`, `restore_account`.
-4. Raise `ACCOUNT_DISABLED` with `errcode = '42501'` — `mapDatabaseError` in
-   `supabase/functions/_shared/http.ts` already maps it to `AUTH_DISABLED` → 403.
-5. Add regression tests to `supabase/tests/write_guards.sql` (defect F).
+**The fix** — `supabase/migrations/20261105000019_disabled_account_write_guard.sql`:
 
-> Migrations are **forward-only**. Add a new file
-> `supabase/migrations/20261105000019_*.sql` — never edit an applied migration.
+1. `public.account_is_disabled(uuid)` — SECURITY DEFINER, STABLE, reads
+   `profiles.disabled_at`.
+2. `public.caller_is_client()` — the `role` GUC discriminator, the same one
+   `profiles_update_guard` already uses, because it is the only role signal
+   that survives a SECURITY DEFINER hop. `anon` and `authenticated` are
+   clients; everything else is the server.
+3. `public.assert_account_not_disabled(uuid)` — the guard itself. Raises
+   `ACCOUNT_DISABLED` with `errcode = '42501'`, which `mapDatabaseError` in
+   `supabase/functions/_shared/http.ts` already maps to `AUTH_DISABLED` → 403.
+   The server is never refused, so `disable_user` and the PII purge still
+   work against a disabled row.
+4. The guard is applied to the client write policies (`contacts`,
+   `location_shares`, `wrong_number_reports`, `reports`, `report_media`,
+   `flags`, and the Storage insert policy) **and** to the SECURITY DEFINER
+   RPCs (`finalize_capture`, `update_category`). The RPCs needed their own
+   check: they run with the owner's privileges, so the policies do not apply
+   to the writes they perform.
+5. `soft_delete_account` and `restore_account` were deliberately **not**
+   guarded — a disabled user must still be able to ask for their own data to
+   be deleted, and to recover an account they deleted. Guarding them would
+   make the disable a permanent imprisonment with no exit.
 
-### 🟡 B2 — The nightly build references a flow that does not exist
+**The verification** — three layers:
 
-`.github/workflows/build.yml` runs `maestro/panic-path.yaml`. There is no
-`maestro/` directory. `docs/operations/runbook.md` names the same flow in
-stage 2 and in the CI-gates section.
+- `supabase/tests/write_guards.sql` Test G1–G31 — 31 new SQL assertions.
+- `tools/probe-disabled-write.cjs` (`pnpm guard:check`) — 8 checks over the
+  **real PostgREST path**, which is the door the Edge Function does not own.
+- A causal check: with the guard neutered the writes succeed again, so the
+  guard is precisely what closes the hole.
 
-**Fix:** create `maestro/panic-path.yaml` (the help grid → dialer → capture
-subset), or amend the workflow + runbook to match reality.
+> Migrations are **forward-only**. This was a new file —
+> `20261105000019_disabled_account_write_guard.sql`. Never edit an applied
+> migration.
 
-### 🟡 B3 — Stray scratch files at the repo root
+### ✅ B2 — The nightly build references a flow that does not exist — FIXED
 
-These would be committed: `debug.log`, `final.txt`, `s.txt`, `sm.txt`,
-`smoke-out.txt`, `smoke2.txt`, `tool-check.txt`, `tmp-check-i18n.mjs`,
-`tmp-cp.txt`, `v1.txt`–`v4.txt`, `w1.txt`–`w2.txt`, `tools-install-specsmd.cjs`,
-`specsmd-0.1.74.tgz`.
+`.github/workflows/build.yml` ran `maestro/panic-path.yaml` and there was no
+`maestro/` directory.
 
-Also in `tools/`: `.probe-rpc.cjs`, `.probe-finalize.cjs`,
-`probe-signup-path.cjs`, `probe-server-side-write.cjs`, `inspect-schema.cjs`,
-`inspect-function-acl.cjs` — one-off probes, not part of the harness.
+**The fix:** `maestro/panic-path.yaml` now exists — the help grid → Help
+Alert → the OS dialer → Capture subset. It signs in, asserts the four
+emergency tiles and their numbers (Police 999, Medical 999, Fire **102**),
+asserts the More Help sheet, confirms the OS dialer opens, and asserts the
+capture screen's controls.
 
-`.gitignore` covers `*.log` and `*.tgz` but none of the rest.
+It **does not place a call** and **does not submit a report**, so a smoke
+run leaves no test data behind. Every text selector matches both Bengali and
+English, because the app falls back to Bengali (`DEFAULT_LOCALE`) when the
+device locale is neither.
 
-**Fix:** delete them, or add ignore rules. `tools/generate-bolt-plan.cjs`,
-`extract-stories.cjs`, `extract-screens.cjs`, `extract-design-tokens.cjs`,
-`dump-screen.cjs`, `dump-lines.cjs` are the specsmd toolchain — **keep**.
+`tools/check-maestro-flow.cjs` (`pnpm maestro:check`) validates the flow
+without an emulator: the YAML parses, every command is a real Maestro
+command, the `appId` matches the EAS package, every `id:` selector refers to
+a `testID` that exists in the app, and every Bengali selector is a string
+that exists in `bn.ts`. A typo fails CI in seconds instead of the nightly
+build after a full APK build.
+
+### ✅ B3 — Stray scratch files at the repo root — FIXED
+
+The scratch files were deleted before the baseline commit, so they never
+entered history. `.gitignore` now also covers `tmp-*`, `*.tmp`, `scratch/`,
+`supabase/.temp/` and `apps/mobile/.expo-export-test/`.
+
+`tools/probe-server-side-write.cjs` was **kept** — `schema_contract.sql` and
+migration 011 cite it as the record of the defect it guards against. The
+other one-off probes were deleted.
+
+`tools/generate-bolt-plan.cjs`, `extract-stories.cjs`, `extract-screens.cjs`,
+`extract-design-tokens.cjs`, `dump-screen.cjs`, `dump-lines.cjs` are the
+specsmd toolchain — **kept**.
 
 ### 🟡 B4 — `eas.json` still carries placeholders
 
@@ -147,86 +183,88 @@ Ordered by dependency. Bolt numbers in brackets.
 
 ### 4.1 Identity — unit `002-identity`
 
-| #   | Gap                                                                                                                                                                                                                | Where                                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| I1  | **Disable check on session resume.** `useAuthSession` never reads `disabled_at`; no disable screen exists. `AUTH_DISABLED` is mapped in i18n but never surfaced.                                                   | `src/shared/auth/useAuthSession.ts`, new screen in `app/(auth)/` |
-| I2  | **Biometric gate.** `expo-local-authentication` is a dependency but imported nowhere; `record_biometric_attempt` RPC has no caller; failure accounting never runs.                                                 | [005]                                                            |
-| I3  | **Account deletion + recovery.** `soft_delete_account` / `restore_account` exist; the Settings "Delete account" row has no `onPress`.                                                                              | [006] story 007                                                  |
-| I4  | **Alternate-phone step bypassed.** `phone.tsx` routes straight to `register`; `alternate-phone.tsx` is unreachable. **Q-1 in the inception log is stale** — `profiles.alternate_phone` _does_ exist in the schema. | [004] story 001                                                  |
-| I5  | `verify-otp` and `reset-password` are declared in the auth `_layout.tsx` but have **no file**.                                                                                                                     | [005]                                                            |
+| # | Gap | Where |
+|---|---|---|
+| I1 | **Disable check on session resume.** `useAuthSession` never reads `disabled_at`; no disable screen exists. `AUTH_DISABLED` is mapped in i18n but never surfaced. | `src/shared/auth/useAuthSession.ts`, new screen in `app/(auth)/` |
+| I2 | **Biometric gate.** `expo-local-authentication` is a dependency but imported nowhere; `record_biometric_attempt` RPC has no caller; failure accounting never runs. | [005] |
+| I3 | **Account deletion + recovery.** `soft_delete_account` / `restore_account` exist; the Settings "Delete account" row has no `onPress`. | [006] story 007 |
+| I4 | **Alternate-phone step bypassed.** `phone.tsx` routes straight to `register`; `alternate-phone.tsx` is unreachable. **Q-1 in the inception log is stale** — `profiles.alternate_phone` *does* exist in the schema. | [004] story 001 |
+| I5 | `verify-otp` and `reset-password` are declared in the auth `_layout.tsx` but have **no file**. | [005] |
 
 ### 4.2 Contacts — unit `002-identity`
 
-| #   | Gap                                                                                                                          | Where           |
-| --- | ---------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| C1  | **Contacts CRUD.** `contacts.tsx` FAB has no `onPress`; `src/shared/api/contacts.ts` is read-only (no insert/update/delete). | [006] story 006 |
+| # | Gap | Where |
+|---|---|---|
+| C1 | **Contacts CRUD.** `contacts.tsx` FAB has no `onPress`; `src/shared/api/contacts.ts` is read-only (no insert/update/delete). | [006] story 006 |
 
 ### 4.3 Help-seek — unit `003-help-seek`
 
-| #   | Gap                                                                        | Where           |
-| --- | -------------------------------------------------------------------------- | --------------- |
-| H1  | `more-help.tsx` — placeholder route.                                       | [009] story 005 |
-| H2  | `station-map.tsx` — placeholder route (needs the shared MapLibre wrapper). | [010] story 007 |
+| # | Gap | Where |
+|---|---|---|
+| H1 | `more-help.tsx` — placeholder route. | [009] story 005 |
+| H2 | `station-map.tsx` — placeholder route (needs the shared MapLibre wrapper). | [010] story 007 |
 
 ### 4.4 Capture — unit `004-capture`
 
-| #   | Gap                                                                                                                                                     | Where           |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| P1  | **Report detail + category edit.** `update_category` RPC has no caller; `reportDetailTitle` / `editCategory` / `categoryReadOnly` i18n keys are unused. | [013] story 003 |
-| P2  | **Offline queue never drains.** `dueItems` / `markAttemptFailed` / `removeFromQueue` exist but nothing retries — a queued report never sends.           | [014] story 005 |
-| P3  | Capture permission degradation (camera denied → degrade).                                                                                               | [014] story 006 |
+| # | Gap | Where |
+|---|---|---|
+| P1 | **Report detail + category edit.** `update_category` RPC has no caller; `reportDetailTitle` / `editCategory` / `categoryReadOnly` i18n keys are unused. | [013] story 003 |
+| P2 | **Offline queue never drains.** `dueItems` / `markAttemptFailed` / `removeFromQueue` exist but nothing retries — a queued report never sends. | [014] story 005 |
+| P3 | Capture permission degradation (camera denied → degrade). | [014] story 006 |
 
 ### 4.5 Location — unit `005-location`
 
-| #   | Gap                                                                                                                             | Where           |
-| --- | ------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| L1  | **Location sharing writes nothing.** The CTA is `router.back()`; no `location_shares` row, no OS share sheet, no telemetry row. | [015–017]       |
-| L2  | The location fix is hard-coded to `null` — `useCurrentFix` exists but the screen does not use it.                               | [017] story 005 |
+| # | Gap | Where |
+|---|---|---|
+| L1 | **Location sharing writes nothing.** The CTA is `router.back()`; no `location_shares` row, no OS share sheet, no telemetry row. | [015–017] |
+| L2 | The location fix is hard-coded to `null` — `useCurrentFix` exists but the screen does not use it. | [017] story 005 |
 
 ### 4.6 Alerts — unit `006-alerts`
 
-| #   | Gap                                                                                           | Where           |
-| --- | --------------------------------------------------------------------------------------------- | --------------- |
-| A1  | `history.tsx` — placeholder route.                                                            | [020] story 006 |
-| A2  | `alert-detail.tsx` — placeholder route (public alert detail, distinct from the author's own). | [021] story 009 |
-| A3  | History filters, history map, author-auto-hide.                                               | [020–021]       |
+| # | Gap | Where |
+|---|---|---|
+| A1 | `history.tsx` — placeholder route. | [020] story 006 |
+| A2 | `alert-detail.tsx` — placeholder route (public alert detail, distinct from the author's own). | [021] story 009 |
+| A3 | History filters, history map, author-auto-hide. | [020–021] |
 
 ### 4.7 Moderation — unit `007-moderation`
 
-| #   | Gap                           | Where           |
-| --- | ----------------------------- | --------------- |
-| M1  | Author-auto-hide queue group. | [024] story 005 |
+| # | Gap | Where |
+|---|---|---|
+| M1 | Author-auto-hide queue group. | [024] story 005 |
 
 > The admin console's queue, report detail, restore/remove decision, disable-user
 > and audit log are **all built and working**. Only the auto-hide group is missing.
 
 ---
 
-## 5. Release plumbing — not started
+## 5. Release plumbing
 
-| #   | Gap                                                                                                                        | Note                                                                                                                         |
-| --- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| R1  | **No git repository.** `git rev-parse` → _not a git repository_. No `.git` anywhere up the tree, no remote.                | `git init` + `git remote add origin <url>` + a baseline commit. **Do this before more work** — there is no safety net today. |
-| R2  | Maestro flow `maestro/panic-path.yaml` missing.                                                                            | See B2                                                                                                                       |
-| R3  | Scratch files at the root.                                                                                                 | See B3                                                                                                                       |
-| R4  | `eas.json` placeholders.                                                                                                   | See B4                                                                                                                       |
-| R5  | `apps/mobile` and `apps/admin` have `.env.example` but **no `.env`** (gitignored). `supabase/functions/.env.local` exists. | A fresh clone needs the local env files created from the examples.                                                           |
+| # | Gap | Note |
+|---|---|---|
+| R1 | **No git repository.** | ✅ **DONE** — `git init` on `main`, a baseline commit of the verified tree, `.gitattributes` for LF normalization. **Still no remote**: `git remote add origin <url>` before the first push. |
+| R2 | Maestro flow `maestro/panic-path.yaml` missing. | ✅ **DONE** — see B2 |
+| R3 | Scratch files at the root. | ✅ **DONE** — see B3 |
+| R4 | `eas.json` placeholders. | See B4 |
+| R5 | `apps/mobile` and `apps/admin` have `.env.example` but **no `.env`** (gitignored). `supabase/functions/.env.local` exists. | A fresh clone needs the local env files created from the examples. |
 
 ---
 
 ## 6. Suggested order of work
 
-1. **R1** — `git init` + baseline commit. Five minutes, removes all risk.
-2. **B1** — the disabled-write bypass, plus regression tests in `write_guards.sql`.
-   This is the only true security defect.
-3. **B3** — delete / ignore the scratch files (do it before the baseline commit
-   so they are never in history).
-4. **I1 → I2 → I4 → I5 → I3 → C1** — unit `002-identity` in full.
-5. **P1 → P2 → P3** — unit `004-capture`.
-6. **L1 → L2** — unit `005-location`.
-7. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
-8. **B2, B4, R5** — release readiness.
-9. Final `pnpm verify` → **one** commit → push.
+1. ~~**R1** — `git init` + baseline commit.~~ ✅ **DONE**
+2. ~~**B1** — the disabled-write bypass, plus regression tests.~~ ✅ **DONE**
+3. ~~**B3** — delete / ignore the scratch files.~~ ✅ **DONE**
+4. ~~**B2** — the Maestro panic-path flow.~~ ✅ **DONE**
+5. **I1 → I2 → I4 → I5 → I3 → C1** — unit `002-identity` in full.
+   I1 (the disable check on session resume) now has a **database-side** guard
+   behind it, so the mobile screen that surfaces `AUTH_DISABLED` is the last
+   piece of the story.
+6. **P1 → P2 → P3** — unit `004-capture`.
+7. **L1 → L2** — unit `005-location`.
+8. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
+9. **B4, R5, and the git remote** — release readiness.
+10. Final `pnpm verify` → **one** commit → push.
 
 ---
 
@@ -269,12 +307,14 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              i18n/ (bn.ts, en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         19 forward-only migrations
-supabase/tests/              4 SQL suites (133 assertions)
+supabase/migrations/         20 forward-only migrations
+supabase/tests/              4 SQL suites (163 assertions)
 supabase/functions/          7 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
-                             purge-media-dry-run
+                             purge-media-dry-run, check-maestro-flow,
+                             probe-disabled-write
+maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md
 memory-bank/                 intents/, bolts/, standards/, story-index.md
@@ -318,11 +358,11 @@ Dev accounts: `mod@nagar.local` / `citizen@nagar.local`, password
 
 ## 10. Open decisions still unanswered
 
-| #   | Question                                                                                                                                     | Impact |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Q-1 | ~~`profiles.alternate_phone`~~ — **resolved**: the column exists. The remaining choice is whether the wizard step persists it or is dropped. | low    |
-| Q-2 | FR-PERMS-3 battery-saver detection has no first-class Expo API — ship a native module, or downgrade to best-effort?                          | medium |
-| Q-3 | More Help: three categories (FR-SEEK-1) vs six flat rows (prototype). Currently 1:1 to the prototype.                                        | low    |
-| Q-4 | Video copy says 30 s (PRD-X-4) vs the prototype's 60 s. PRD wins by default.                                                                 | low    |
-| Q-5 | Screen 20's dispatch-style failover copy — the 2026-10-12 override forbids it. Brief corrects the copy.                                      | low    |
-| Q-6 | A distinct **public** alert-detail screen is required (not the author's own report detail).                                                  | low    |
+| # | Question | Impact |
+|---|---|---|
+| Q-1 | ~~`profiles.alternate_phone`~~ — **resolved**: the column exists. The remaining choice is whether the wizard step persists it or is dropped. | low |
+| Q-2 | FR-PERMS-3 battery-saver detection has no first-class Expo API — ship a native module, or downgrade to best-effort? | medium |
+| Q-3 | More Help: three categories (FR-SEEK-1) vs six flat rows (prototype). Currently 1:1 to the prototype. | low |
+| Q-4 | Video copy says 30 s (PRD-X-4) vs the prototype's 60 s. PRD wins by default. | low |
+| Q-5 | Screen 20's dispatch-style failover copy — the 2026-10-12 override forbids it. Brief corrects the copy. | low |
+| Q-6 | A distinct **public** alert-detail screen is required (not the author's own report detail). | low |
