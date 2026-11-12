@@ -1,0 +1,50 @@
+{
+  "name": "nagar-shield",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nagar Shield — Bangladesh citizen safety app. MVP Phase 1.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\"",
+    "db:reset": "supabase db reset --local",
+    "db:test": "node tools/run-sql-tests.cjs",
+    "db:smoke": "node tools/smoke-rpc.cjs",
+    "fn:serve": "supabase functions serve --env-file supabase/functions/.env.local --no-verify-jwt",
+    "fn:smoke": "node tools/smoke-functions.cjs",
+    "fn:typecheck": "deno check --config supabase/functions/deno.json supabase/functions/purge-media/index.ts supabase/functions/purge-deleted-accounts/index.ts supabase/functions/cleanup-geocode-cache/index.ts supabase/functions/keep-project-awake/index.ts supabase/functions/moderation-decide/index.ts supabase/functions/disable-user/index.ts supabase/functions/finalize-capture/index.ts",
+    "data:check": "node tools/mirror-reference-data.cjs --check",
+    "data:write-seed": "node tools/mirror-reference-data.cjs --write-seed",
+    "shared:check": "node tools/mirror-shared-to-functions.cjs --check",
+    "shared:mirror": "node tools/mirror-shared-to-functions.cjs",
+    "secret:scan": "node tools/secret-scan.cjs",
+    "release:verify": "node tools/release-verify.cjs",
+    "purge:dry-run": "node tools/purge-media-dry-run.cjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm fn:typecheck",
+    "mobile": "pnpm --filter @nagar-shield/mobile",
+    "admin": "pnpm --filter @nagar-shield/admin",
+    "shared": "pnpm --filter @nagar-shield/shared"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "fs-extra": "^11.4.1",
+    "js-yaml": "^5.5.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "workspaces": [
+    "apps/mobile",
+    "apps/admin",
+    "packages/shared"
+  ]
+}

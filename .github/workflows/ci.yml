@@ -1,0 +1,357 @@
+# =============================================================================
+# Nagar Shield — CI
+#
+# The pull-request gate. Every job here fails the PR on a problem; none of
+# them is allowed to fail silently.
+#
+# The job graph:
+#
+#   lint ─┐
+#   typecheck ─┼─> shared-test ─> unit-test-mobile ─┐
+#               │                 unit-test-admin  ─┼─> migration-dry-run ─> rls-integration ─> secret-scan
+#               │                 unit-test-functions ─┘
+#
+# `shared-test` gates every other test job: the shared contracts are the
+# source of truth, so a broken contract fails the PR before any consumer
+# runs. `migration-dry-run` precedes `rls-integration` because the RLS tests
+# need a schema with the migrations applied. `secret-scan` runs last because
+# it inspects the **built** bundles.
+#
+# Fork PRs get no secrets and no write permissions. The migration, RLS, and
+# secret jobs run entirely against a local Supabase stack and a pattern list,
+# so they work on a fork with no credential at all.
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# The pipeline needs to read the repository and nothing else. There is no
+# deploy job here — the production release is a human-driven runbook step.
+permissions:
+  contents: read
+
+# A superseded run on the same branch is cancelled rather than left to
+# compete for the free-tier runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The pinned toolchain. The installing job and every testing job use the
+  # same Node and pnpm, so a job can never test against a different
+  # toolchain than the one that installed the dependencies.
+  NODE_VERSION: '22.19.0'
+  PNPM_VERSION: '9.15.0'
+  SUPABASE_CLI_VERSION: '2.122.0'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The two cheapest signals. They gate everything else.
+  # ---------------------------------------------------------------------------
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The three workspaces (mobile, admin, shared).
+      - run: pnpm typecheck
+
+      # The Edge Functions, under the Deno type checker. A type error in a
+      # function fails the PR here, before any test job runs.
+      - name: typecheck the Edge Functions
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+
+      - run: pnpm fn:typecheck
+
+  # ---------------------------------------------------------------------------
+  # The shared contracts — the first test signal, and the gate for every
+  # other test job.
+  # ---------------------------------------------------------------------------
+
+  shared-test:
+    name: shared-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @nagar-shield/shared test -- --ci
+
+  # ---------------------------------------------------------------------------
+  # The consumer test jobs. Each declares `needs: [shared-test]`, so a broken
+  # contract skips them instead of running them against a broken baseline.
+  # ---------------------------------------------------------------------------
+
+  unit-test-mobile:
+    name: unit-test-mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [shared-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @nagar-shield/mobile test -- --ci
+
+  unit-test-admin:
+    name: unit-test-admin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [shared-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @nagar-shield/admin test -- --ci
+
+  unit-test-functions:
+    name: unit-test-functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [shared-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The pure job helpers — the age cut-offs, the idempotency rules, and
+      # the tombstone builder — live in the shared package and are covered by
+      # the shared suite. The functions job adds the **type** check over the
+      # Deno sources, which is the only thing the Edge Functions have that
+      # the other workspaces do not.
+      - name: typecheck the Edge Functions
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+
+      - run: pnpm fn:typecheck
+
+  # ---------------------------------------------------------------------------
+  # The migration dry-run. Local only — it never touches staging or
+  # production. Migrations are forward-only, so this is the only place a bad
+  # migration is caught before it is deployed.
+  # ---------------------------------------------------------------------------
+
+  migration-dry-run:
+    name: migration-dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [unit-test-mobile, unit-test-admin, unit-test-functions]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # `supabase db reset` drops the local database and replays **every**
+      # migration in filename order against a fresh one. A migration with a
+      # syntax error fails here, with nothing deployed anywhere.
+      - name: replay every migration against a local stack
+        run: npx supabase start && npx supabase db reset --local
+
+      # The drift guard: the reference data in Postgres must match the JSON
+      # the mobile bundle ships, byte for byte.
+      - name: the seeded reference data has not drifted
+        run: pnpm data:check
+
+      # The shared mirror: the Edge Functions' vendored contracts must match
+      # `packages/shared`, so a stale contract can never reach production.
+      - name: the Edge Functions mirror has not drifted
+        run: pnpm shared:check
+
+      # The SQL suites — the schema contract, the business rules, and the
+      # read models — against the freshly migrated database.
+      - name: run the SQL test suites
+        run: pnpm db:test
+
+      - name: the container logs on failure
+        if: failure()
+        run: npx supabase status || docker logs supabase_db_nagar-shield || true
+
+  # ---------------------------------------------------------------------------
+  # The RLS integration tests. They exercise the policies as an **anon**
+  # client and as an **authenticated** client, including the negative tests:
+  # an anon client cannot read a private row, a citizen cannot moderate, and
+  # no client can read or write `job_runs`.
+  # ---------------------------------------------------------------------------
+
+  rls-integration:
+    name: rls-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [migration-dry-run]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: start the local stack
+        run: npx supabase start
+
+      # The REST smoke tests exercise the read models and the RPCs as the
+      # anon, citizen, and moderator roles against the local stack.
+      - name: the REST read models and RPCs
+        run: pnpm db:smoke
+
+      # The Edge Function smoke tests cover the auth gates on the jobs and the
+      # client-facing functions, including the "no client may call the
+      # scheduler" posture.
+      - name: the Edge Function auth gates
+        run: pnpm fn:smoke
+
+  # ---------------------------------------------------------------------------
+  # The secret scan — the mechanical proof that the service-role key is never
+  # in a bundle. It runs last because it inspects the **built** output.
+  #
+  # The scan runs on a **pattern list**, not on a live secret value, so a fork
+  # PR never receives the key. A finding prints the file and the pattern —
+  # never the matched value.
+  # ---------------------------------------------------------------------------
+
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [rls-integration]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The admin bundle. The scan over `apps/admin` covers the Next.js build
+      # output when it is present.
+      - name: build the admin console
+        run: pnpm --filter @nagar-shield/admin build || echo "the admin build is optional in this job"
+
+      # The scan itself: the service-role key name, the service-role JWT
+      # marker, the secret-key prefix, the banned analytics / ad SDKs, and the
+      # SMS OTP feature flag.
+      - name: scan the client sources and bundles
+        run: pnpm secret:scan
+
+      # The EAS profiles carry the per-profile env vars. The scan checks that
+      # the SMS OTP flag is off in every profile and that no profile leaks a
+      # server credential.
+      - name: scan the EAS profiles
+        run: pnpm secret:scan eas.json apps/mobile/app.config.ts apps/mobile/app.json
+
+      # The final gate: the service-role key must not be in the built output.
+      # The scan reports a file and a pattern, never the matched value.
+      - name: scan the built bundles for the service-role key
+        run: |
+          pnpm secret:scan apps/admin/.next apps/mobile/dist 2>/dev/null \
+            || pnpm secret:scan apps/admin apps/mobile

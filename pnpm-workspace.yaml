@@ -1,0 +1,4 @@
+packages:
+  - 'apps/mobile'
+  - 'apps/admin'
+  - 'packages/shared'

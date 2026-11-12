@@ -1,0 +1,64 @@
+<div class="screen" data-screen="12" data-name="Registration">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar app-bar-no-border" style="background:white;">
+          <button class="back-btn" data-nav="11">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="brand-display-tag" style="font-weight:700; color:var(--purple-700);">Nagar Shield</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content auth-screen" style="padding-top:0;">
+          <div class="auth-hero" style="margin-top:24px;">
+            <h1>আপনার অ্যাকাউন্ট তৈরি করুন</h1>
+            <p>একসাথে শহরকে নিরাপদ করি</p>
+          </div>
+          <div class="input-group">
+            <div class="input-field"><input type="text" placeholder=" "><label class="input-label">পূর্ণ নাম</label></div>
+            <div class="input-helper">আপনার আসল নাম ব্যবহার করুন</div>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="email" placeholder=" ">
+              <span class="leading-icon material-symbols-outlined">mail</span>
+              <label class="input-label">ইমেইল (প্রয়োজন)</label>
+            </div>
+            <div class="input-helper">OTP ডিফল্টভাবে ইমেইলে যাবে — বিনামূল্যে</div>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="tel" placeholder=" ">
+              <span class="leading-icon material-symbols-outlined">phone</span>
+              <label class="input-label">ফোন (প্রয়োজন)</label>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--ink-600);">
+              <div class="custom-checkbox" onclick="this.classList.toggle('checked')"></div>
+              <span>SMS-এও OTP পাঠান (ঐচ্ছিক, অপারেটর চার্জ প্রযোজ্য)</span>
+            </label>
+          </div>
+          <button class="btn btn-secondary btn-lg mt-16" onclick="document.getElementById('reg-otp').style.display='block'; this.style.display='none';">
+            <span class="material-symbols-outlined">send</span>
+            OTP পাঠান
+          </button>
+          <div id="reg-otp" style="display:none; margin-top:16px;">
+            <div class="input-group">
+              <div class="input-field input-with-icon" style="position:relative;">
+                <input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder=" ">
+                <span class="leading-icon material-symbols-outlined">lock</span>
+                <label class="input-label">OTP কোড (৬ সংখ্যা)</label>
+              </div>
+              <div class="input-helper" style="color:var(--green-600);">✓ ইমেইলে কোড পাঠানো হয়েছে</div>
+            </div>
+            <button class="btn btn-primary btn-lg" data-nav="18">যাচাই করুন ও চালিয়ে যান</button>
+          </div>
+          <div class="text-center mt-16" style="font-size:12px; color:var(--ink-500);">
+            অ্যাকাউন্ট তৈরি করার মাধ্যমে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন
+          </div>
+        </div>
+      </div>

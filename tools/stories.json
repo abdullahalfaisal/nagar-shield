@@ -1,0 +1,524 @@
+﻿{
+  "001-foundation": {
+    "stories": [
+      {
+        "id": "US-FND-01",
+        "title": "Monorepo workspace and TypeScript configuration",
+        "priority": "Must"
+      },
+      {
+        "id": "US-FND-02",
+        "title": "Shared contracts package (types, Zod schemas, error codes)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-FND-03",
+        "title": "Mobile design system (theme tokens + shared UI primitives)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-FND-04",
+        "title": "Mobile app shell (Expo Router groups, i18n, Supabase client)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-FND-05",
+        "title": "Admin app skeleton and CI pipeline",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-001-foundation-1",
+        "type": "simple",
+        "stories": "US-FND-01, US-FND-02",
+        "objective": "Workspace + shared contracts"
+      },
+      {
+        "bolt": "bolt-001-foundation-2",
+        "type": "simple",
+        "stories": "US-FND-03, US-FND-04",
+        "objective": "Design system + app shell"
+      },
+      {
+        "bolt": "bolt-001-foundation-3",
+        "type": "simple",
+        "stories": "US-FND-05",
+        "objective": "Admin skeleton + CI"
+      }
+    ]
+  },
+  "002-identity": {
+    "stories": [
+      {
+        "id": "US-AUTH-01",
+        "title": "Signup with email + phone (email-primary Auth user, one profile row)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-02",
+        "title": "Dual-identifier login (phone or email) + 30-day Remember me",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-03",
+        "title": "Password reset by email OTP (10-minute OTP, 3 attempts, 30-minute cooldown)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-04",
+        "title": "Biometric re-auth gate with 3-fail / 5-in-24h failure handling",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-05",
+        "title": "Remote account disable handled in-app (`AUTH_DISABLED` on writes)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-06",
+        "title": "Emergency contacts CRUD (onboarding capture + owner-scoped CRUD)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-AUTH-07",
+        "title": "Account deletion with a 30-day recovery window and restore",
+        "priority": "Should"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-002-identity-1",
+        "type": "ddd",
+        "stories": "US-AUTH-01, US-AUTH-02",
+        "objective": "`0001_identity.sql` (`profiles`, `emergency_contacts`, RLS, `resolve_login_identifier`, provisioning trigger) + Supabase Auth wiring (signup, identifier resolution, password sign-in, Remember me session)"
+      },
+      {
+        "bolt": "bolt-002-identity-2",
+        "type": "simple",
+        "stories": "US-AUTH-01, US-AUTH-03, US-AUTH-04",
+        "objective": "Mobile auth surfaces: onboarding wizard (S-00 ΓÇª S-06), Login, Registration, Forgot Password, email-OTP flow, biometric lock gate with failure accounting"
+      },
+      {
+        "bolt": "bolt-002-identity-3",
+        "type": "simple",
+        "stories": "US-AUTH-05, US-AUTH-06, US-AUTH-07",
+        "objective": "Account lifecycle: disabled-account gate (`AUTH_DISABLED`), Settings ΓåÆ account section (profile/identity edit, biometric toggle), emergency-contact CRUD, account deletion + 30-day restore"
+      }
+    ]
+  },
+  "003-help-seek": {
+    "stories": [
+      {
+        "id": "US-HELP-01",
+        "title": "Home surface + Help Alert panic grid + dialer confirmation (Police / Medical / Fire)",
+        "priority": "Must"
+      },
+      {
+        "id": "US-HELP-02",
+        "title": "Personal Emergency contact picker sheet",
+        "priority": "Must"
+      },
+      {
+        "id": "US-HELP-03",
+        "title": "Offline-capable bundled station / hotline dataset",
+        "priority": "Must"
+      },
+      {
+        "id": "US-HELP-04",
+        "title": "Graceful degradation ΓÇö location denied ΓåÆ manual dial guidance; battery saver ΓåÆ warning",
+        "priority": "Must"
+      },
+      {
+        "id": "US-SEEK-01",
+        "title": "More Help sheet + curated hotline list",
+        "priority": "Must"
+      },
+      {
+        "id": "US-SEEK-02",
+        "title": "Thana line with 10 km ΓåÆ `999` fallback",
+        "priority": "Must"
+      },
+      {
+        "id": "US-SEEK-03",
+        "title": "Find-a-station map (MapLibre + OSM)",
+        "priority": "Should"
+      },
+      {
+        "id": "US-SEEK-04",
+        "title": "Wrong-number report flow",
+        "priority": "Should"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-003-help-seek-1",
+        "type": "ddd",
+        "stories": "US-HELP-03, US-SEEK-02",
+        "objective": "`0002_help_seek.sql` (`stations`, `hotlines`, `wrong_number_reports`, RLS, geography + GiST index, `nearest_thana` RPC) + curated JSON + seed + mirror/refresh script"
+      },
+      {
+        "bolt": "bolt-003-help-seek-2",
+        "type": "simple",
+        "stories": "US-HELP-01",
+        "objective": "`openDialer` + `confirmDial` + `helpAlertTap` helper, the Home layout composition and Help Alert block, the Help Alert screen (18), the More Options hub (15)"
+      },
+      {
+        "bolt": "bolt-003-help-seek-3",
+        "type": "simple",
+        "stories": "US-SEEK-01, US-SEEK-03, US-SEEK-04",
+        "objective": "More Help bottom sheet + hotline list, Thana line with the 10 km fallback, Find-a-station map (MapLibre + OSM), wrong-number report sheet"
+      },
+      {
+        "bolt": "bolt-003-help-seek-4",
+        "type": "simple",
+        "stories": "US-HELP-02, US-HELP-04",
+        "objective": "Personal Emergency picker sheet (25 s user-armed affordance), Emergency Contacts screen (20), graceful degradation (location denied ΓåÆ manual dial guidance; battery saver ΓåÆ warning)"
+      }
+    ]
+  },
+  "004-capture": {
+    "stories": [
+      {
+        "id": "US-CAPTURE-01",
+        "title": "Capture screen ΓÇö media entry points, anonymous toggle, description counter, location card, sticky CTA",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-02",
+        "title": "Area hierarchy extraction ΓÇö Dhaka-local table first, online backup, never blocks the submit",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-03",
+        "title": "Report detail + author-only category edit from History",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-04",
+        "title": "EXIF strip + media caps (1080p / 30 s / 10 MB) before upload",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-05",
+        "title": "Offline upload queue with exponential backoff and \"saved on device\"",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-06",
+        "title": "Permission degradation ΓÇö camera / mic entry points hidden when denied",
+        "priority": "Must"
+      },
+      {
+        "id": "US-CAPTURE-07",
+        "title": "Storage upload + `finalize_capture` round trip",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-004-capture-1",
+        "type": "ddd",
+        "stories": "US-CAPTURE-02, US-CAPTURE-03",
+        "objective": "`0003_capture.sql` (`reports`, `report_media`, `area_lookup`, `geocode_cache`, CHECK constraints, RLS, geography + GiST index, `update_category` RPC) + the curated `area-lookup.json` seed"
+      },
+      {
+        "bolt": "bolt-004-capture-2",
+        "type": "ddd",
+        "stories": "US-CAPTURE-07",
+        "objective": "`finalize_capture` Edge Function ΓÇö Zod validation, idempotency key, area resolution (local ΓåÆ cache ΓåÆ online ΓåÆ degrade), the `reports` + `report_media` insert, the per-user capture cap, the private Storage bucket + signed-path storage policies"
+      },
+      {
+        "bolt": "bolt-004-capture-3",
+        "type": "simple",
+        "stories": "US-CAPTURE-01, US-CAPTURE-06",
+        "objective": "Mobile Capture screen (17) 1:1 ΓÇö `UploadCard`, the anonymous `Toggle`, the description textarea + `0 / 140` counter, the auto-detected `LocationCard`, the sticky **αª░αª┐αª¬αºïαª░αºìαªƒ αª¬αª╛αªáαª╛αª¿** CTA, and the permission-degradation behaviour"
+      },
+      {
+        "bolt": "bolt-004-capture-4",
+        "type": "simple",
+        "stories": "US-CAPTURE-04, US-CAPTURE-05",
+        "objective": "The media pipeline (`stripExif`, `compressImage`, `transcodeVideo`, `uploadToStorage`) and the offline queue (`enqueueUpload`, `drainUploadQueue`) with exponential backoff and the \"saved on device\" state"
+      },
+      {
+        "bolt": "bolt-004-capture-5",
+        "type": "simple",
+        "stories": "US-CAPTURE-03",
+        "objective": "Report detail surface + the author-only category edit, wired to the History entry point and the immediate-visibility guarantee"
+      }
+    ]
+  },
+  "005-location": {
+    "stories": [
+      {
+        "id": "US-LOC-01",
+        "title": "Location Sharing screen ΓÇö recipient selection and a single-contact snapshot to an app user",
+        "priority": "Must"
+      },
+      {
+        "id": "US-LOC-02",
+        "title": "OS share-sheet fallback for a recipient who is not a Nagar Shield user",
+        "priority": "Must"
+      },
+      {
+        "id": "US-LOC-03",
+        "title": "Share with all primary contacts ΓÇö one snapshot per primary",
+        "priority": "Must"
+      },
+      {
+        "id": "US-LOC-04",
+        "title": "Snapshot payload builder + `location_share_intent_ms` telemetry",
+        "priority": "Must"
+      },
+      {
+        "id": "US-LOC-05",
+        "title": "Permission degradation ΓÇö the screen still works when location is denied (manual coordinates / share without location)",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-005-location-1",
+        "type": "ddd",
+        "stories": "US-LOC-04",
+        "objective": "`0004_location.sql` (`location_shares`, the `mode` / `share_channel` CHECK constraints, the coordinate columns, the RLS policies, the `shared_at` index) + the `location_shares` write path"
+      },
+      {
+        "bolt": "bolt-005-location-2",
+        "type": "simple",
+        "stories": "US-LOC-01, US-LOC-03",
+        "objective": "Mobile Location Sharing screen (19) 1:1 ΓÇö the `map-preview` illustration block, the live `address-card`, the share-with-all `Toggle`, the contact rows with the avatar gradients and the `.custom-checkbox` selection, the sticky **αª╢αºçαª»αª╝αª╛αª░ αªòαª░αºüαª¿** CTA, and the recipient fan-out"
+      },
+      {
+        "bolt": "bolt-005-location-3",
+        "type": "simple",
+        "stories": "US-LOC-02",
+        "objective": "The OS share-sheet path (`fireOsShare` via `expo-sharing`), the `share_channel` classification, the optional `expo-clipboard` copy affordance, and the \"shared\" (never \"delivered\") confirmation"
+      },
+      {
+        "bolt": "bolt-005-location-4",
+        "type": "simple",
+        "stories": "US-LOC-04, US-LOC-05",
+        "objective": "The snapshot payload builder (`buildSnapshotPayload`), the just-in-time location permission + single fix, the `location_share_intent_ms` telemetry, and the permission-degradation path (manual coordinates / share without location)"
+      }
+    ]
+  },
+  "006-alerts": {
+    "stories": [
+      {
+        "id": "US-ALERTS-01",
+        "title": "Alerts feed list ΓÇö BD-wide, recency ordered, public projection",
+        "priority": "Must"
+      },
+      {
+        "id": "US-ALERTS-02",
+        "title": "Auto-refresh every 60 s + pull-to-refresh + battery pause",
+        "priority": "Must"
+      },
+      {
+        "id": "US-ALERTS-03",
+        "title": "Area filter chips",
+        "priority": "Must"
+      },
+      {
+        "id": "US-ALERTS-04",
+        "title": "Flag an alert ΓÇö reason enum, duplicate rejection, rate limit",
+        "priority": "Must"
+      },
+      {
+        "id": "US-ALERTS-05",
+        "title": "Author auto-hide at 5 flagged reports in 24 h",
+        "priority": "**Should**"
+      },
+      {
+        "id": "US-HIST-01",
+        "title": "History list ΓÇö 1 km / 24 h default, immediate visibility, < 2 s load",
+        "priority": "Must"
+      },
+      {
+        "id": "US-HIST-02",
+        "title": "History filters ΓÇö radius / window / category",
+        "priority": "Must"
+      },
+      {
+        "id": "US-HIST-03",
+        "title": "History map ΓÇö MapLibre + OSM, reusing the station-map wrapper",
+        "priority": "Must"
+      },
+      {
+        "id": "US-ALERTS-06",
+        "title": "Alert detail screen (the prototype's `data-nav=\"21a\"` target has no screen ΓÇö build it)",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-006-alerts-1",
+        "type": "ddd",
+        "stories": "US-ALERTS-01, US-ALERTS-03",
+        "objective": "`0005_alerts.sql` ΓÇö the `flags` table (CHECK on the 5-value reason, `UNIQUE (report_id, flagger_id)`, cascade FKs), the `flags (report_id)` and `flags (flagger_id, created_at)` indexes, the RLS policies, and the `alerts_feed` public-projection RPC with its cursor pagination"
+      },
+      {
+        "bolt": "bolt-006-alerts-2",
+        "type": "ddd",
+        "stories": "US-ALERTS-04, US-ALERTS-05",
+        "objective": "The `flag_report` Edge Function ΓÇö rate limit ΓåÆ insert ΓåÆ 3-flag threshold ΓåÆ 5-flag author auto-hide, in one transaction, with the `FLAG_RATE_LIMIT` / `CONFLICT` error envelope"
+      },
+      {
+        "bolt": "bolt-006-alerts-3",
+        "type": "ddd",
+        "stories": "US-HIST-01, US-HIST-02",
+        "objective": "The `history_nearby` RPC ΓÇö PostGIS `ST_DWithin` over the geography GiST index, the 1 km / 24 h defaults, the category filter, the author's own reports, and the cursor pagination"
+      },
+      {
+        "bolt": "bolt-006-alerts-4",
+        "type": "simple",
+        "stories": "US-ALERTS-01, US-ALERTS-02, US-ALERTS-03",
+        "objective": "The Home Alerts feed block 1:1 ΓÇö the auto-refresh header, the area chip row, the alert card (category accent, 40 dp icon tile, the area / category / description / time lines, the 48 dp flag button), plus `useAlertsFeed()`, `useAutoRefresh(60_000)`, `useBatteryGuard()`, and the pull-to-refresh gesture"
+      },
+      {
+        "bolt": "bolt-006-alerts-5",
+        "type": "simple",
+        "stories": "US-ALERTS-04, US-ALERTS-06",
+        "objective": "The flag bottom sheet (the 5 reason radios + the optional note + the submit / cancel + the success toast), the error mapping for `FLAG_RATE_LIMIT` / `CONFLICT`, and the **alert-detail surface** built from the card plus unit 004's report-detail pattern"
+      },
+      {
+        "bolt": "bolt-006-alerts-6",
+        "type": "simple",
+        "stories": "US-HIST-01, US-HIST-02, US-HIST-03",
+        "objective": "The History screen (21) 1:1 ΓÇö the location pill, the segmented tabs, the map link, the body copy, the list and its skeleton; the filter sheet (radius / window / category); the Distribution tab (22) as **counts in a list**; and the History map on unit 003's shared MapLibre wrapper"
+      }
+    ]
+  },
+  "007-moderation": {
+    "stories": [
+      {
+        "id": "US-MOD-01",
+        "title": "Moderator login + queue list ΓÇö sign in, land on the `hidden_pending_review` queue, paginate it",
+        "priority": "Must"
+      },
+      {
+        "id": "US-MOD-02",
+        "title": "Report review detail ΓÇö media preview, every flag reason, the uploader's identity",
+        "priority": "Must"
+      },
+      {
+        "id": "US-MOD-03",
+        "title": "Restore / remove decision with a required note ΓÇö one decision, one audit row, one status transition",
+        "priority": "Must"
+      },
+      {
+        "id": "US-MOD-04",
+        "title": "Disable a user ΓÇö search, disable with a reason, the account is locked out server-side",
+        "priority": "Must"
+      },
+      {
+        "id": "US-MOD-05",
+        "title": "Author-auto-hidden batch (the 5-flags-in-24 h case) surfaced in the queue with an explanatory badge",
+        "priority": "**Should**"
+      },
+      {
+        "id": "US-MOD-06",
+        "title": "Moderator action audit log ΓÇö the append-only `moderation_actions` history view",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-007-moderation-1",
+        "type": "ddd",
+        "stories": "US-MOD-01, US-MOD-06",
+        "objective": "`0006_moderation.sql` ΓÇö the `moderation_actions` table (the 3-value `decision` CHECK, the non-empty `note` CHECK, `ON DELETE SET NULL` FKs, the append-only trigger), the moderator-only RLS policies, the indexes, and the `moderation_queue` RPC (the role check, the flag aggregation, the `hide_reason` derivation, the cursor pagination)"
+      },
+      {
+        "bolt": "bolt-007-moderation-2",
+        "type": "ddd",
+        "stories": "US-MOD-03, US-MOD-04",
+        "objective": "The `moderation_decide` Edge Function ΓÇö note validation, the single transaction (action row + status transition), the `CONFLICT` guard, the `restore` / `remove` semantics ΓÇö and the `disable_user` Edge Function ΓÇö `disabled_at` + a `disable_user` action row with the reason as its note"
+      },
+      {
+        "bolt": "bolt-007-moderation-3",
+        "type": "simple",
+        "stories": "US-MOD-01, US-MOD-05",
+        "objective": "The admin shell + the token layer (the web-safe CSS custom-property subset from `docs/design/design-tokens.md`), the `/login` route, the `/queue` route (the list, the flag-reason chips, the hide-reason badge, the masked uploader handle, the cursor pagination), and `useModerationQueue()` with the post-decision invalidation"
+      },
+      {
+        "bolt": "bolt-007-moderation-4",
+        "type": "simple",
+        "stories": "US-MOD-02, US-MOD-03",
+        "objective": "The `/queue/[reportId]` review detail ΓÇö the wide two-column layout (the media preview on the signed URL, the report meta, the complete flag-reason list, the uploader identity block) and the decision panel (the choice, the required note, the submit, the error mapping for `VALIDATION_FAILED` / `FORBIDDEN` / `CONFLICT`)"
+      },
+      {
+        "bolt": "bolt-007-moderation-5",
+        "type": "simple",
+        "stories": "US-MOD-04, US-MOD-06",
+        "objective": "The `/users` route (search, the account row, the disable-with-reason action) and the `/audit` route (the append-only action history with its filters and no edit / delete affordance)"
+      }
+    ]
+  },
+  "008-jobs-operations": {
+    "stories": [
+      {
+        "id": "US-OPS-01",
+        "title": "Media purge job ΓÇö 90-day hard delete of the Storage objects, **idempotent**, report metadata retained",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-02",
+        "title": "Deleted-account PII purge ΓÇö the 30-day recovery window is respected and never shortened",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-03",
+        "title": "Geocode cache cleanup ΓÇö the 90-day cache eviction",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-04",
+        "title": "EAS build profiles (dev / preview / production) producing a sideloadable APK",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-05",
+        "title": "CI pipeline ΓÇö lint + typecheck + unit + shared + Supabase migration dry-run + RLS integration tests",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-06",
+        "title": "Release & verification runbook ΓÇö build ΓåÆ dev ΓåÆ verify ΓåÆ staging ΓåÆ verify ΓåÆ prod ΓåÆ verify ΓåÆ monitor",
+        "priority": "Must"
+      },
+      {
+        "id": "US-OPS-07",
+        "title": "Secret + environment management across local / EAS / Vercel / GitHub Environments",
+        "priority": "Must"
+      }
+    ],
+    "bolts": [
+      {
+        "bolt": "bolt-008-jobs-operations-1",
+        "type": "ddd",
+        "stories": "US-OPS-01",
+        "objective": "`0007_jobs.sql` ΓÇö the `job_runs` table (the `job_name` CHECK, the 3-value `status` CHECK, the counts, the nullable `error_detail`), the `report_media.purged_at` and `reports.deleted_at` columns, the `profiles.pii_purged_at` column, the supporting indexes (the age range scan on `report_media (created_at)`), and the no-policy RLS posture on `job_runs`"
+      },
+      {
+        "bolt": "bolt-008-jobs-operations-2",
+        "type": "ddd",
+        "stories": "US-OPS-01, US-OPS-02, US-OPS-03",
+        "objective": "The four Edge Functions and the shared `job-runner` helper ΓÇö `purge-media` (the 90-day Storage delete, the idempotent candidate query, the metadata-preserving write), `cleanup-geocode-cache`, `purge-deleted-accounts` (the 30-day window, the PII scrub, the report-metadata preservation), and `keep-project-awake` ΓÇö plus the cron schedule wiring"
+      },
+      {
+        "bolt": "bolt-008-jobs-operations-3",
+        "type": "simple",
+        "stories": "US-OPS-04, US-OPS-05",
+        "objective": "`eas.json` (the dev / preview / production profiles, the APK output, the cert-pinning config, the per-profile env vars) and the CI extension ΓÇö the Supabase migration dry-run, the RLS integration tests, the artifact secret grep, and the EAS build job"
+      },
+      {
+        "bolt": "bolt-008-jobs-operations-4",
+        "type": "simple",
+        "stories": "US-OPS-06, US-OPS-07",
+        "objective": "`docs/operations/runbook.md` (the eight-stage release progression with a verification command per stage, the rollback note, the free-tier quota accounting) and `docs/operations/secrets.md` (the local / EAS / Vercel / GitHub Environments matrix), plus the `tools/` scripts the runbook calls ΓÇö `purge-media-dry-run.ts`, `secret-scan.ts`, `release-verify.ts`"
+      }
+    ]
+  }
+}

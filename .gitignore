@@ -1,0 +1,38 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.expo-export-test/
+out/
+coverage/
+
+.env
+.env.*
+!.env.example
+supabase/functions/.env.local
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+.DS_Store
+Thumbs.db
+
+*.tsbuildinfo
+*.tgz
+.vercel/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local scratch — captured console output, one-off notes, ad-hoc probes.
+# The real harnesses live in tools/ and are tracked deliberately.
+tmp-*
+*.tmp
+scratch/
+
+# Supabase CLI scratch: generated keys, pre-reset backups, cron probes.
+supabase/.temp/
+

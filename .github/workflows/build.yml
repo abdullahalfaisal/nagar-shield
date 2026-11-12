@@ -1,0 +1,136 @@
+# =============================================================================
+# Nagar Shield — nightly build
+#
+# The nightly smoke build. It produces a **preview** APK, exercises it against
+# an emulator, and scans the artifact for secrets.
+#
+# It is a **smoke test, not a release**:
+#   * it uses the `preview` profile, never `production`
+#   * it never deploys — the production deploy is a human-driven runbook step
+#     (`docs/operations/runbook.md`)
+#   * it never touches a staging or production project ref
+#
+# It runs once a day, not on every push, because an EAS build consumes the
+# free-tier build quota.
+# =============================================================================
+
+name: Nightly build
+
+on:
+  schedule:
+    # 03:17 UTC. The minute is deliberately off the hour so the nightly run
+    # does not land on the same minute as the scheduled database jobs.
+    - cron: '17 3 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22.19.0'
+  PNPM_VERSION: '9.15.0'
+  EXPO_TOKEN: ${{ secrets.EAS_TOKEN }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The preview APK.
+  # ---------------------------------------------------------------------------
+
+  preview-apk:
+    name: preview-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The EAS token comes from the GitHub **staging** Environment secret. It
+      # is never a repository-level secret and never appears in the log.
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EAS_TOKEN }}
+
+      # The preview profile produces an **APK** (not an AAB) against the
+      # staging env vars. The APK is the Phase 1 distribution artefact — it
+      # is sideloaded, and there is no Play Store dependency.
+      - name: build the preview APK
+        id: build
+        run: eas build -p android --profile preview --platform android --non-interactive --wait
+
+      - name: download the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nagar-shield-preview-apk
+          path: ${{ steps.build.outputs.apk_path || '*.apk' }}
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # The artifact scan and the emulator smoke run.
+  # ---------------------------------------------------------------------------
+
+  apk-smoke:
+    name: apk-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [preview-apk]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nagar-shield-preview-apk
+          path: apk
+
+      # The scan reads the APK's ZIP entries directly — no dependency needed.
+      # A finding prints the file and the pattern, never the matched value.
+      - name: scan the APK for the service-role key
+        run: pnpm secret:scan apk
+
+      # The emulator smoke run. The Maestro subset covers the panic path —
+      # the help grid, the dialer, and the capture screen. A failure fails the
+      # nightly job; it never promotes anything.
+      - name: run the Maestro panic-path subset
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: maestro/panic-path.yaml
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+
+      - name: install the APK
+        run: adb install -r apk/*.apk
+
+      - name: upload the emulator logs on failure
+        if: failure()
+        run: adb logcat -d | tail -n 2000

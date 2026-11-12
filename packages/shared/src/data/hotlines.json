@@ -1,0 +1,139 @@
+{
+  "$comment": "Curated emergency hotline dataset for Nagar Shield. This file is the single source of truth: the mobile bundle ships a byte-identical copy, and the Postgres mirror is regenerated from it by tools/mirror-reference-data.cjs. Never hand-edit the database rows. Retired entries stay in the file with isActive=false so the audit trail survives. lastVerifiedAt is the quarterly curator stamp — a stale value means the entry is due for verification.",
+  "version": "2026-Q4",
+  "lastVerifiedAt": "2026-10-15T00:00:00Z",
+  "hotlines": [
+    {
+      "id": "hl-women-children",
+      "name": "Women & Children Helpline",
+      "nameBn": "নারী ও শিশু হেল্পলাইন",
+      "phone": "109",
+      "category": "helpline",
+      "description": "National helpline for women and children in distress.",
+      "sortOrder": 1,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-disaster",
+      "name": "Disaster Helpline",
+      "nameBn": "দুর্যোগ হেল্পলাইন",
+      "phone": "333",
+      "category": "helpline",
+      "description": "National disaster response helpline.",
+      "sortOrder": 2,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-ambulance",
+      "name": "Ambulance",
+      "nameBn": "অ্যাম্বুলেন্স",
+      "phone": "999",
+      "category": "medical",
+      "description": "National ambulance and emergency medical service.",
+      "sortOrder": 3,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-electricity",
+      "name": "Electricity Complaint",
+      "nameBn": "বিদ্যুৎ অভিযোগ",
+      "phone": "16116",
+      "category": "utility",
+      "description": "National electricity emergency and complaint line.",
+      "sortOrder": 4,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-police-emergency",
+      "name": "Police Emergency",
+      "nameBn": "পুলিশ জরুরি সেবা",
+      "phone": "999",
+      "category": "police",
+      "description": "National police emergency number.",
+      "sortOrder": 5,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-fire-service",
+      "name": "Fire Service",
+      "nameBn": "ফায়ার সার্ভিস",
+      "phone": "102",
+      "category": "fire",
+      "description": "National fire and rescue emergency number.",
+      "sortOrder": 6,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-ambulance-city",
+      "name": "City Ambulance Service",
+      "nameBn": "সিটি অ্যাম্বুলেন্স সেবা",
+      "phone": "1098",
+      "category": "medical",
+      "description": "Dedicated city ambulance control room.",
+      "sortOrder": 7,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-fire-service-city",
+      "name": "City Fire Service",
+      "nameBn": "সিটি ফায়ার সার্ভিস",
+      "phone": "9553333",
+      "category": "fire",
+      "description": "Dhaka city fire service control room.",
+      "sortOrder": 8,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-traffic",
+      "name": "Traffic Control",
+      "nameBn": "ট্রাফিক কন্ট্রোল",
+      "phone": "121",
+      "category": "utility",
+      "description": "National traffic control room.",
+      "sortOrder": 9,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-railway-emergency",
+      "name": "Railway Emergency",
+      "nameBn": "রেলওয়ে জরুরি সেবা",
+      "phone": "999",
+      "category": "utility",
+      "description": "Bangladesh Railway emergency assistance.",
+      "sortOrder": 10,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-narc",
+      "name": "NARC Control Room",
+      "nameBn": "বিআরটিএ কর্তৃপক্ষের নিয়ন্ত্রণ কক্ষ",
+      "phone": "16247",
+      "category": "utility",
+      "description": "Bangladesh Road Transport Authority control room.",
+      "sortOrder": 11,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    },
+    {
+      "id": "hl-fire-service-stations",
+      "name": "Fire Service Station",
+      "nameBn": "ফায়ার স্টেশন",
+      "phone": "102",
+      "category": "fire",
+      "description": "Nearest fire and rescue station.",
+      "sortOrder": 12,
+      "isActive": true,
+      "lastVerifiedAt": "2026-10-15T00:00:00Z"
+    }
+  ]
+}

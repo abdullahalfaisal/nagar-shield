@@ -1,0 +1,102 @@
+project_id = "nagar-shield"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+schema_paths = ["./migrations"]
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["nagarshield://auth/callback", "nagarshield://auth/reset"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+
+# -----------------------------------------------------------------------------
+# The Edge Functions' gateway posture.
+#
+# The two groups are different on purpose:
+#
+#   * The four scheduled jobs are called by the **cron / pg_net** path with the
+#     service-role credential. That credential is a secret key (`sb_secret_…`),
+#     not a JWT, so a gateway that insists on a signed JWT would reject it.
+#     `verify_jwt = false` lets the request through to the function, and the
+#     function's own `requireServiceRole` gate is the real control — it
+#     compares the bearer against the service-role key and rejects anything
+#     else. The jobs are therefore **not** client-callable, which is exactly
+#     the posture the unit brief fixes.
+#
+#   * The three client-facing functions carry a **user's session JWT**, so the
+#     gateway verifies it first and an unauthenticated caller is rejected
+#     before the function runs. The function then resolves the caller's
+#     profile and enforces the role check.
+#
+# The posture is written out rather than left to the CLI default: the default
+# flipped between CLI versions, and a silent flip would break the scheduler.
+# -----------------------------------------------------------------------------
+
+[functions.purge-media]
+verify_jwt = false
+
+[functions.purge-deleted-accounts]
+verify_jwt = false
+
+[functions.cleanup-geocode-cache]
+verify_jwt = false
+
+[functions.keep-project-awake]
+verify_jwt = false
+
+[functions.finalize-capture]
+verify_jwt = true
+
+[functions.moderation-decide]
+verify_jwt = true
+
+[functions.disable-user]
+verify_jwt = true
+
+[analytics]
+enabled = false

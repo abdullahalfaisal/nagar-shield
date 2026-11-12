@@ -1,0 +1,136 @@
+<div class="screen" data-screen="18" data-name="Help Alert">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="help-header">
+          <h2 style="color:var(--red-600); display:flex; align-items:center; gap:6px;"><span class="material-symbols-outlined" style="font-size:22px;">emergency</span>জরুরি সাহায্য</h2>
+          <p>এক টোকায় সাহায্য পান</p>
+        </div>
+        <div class="content" style="padding-top:8px;">
+          <div class="help-card purple" role="button" tabindex="0" aria-label="পুলিশ Police ৯৯৯" onclick="helpAlertTap('police','999')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_police</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">পুলিশ</div>
+              <div class="help-card-sub">নিকটবর্তী থানায় কল</div>
+              <div class="help-card-en">Police</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৯৯৯</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card red" role="button" tabindex="0" aria-label="মেডিকেল Medical ৯৯৯" onclick="helpAlertTap('medical','999')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_hospital</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">মেডিকেল</div>
+              <div class="help-card-sub">নিকটবর্তী হাসপাতালে কল</div>
+              <div class="help-card-en">Medical</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৯৯৯</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card amber" role="button" tabindex="0" aria-label="ফায়ার সার্ভিস Fire Service ১০২" onclick="helpAlertTap('fire','102')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_fire_department</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">ফায়ার সার্ভিস</div>
+              <div class="help-card-sub">নিকটবর্তী ফায়ার স্টেশনে কল</div>
+              <div class="help-card-en">Fire Service</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">১০২</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card green" role="button" tabindex="0" aria-label="বিশ্বস্ত পরিচিত Personal Contacts ৫ জন" onclick="helpAlertTap('personal','contacts')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">groups_2</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">বিশ্বস্ত পরিচিত</div>
+              <div class="help-card-sub">আপনার ৫টি সংরক্ষিত কন্টাক্ট</div>
+              <div class="help-card-en">Personal Contacts</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৫ জন</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <!-- More Help link card (5th surface per FR-HELP-1) -->
+          <div onclick="document.getElementById('more-help-dialog').style.display='flex'" style="margin:8px 20px; padding:18px 20px; background:var(--surface-white); border:1.5px dashed var(--ink-300); border-radius:18px; display:flex; align-items:center; gap:14px; cursor:pointer; color:var(--ink-700);">
+            <div style="width:48px;height:48px;border-radius:14px;background:var(--ink-100);color:var(--ink-700);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:24px;">more_horiz</span>
+            </div>
+            <div style="flex:1;">
+              <div id="more-help-title" style="font-size:15px;font-weight:700;color:var(--ink-950);">আরও সাহায্য</div>
+              <div style="font-size:12px;color:var(--ink-500);margin-top:2px;">অন্যান্য জরুরি নম্বর ও সেবা</div>
+            </div>
+            <span class="material-symbols-outlined" style="color:var(--ink-400);">chevron_right</span>
+          </div>
+
+          <div id="more-help-dialog" role="dialog" aria-modal="true" aria-labelledby="more-help-title" onclick="if(event.target===this) this.style.display='none'" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:200; align-items:flex-end; justify-content:center;">
+            <div style="background:var(--surface-white); border-radius:24px 24px 0 0; padding:24px 20px calc(20px + 24px); width:100%; max-width:390px;">
+              <div style="width:40px;height:4px;background:var(--ink-200);border-radius:2px;margin:0 auto 20px;"></div>
+              <h3 style="font-size:18px;font-weight:700;color:var(--ink-950);margin-bottom:16px;">আরও জরুরি নম্বর</h3>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">নারী ও শিশু হেল্পলাইন</div><div style="font-size:11px;color:var(--ink-500);">109</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">দুর্যোগ হেল্পলাইন</div><div style="font-size:11px;color:var(--ink-500);">333</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">অ্যাম্বুলেন্স</div><div style="font-size:11px;color:var(--ink-500);">999</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">বিদ্যুৎ অভিযোগ</div><div style="font-size:11px;color:var(--ink-500);">16116</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div style="flex:1;">
+                    <div style="font-weight:600;font-size:14px;">নিকটবর্তী থানা</div>
+                    <div style="font-size:11px;color:var(--ink-500);">সবচেয়ে কাছের থানায় কল</div>
+                    <div style="font-size:10px;color:var(--ink-400);font-style:italic;margin-top:4px;line-height:1.4;">
+                      ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।
+                    </div>
+                  </div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">ম্যাপে স্টেশন খুঁজুন</div><div style="font-size:11px;color:var(--ink-500);">হাসপাতাল · ফায়ার · থানা</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">map</span>
+                </div>
+              </div>
+              <div style="margin-top:14px; padding:0 4px; font-size:11px; color:var(--ink-500); text-align:right;">
+                <a onclick="document.getElementById('wrong-number-dialog').style.display='flex'" style="color:var(--violet-700); cursor:pointer; font-weight:600;">নম্বর ভুল? রিপোর্ট করুন →</a>
+              </div>
+              <button onclick="document.getElementById('more-help-dialog').style.display='none'" style="margin-top:16px;width:100%;height:48px;background:var(--violet-50);color:var(--violet-700);border:none;border-radius:14px;font-weight:600;font-size:15px;">বন্ধ করুন</button>
+            </div>
+          </div>
+
+          <div style="padding:16px 24px; text-align:center;">
+            <p style="font-size:11px; color:var(--ink-500); line-height:1.5;">
+              কলগুলি নিকটবর্তী উপলব্ধ সেবায় স্বয়ংক্রিয়ভাবে রাউট করা হয়
+            </p>
+          </div>
+        </div>
+      </div>

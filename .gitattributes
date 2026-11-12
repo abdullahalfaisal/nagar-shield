@@ -1,0 +1,22 @@
+# Normalize line endings on checkin; keep LF in the repository so diffs are
+# stable across Windows and CI (Linux) checkouts.
+* text=auto eol=lf
+
+# Windows scripts must stay CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never diff these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.hbc binary
+*.keystore binary
+*.jks binary
+*.p12 binary
+*.apk binary
+*.aab binary

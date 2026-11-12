@@ -1,0 +1,58 @@
+<div class="screen" data-screen="11" data-name="Login">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="content auth-screen">
+          <div style="height:40px;"></div>
+          <div class="brand-display">
+            <div class="brand-display-logo">
+              <svg width="44" height="44" viewBox="0 0 64 64" fill="none">
+                <path d="M32 6L12 14V28C12 42 20 52 32 58C44 52 52 42 52 28V14L32 6Z" stroke="white" stroke-width="2.5" fill="rgba(255,255,255,0.1)"/>
+                <circle cx="32" cy="22" r="3" fill="white"/>
+                <ellipse cx="32" cy="22" rx="7" ry="3" stroke="white" stroke-width="1.5" fill="none"/>
+                <path d="M14 38H50L48 46H16L14 38Z" stroke="white" stroke-width="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div class="brand-display-name">Nagar Shield</div>
+            <div class="brand-display-tag">শহরে, সদা সতর্ক</div>
+          </div>
+          <div class="auth-hero">
+            <h1>স্বাগতম ফিরে আসায়</h1>
+            <p>আপনার অ্যাকাউন্টে প্রবেশ করুন</p>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="text" placeholder=" " id="login-identifier">
+              <span class="leading-icon material-symbols-outlined">mail</span>
+              <label class="input-label" for="login-identifier">ফোন বা ইমেইল</label>
+            </div>
+            <div class="input-helper">যেকোনো একটি দিয়ে প্রবেশ করুন</div>
+          </div>
+          <button class="btn btn-secondary btn-lg" id="send-otp-btn" onclick="document.getElementById('otp-step').style.display='block'; this.style.display='none';">
+            <span class="material-symbols-outlined">send</span>
+            OTP পাঠান
+          </button>
+          <div id="otp-step" style="display:none; margin-top:16px;">
+            <div class="input-group">
+              <div class="input-field input-with-icon" style="position:relative;">
+                <input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder=" " id="login-otp">
+                <span class="leading-icon material-symbols-outlined">lock</span>
+                <label class="input-label" for="login-otp">OTP কোড (৬ সংখ্যা)</label>
+              </div>
+              <div class="input-helper" style="color:var(--green-600);">✓ ইমেইলে কোড পাঠানো হয়েছে</div>
+            </div>
+            <div style="text-align:right; margin-bottom:16px;">
+              <span class="text-link">কোড পুনঃপাঠান (30s)</span>
+            </div>
+            <button class="btn btn-primary btn-lg" data-nav="18">OTP দিয়ে প্রবেশ</button>
+          </div>
+          <div class="text-center mt-24" style="font-size:14px; color:var(--ink-600);">
+            অ্যাকাউন্ট নেই? <span class="text-link" data-nav="12">সাইন আপ</span>
+          </div>
+        </div>
+      </div>

@@ -1,0 +1,526 @@
+/**
+ * The console's token layer and layout primitives.
+ *
+ * Every value here is copied verbatim from `docs/design/design-tokens.md` — the
+ * web-safe subset of the same token set the mobile app consumes. The console
+ * introduces **no new hex value** and **no third-party UI kit**; it reuses the
+ * product's design system rather than inventing a second one.
+ *
+ * Dark is the default (the prototype's `restoreTheme()` sets `data-theme="dark"`
+ * on load), and the light theme is the `:root` default that the dark block
+ * overrides.
+ */
+
+:root {
+  /* --- the violet ramp --- */
+  --violet-900: #3b1e91;
+  --violet-800: #4c2bb5;
+  --violet-700: #6d28d9;
+  --violet-600: #7c3aed;
+  --violet-500: #8b5cf6;
+  --violet-400: #a78bfa;
+  --violet-300: #c4b5fd;
+  --violet-200: #ddd6fe;
+  --violet-100: #ede9fe;
+  --violet-50: #f5f3ff;
+  --violet-25: #faf8ff;
+
+  /* --- the semantic ramps --- */
+  --red-600: #dc2626;
+  --red-500: #ef4444;
+  --red-100: #fee2e2;
+  --red-50: #fef2f2;
+  --amber-600: #d97706;
+  --amber-500: #f59e0b;
+  --amber-100: #fef3c7;
+  --amber-50: #fffbeb;
+  --green-700: #047857;
+  --green-600: #059669;
+  --green-500: #10b981;
+  --green-100: #d1fae5;
+  --green-50: #ecfdf5;
+  --sky-600: #0284c7;
+  --sky-100: #e0f2fe;
+  --sky-50: #f0f9ff;
+
+  /* --- the ink ramp (light) --- */
+  --ink-900: #11112b;
+  --ink-800: #1a1a2e;
+  --ink-700: #2d2d44;
+  --ink-600: #4a4a66;
+  --ink-500: #6b6b85;
+  --ink-400: #9090a8;
+  --ink-300: #b8b8cc;
+  --ink-200: #e2e2ee;
+  --ink-100: #efeff5;
+  --ink-50: #f7f7fb;
+
+  /* --- the surfaces (light) --- */
+  --surface-white: #ffffff;
+  --surface-lavender: #fafafe;
+  --surface-card: #ffffff;
+  --surface-outline: #e2e2ee;
+
+  /* --- geometry --- */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* --- elevation --- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.05);
+  --shadow-lift: 0 4px 8px rgba(15, 23, 42, 0.06), 0 16px 32px rgba(15, 23, 42, 0.1);
+  --shadow-fab: 0 8px 16px rgba(124, 58, 237, 0.28), 0 2px 6px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 0 4px rgba(124, 58, 237, 0.16), 0 8px 24px rgba(124, 58, 237, 0.22);
+
+  /* --- gradients --- */
+  --grad-primary-soft: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+  --grad-hero: linear-gradient(135deg, #4c2bb5 0%, #7c3aed 50%, #a78bfa 100%);
+
+  /* --- motion --- */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+
+  /* --- the console's own layout constants (not design tokens) --- */
+  --tap-target: 48px;
+  --rail-width: 232px;
+  --page-max: 1440px;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --ink-950: #f5f5fa;
+  --ink-900: #e2e2ee;
+  --ink-800: #c4c4d6;
+  --ink-700: #b8b8cc;
+  --ink-600: #9090a8;
+  --ink-500: #6b6b85;
+  --ink-400: #4a4a66;
+  --ink-300: #2d2d44;
+  --ink-200: #1a1a2e;
+  --ink-100: #11112b;
+  --ink-50: #0b0b1a;
+  --surface-white: #11112b;
+  --surface-lavender: #0b0b1a;
+  --surface-card: #1a1a2e;
+  --surface-outline: #3a3a52;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans Bengali', 'Roboto', system-ui, sans-serif;
+  background: var(--surface-lavender);
+  color: var(--ink-900);
+  font-feature-settings: 'ss01', 'cv11';
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--violet-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===========================================================================
+   The shell — a desktop list + rail layout, never a phone frame
+   =========================================================================== */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.rail {
+  width: var(--rail-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--surface-outline);
+  background: var(--surface-card);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.railBrand {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--violet-700);
+  letter-spacing: -0.3px;
+  padding: 0 8px 4px;
+}
+
+.railTagline {
+  font-size: 11px;
+  color: var(--ink-500);
+  padding: 0 8px 16px;
+}
+
+.railLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap-target);
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  color: var(--ink-700);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-in-out), color var(--dur-fast) var(--ease-in-out);
+}
+
+.railLink:hover {
+  background: var(--violet-50);
+  color: var(--violet-700);
+}
+
+.railLinkActive {
+  background: var(--violet-100);
+  color: var(--violet-700);
+}
+
+.railSpacer {
+  flex: 1;
+}
+
+.railSignOut {
+  min-height: var(--tap-target);
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--ink-200);
+  background: var(--surface-white);
+  color: var(--ink-700);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.railSignOut:hover {
+  border-color: var(--violet-300);
+  color: var(--violet-700);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px 64px;
+}
+
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: var(--ink-950);
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--ink-500);
+  margin-top: 4px;
+}
+
+/* ===========================================================================
+   The card primitives — the mobile alert card's visual pattern, 1:1
+   =========================================================================== */
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+}
+
+.cardAccent {
+  border-left: 4px solid var(--violet-300);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .gridTwo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  margin-bottom: 6px;
+}
+
+.fieldValue {
+  font-size: 14px;
+  color: var(--ink-900);
+  margin-bottom: 16px;
+  word-break: break-word;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: 12px 14px;
+  border: 1.5px solid var(--surface-outline);
+  border-radius: var(--r-md);
+  background: var(--surface-white);
+  color: var(--ink-950);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--violet-500);
+  box-shadow: var(--shadow-glow);
+}
+
+.button {
+  min-height: var(--tap-target);
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--r-md);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.buttonPrimary {
+  background: var(--violet-600);
+  color: #ffffff;
+  box-shadow: var(--shadow-fab);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--violet-700);
+}
+
+.buttonSecondary {
+  background: var(--surface-white);
+  color: var(--violet-700);
+  border: 1.5px solid var(--ink-200);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: var(--violet-50);
+  border-color: var(--violet-300);
+}
+
+.buttonDanger {
+  background: var(--red-600);
+  color: #ffffff;
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background: var(--red-500);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--violet-100);
+  color: var(--violet-700);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chipWarning {
+  background: var(--amber-100);
+  color: var(--amber-600);
+}
+
+.chipDanger {
+  background: var(--red-100);
+  color: var(--red-600);
+}
+
+.chipMuted {
+  background: var(--ink-100);
+  color: var(--ink-600);
+}
+
+.banner {
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--amber-50);
+  border: 1px solid var(--amber-100);
+  color: var(--amber-600);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bannerDanger {
+  background: var(--red-50);
+  border-color: var(--red-100);
+  color: var(--red-600);
+}
+
+.emptyState {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: 6px;
+}
+
+.emptyBody {
+  font-size: 13px;
+  color: var(--ink-500);
+}
+
+.skeleton {
+  height: 88px;
+  border-radius: var(--r-md);
+  background: var(--ink-100);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  border-bottom: 1px solid var(--surface-outline);
+}
+
+.table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--ink-100);
+  color: var(--ink-800);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.tableNote {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 420px;
+}
+
+.link {
+  color: var(--violet-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.stackGapSm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.muted {
+  color: var(--ink-500);
+  font-size: 12px;
+}

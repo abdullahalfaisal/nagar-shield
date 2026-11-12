@@ -1,0 +1,4319 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nagar Shield — Interactive Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* ===== Modern Violet palette (refined) ===== */
+  --violet-950: #1E0B47;
+  --violet-900: #3B1E91;
+  --violet-800: #4C2BB5;
+  --violet-700: #6D28D9;
+  --violet-600: #7C3AED;    /* primary */
+  --violet-500: #8B5CF6;    /* hover */
+  --violet-400: #A78BFA;
+  --violet-300: #C4B5FD;
+  --violet-200: #DDD6FE;
+  --violet-100: #EDE9FE;
+  --violet-50:  #F5F3FF;
+  --violet-25:  #FAF8FF;
+
+  /* Brand gradient (primary CTA, splash) */
+  --grad-primary: linear-gradient(135deg, #7C3AED 0%, #A78BFA 50%, #6D28D9 100%);
+  --grad-primary-soft: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+  --grad-hero: linear-gradient(135deg, #4C2BB5 0%, #7C3AED 50%, #A78BFA 100%);
+  --grad-emergency: linear-gradient(135deg, #E94B45 0%, #F87171 100%);
+
+  /* Legacy aliases kept so existing references resolve. */
+  --blue-950: var(--violet-950);
+  --blue-900: var(--violet-700);
+  --blue-700: var(--violet-600);
+  --blue-600: var(--violet-500);
+  --blue-500: var(--violet-500);
+  --blue-400: var(--violet-400);
+  --blue-300: var(--violet-300);
+  --blue-100: var(--violet-100);
+  --blue-50:  var(--violet-50);
+  --purple-950: var(--violet-950);
+  --purple-900: var(--violet-700);
+  --purple-700: var(--violet-600);
+  --purple-600: var(--violet-500);
+  --purple-500: var(--violet-500);
+  --purple-400: var(--violet-400);
+  --purple-300: var(--violet-300);
+  --purple-100: var(--violet-100);
+  --purple-50:  var(--violet-50);
+
+  /* ===== Semantic ===== */
+  --red-700: #B91C1C;
+  --red-600: #DC2626;
+  --red-500: #EF4444;
+  --red-100: #FEE2E2;
+  --red-50:  #FEF2F2;
+  --amber-600: #D97706;
+  --amber-500: #F59E0B;
+  --amber-100: #FEF3C7;
+  --amber-50:  #FFFBEB;
+  --green-700: #047857;
+  --green-600: #059669;
+  --green-500: #10B981;
+  --green-100: #D1FAE5;
+  --green-50:  #ECFDF5;
+  --sky-600: #0284C7;
+  --sky-100: #E0F2FE;
+  --sky-50:  #F0F9FF;
+
+  /* ===== Neutrals (cool slate, modern) ===== */
+  --ink-950: #0B0B1A;
+  --ink-900: #11112B;
+  --ink-800: #1A1A2E;
+  --ink-700: #2D2D44;
+  --ink-600: #4A4A66;
+  --ink-500: #6B6B85;
+  --ink-400: #9090A8;
+  --ink-300: #B8B8CC;
+  --ink-200: #E2E2EE;
+  --ink-100: #EFEFF5;
+  --ink-50:  #F7F7FB;
+
+  --surface-white:   #FFFFFF;
+  --surface-lavender: #FAFAFE;
+  --surface-card:    #FFFFFF;
+  --surface-outline: #E2E2EE;  /* input borders, list dividers, .help-header */
+  --app-bar-bg:      rgba(255,255,255,0.86);
+
+  /* ===== Radius scale (modern, generous) ===== */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --r-2xl: 28px;
+  --r-pill: 999px;
+
+  /* ===== Shadow scale (soft, layered) ===== */
+  --shadow-xs: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 2px 6px rgba(15,23,42,0.04);
+  --shadow-card: 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px rgba(15,23,42,0.05);
+  --shadow-lift: 0 4px 8px rgba(15,23,42,0.06), 0 16px 32px rgba(15,23,42,0.10);
+  --shadow-fab:  0 8px 16px rgba(124,58,237,0.28), 0 2px 6px rgba(15,23,42,0.08);
+  --shadow-glow: 0 0 0 4px rgba(124,58,237,0.16), 0 8px 24px rgba(124,58,237,0.22);
+  --shadow-emergency: 0 8px 16px rgba(220,38,38,0.28), 0 2px 6px rgba(15,23,42,0.08);
+
+  /* ===== Motion ===== */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 360ms;
+}
+
+/* ===== Dark theme override =====
+   :root above is the light palette. Dark is the default per DESIGN.md for
+   panic-moment low-light legibility. When <html data-theme="dark"> (the
+   default applied by restoreTheme() on load), these overrides flip ink +
+   surface tokens. Every component auto-adapts because they read tokens. */
+:root[data-theme="dark"] {
+  --ink-950: #F5F5FA;
+  --ink-900: #E2E2EE;
+  --ink-800: #C4C4D6;
+  --ink-700: #B8B8CC;
+  --ink-600: #9090A8;
+  --ink-500: #6B6B85;
+  --ink-400: #4A4A66;
+  --ink-300: #2D2D44;
+  --ink-200: #1A1A2E;
+  --ink-100: #11112B;
+  --ink-50:  #0B0B1A;
+  --surface-white:    #11112B;
+  --surface-lavender: #0B0B1A;
+  --surface-card:     #1A1A2E;
+  --surface-outline:  #3A3A52;  /* ~3:1 on dark surface — visible input borders */
+  --app-bar-bg:       rgba(11,11,26,0.86);
+  color-scheme: dark;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html, body { min-height:100%; }
+body {
+  font-family: 'Inter', 'Noto Sans Bengali', 'Roboto', sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(167,139,250,0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(124,58,237,0.10), transparent 60%),
+    #F7F7FB;
+  color: var(--ink-950);
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* ===== Browser Frame ===== */
+.app-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.prototype-header {
+  text-align: center;
+  color: var(--ink-950);
+  max-width: 800px;
+  margin-bottom: 14px;
+}
+.prototype-header h1 {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  letter-spacing: -0.6px;
+  background: var(--grad-hero);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+.prototype-header p {
+  color: var(--ink-500);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+/* ===== Phone Stage =====
+   A wrapper that holds the phone and shrinks to match the
+   scaled phone's visual size. The phone itself is scaled with
+   transform: scale() (so all internal pixel-perfect design stays
+   intact at any size), and the stage uses negative margins to
+   collapse to the painted footprint — so the phone truly fits
+   the viewport instead of overflowing it. */
+.phone-stage {
+  width: calc(390px * var(--phone-scale, 1));
+  height: calc(844px * var(--phone-scale, 1));
+  position: relative;
+  flex-shrink: 0;
+}
+.phone-frame {
+  width: 390px;
+  height: 844px;
+  background: var(--surface-white);
+  border-radius: 50px;
+  box-shadow: 0 50px 100px rgba(0,0,0,0.4), 0 0 0 12px #1a1a2e, 0 0 0 14px #2d2d44;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  transform: scale(var(--phone-scale, 1));
+  transform-origin: top left;
+}
+.phone-screen {
+  position: absolute;
+  inset: 12px;
+  background: var(--surface-lavender);
+  border-radius: 38px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* iOS Status bar (faked) */
+.ios-status {
+  height: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 28px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+  background: transparent;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.ios-status .right { display:flex; gap:6px; align-items:center; }
+.ios-notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 122px;
+  height: 32px;
+  background: #0B0B1A;
+  border-radius: var(--r-pill);
+  z-index: 100;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* ===== Screen wrapper ===== */
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-lavender);
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateX(40px) scale(0.98);
+  transition: opacity var(--dur-slow) var(--ease-out),
+              transform var(--dur-slow) var(--ease-out);
+  pointer-events: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.screen::-webkit-scrollbar { display:none; }
+.screen.active {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+.screen.exit-left {
+  opacity: 0;
+  transform: translateX(-40px) scale(0.98);
+}
+
+/* Content area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px;
+}
+.content::-webkit-scrollbar { display:none; }
+
+/* ===== Top App Bar ===== */
+.app-bar {
+  background: var(--app-bar-bg);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  padding: 10px 16px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ink-100);
+}
+.app-bar-no-border {
+  border-bottom: none;
+  background: transparent;
+  backdrop-filter: none;
+}
+.app-bar-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink-950);
+  letter-spacing: -0.01em;
+}
+.back-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+  background: transparent;
+  cursor: pointer;
+  color: var(--violet-700);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.back-btn:hover { background: var(--violet-50); }
+.icon-btn {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-700);
+  transition: background var(--dur-fast) var(--ease-out);
+  position: relative;
+}
+.icon-btn:hover { background: var(--ink-50); }
+.badge-dot {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 8px; height: 8px;
+  background: var(--red-500);
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 0 rgba(239,68,68,0.4);
+  animation: pulse-red 2s infinite;
+}
+.badge-count {
+  position: absolute;
+  top: 4px; right: 4px;
+  background: var(--red-500);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  display:flex; align-items:center; justify-content:center;
+  padding: 0 5px;
+  border: 2px solid white;
+  font-feature-settings: "tnum";
+}
+
+/* ===== Material Symbols (Sharp/Thin, Modern App style) ===== */
+.material-symbols-outlined,
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-weight: 400;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: "opsz" 24, "wght" 400, "FILL" 0, "GRAD" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+/* Helper class to fill an icon (active nav, FAB, primary chips) */
+.material-symbols-filled,
+.material-symbols-filled.material-symbols-outlined,
+.material-symbols-filled.material-symbols-rounded {
+  font-variation-settings: "opsz" 24, "wght" 500, "FILL" 1, "GRAD" 0;
+}
+/* Slightly heavier weight for icons in dense UI rows */
+.material-symbols-bold {
+  font-variation-settings: "opsz" 24, "wght" 600, "FILL" 0, "GRAD" 0;
+}
+
+/* ===== Splash Screen ===== */
+.splash {
+  background: var(--grad-hero);
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: white;
+}
+.splash-logo {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 32px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.20);
+  animation: pulse-glow 3.5s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 12px 32px rgba(0,0,0,0.20),
+                0 0 0 0 rgba(255,255,255,0.0);
+  }
+  50% {
+    box-shadow: 0 16px 40px rgba(0,0,0,0.28),
+                0 0 0 16px rgba(255,255,255,0.06);
+  }
+}
+.splash-tagline {
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: 0.5px;
+  margin-bottom: 80px;
+}
+.loading-dots {
+  display: flex;
+  gap: 8px;
+}
+.loading-dots span {
+  width: 8px; height: 8px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+  animation: bounce 1.4s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-8px); opacity: 1; }
+}
+
+/* ===== Login & Registration ===== */
+.auth-screen {
+  padding: 0 24px;
+  padding-top: 0;
+}
+.auth-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
+  margin-bottom: 40px;
+}
+.auth-brand {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--purple-700);
+  letter-spacing: -0.3px;
+}
+.auth-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.auth-hero h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink-950);
+  margin-bottom: 8px;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+}
+.auth-hero p {
+  font-size: 14px;
+  color: var(--ink-600);
+  line-height: 1.5;
+  font-weight: 500;
+}
+.brand-display {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.brand-display-logo {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px;
+  border-radius: var(--r-xl);
+  background: var(--grad-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 28px rgba(124,58,237,0.32),
+              0 2px 6px rgba(15,23,42,0.08);
+  position: relative;
+}
+.brand-display-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent 50%);
+  pointer-events: none;
+}
+.brand-display-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-950);
+  letter-spacing: -0.5px;
+}
+.brand-display-tag {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-top: 4px;
+}
+
+/* ===== Inputs (modern: filled, soft, focus ring) ===== */
+.input-group { margin-bottom: 16px; }
+.input-field { position: relative; margin-bottom: 4px; }
+.input-label {
+  position: absolute;
+  top: 18px;
+  left: 16px;
+  font-size: 15px;
+  color: var(--ink-500);
+  pointer-events: none;
+  transition: all var(--dur-base) var(--ease-out);
+  background: transparent;
+  padding: 0 4px;
+}
+.input-field input {
+  width: 100%;
+  height: 56px;
+  padding: 20px 16px 8px;
+  border: 1.5px solid var(--surface-outline);
+  border-radius: var(--r-lg);
+  background: var(--surface-white);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink-950);
+  outline: none;
+  transition: all var(--dur-base) var(--ease-out);
+  box-shadow: var(--shadow-xs);
+}
+.input-field input:hover { border-color: var(--ink-300); }
+.input-field input:focus {
+  border-color: var(--violet-500);
+  box-shadow: var(--shadow-glow);
+}
+/* Global focus-visible ring for keyboard users (a11y: H3-class). */
+:focus-visible {
+  outline: 3px solid var(--violet-500);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Reduced-motion: kill decorative animations. Keeps transform/colour
+   transitions intact (functional feedback) but stops pulses/bounces. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.input-field input:focus + .input-label,
+.input-field input:not(:placeholder-shown) + .input-label {
+  top: 10px;
+  font-size: 11px;
+  color: var(--violet-700);
+  font-weight: 600;
+  background: var(--surface-white);
+}
+.input-with-icon input { padding-left: 48px; }
+.input-with-icon .leading-icon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  color: var(--ink-500);
+  font-size: 20px;
+}
+.input-with-icon .trailing-icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: var(--ink-500);
+  font-size: 20px;
+  cursor: pointer;
+}
+.input-helper {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-top: 6px;
+  padding-left: 4px;
+}
+/* .password-strength CSS removed 2026-09-11: OTP-only auth model has
+   no password fields. CSS retained only if password login is re-introduced. */
+
+/* Checkbox custom (modern) */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.custom-checkbox {
+  width: 22px; height: 22px;
+  border: 1.5px solid var(--ink-300);
+  border-radius: var(--r-xs);
+  background: var(--surface-white);
+  display:flex; align-items:center; justify-content:center;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+.custom-checkbox:hover { border-color: var(--violet-400); }
+.custom-checkbox.checked {
+  background: var(--violet-600);
+  border-color: var(--violet-600);
+}
+.custom-checkbox.checked::after {
+  content: '';
+  width: 6px; height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.check-label {
+  font-size: 14px;
+  color: var(--ink-700);
+  font-weight: 500;
+}
+
+/* ===== Buttons (modern: gradient primary, soft shadow, press animation) ===== */
+.btn {
+  width: 100%;
+  height: 52px;
+  border-radius: var(--r-lg);
+  border: none;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              background var(--dur-base) var(--ease-out),
+              filter var(--dur-base) var(--ease-out);
+  letter-spacing: -0.01em;
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.16), transparent 40%);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+.btn:hover::after { opacity: 1; }
+.btn:active { transform: scale(0.98); }
+.btn-primary {
+  background: var(--grad-primary);
+  color: white;
+  box-shadow: var(--shadow-fab);
+}
+.btn-primary:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 12px 28px rgba(124,58,237,0.36), 0 4px 8px rgba(15,23,42,0.10);
+  transform: translateY(-1px);
+}
+.btn-emergency {
+  background: var(--grad-emergency);
+  color: white;
+  box-shadow: var(--shadow-emergency);
+}
+.btn-lg { height: 56px; font-size: 16px; border-radius: var(--r-xl); }
+.btn-secondary {
+  background: var(--surface-white);
+  color: var(--violet-700);
+  border: 1.5px solid var(--ink-200);
+  box-shadow: var(--shadow-xs);
+}
+.btn-secondary:hover {
+  background: var(--violet-50);
+  border-color: var(--violet-300);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--violet-700);
+  font-weight: 600;
+}
+.btn-ghost:hover { background: var(--violet-50); }
+.divider-or {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+.divider-or::before, .divider-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--ink-100);
+}
+.divider-or span {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+.text-link {
+  color: var(--purple-500);
+  font-weight: 600;
+  cursor: pointer;
+}
+.text-link:hover { text-decoration: underline; }
+.text-center { text-align: center; }
+.mt-24 { margin-top: 24px; }
+.mt-16 { margin-top: 16px; }
+
+/* ===== Safety Profile Wizard ===== */
+.wizard-screen {
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--surface-lavender) 70%);
+}
+.wizard-progress {
+  display: flex;
+  gap: 6px;
+  padding: 14px 24px 0;
+}
+.wizard-progress .seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ink-200);
+  transition: background var(--dur-base) var(--ease-out);
+}
+.wizard-progress .seg.done { background: var(--violet-600); }
+.wizard-progress .seg.active { background: var(--violet-400); }
+.wizard-step-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 24px 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.wizard-step-label .step-count { color: var(--violet-700); }
+.wizard-eyebrow {
+  padding: 28px 24px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--violet-700);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wizard-eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--violet-600);
+}
+.wizard-hero {
+  padding: 0 24px 18px;
+}
+.wizard-hero h1 {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ink-950);
+  margin-bottom: 8px;
+}
+.wizard-hero h1 em { font-style: normal; color: var(--violet-700); }
+.wizard-hero p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-600);
+}
+.wizard-body {
+  padding: 8px 24px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+.wizard-sticky {
+  padding: 12px 24px 22px;
+  background: linear-gradient(180deg, transparent, var(--surface-lavender) 35%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wizard-sticky .btn { width: 100%; }
+.wizard-sticky .escape {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-500);
+  cursor: pointer;
+}
+.wizard-sticky .escape:hover { color: var(--violet-700); text-decoration: underline; }
+
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+.chip-grid .chip {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-lg);
+  background: var(--surface-white);
+  border: 1.5px solid var(--ink-200);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-900);
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.chip-grid .chip:hover {
+  border-color: var(--violet-400);
+  background: var(--violet-50);
+}
+.chip-grid .chip.selected {
+  background: var(--grad-primary);
+  color: white;
+  border-color: transparent;
+  box-shadow: var(--shadow-glow);
+}
+.blood-group-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.blood-group-grid .chip.selected { background: var(--grad-primary); color: white; }
+
+.contact-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.contact-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface-white);
+  border: 1.5px solid var(--ink-200);
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.contact-slot:hover { border-color: var(--violet-400); background: var(--violet-50); }
+.contact-slot.filled {
+  border-color: var(--green-500);
+  background: var(--green-50);
+}
+.contact-slot .slot-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--violet-100);
+  color: var(--violet-700);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.contact-slot.filled .slot-num {
+  background: var(--green-500);
+  color: white;
+}
+.contact-slot .slot-text {
+  flex: 1;
+  min-width: 0;
+}
+.contact-slot .slot-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+.contact-slot .slot-sub {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+.contact-slot .slot-trailing {
+  color: var(--ink-400);
+}
+
+.location-illustration {
+  margin: 12px 24px 4px;
+  height: 160px;
+  border-radius: var(--r-2xl);
+  background:
+    radial-gradient(circle at 50% 60%, rgba(124,58,237,0.16), transparent 70%),
+    linear-gradient(180deg, var(--violet-50), #FFFFFF);
+  border: 1px solid var(--ink-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.location-illustration .pin {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--grad-primary);
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  box-shadow: var(--shadow-glow);
+}
+.location-illustration .ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--violet-300);
+  animation: ring-pulse 2.4s var(--ease-out) infinite;
+  opacity: 0.6;
+}
+.location-illustration .ring.r1 { width: 120px; height: 120px; }
+.location-illustration .ring.r2 { width: 200px; height: 200px; animation-delay: 0.8s; }
+@keyframes ring-pulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+.location-reassure {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 24px 0;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--violet-50);
+  border: 1px solid var(--violet-200);
+}
+.location-reassure .icon {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--violet-600);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+}
+.location-reassure .text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-700);
+}
+.location-reassure .text strong { color: var(--violet-800); }
+
+/* Welcome / Done — centered */
+.wizard-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+}
+.wizard-center .badge {
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  background: var(--grad-primary);
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  box-shadow: var(--shadow-glow);
+  margin-bottom: 18px;
+}
+.wizard-center h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink-950);
+  margin-bottom: 10px;
+}
+.wizard-center h1 em { font-style: normal; color: var(--violet-700); }
+.wizard-center p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-600);
+  max-width: 32ch;
+  margin-bottom: 18px;
+}
+.summary-card {
+  margin: 8px 24px 0;
+  padding: 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface-white);
+  border: 1px solid var(--ink-200);
+  text-align: left;
+}
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ink-100);
+  font-size: 13px;
+}
+.summary-row:last-child { border-bottom: 0; }
+.summary-row .label { color: var(--ink-500); font-weight: 500; }
+.summary-row .value { color: var(--ink-950); font-weight: 700; }
+
+/* Lock screen (S-99) */
+.lock-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--violet-25) 100%);
+}
+.lock-screen .badge {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: var(--violet-100);
+  color: var(--violet-700);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 18px;
+}
+.lock-screen h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-950);
+  margin-bottom: 8px;
+}
+.lock-screen p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-600);
+  max-width: 32ch;
+  margin-bottom: 22px;
+}
+.lock-screen .btn { width: 100%; max-width: 320px; }
+
+/* ===== Home Screen ===== */
+.greeting-block {
+  flex: 1;
+}
+.greeting-block .hi {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-950);
+  margin-bottom: 2px;
+}
+.greeting-block .date {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+.avatar-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--grad-primary-soft);
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  border: 2.5px solid var(--surface-white);
+  box-shadow: var(--shadow-card);
+  letter-spacing: -0.02em;
+}
+
+/* Search bar (modern: filled, soft) */
+.search-bar {
+  margin: 0 20px 16px;
+  height: 48px;
+  background: var(--ink-50);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 10px;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.search-bar:focus-within {
+  background: var(--surface-white);
+  border-color: var(--violet-300);
+  box-shadow: var(--shadow-glow);
+}
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--ink-950);
+  font-weight: 500;
+}
+.search-bar input::placeholder { color: var(--ink-500); font-weight: 400; }
+.search-bar .material-symbols-rounded {
+  color: var(--ink-500);
+  font-size: 20px;
+}
+
+/* Section title */
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  margin: 16px 0 12px;
+}
+.section-title h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-950);
+  letter-spacing: -0.01em;
+}
+.section-title a {
+  font-size: 13px;
+  color: var(--violet-700);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transition: gap var(--dur-fast) var(--ease-out);
+}
+.section-title a:hover { gap: 6px; }
+
+/* Quick action grid (modern: cleaner cards, gradient icon backgrounds) */
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 0 20px;
+}
+.action-card {
+  background: var(--surface-white);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-xl);
+  padding: 16px 8px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
+  position: relative;
+}
+.action-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: transparent;
+}
+.action-card:active { transform: translateY(0); }
+.action-card-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 10px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.action-card:hover .action-card-icon { transform: scale(1.06); }
+.action-card-icon.purple { background: var(--violet-100); color: var(--violet-700); }
+.action-card-icon.red    { background: var(--red-100);    color: var(--red-600); }
+.action-card-icon.green  { background: var(--green-100);  color: var(--green-700); }
+.action-card-icon.amber  { background: var(--amber-100);  color: var(--amber-600); }
+.action-card-icon.sky    { background: var(--sky-100);    color: var(--sky-600); }
+.action-card-icon .material-symbols-rounded {
+  font-size: 22px;
+  font-variation-settings: "FILL" 1;
+}
+.action-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-950);
+  margin-bottom: 2px;
+  letter-spacing: -0.01em;
+}
+.action-card-sub {
+  font-size: 10.5px;
+  color: var(--ink-500);
+  font-weight: 500;
+}
+.action-card.alert { position: relative; }
+.action-card.alert::after {
+  content: '';
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 8px; height: 8px;
+  background: var(--red-500);
+  border-radius: 50%;
+  animation: pulse-red 2s infinite;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.18);
+}
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+
+/* Crime news carousel */
+.news-scroll {
+  display: flex;
+  gap: 12px;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.news-scroll::-webkit-scrollbar { display:none; }
+.news-card {
+  flex: 0 0 220px;
+  background: var(--surface-white);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.news-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+.news-card-img {
+  height: 90px;
+  background: var(--grad-hero);
+  position: relative;
+  overflow: hidden;
+}
+.news-card-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255,255,255,0.05) 10px,
+    rgba(255,255,255,0.05) 20px
+  );
+}
+.news-card-body { padding: 12px; }
+.news-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-950);
+  margin-bottom: 6px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.news-card-meta {
+  font-size: 11px;
+  color: var(--ink-500);
+  font-weight: 500;
+}
+
+/* Activity ticker */
+.activity-ticker {
+  margin: 16px 20px;
+  padding: 14px 16px;
+  background: var(--surface-white);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--ink-100);
+  box-shadow: var(--shadow-xs);
+}
+.ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  color: var(--ink-700);
+  font-weight: 500;
+}
+.ticker-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ticker-dot.red { background: var(--red-500); }
+.ticker-dot.green { background: var(--green-500); }
+.ticker-dot.amber { background: var(--amber-600); }
+
+/* FAB */
+.fab {
+  position: absolute;
+  bottom: 110px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--r-xl);
+  background: var(--grad-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-fab);
+  cursor: pointer;
+  z-index: 50;
+  border: none;
+  transition: transform var(--dur-base) var(--ease-spring),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.fab:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 12px 28px rgba(124,58,237,0.40), 0 4px 8px rgba(15,23,42,0.10);
+}
+.fab:active { transform: scale(0.96); }
+.fab .material-symbols-rounded { font-size: 28px; font-variation-settings: "FILL" 1; }
+
+/* Bottom Nav (modern: floating glass pill) */
+.bottom-nav {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  right: 14px;
+  height: 64px;
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--r-2xl);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 8px;
+  z-index: 40;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.10), 0 2px 6px rgba(15,23,42,0.06);
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: var(--r-lg);
+  transition: background var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out);
+  position: relative;
+  flex: 1;
+  max-width: 90px;
+}
+.nav-item.active {
+  background: var(--violet-100);
+  color: var(--violet-700);
+}
+.nav-item:not(.active) { color: var(--ink-500); }
+.nav-item .material-symbols-rounded {
+  font-size: 22px;
+  transition: font-variation-settings var(--dur-base) var(--ease-out);
+}
+.nav-item.active .material-symbols-rounded {
+  font-variation-settings: "FILL" 1, "wght" 600;
+}
+.nav-item span.label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* ===== More Options Screen ===== */
+.list-section {
+  background: var(--surface-white);
+  margin: 0 20px 16px;
+  border-radius: var(--r-xl);
+  border: 1px solid var(--ink-100);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+.list-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 14px 16px 8px;
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+  border-top: 1px solid var(--ink-100);
+}
+.list-row:first-of-type { border-top: none; }
+.list-row:hover { background: var(--violet-25); }
+.list-row-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.list-row-icon.purple { background: var(--violet-100); color: var(--violet-700); }
+.list-row-icon.red    { background: var(--red-100);    color: var(--red-600); }
+.list-row-icon.green  { background: var(--green-100);  color: var(--green-700); }
+.list-row-icon.amber  { background: var(--amber-100);  color: var(--amber-600); }
+.list-row-icon.sky    { background: var(--sky-100);    color: var(--sky-600); }
+.list-row-icon.gray   { background: var(--ink-100);    color: var(--ink-700); }
+.list-row-icon .material-symbols-rounded {
+  font-size: 20px;
+  font-variation-settings: "FILL" 1;
+}
+.list-row-content { flex: 1; min-width: 0; }
+.list-row-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-950);
+  letter-spacing: -0.01em;
+}
+.list-row-sub {
+  font-size: 12px;
+  color: var(--ink-500);
+  margin-top: 1px;
+}
+.list-row .material-symbols-rounded.arrow {
+  color: var(--ink-400);
+  font-size: 18px;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.list-row:hover .material-symbols-rounded.arrow {
+  color: var(--violet-700);
+  transform: translateX(2px);
+}
+.logout-row {
+  margin: 24px 20px;
+  padding: 16px;
+  text-align: center;
+  background: var(--red-50);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--red-100);
+  color: var(--red-600);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 15px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.logout-row:hover { background: var(--red-100); }
+
+/* ===== Settings ===== */
+.profile-card {
+  margin: 16px 20px;
+  padding: 18px;
+  background: white;
+  border-radius: 20px;
+  border: 1px solid var(--ink-100);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.avatar-md {
+  width: 56px; height: 56px;
+  border-radius: var(--r-lg);
+  background: var(--grad-primary-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 20px;
+  flex-shrink: 0;
+  letter-spacing: -0.02em;
+  box-shadow: var(--shadow-card);
+}
+.profile-info { flex: 1; min-width: 0; }
+.profile-name { font-size: 16px; font-weight: 700; color: var(--ink-950); letter-spacing: -0.01em; }
+.profile-email { font-size: 12px; color: var(--ink-500); margin-top: 2px; }
+.profile-edit {
+  font-size: 12px;
+  color: var(--violet-700);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.profile-edit:hover { background: var(--violet-50); }
+
+/* Toggle switch (modern) */
+.toggle {
+  width: 44px;
+  height: 26px;
+  background: var(--ink-200);
+  border-radius: var(--r-pill);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out);
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--violet-600); }
+.toggle::after {
+  content: '';
+  width: 22px;
+  height: 22px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform var(--dur-base) var(--ease-spring);
+  box-shadow: 0 2px 4px rgba(15,23,42,0.18);
+}
+.toggle.on::after { transform: translateX(18px); }
+
+/* ===== Capture Page ===== */
+.capture-anon {
+  margin: 16px 20px;
+  padding: 14px 16px;
+  background: var(--violet-50);
+  border: 1px solid var(--violet-100);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.capture-anon .icon-circle {
+  width: 36px; height: 36px;
+  background: var(--violet-100);
+  border-radius: var(--r-md);
+  display:flex; align-items:center; justify-content:center;
+  color: var(--violet-700);
+}
+.capture-anon .icon-circle .material-symbols-rounded { font-variation-settings: "FILL" 1; }
+.capture-anon-content { flex: 1; }
+.capture-anon-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+}
+.capture-anon-helper {
+  font-size: 11px;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+.upload-card {
+  margin: 0 20px 12px;
+  padding: 20px;
+  background: var(--violet-25);
+  border: 1.5px dashed var(--violet-300);
+  border-radius: var(--r-xl);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.upload-card:hover {
+  border-color: var(--violet-500);
+  background: var(--violet-50);
+  border-style: solid;
+}
+.upload-card-icon {
+  width: 44px; height: 44px;
+  border-radius: var(--r-md);
+  background: var(--violet-100);
+  color: var(--violet-700);
+  display:flex; align-items:center; justify-content:center;
+}
+.upload-card-icon .material-symbols-rounded {
+  font-size: 22px;
+  font-variation-settings: "FILL" 1;
+}
+.upload-card-info { flex: 1; }
+.upload-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+  letter-spacing: -0.01em;
+}
+.upload-card-sub {
+  font-size: 11px;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+.textarea-field {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--ink-200);
+  border-radius: var(--r-lg);
+  background: var(--surface-white);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink-950);
+  resize: none;
+  outline: none;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.textarea-field:focus {
+  border-color: var(--violet-500);
+  box-shadow: var(--shadow-glow);
+}
+.location-card {
+  margin: 0 20px;
+  padding: 14px 16px;
+  background: var(--surface-white);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-xs);
+}
+.location-card .material-symbols-rounded {
+  color: var(--violet-700);
+  font-size: 22px;
+  font-variation-settings: "FILL" 1;
+}
+.location-card-info { flex: 1; }
+.location-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-950);
+}
+.location-card-sub {
+  font-size: 11px;
+  color: var(--ink-500);
+}
+.location-card-edit {
+  font-size: 12px;
+  color: var(--purple-500);
+  font-weight: 600;
+}
+.sticky-cta {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 20px 20px;
+  background: linear-gradient(to top, var(--surface-lavender) 75%, rgba(250,250,254,0) 100%);
+  z-index: 5;
+}
+/* Capture and Location Sharing: explicit bottom padding on content
+   so contacts/textarea scroll above the sticky CTA. */
+.screen[data-screen="17"] .content,
+.screen[data-screen="19"] .content { padding-bottom: 110px; }
+
+/* ===== Help Alert ===== */
+.help-header {
+  padding: 16px 20px;
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--ink-100);
+}
+.help-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--red-600);
+  margin-bottom: 2px;
+  letter-spacing: -0.01em;
+}
+.help-header p {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+.help-card {
+  margin: 12px 20px;
+  padding: 20px;
+  height: 80px;
+  border-radius: var(--r-xl);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(15,23,42,0.10);
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.help-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15,23,42,0.14);
+}
+.help-card.purple { background: var(--grad-hero); box-shadow: 0 12px 28px rgba(124,58,237,0.28); }
+.help-card.red    { background: var(--grad-emergency); box-shadow: 0 12px 28px rgba(220,38,38,0.30); }
+.help-card.amber  { background: linear-gradient(135deg, #D97706, #F59E0B); box-shadow: 0 12px 28px rgba(217,119,6,0.30); }
+.help-card.green  { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 12px 28px rgba(5,150,105,0.30); }
+.help-card-icon {
+  width: 56px; height: 56px;
+  background: rgba(255,255,255,0.20);
+  border-radius: var(--r-lg);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink: 0;
+  backdrop-filter: blur(12px);
+}
+.help-card-icon .material-symbols-rounded {
+  font-size: 28px;
+  font-variation-settings: "FILL" 1;
+}
+.help-card-content { flex: 1; min-width: 0; }
+.help-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.help-card-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+}
+.help-card-en {
+  font-size: 11px;
+  font-weight: 500;
+  color: #FFFFFF;
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+}
+.help-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.help-card-phone {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.5px;
+}
+.help-card-circle {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.help-card-circle .material-symbols-outlined { font-size: 18px; font-variation-settings: "FILL" 1; }
+
+/* ===== Location Sharing ===== */
+.map-preview {
+  height: 240px;
+  margin: 16px 20px;
+  border-radius: var(--r-xl);
+  background:
+    linear-gradient(135deg, #E8DFF5 0%, #F0E8FA 100%),
+    repeating-linear-gradient(0deg, transparent 0, transparent 18px, var(--ink-100) 18px, var(--ink-100) 19px),
+    repeating-linear-gradient(90deg, transparent 0, transparent 18px, var(--ink-100) 18px, var(--ink-100) 19px);
+  background-blend-mode: normal, multiply, multiply;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ink-100);
+  box-shadow: var(--shadow-card);
+}
+.map-roads {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.6) 30%, rgba(255,255,255,0.6) 35%, transparent 35%),
+    linear-gradient(-45deg, transparent 60%, rgba(255,255,255,0.6) 60%, rgba(255,255,255,0.6) 65%, transparent 65%);
+}
+.map-pin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.map-pin-dot {
+  width: 24px;
+  height: 24px;
+  background: var(--violet-600);
+  border: 4px solid white;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(124,58,237,0.40);
+  position: relative;
+  z-index: 2;
+}
+.map-pin-pulse {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  background: var(--violet-500);
+  border-radius: 50%;
+  animation: pulse-map 2.5s ease-out infinite;
+}
+@keyframes pulse-map {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+.map-pin-label {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink-950);
+  color: white;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-card);
+}
+.map-pin-label::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--ink-950);
+}
+.map-live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255,255,255,0.94);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--red-600);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--shadow-card);
+  letter-spacing: 0.5px;
+}
+.map-live-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--red-500);
+  border-radius: 50%;
+  animation: pulse-red 1.5s infinite;
+}
+
+.address-card {
+  margin: 0 20px 16px;
+  padding: 16px;
+  background: var(--surface-white);
+  border: 1px solid var(--ink-100);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xs);
+}
+.address-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--ink-500);
+  font-weight: 500;
+}
+.address-card-address {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+.address-card-coords {
+  font-size: 11px;
+  color: var(--ink-500);
+  font-family: 'Roboto', monospace;
+}
+.share-toggle-row {
+  margin: 16px 20px;
+  padding: 16px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--ink-100);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.share-toggle-content { flex: 1; }
+.share-toggle-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+}
+.share-toggle-sub {
+  font-size: 11px;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+
+/* ===== Emergency Contacts ===== */
+.contact-row {
+  margin: 8px 20px;
+  padding: 14px;
+  background: white;
+  border: 1px solid var(--ink-100);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.contact-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: white;
+  flex-shrink: 0;
+}
+.contact-avatar.family { background: linear-gradient(135deg, #F472B6, #EC4899); }
+.contact-avatar.friend { background: linear-gradient(135deg, var(--purple-500), var(--purple-400)); }
+.contact-avatar.colleague { background: linear-gradient(135deg, var(--green-500), var(--green-600)); }
+.contact-info { flex: 1; }
+.contact-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-950);
+}
+.contact-phone {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+.contact-relationship {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.contact-relationship.family { background: #FCE7F3; color: #BE185D; }
+.contact-relationship.friend { background: var(--purple-100); color: var(--purple-700); }
+.contact-relationship.colleague { background: var(--green-100); color: var(--green-600); }
+.contact-action {
+  width: 36px; height: 36px;
+  background: var(--green-100);
+  color: var(--green-600);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.contact-action .material-symbols-outlined { font-size: 20px; font-variation-settings: "FILL" 1; }
+
+.section-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 16px 24px 8px;
+}
+
+/* ===== History Pages ===== */
+.location-pill {
+  margin: 16px 20px;
+  padding: 10px 16px;
+  background: white;
+  border: 1px solid var(--ink-100);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-700);
+  font-weight: 500;
+  cursor: pointer;
+}
+.location-pill .material-symbols-outlined { color: var(--purple-700); font-size: 18px; }
+
+.segmented-tabs {
+  display: flex;
+  margin: 0 20px 16px;
+  background: var(--ink-100);
+  border-radius: var(--r-md);
+  padding: 4px;
+}
+.segmented-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 8px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+  letter-spacing: -0.01em;
+}
+.segmented-tab:hover { color: var(--ink-700); }
+.segmented-tab.active {
+  background: var(--surface-white);
+  color: var(--violet-700);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 2px 6px rgba(15,23,42,0.06);
+}
+
+/* Filter chip (used on History list) */
+.time-chip {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid var(--surface-outline);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.time-chip:hover { background: var(--ink-50); }
+.time-chip.active {
+  background: var(--violet-700);
+  color: white;
+  border-color: var(--violet-700);
+}
+
+/* ===== Layout Columns ===== */
+.phone-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.sidebar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  flex: 1 1 auto;
+  max-width: 380px;
+  min-width: 0;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sidebar-column::-webkit-scrollbar { width: 6px; }
+.sidebar-column::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+/* ===== Sidebar Brand (top of right panel, right-aligned) ===== */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 6px 6px;
+  text-align: right;
+}
+.sidebar-brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: var(--grad-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 20px rgba(124,58,237,0.32);
+  flex-shrink: 0;
+}
+.sidebar-brand-mark .material-symbols-rounded {
+  font-size: 22px;
+  font-variation-settings: "FILL" 1;
+}
+.sidebar-brand-text { text-align: right; min-width: 0; }
+.sidebar-brand-text h1 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: var(--grad-hero);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+}
+.sidebar-brand-text p {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-500);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* ===== Bottom Navigation Controls (external) ===== */
+.nav-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0,0,0,0.42);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.30);
+  width: 100%;
+  max-width: 360px;
+  align-self: center;
+}
+.nav-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.nav-btn:hover {
+  background: rgba(255,255,255,0.20);
+  transform: scale(1.05);
+}
+.nav-btn:active { transform: scale(0.95); }
+.nav-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.nav-btn .material-symbols-rounded { font-size: 22px; font-variation-settings: "FILL" 1; }
+.screen-indicator {
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 100px;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+.screen-pill {
+  background: rgba(255,255,255,0.15);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: white;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.screen-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+}
+.screen-map-title {
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  grid-column: 1 / -1;
+  text-align: left;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.screen-map button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  font-size: 11.5px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+  letter-spacing: -0.01em;
+}
+.screen-map button:hover {
+  background: rgba(255,255,255,0.14);
+  color: white;
+  border-color: rgba(255,255,255,0.16);
+}
+.screen-map button.active {
+  background: var(--grad-primary-soft);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(124,58,237,0.32);
+}
+
+/* Responsive — on truly narrow viewports we let the JS scale
+   script take over, but tighten padding and header text. */
+@media (max-width: 900px) {
+  /* On narrow viewports, stack everything vertically. */
+  .app-container { flex-direction: column; gap: 16px; }
+  .sidebar-column { max-width: 100%; max-height: none; overflow: visible; }
+  .phone-column { order: -1; }
+  .screen-map { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 768px) {
+  body { padding: 8px; overflow-y: auto; }
+  .prototype-header h1 { font-size: 20px; }
+  .prototype-header p { font-size: 12px; }
+  .screen-map { padding: 8px; }
+}
+@media (max-width: 480px) {
+  .prototype-header h1 { font-size: 18px; }
+  .prototype-header p { font-size: 11px; }
+  .screen-map { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- LEFT COLUMN: phone only (brand moved to sidebar top) -->
+  <div class="phone-column">
+
+  <!-- Phone Stage (sized to scaled phone footprint) -->
+  <div class="phone-stage">
+  <!-- Phone Frame -->
+  <div class="phone-frame">
+    <div class="phone-screen">
+      <div class="ios-notch"></div>
+
+      <!-- ========== SCREEN 0: Splash ========== -->
+      <div class="screen splash active" data-screen="0" data-name="Splash">
+        <div class="ios-status" style="color:white;">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+          <div class="splash-logo">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <path d="M32 6L12 14V28C12 42 20 52 32 58C44 52 52 42 52 28V14L32 6Z" stroke="white" stroke-width="2" fill="rgba(255,255,255,0.05)"/>
+              <circle cx="32" cy="22" r="3" fill="white"/>
+              <ellipse cx="32" cy="22" rx="7" ry="3" stroke="white" stroke-width="1.5" fill="none"/>
+              <path d="M14 38H50L48 46H16L14 38Z" stroke="white" stroke-width="1.5" fill="none"/>
+              <rect x="22" y="40" width="2" height="4" fill="white"/>
+              <rect x="26" y="40" width="2" height="6" fill="white"/>
+              <rect x="30" y="40" width="2" height="5" fill="white"/>
+              <rect x="34" y="40" width="2" height="7" fill="white"/>
+              <rect x="38" y="40" width="2" height="4" fill="white"/>
+            </svg>
+          </div>
+          <div class="brand-display-name" style="color:white; font-size:26px; margin-bottom:8px;">Nagar Shield</div>
+          <div class="splash-tagline">শহরে, সদা সতর্ক</div>
+          <div class="loading-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 1: S-00 Welcome (Safety Profile) ========== -->
+      <div class="screen wizard-screen" data-screen="1" data-name="S-00 Welcome">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-center">
+          <div class="badge">
+            <span class="material-symbols-rounded" style="font-size:42px;">shield</span>
+          </div>
+          <h1>Welcome to <em>Nagar Shield</em></h1>
+          <p>New here? Let's set up your safety profile — five quick steps so we can help when it matters most.</p>
+          <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+            <div style="font-size:11px; color:var(--ink-500); letter-spacing:0.08em; text-transform:uppercase; font-weight:600;">What you'll add</div>
+            <div style="font-size:13px; color:var(--ink-700); line-height:1.7;">
+              Phone · Alternate phone · Emergency contacts · Location
+            </div>
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="2">Create my safety profile</button>
+          <div style="display:flex; align-items:center; gap:8px; margin:14px 0 6px;">
+            <div style="flex:1; height:1px; background:var(--ink-200);"></div>
+            <span style="font-size:11px; color:var(--ink-500); letter-spacing:0.08em; text-transform:uppercase;">Already a user</span>
+            <div style="flex:1; height:1px; background:var(--ink-200);"></div>
+          </div>
+          <button class="btn btn-secondary btn-lg" data-nav="11">Log in to existing account</button>
+          <div class="text-center" style="margin-top:10px; font-size:13px; color:var(--ink-500);">
+            New on this device? <span class="text-link" data-nav="12">Create an account</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 2: S-01 Own Phone ========== -->
+      <div class="screen wizard-screen" data-screen="2" data-name="S-01 Phone">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+          <div class="seg active"></div>
+          <div class="seg"></div>
+          <div class="seg"></div>
+          <div class="seg"></div>
+        </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 1 of 4</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Your safety profile</div>
+          <h1>Your <em>phone number</em></h1>
+          <p>This is how we'll reach you when help is on the way. We never share it with other users.</p>
+        </div>
+        <div class="wizard-body">
+          <div class="input-group">
+            <div class="input-field">
+              <input type="tel" placeholder=" " id="wiz-phone-1">
+              <label class="input-label" for="wiz-phone-1">Mobile number (01XXXXXXXXX)</label>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--ink-500);">
+            <span class="material-symbols-rounded" style="font-size:16px; color:var(--violet-600);">lock</span>
+            Encrypted at rest. Used only by you and Nagar Shield.
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="3">Continue</button>
+          <div class="escape" data-nav="1">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 3: S-02 Alternate Phone ========== -->
+      <div class="screen wizard-screen" data-screen="3" data-name="S-02 Alt Phone">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+          <div class="seg done"></div>
+          <div class="seg active"></div>
+          <div class="seg"></div>
+          <div class="seg"></div>
+        </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 1 of 4</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Your safety profile</div>
+          <h1>An <em>alternate number</em></h1>
+          <p>A second way to reach you if your primary number is unreachable. A close family member works well.</p>
+        </div>
+        <div class="wizard-body">
+          <div class="input-group">
+            <div class="input-field">
+              <input type="tel" placeholder=" " id="wiz-phone-2">
+              <label class="input-label" for="wiz-phone-2">Alternate mobile (01XXXXXXXXX)</label>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--ink-500);">
+            <span class="material-symbols-rounded" style="font-size:16px; color:var(--violet-600);">diversity_3</span>
+            Must be different from your primary number.
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="4">Continue</button>
+          <div class="escape" data-nav="2">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 5: S-04a Contact 1 of 3 ========== -->
+      <div class="screen wizard-screen" data-screen="5" data-name="S-04a Contact 1">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+            <div class="seg done"></div>
+            <div class="seg done"></div>
+            <div class="seg active"></div>
+            <div class="seg"></div>
+          </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 2 of 4</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Setup · ৪ ধাপ</div>
+          <h1>Add your <em>first emergency contact</em></h1>
+          <p>Someone who will pick up if you call for help. Add three in total — family, close friends, anyone you trust.</p>
+        </div>
+        <div class="wizard-body">
+          <div class="contact-slot-list">
+            <div class="contact-slot filled">
+              <div class="slot-num">1</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 1</div>
+                <div class="slot-sub">Rahim Ahmed · 01712-345678</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+            <div class="contact-slot">
+              <div class="slot-num">2</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 2</div>
+                <div class="slot-sub">Not added yet</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing">chevron_right</span>
+            </div>
+            <div class="contact-slot">
+              <div class="slot-num">3</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 3</div>
+                <div class="slot-sub">Not added yet</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing">chevron_right</span>
+            </div>
+          </div>
+          <div class="input-group" style="margin-top:18px;">
+            <div class="input-field">
+              <input type="text" placeholder=" " id="wiz-c1-name">
+              <label class="input-label" for="wiz-c1-name">Contact name</label>
+            </div>
+          </div>
+          <div class="input-group">
+            <div class="input-field">
+              <input type="tel" placeholder=" " id="wiz-c1-phone">
+              <label class="input-label" for="wiz-c1-phone">Their mobile (01XXXXXXXXX)</label>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="6">Save & continue</button>
+          <div class="escape" data-nav="4">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 6: S-04b Contact 2 of 3 ========== -->
+      <div class="screen wizard-screen" data-screen="6" data-name="S-04b Contact 2">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+            <div class="seg done"></div>
+            <div class="seg done"></div>
+            <div class="seg active"></div>
+            <div class="seg"></div>
+          </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 2 of 4</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Setup · ৪ ধাপ</div>
+          <h1>Add a <em>second contact</em></h1>
+          <p>One more. Three is the minimum — but you can add as many as you want after setup.</p>
+        </div>
+        <div class="wizard-body">
+          <div class="contact-slot-list">
+            <div class="contact-slot filled">
+              <div class="slot-num">1</div>
+              <div class="slot-text">
+                <div class="slot-title">Rahim Ahmed</div>
+                <div class="slot-sub">01712-345678</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+            <div class="contact-slot filled">
+              <div class="slot-num">2</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 2</div>
+                <div class="slot-sub">Sumaiya Khan · 01815-234567</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+            <div class="contact-slot">
+              <div class="slot-num">3</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 3</div>
+                <div class="slot-sub">Add one more to finish</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing">chevron_right</span>
+            </div>
+          </div>
+          <div class="input-group" style="margin-top:18px;">
+            <div class="input-field">
+              <input type="text" placeholder=" " id="wiz-c2-name">
+              <label class="input-label" for="wiz-c2-name">Contact name</label>
+            </div>
+          </div>
+          <div class="input-group">
+            <div class="input-field">
+              <input type="tel" placeholder=" " id="wiz-c2-phone">
+              <label class="input-label" for="wiz-c2-phone">Their mobile (01XXXXXXXXX)</label>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="7">Save & continue</button>
+          <div class="escape" data-nav="5">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 7: S-04c Contact 3 of 3 ========== -->
+      <div class="screen wizard-screen" data-screen="7" data-name="S-04c Contact 3">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+          <div class="seg done"></div>
+          <div class="seg done"></div>
+          <div class="seg done"></div>
+          <div class="seg active"></div>
+        </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 2 of 4</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Setup · ৪ ধাপ</div>
+          <h1>One more <em>contact</em></h1>
+          <p>After this, location permission is the last step before Nagar Shield opens up.</p>
+        </div>
+        <div class="wizard-body">
+          <div class="contact-slot-list">
+            <div class="contact-slot filled">
+              <div class="slot-num">1</div>
+              <div class="slot-text">
+                <div class="slot-title">Rahim Ahmed</div>
+                <div class="slot-sub">01712-345678</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+            <div class="contact-slot filled">
+              <div class="slot-num">2</div>
+              <div class="slot-text">
+                <div class="slot-title">Sumaiya Khan</div>
+                <div class="slot-sub">01815-234567</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+            <div class="contact-slot filled">
+              <div class="slot-num">3</div>
+              <div class="slot-text">
+                <div class="slot-title">Contact 3</div>
+                <div class="slot-sub">Faisal Iqbal · 01933-456789</div>
+              </div>
+              <span class="material-symbols-rounded slot-trailing" style="color:var(--green-600);">check_circle</span>
+            </div>
+          </div>
+          <div style="margin-top:18px; padding:14px; border-radius:var(--r-lg); background:var(--violet-50); border:1px solid var(--violet-200); display:flex; gap:10px; align-items:flex-start;">
+            <span class="material-symbols-rounded" style="font-size:18px; color:var(--violet-700); margin-top:1px;">verified_user</span>
+            <div style="font-size:12px; line-height:1.5; color:var(--ink-700);">
+              <strong style="color:var(--violet-800);">All three saved.</strong> You can edit or add more contacts any time from Settings → Safety Profile.
+            </div>
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="8">Continue to location</button>
+          <div class="escape" data-nav="6">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 8: S-05 Location ========== -->
+      <div class="screen wizard-screen" data-screen="8" data-name="S-05 Location">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-progress">
+          <div class="seg done"></div>
+          <div class="seg done"></div>
+          <div class="seg done"></div>
+          <div class="seg active"></div>
+        </div>
+        <div class="wizard-step-label">
+          <span>Setup · <span class="step-count">Step 4 of 4 · last</span></span>
+        </div>
+        <div class="wizard-hero">
+          <div class="wizard-eyebrow"><span class="dot"></span> Almost done</div>
+          <h1>Allow <em>location</em> while using the app</h1>
+          <p>Location is what makes Capture auto-stamp the area and Location Sharing work. We only use it while a share or report is active — never in the background. You can skip this step and grant permission later from Settings.</p>
+        </div>
+        <div class="location-illustration">
+          <div class="ring r1"></div>
+          <div class="ring r2"></div>
+          <div class="pin">
+            <span class="material-symbols-rounded" style="font-size:32px;">my_location</span>
+          </div>
+        </div>
+        <div class="location-reassure">
+          <div class="icon">
+            <span class="material-symbols-rounded" style="font-size:16px;">lock</span>
+          </div>
+          <div class="text">
+            <strong>What we do with location:</strong> we use it only while you're sharing your live location or filing a Capture. We never collect it in the background, never sell it, and never share it without your action.
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="9">Allow precise location</button>
+          <div class="escape" data-nav="9">Continue without location</div>
+          <div class="escape" data-nav="7" style="font-size:12px;">Back</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 9: S-06 You're All Set ========== -->
+      <div class="screen wizard-screen" data-screen="9" data-name="S-06 Done">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="wizard-center">
+          <div class="badge" style="background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 8px 24px rgba(16,185,129,0.35);">
+            <span class="material-symbols-rounded" style="font-size:46px;">check</span>
+          </div>
+          <h1>You're <em>all set</em></h1>
+          <p>Your safety profile is saved. Nagar Shield is ready to help — and to call the right people — when you need it.</p>
+        </div>
+        <div style="padding: 0 24px;">
+          <div class="summary-card">
+            <div class="summary-row">
+              <span class="label">Phone</span>
+              <span class="value">01712-345678</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Alternate</span>
+              <span class="value">01815-234567</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Emergency contacts</span>
+              <span class="value">3 saved</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Location</span>
+              <span class="value" style="color: var(--green-600);">Allowed</span>
+            </div>
+          </div>
+        </div>
+        <div class="wizard-sticky">
+          <button class="btn btn-primary btn-lg" data-nav="14">Open Nagar Shield</button>
+          <div class="escape" data-nav="16">Edit my profile</div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 11: Login ========== -->
+      <div class="screen" data-screen="11" data-name="Login">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="content auth-screen">
+          <div style="height:40px;"></div>
+          <div class="brand-display">
+            <div class="brand-display-logo">
+              <svg width="44" height="44" viewBox="0 0 64 64" fill="none">
+                <path d="M32 6L12 14V28C12 42 20 52 32 58C44 52 52 42 52 28V14L32 6Z" stroke="white" stroke-width="2.5" fill="rgba(255,255,255,0.1)"/>
+                <circle cx="32" cy="22" r="3" fill="white"/>
+                <ellipse cx="32" cy="22" rx="7" ry="3" stroke="white" stroke-width="1.5" fill="none"/>
+                <path d="M14 38H50L48 46H16L14 38Z" stroke="white" stroke-width="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div class="brand-display-name">Nagar Shield</div>
+            <div class="brand-display-tag">শহরে, সদা সতর্ক</div>
+          </div>
+          <div class="auth-hero">
+            <h1>স্বাগতম ফিরে আসায়</h1>
+            <p>আপনার অ্যাকাউন্টে প্রবেশ করুন</p>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="text" placeholder=" " id="login-identifier">
+              <span class="leading-icon material-symbols-outlined">mail</span>
+              <label class="input-label" for="login-identifier">ফোন বা ইমেইল</label>
+            </div>
+            <div class="input-helper">যেকোনো একটি দিয়ে প্রবেশ করুন</div>
+          </div>
+          <button class="btn btn-secondary btn-lg" id="send-otp-btn" onclick="document.getElementById('otp-step').style.display='block'; this.style.display='none';">
+            <span class="material-symbols-outlined">send</span>
+            OTP পাঠান
+          </button>
+          <div id="otp-step" style="display:none; margin-top:16px;">
+            <div class="input-group">
+              <div class="input-field input-with-icon" style="position:relative;">
+                <input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder=" " id="login-otp">
+                <span class="leading-icon material-symbols-outlined">lock</span>
+                <label class="input-label" for="login-otp">OTP কোড (৬ সংখ্যা)</label>
+              </div>
+              <div class="input-helper" style="color:var(--green-600);">✓ ইমেইলে কোড পাঠানো হয়েছে</div>
+            </div>
+            <div style="text-align:right; margin-bottom:16px;">
+              <span class="text-link">কোড পুনঃপাঠান (30s)</span>
+            </div>
+            <button class="btn btn-primary btn-lg" data-nav="18">OTP দিয়ে প্রবেশ</button>
+          </div>
+          <div class="text-center mt-24" style="font-size:14px; color:var(--ink-600);">
+            অ্যাকাউন্ট নেই? <span class="text-link" data-nav="12">সাইন আপ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 12: Registration ========== -->
+      <div class="screen" data-screen="12" data-name="Registration">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar app-bar-no-border" style="background:white;">
+          <button class="back-btn" data-nav="11">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="brand-display-tag" style="font-weight:700; color:var(--purple-700);">Nagar Shield</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content auth-screen" style="padding-top:0;">
+          <div class="auth-hero" style="margin-top:24px;">
+            <h1>আপনার অ্যাকাউন্ট তৈরি করুন</h1>
+            <p>একসাথে শহরকে নিরাপদ করি</p>
+          </div>
+          <div class="input-group">
+            <div class="input-field"><input type="text" placeholder=" "><label class="input-label">পূর্ণ নাম</label></div>
+            <div class="input-helper">আপনার আসল নাম ব্যবহার করুন</div>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="email" placeholder=" ">
+              <span class="leading-icon material-symbols-outlined">mail</span>
+              <label class="input-label">ইমেইল (প্রয়োজন)</label>
+            </div>
+            <div class="input-helper">OTP ডিফল্টভাবে ইমেইলে যাবে — বিনামূল্যে</div>
+          </div>
+          <div class="input-group">
+            <div class="input-field input-with-icon" style="position:relative;">
+              <input type="tel" placeholder=" ">
+              <span class="leading-icon material-symbols-outlined">phone</span>
+              <label class="input-label">ফোন (প্রয়োজন)</label>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:var(--ink-600);">
+              <div class="custom-checkbox" onclick="this.classList.toggle('checked')"></div>
+              <span>SMS-এও OTP পাঠান (ঐচ্ছিক, অপারেটর চার্জ প্রযোজ্য)</span>
+            </label>
+          </div>
+          <button class="btn btn-secondary btn-lg mt-16" onclick="document.getElementById('reg-otp').style.display='block'; this.style.display='none';">
+            <span class="material-symbols-outlined">send</span>
+            OTP পাঠান
+          </button>
+          <div id="reg-otp" style="display:none; margin-top:16px;">
+            <div class="input-group">
+              <div class="input-field input-with-icon" style="position:relative;">
+                <input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder=" ">
+                <span class="leading-icon material-symbols-outlined">lock</span>
+                <label class="input-label">OTP কোড (৬ সংখ্যা)</label>
+              </div>
+              <div class="input-helper" style="color:var(--green-600);">✓ ইমেইলে কোড পাঠানো হয়েছে</div>
+            </div>
+            <button class="btn btn-primary btn-lg" data-nav="18">যাচাই করুন ও চালিয়ে যান</button>
+          </div>
+          <div class="text-center mt-16" style="font-size:12px; color:var(--ink-500);">
+            অ্যাকাউন্ট তৈরি করার মাধ্যমে আপনি আমাদের শর্তাবলী মেনে নিচ্ছেন
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 13: Forgot Password ========== -->
+      <div class="screen" data-screen="13" data-name="Forgot Password">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="11">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">অ্যাকাউন্ট পুনরুদ্ধার</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content" style="padding:40px 24px; display:flex; flex-direction:column; align-items:center;">
+          <div style="margin-top:40px; margin-bottom:24px;">
+            <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
+              <rect x="20" y="44" width="56" height="40" rx="6" stroke="var(--purple-300)" stroke-width="2.5" fill="var(--purple-50)"/>
+              <path d="M30 44V32C30 24 36 18 44 18H52C60 18 66 24 66 32V44" stroke="var(--purple-300)" stroke-width="2.5"/>
+              <circle cx="48" cy="60" r="5" fill="var(--purple-700)"/>
+              <rect x="47" y="60" width="2" height="8" fill="var(--purple-700)"/>
+              <circle cx="48" cy="48" r="3" fill="var(--purple-700)"/>
+            </svg>
+          </div>
+          <h2 style="font-size:24px; font-weight:600; color:var(--ink-950); margin-bottom:8px; text-align:center;">পাসওয়ার্ড ভুলে গেছেন?</h2>
+          <p style="font-size:14px; color:var(--ink-600); text-align:center; margin-bottom:40px; line-height:1.5;">
+            আপনার ইমেইল দিন, আমরা একটি<br>রিসেট লিংক পাঠাবো
+          </p>
+          <div style="width:100%; max-width:340px;">
+            <div class="input-group">
+              <div class="input-field input-with-icon" style="position:relative;">
+                <input type="text" placeholder=" ">
+                <span class="leading-icon material-symbols-outlined">mail</span>
+                <label class="input-label">ফোন বা ইমেইল</label>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-lg mt-16" data-nav="11">OTP কোড পাঠান</button>
+            <div class="text-center mt-24">
+              <span class="text-link" data-nav="11">← লগইনে ফিরে যান</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 14: Home (Dashboard) ========== -->
+      <div class="screen" data-screen="14" data-name="Home (Dashboard)">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="greeting-block">
+            <div class="hi" style="display:flex; align-items:center; gap:6px;">সুপ্রভাত, রাহুল<span class="material-symbols-outlined" style="font-size:20px; color:var(--amber-600); font-variation-settings:'FILL' 1;">wb_sunny</span></div>
+            <div class="date">রবিবার, ৩০ আগস্ট</div>
+          </div>
+          <button class="icon-btn" data-nav="15" aria-label="আরও বিকল্প — more options" title="আরও বিকল্প" style="margin-right:4px;">
+            <span class="material-symbols-outlined">more_horiz</span>
+            <span class="badge-dot"></span>
+          </button>
+          <div class="avatar-sm">রা</div>
+        </div>
+        <div class="content">
+          <!-- Quick Actions (no hero card - no Safety Score in contract) -->
+          <!-- Search -->
+          <div class="search-bar">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" placeholder="এলাকা খুঁজুন...">
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="section-title">
+            <h3>দ্রুত অ্যাকশন</h3>
+          </div>
+          <div class="quick-actions">
+            <div class="action-card" data-nav="17">
+              <div class="action-card-icon purple">
+                <span class="material-symbols-outlined">photo_camera</span>
+              </div>
+              <div class="action-card-label">ক্যাপচার</div>
+              <div class="action-card-sub">অপরাধ প্রমাণ</div>
+            </div>
+            <div class="action-card" data-nav="18">
+              <div class="action-card-icon red">
+                <span class="material-symbols-outlined">notifications_active</span>
+              </div>
+              <div class="action-card-label">হেল্প অ্যালার্ট</div>
+              <div class="action-card-sub">জরুরি সাহায্য (হোম)</div>
+            </div>
+            <div class="action-card" data-nav="19">
+              <div class="action-card-icon green">
+                <span class="material-symbols-outlined">my_location</span>
+              </div>
+              <div class="action-card-label">লোকেশন শেয়ার</div>
+              <div class="action-card-sub">৩জন সক্রিয়</div>
+            </div>
+            <div class="action-card" data-nav="21">
+              <div class="action-card-icon purple">
+                <span class="material-symbols-outlined">monitoring</span>
+              </div>
+              <div class="action-card-label">ক্রাইম হিস্ট্রি</div>
+              <div class="action-card-sub">গত ৩০ দিন</div>
+            </div>
+            <div class="action-card" data-nav="20">
+              <div class="action-card-icon purple">
+                <span class="material-symbols-outlined">contact_emergency</span>
+              </div>
+              <div class="action-card-label">জরুরি কন্টাক্ট</div>
+              <div class="action-card-sub">৫টি সংরক্ষিত</div>
+            </div>
+            <div class="action-card" data-nav="15">
+              <div class="action-card-icon gray">
+                <span class="material-symbols-outlined">grid_view</span>
+              </div>
+              <div class="action-card-label">আরও</div>
+              <div class="action-card-sub">সেটিংস, গ্রুপ</div>
+            </div>
+          </div>
+
+          <!-- Alerts feed (vertical, BD-wide public safety newsfeed) -->
+          <div style="margin: 0 20px 8px; display:flex; align-items:center; gap:6px; font-size:11px; color:var(--ink-500); font-weight:600;">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--red-500);box-shadow:0 0 0 0 rgba(239,68,68,0.4);animation:pulse-red 1.5s infinite;"></span>
+            Auto-refreshes every 60s
+          </div>
+          <div style="display:flex;gap:8px;overflow-x:auto;padding:0 20px 12px;scrollbar-width:none;">
+            <div style="background:var(--grad-primary);color:white;padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;flex-shrink:0;">All BD</div>
+            <div style="background:var(--surface-white);border:1px solid var(--ink-200);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--ink-700);flex-shrink:0;">My division</div>
+            <div style="background:var(--surface-white);border:1px solid var(--ink-200);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--ink-700);flex-shrink:0;">My city</div>
+            <div style="background:var(--surface-white);border:1px solid var(--ink-200);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--ink-700);flex-shrink:0;">Mirpur</div>
+            <div style="background:var(--surface-white);border:1px solid var(--ink-200);padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--ink-700);flex-shrink:0;">Dhanmondi</div>
+          </div>
+
+          <!-- Alert card: চুরি theft -->
+          <div style="margin:0 20px 10px;padding:14px 16px;background:var(--surface-white);border:1px solid var(--ink-100);border-left:4px solid #7B1FA2;border-radius:14px;display:flex;gap:12px;box-shadow:var(--shadow-card);position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(123,31,162,0.15);color:#7B1FA2;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:22px;" aria-hidden="true">backpack</span></div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ink-500);font-weight:600;">Mirpur · মিরপুর</div>
+              <div style="font-size:15px;font-weight:700;color:var(--ink-950);margin:2px 0 4px;">চুরি — Theft</div>
+              <div style="font-size:13px;color:var(--ink-600);line-height:1.4;">Bag snatching near Shah Ali Plaza</div>
+              <div style="font-size:11px;color:var(--ink-500);margin-top:6px;">5 min ago</div>
+            </div>
+            <button data-dialog="flag" title="রিপোর্ট করুন" aria-label="রিপোর্ট করুন" style="width:48px;height:48px;background:transparent;border:none;color:var(--ink-500);border-radius:50%;cursor:pointer;align-self:flex-start;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">flag</span>
+            </button>
+            <div data-nav="21a" aria-label="রিপোর্ট বিস্তারিত দেখুন — view report details" style="font-size:11px;color:var(--violet-700);font-weight:600;margin-top:6px;cursor:pointer;">✎ বিস্তারিত দেখুন</div>
+          </div>
+
+          <!-- Alert card: আক্রমণ assault -->
+          <div style="margin:0 20px 10px;padding:14px 16px;background:var(--surface-white);border:1px solid var(--ink-100);border-left:4px solid #DC2626;border-radius:14px;display:flex;gap:12px;box-shadow:var(--shadow-card);position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(220,38,38,0.15);color:#DC2626;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:22px;" aria-hidden="true">warning</span></div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ink-500);font-weight:600;">Dhanmondi · ধানমন্ডি</div>
+              <div style="font-size:15px;font-weight:700;color:var(--ink-950);margin:2px 0 4px;">আক্রমণ — Assault</div>
+              <div style="font-size:13px;color:var(--ink-600);line-height:1.4;">Argument escalating near lake</div>
+              <div style="font-size:11px;color:var(--ink-500);margin-top:6px;">22 min ago</div>
+            </div>
+            <button data-dialog="flag" title="রিপোর্ট করুন" aria-label="রিপোর্ট করুন" style="width:48px;height:48px;background:transparent;border:none;color:var(--ink-500);border-radius:50%;cursor:pointer;align-self:flex-start;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">flag</span>
+            </button>
+            <div data-nav="21a" aria-label="রিপোর্ট বিস্তারিত দেখুন — view report details" style="font-size:11px;color:var(--violet-700);font-weight:600;margin-top:6px;cursor:pointer;">✎ বিস্তারিত দেখুন</div>
+          </div>
+
+          <!-- Alert card: আগুন fire -->
+          <div style="margin:0 20px 10px;padding:14px 16px;background:var(--surface-white);border:1px solid var(--ink-100);border-left:4px solid #D97706;border-radius:14px;display:flex;gap:12px;box-shadow:var(--shadow-card);position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(217,119,6,0.15);color:#D97706;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:22px;" aria-hidden="true">local_fire_department</span></div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ink-500);font-weight:600;">Uttara · উত্তরা</div>
+              <div style="font-size:15px;font-weight:700;color:var(--ink-950);margin:2px 0 4px;">আগুন — Fire</div>
+              <div style="font-size:13px;color:var(--ink-600);line-height:1.4;">Small fire in market area, fire service responding</div>
+              <div style="font-size:11px;color:var(--ink-500);margin-top:6px;">1 hr ago</div>
+            </div>
+            <button data-dialog="flag" title="রিপোর্ট করুন" aria-label="রিপোর্ট করুন" style="width:48px;height:48px;background:transparent;border:none;color:var(--ink-500);border-radius:50%;cursor:pointer;align-self:flex-start;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">flag</span>
+            </button>
+            <div data-nav="21a" aria-label="রিপোর্ট বিস্তারিত দেখুন — view report details" style="font-size:11px;color:var(--violet-700);font-weight:600;margin-top:6px;cursor:pointer;">✎ বিস্তারিত দেখুন</div>
+          </div>
+
+          <!-- Alert card: চিকিৎসা medical -->
+          <div style="margin:0 20px 10px;padding:14px 16px;background:var(--surface-white);border:1px solid var(--ink-100);border-left:4px solid #C2185B;border-radius:14px;display:flex;gap:12px;box-shadow:var(--shadow-card);position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(194,24,91,0.15);color:#C2185B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:22px;" aria-hidden="true">medical_services</span></div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ink-500);font-weight:600;">Gulshan · গুলশান</div>
+              <div style="font-size:15px;font-weight:700;color:var(--ink-950);margin:2px 0 4px;">চিকিৎসা — Medical</div>
+              <div style="font-size:13px;color:var(--ink-600);line-height:1.4;">Road accident near Gulshan-2 circle</div>
+              <div style="font-size:11px;color:var(--ink-500);margin-top:6px;">2 hr ago</div>
+            </div>
+            <button data-dialog="flag" title="রিপোর্ট করুন" aria-label="রিপোর্ট করুন" style="width:48px;height:48px;background:transparent;border:none;color:var(--ink-500);border-radius:50%;cursor:pointer;align-self:flex-start;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">flag</span>
+            </button>
+            <div data-nav="21a" aria-label="রিপোর্ট বিস্তারিত দেখুন — view report details" style="font-size:11px;color:var(--violet-700);font-weight:600;margin-top:6px;cursor:pointer;">✎ বিস্তারিত দেখুন</div>
+          </div>
+
+          <!-- Alert card: দুর্ঘটনা accident -->
+          <div style="margin:0 20px 10px;padding:14px 16px;background:var(--surface-white);border:1px solid var(--ink-100);border-left:4px solid #5D4037;border-radius:14px;display:flex;gap:12px;box-shadow:var(--shadow-card);position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(93,64,55,0.15);color:#5D4037;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:22px;" aria-hidden="true">diamond</span></div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ink-500);font-weight:600;">Mohammadpur · মোহাম্মদপুর</div>
+              <div style="font-size:15px;font-weight:700;color:var(--ink-950);margin:2px 0 4px;">দুর্ঘটনা — Accident</div>
+              <div style="font-size:13px;color:var(--ink-600);line-height:1.4;">Two-wheeler collision at Town Hall intersection</div>
+              <div style="font-size:11px;color:var(--ink-500);margin-top:6px;">3 hr ago</div>
+            </div>
+            <button data-dialog="flag" title="রিপোর্ট করুন" aria-label="রিপোর্ট করুন" style="width:48px;height:48px;background:transparent;border:none;color:var(--ink-500);border-radius:50%;cursor:pointer;align-self:flex-start;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">flag</span>
+            </button>
+            <div data-nav="21a" aria-label="রিপোর্ট বিস্তারিত দেখুন — view report details" style="font-size:11px;color:var(--violet-700);font-weight:600;margin-top:6px;cursor:pointer;">✎ বিস্তারিত দেখুন</div>
+          </div>
+        </div>
+
+          <div style="height:60px;"></div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 15: More Options ========== -->
+      <div class="screen" data-screen="15" data-name="More Options">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">আরও অপশন</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div class="list-section">
+            <div class="list-section-header">সেবা</div>
+            <div class="list-row">
+              <div class="list-row-icon red">
+                <span class="material-symbols-outlined">notifications</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">নোটিফিকেশন</div>
+                <div class="list-row-sub">৩টি নতুন</div>
+              </div>
+              <div style="background:var(--red-600); color:white; font-size:11px; padding:2px 8px; border-radius:999px; font-weight:700;">3</div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon amber">
+                <span class="material-symbols-outlined">contact_page</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">সংরক্ষিত কন্টাক্ট</div>
+                <div class="list-row-sub">১২টি</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon red">
+                <span class="material-symbols-outlined">emergency</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">জরুরি সেবা</div>
+                <div class="list-row-sub">পুলিশ, হাসপাতাল, ফায়ার</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+          </div>
+
+          <div class="list-section">
+            <div class="list-section-header">অ্যাকাউন্ট</div>
+            <div class="list-row" data-nav="17">
+              <div class="list-row-icon gray">
+                <span class="material-symbols-outlined">tune</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">সেটিংস</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon gray">
+                <span class="material-symbols-outlined">help</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">সাহায্য ও সাপোর্ট</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon purple">
+                <span class="material-symbols-outlined">info</span>
+              </div>
+              <div class="list-row-content">
+                <div class="list-row-title">Nagar Shield সম্পর্কে</div>
+                <div class="list-row-sub">v1.0.0 · AIUB</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+          </div>
+
+          <div class="logout-row" data-nav="11">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <span class="material-symbols-outlined" style="font-size:20px;">logout</span>
+              লগ আউট
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 16: Settings ========== -->
+      <div class="screen" data-screen="16" data-name="Settings">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">সেটিংস</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div class="profile-card">
+            <div class="avatar-md">রা</div>
+            <div class="profile-info">
+              <div class="profile-name">রাহুল আহমেদ</div>
+              <div class="profile-email">rahul@example.com</div>
+            </div>
+            <div class="profile-edit">এডিট</div>
+          </div>
+
+          <div class="list-section">
+            <div class="list-section-header">অ্যাকাউন্ট</div>
+            <div class="list-row">
+              <div class="list-row-icon purple"><span class="material-symbols-outlined">account_circle</span></div>
+              <div class="list-row-content"><div class="list-row-title">প্রোফাইল এডিট</div></div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon purple"><span class="material-symbols-outlined">badge</span></div>
+              <div class="list-row-content"><div class="list-row-title">পরিচয় পরিবর্তন (ফোন / ইমেইল)</div></div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+          </div>
+
+          <div class="list-section">
+            <div class="list-section-header">পছন্দ</div>
+            <div class="list-row">
+              <div class="list-row-icon green"><span class="material-symbols-outlined">language</span></div>
+              <div class="list-row-content"><div class="list-row-title">ভাষা</div></div>
+              <div style="background:var(--purple-100); color:var(--purple-700); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:600;">বাংলা</div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon gray"><span class="material-symbols-outlined">dark_mode</span></div>
+              <div class="list-row-content">
+                <div class="list-row-title">ডার্ক মোড</div>
+                <div class="list-row-sub">চোখের জন্য আরামদায়ক</div>
+              </div>
+              <div class="toggle" id="dark-mode-toggle" onclick="toggleDarkMode(this)" aria-label="ডার্ক মোড টগল"></div>
+            </div>
+          </div>
+
+          <div class="list-section">
+            <div class="list-section-header">নিরাপত্তা</div>
+            <div class="list-row">
+              <div class="list-row-icon amber"><span class="material-symbols-outlined">sms</span></div>
+              <div class="list-row-content">
+                <div class="list-row-title">SMS-এ ও OTP পাঠান</div>
+                <div class="list-row-sub">ক্যারিয়ার চার্জ প্রযোজ্য হতে পারে</div>
+              </div>
+              <div class="toggle" onclick="smsToggleClick()" id="sms-otp-toggle"></div>
+            </div>
+          </div>
+
+          <div class="list-section">
+            <div class="list-section-header">সম্পর্কে</div>
+            <div class="list-row">
+              <div class="list-row-icon purple"><span class="material-symbols-outlined">info</span></div>
+              <div class="list-row-content">
+                <div class="list-row-title">Nagar Shield সম্পর্কে</div>
+                <div class="list-row-sub">v1.0.0</div>
+              </div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon amber"><span class="material-symbols-outlined">star</span></div>
+              <div class="list-row-content"><div class="list-row-title">অ্যাপ রেট করুন</div></div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+            <div class="list-row">
+              <div class="list-row-icon green"><span class="material-symbols-outlined">ios_share</span></div>
+              <div class="list-row-content"><div class="list-row-title">অ্যাপ শেয়ার করুন</div></div>
+              <span class="material-symbols-outlined arrow">arrow_forward_ios</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 17: Capture Page ========== -->
+      <div class="screen" data-screen="17" data-name="Capture (Report Crime)">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar app-bar-no-border" style="background:white;">
+          <button class="icon-btn" data-nav="14">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <div style="text-align:center;">
+            <div class="app-bar-title">অপরাধ রিপোর্ট করুন</div>
+            <div style="font-size:11px; color:var(--ink-500);">আপনার সাক্ষ্য অন্যদের সুরক্ষিত রাখবে</div>
+          </div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div class="capture-anon">
+            <div class="icon-circle">
+              <span class="material-symbols-outlined">visibility_off</span>
+            </div>
+            <div class="capture-anon-content">
+              <div class="capture-anon-label">বেনামী রিপোর্ট</div>
+              <div class="capture-anon-helper">আপনার পরিচয় সম্পূর্ণ গোপন থাকবে</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+
+          <div style="padding:8px 0;"></div>
+
+          <div class="upload-card" style="margin-top:0;">
+            <div class="upload-card-icon">
+              <span class="material-symbols-outlined">videocam</span>
+            </div>
+            <div class="upload-card-info">
+              <div class="upload-card-title">ভিডিও ক্যাপচার করুন</div>
+              <div class="upload-card-sub">সর্বোচ্চ ৬০ সেকেন্ড</div>
+            </div>
+            <span class="material-symbols-outlined" style="color:var(--ink-400); font-size:18px;">arrow_forward_ios</span>
+          </div>
+
+          <div class="upload-card">
+            <div class="upload-card-icon">
+              <span class="material-symbols-outlined">photo_camera</span>
+            </div>
+            <div class="upload-card-info">
+              <div class="upload-card-title">ছবি তুলুন</div>
+              <div class="upload-card-sub">অথবা গ্যালারি থেকে নির্বাচন করুন</div>
+            </div>
+            <span class="material-symbols-outlined" style="color:var(--ink-400); font-size:18px;">arrow_forward_ios</span>
+          </div>
+
+          <div class="upload-card">
+            <div class="upload-card-icon">
+              <span class="material-symbols-outlined">attach_file</span>
+            </div>
+            <div class="upload-card-info">
+              <div class="upload-card-title">ফাইল আপলোড করুন</div>
+              <div class="upload-card-sub">PDF, DOC — সর্বোচ্চ ১০MB</div>
+            </div>
+            <span class="material-symbols-outlined" style="color:var(--ink-400); font-size:18px;">arrow_forward_ios</span>
+          </div>
+
+          <div style="padding:16px 20px;">
+            <div style="font-size:13px; font-weight:600; color:var(--ink-950); margin-bottom:8px;">দৃশ্যের বর্ণনা</div>
+            <textarea class="textarea-field" placeholder="কী ঘটেছে, কখন, কোথায় — যত বিস্তারিত পারেন..."></textarea>
+            <div style="text-align:right; font-size:12px; color:var(--ink-500); margin-top:4px;">0 / 140</div>
+          </div>
+
+          <div class="location-card">
+            <span class="material-symbols-outlined">location_on</span>
+            <div class="location-card-info">
+              <div class="location-card-title">বসুন্ধরা R/A, ঢাকা</div>
+              <div class="location-card-sub">অটো-ডিটেক্টেড · ±৫ মিটার</div>
+            </div>
+            <div class="location-card-edit">পরিবর্তন</div>
+          </div>
+
+          <div class="sticky-cta">
+            <button class="btn btn-primary btn-lg">
+              <span class="material-symbols-outlined">send</span>
+              রিপোর্ট পাঠান
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 18: Help Alert ========== -->
+      <div class="screen" data-screen="18" data-name="Help Alert">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="help-header">
+          <h2 style="color:var(--red-600); display:flex; align-items:center; gap:6px;"><span class="material-symbols-outlined" style="font-size:22px;">emergency</span>জরুরি সাহায্য</h2>
+          <p>এক টোকায় সাহায্য পান</p>
+        </div>
+        <div class="content" style="padding-top:8px;">
+          <div class="help-card purple" role="button" tabindex="0" aria-label="পুলিশ Police ৯৯৯" onclick="helpAlertTap('police','999')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_police</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">পুলিশ</div>
+              <div class="help-card-sub">নিকটবর্তী থানায় কল</div>
+              <div class="help-card-en">Police</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৯৯৯</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card red" role="button" tabindex="0" aria-label="মেডিকেল Medical ৯৯৯" onclick="helpAlertTap('medical','999')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_hospital</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">মেডিকেল</div>
+              <div class="help-card-sub">নিকটবর্তী হাসপাতালে কল</div>
+              <div class="help-card-en">Medical</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৯৯৯</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card amber" role="button" tabindex="0" aria-label="ফায়ার সার্ভিস Fire Service ১০২" onclick="helpAlertTap('fire','102')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">local_fire_department</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">ফায়ার সার্ভিস</div>
+              <div class="help-card-sub">নিকটবর্তী ফায়ার স্টেশনে কল</div>
+              <div class="help-card-en">Fire Service</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">১০২</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <div class="help-card green" role="button" tabindex="0" aria-label="বিশ্বস্ত পরিচিত Personal Contacts ৫ জন" onclick="helpAlertTap('personal','contacts')">
+            <div class="help-card-icon">
+              <span class="material-symbols-outlined">groups_2</span>
+            </div>
+            <div class="help-card-content">
+              <div class="help-card-title">বিশ্বস্ত পরিচিত</div>
+              <div class="help-card-sub">আপনার ৫টি সংরক্ষিত কন্টাক্ট</div>
+              <div class="help-card-en">Personal Contacts</div>
+            </div>
+            <div class="help-card-right">
+              <div class="help-card-phone">৫ জন</div>
+              <div class="help-card-circle"><span class="material-symbols-outlined">call</span></div>
+            </div>
+          </div>
+
+          <!-- More Help link card (5th surface per FR-HELP-1) -->
+          <div onclick="document.getElementById('more-help-dialog').style.display='flex'" style="margin:8px 20px; padding:18px 20px; background:var(--surface-white); border:1.5px dashed var(--ink-300); border-radius:18px; display:flex; align-items:center; gap:14px; cursor:pointer; color:var(--ink-700);">
+            <div style="width:48px;height:48px;border-radius:14px;background:var(--ink-100);color:var(--ink-700);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:24px;">more_horiz</span>
+            </div>
+            <div style="flex:1;">
+              <div id="more-help-title" style="font-size:15px;font-weight:700;color:var(--ink-950);">আরও সাহায্য</div>
+              <div style="font-size:12px;color:var(--ink-500);margin-top:2px;">অন্যান্য জরুরি নম্বর ও সেবা</div>
+            </div>
+            <span class="material-symbols-outlined" style="color:var(--ink-400);">chevron_right</span>
+          </div>
+
+          <div id="more-help-dialog" role="dialog" aria-modal="true" aria-labelledby="more-help-title" onclick="if(event.target===this) this.style.display='none'" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:200; align-items:flex-end; justify-content:center;">
+            <div style="background:var(--surface-white); border-radius:24px 24px 0 0; padding:24px 20px calc(20px + 24px); width:100%; max-width:390px;">
+              <div style="width:40px;height:4px;background:var(--ink-200);border-radius:2px;margin:0 auto 20px;"></div>
+              <h3 style="font-size:18px;font-weight:700;color:var(--ink-950);margin-bottom:16px;">আরও জরুরি নম্বর</h3>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">নারী ও শিশু হেল্পলাইন</div><div style="font-size:11px;color:var(--ink-500);">109</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">দুর্যোগ হেল্পলাইন</div><div style="font-size:11px;color:var(--ink-500);">333</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">অ্যাম্বুলেন্স</div><div style="font-size:11px;color:var(--ink-500);">999</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">বিদ্যুৎ অভিযোগ</div><div style="font-size:11px;color:var(--ink-500);">16116</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div style="flex:1;">
+                    <div style="font-weight:600;font-size:14px;">নিকটবর্তী থানা</div>
+                    <div style="font-size:11px;color:var(--ink-500);">সবচেয়ে কাছের থানায় কল</div>
+                    <div style="font-size:10px;color:var(--ink-400);font-style:italic;margin-top:4px;line-height:1.4;">
+                      ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।
+                    </div>
+                  </div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">call</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--ink-50);border-radius:12px;">
+                  <div><div style="font-weight:600;font-size:14px;">ম্যাপে স্টেশন খুঁজুন</div><div style="font-size:11px;color:var(--ink-500);">হাসপাতাল · ফায়ার · থানা</div></div>
+                  <span class="material-symbols-outlined" style="color:var(--violet-700);">map</span>
+                </div>
+              </div>
+              <div style="margin-top:14px; padding:0 4px; font-size:11px; color:var(--ink-500); text-align:right;">
+                <a onclick="document.getElementById('wrong-number-dialog').style.display='flex'" style="color:var(--violet-700); cursor:pointer; font-weight:600;">নম্বর ভুল? রিপোর্ট করুন →</a>
+              </div>
+              <button onclick="document.getElementById('more-help-dialog').style.display='none'" style="margin-top:16px;width:100%;height:48px;background:var(--violet-50);color:var(--violet-700);border:none;border-radius:14px;font-weight:600;font-size:15px;">বন্ধ করুন</button>
+            </div>
+          </div>
+
+          <div style="padding:16px 24px; text-align:center;">
+            <p style="font-size:11px; color:var(--ink-500); line-height:1.5;">
+              কলগুলি নিকটবর্তী উপলব্ধ সেবায় স্বয়ংক্রিয়ভাবে রাউট করা হয়
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 19: Location Sharing ========== -->
+      <div class="screen" data-screen="19" data-name="Location Sharing">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">লোকেশন শেয়ার</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div class="map-preview">
+            <div class="map-roads"></div>
+            <div class="map-pin" role="img" aria-label="আপনার বর্তমান অবস্থান — your current location">
+              <div class="map-pin-label">আপনি এখানে</div>
+              <div class="map-pin-dot"></div>
+              <div class="map-pin-pulse"></div>
+            </div>
+          </div>
+
+          <div class="address-card">
+            <div class="address-card-header">
+              <span class="material-symbols-outlined" style="font-size:14px;">location_on</span>
+              আপনার বর্তমান লোকেশন
+            </div>
+            <div class="address-card-address">বাড়ি ১২, রোড ৭, বসুন্ধরা R/A, ঢাকা</div>
+            <div class="address-card-coords">23.7806° N, 90.4066° E</div>
+          </div>
+
+          <div class="share-toggle-row">
+            <div class="share-toggle-content">
+              <div class="share-toggle-title">সবার সাথে শেয়ার করুন</div>
+              <div class="share-toggle-sub">আপনার সব জরুরি কন্টাক্ট দেখতে পাবে</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:12px; padding:8px 20px;">
+            <div style="flex:1; height:1px; background:var(--ink-100);"></div>
+            <span style="font-size:11px; color:var(--ink-500);">অথবা নির্দিষ্ট কাউকে</span>
+            <div style="flex:1; height:1px; background:var(--ink-100);"></div>
+          </div>
+
+          <div style="margin:0 20px;">
+            <div class="contact-row">
+              <div class="contact-avatar family">মা</div>
+              <div class="contact-info">
+                <div class="contact-name">মা</div>
+                <div class="contact-phone">০১৭১২-৩৪৫৬৭৮</div>
+              </div>
+              <div class="custom-checkbox checked" onclick="this.classList.toggle('checked')"></div>
+            </div>
+            <div class="contact-row">
+              <div class="contact-avatar friend">স</div>
+              <div class="contact-info">
+                <div class="contact-name">সাকিব হোসেন</div>
+                <div class="contact-phone">০১৮১৫-৬৫৪৩২১</div>
+              </div>
+              <div class="custom-checkbox checked" onclick="this.classList.toggle('checked')"></div>
+            </div>
+            <div class="contact-row">
+              <div class="contact-avatar colleague">ত</div>
+              <div class="contact-info">
+                <div class="contact-name">তানভীর</div>
+                <div class="contact-phone">০১৯৩৩-২২১১৪৪</div>
+              </div>
+              <div class="custom-checkbox" onclick="this.classList.toggle('checked')"></div>
+            </div>
+          </div>
+
+          <div class="sticky-cta">
+            <button class="btn btn-primary btn-lg">
+              <span class="material-symbols-outlined">ios_share</span>
+              শেয়ার করুন
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 20: Emergency Contacts ========== -->
+      <div class="screen" data-screen="20" data-name="Emergency Contacts">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">জরুরি কন্টাক্ট</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div style="text-align:center; padding:8px 24px 16px; font-size:13px; color:var(--ink-500); line-height:1.5;">
+            Personal Emergency dials your <strong style="color:var(--violet-700);">★ primary contacts</strong> first.<br>
+            If no answer, it moves to the next primary, then the rest.
+          </div>
+
+          <div class="section-group-title">পরিবার (২)</div>
+          <div class="contact-row">
+            <div class="contact-avatar family">মা</div>
+            <div class="contact-info">
+              <div class="contact-name">মা <span class="primary-star" title="Primary — Personal Emergency dials this first" onclick="this.classList.toggle('on')" style="cursor:pointer;">★</span></div>
+              <div class="contact-phone">০১৭১২-৩৪৫৬৭৮</div>
+              <span class="contact-relationship family">পরিবার</span>
+            </div>
+            <div class="contact-action">
+              <span class="material-symbols-outlined">call</span>
+            </div>
+          </div>
+          <div class="contact-row">
+            <div class="contact-avatar family">বা</div>
+            <div class="contact-info">
+              <div class="contact-name">বাবা <span class="primary-star" title="Primary — Personal Emergency dials this first" onclick="this.classList.toggle('on')" style="cursor:pointer;">★</span></div>
+              <div class="contact-phone">০১৭১১-৯৮৭৬৫৪</div>
+              <span class="contact-relationship family">পরিবার</span>
+            </div>
+            <div class="contact-action">
+              <span class="material-symbols-outlined">call</span>
+            </div>
+          </div>
+
+          <div class="section-group-title">বন্ধু (২)</div>
+          <div class="contact-row">
+            <div class="contact-avatar friend">স</div>
+            <div class="contact-info">
+              <div class="contact-name">সাকিব হোসেন <span class="primary-star off" title="Mark as primary" onclick="this.classList.toggle('off'); this.classList.toggle('on')" style="cursor:pointer;">★</span></div>
+              <div class="contact-phone">০১৮১৫-৬৫৪৩২১</div>
+              <span class="contact-relationship friend">বন্ধু</span>
+            </div>
+            <div class="contact-action">
+              <span class="material-symbols-outlined">call</span>
+            </div>
+          </div>
+          <div class="contact-row">
+            <div class="contact-avatar friend">মি</div>
+            <div class="contact-info">
+              <div class="contact-name">মিথুন <span class="primary-star off" title="Mark as primary" onclick="this.classList.toggle('off'); this.classList.toggle('on')" style="cursor:pointer;">★</span></div>
+              <div class="contact-phone">০১৯৩৩-২২১১৪৪</div>
+              <span class="contact-relationship friend">বন্ধু</span>
+            </div>
+            <div class="contact-action">
+              <span class="material-symbols-outlined">call</span>
+            </div>
+          </div>
+
+          <div class="section-group-title">সহকর্মী (১)</div>
+          <div class="contact-row">
+            <div class="contact-avatar colleague">ত</div>
+            <div class="contact-info">
+              <div class="contact-name">তানভীর <span class="primary-star off" title="Mark as primary" onclick="this.classList.toggle('off'); this.classList.toggle('on')" style="cursor:pointer;">★</span></div>
+              <div class="contact-phone">০১৯৩৩-২২১১৪৪</div>
+              <span class="contact-relationship colleague">সহকর্মী</span>
+            </div>
+            <div class="contact-action">
+              <span class="material-symbols-outlined">call</span>
+            </div>
+          </div>
+
+          <div style="height:80px;"></div>
+        </div>
+        <button class="fab" style="background:linear-gradient(135deg,var(--green-500),var(--green-600));">
+          <span class="material-symbols-outlined">add</span>
+        </button>
+      </div>
+
+      <!-- ========== SCREEN 21: History Overview ========== -->
+      <div class="screen" data-screen="21" data-name="History Overview">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">ক্রাইম হিস্ট্রি</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div class="location-pill">
+            <span class="material-symbols-outlined">location_on</span>
+            বসুন্ধরা R/A, ঢাকা
+            <span class="material-symbols-outlined" style="margin-left:auto; color:var(--ink-400);">keyboard_arrow_down</span>
+          </div>
+
+          <div class="segmented-tabs">
+            <div class="segmented-tab active">ধরন</div>
+            <div class="segmented-tab" data-nav="21">মোট</div>
+            <div class="segmented-tab" data-nav="22">বিতরণ</div>
+          </div>
+
+          <div class="view-graph-link" data-nav="23">
+            <span class="material-symbols-outlined" style="font-size:18px;">map</span>
+            ম্যাপ ভিউ
+          </div>
+          <div style="padding:14px 20px; text-align:center; color:var(--ink-500); font-size:13px; line-height:1.5;">
+            Reports you file and recent reports within 1 km in the last 24 hours.
+            Detailed map + filters coming soon.
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 21a: Report Detail / Category Refinement (CAP-2) ========== -->
+      <div class="screen" data-screen="21a" data-name="Report Detail (Category Refinement)">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="21">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">রিপোর্ট বিস্তারিত</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content">
+          <div style="padding:6px 4px 14px; font-size:13px; color:var(--ink-500); line-height:1.5;">
+            আপনার রিপোর্টটি ইতোমধ্যে জমা হয়েছে। মডারেশন টিম ছবি, বিবরণ,
+            অবস্থান ও সময়ের ভিত্তিতে রিভিউ করে — ধরন পরিবর্তন করা বাধ্যতামূলক নয়,
+            তবে সঠিক ধরন দিলে আশেপাশের মানুষ দ্রুত সাহায্য পাবে।
+          </div>
+
+          <div class="card" style="padding:14px 16px; margin-bottom:16px;">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#7C3AED,#A78BFA);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;">
+                <span class="material-symbols-outlined">image</span>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:600; color:var(--ink-950); margin-bottom:2px;">সন্দেহজনক ব্যক্তি</div>
+                <div style="font-size:12px; color:var(--ink-500);">৫ মিনিট আগে · বসুন্ধরা R/A</div>
+                <div style="font-size:12px; color:var(--ink-500); margin-top:4px;">ফাইল #R-2026-0911-017</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:14px; font-weight:700; color:var(--ink-950); margin:6px 4px 10px;">
+            ধরন নির্বাচন করুন
+          </div>
+          <div style="font-size:12px; color:var(--ink-500); margin:0 4px 12px; line-height:1.5;">
+            বাধ্যতামূল্য নয় — আপনি পরে আবার পরিবর্তন করতে পারবেন।
+          </div>
+          <div id="category-chips" style="display:flex; flex-wrap:wrap; gap:8px; padding:0 4px 16px;">
+              <div class="category-chip" data-cat="theft" role="button" tabindex="0" aria-label="চুরি — theft, stealing of personal property" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">চুরি</div>
+              <div class="category-chip" data-cat="assault" role="button" tabindex="0" aria-label="আক্রমণ — assault, physical attack on a person" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">আক্রমণ</div>
+              <div class="category-chip" data-cat="robbery" role="button" tabindex="0" aria-label="ডাকাতি — robbery, theft with force or threat" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">ডাকাতি</div>
+              <div class="category-chip" data-cat="harassment" role="button" tabindex="0" aria-label="হয়রানি — harassment, unwanted advances or intimidation" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">হয়রানি</div>
+              <div class="category-chip" data-cat="accident" role="button" tabindex="0" aria-label="দুর্ঘটনা — accident, road or workplace incident" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">দুর্ঘটনা</div>
+              <div class="category-chip" data-cat="fire" role="button" tabindex="0" aria-label="আগুন — fire, building or vehicle on fire" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">আগুন</div>
+              <div class="category-chip" data-cat="medical_emergency" role="button" tabindex="0" aria-label="চিকিৎসা — medical emergency, injury or sudden illness" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">চিকিৎসা</div>
+              <div class="category-chip" data-cat="vandalism" role="button" tabindex="0" aria-label="ভাঙচুর — vandalism, property damage" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">ভাঙচুর</div>
+              <div class="category-chip" data-cat="fraud" role="button" tabindex="0" aria-label="প্রতারণা — fraud, scam or financial deception" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">প্রতারণা</div>
+              <div class="category-chip" data-cat="suspicious_activity" role="button" tabindex="0" aria-label="সন্দেহজনক — suspicious activity, behavior worth reporting" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">সন্দেহজনক</div>
+              <div class="category-chip" data-cat="other" role="button" tabindex="0" aria-label="অন্যান্য — other, none of the listed categories" onclick="document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on'));this.classList.add('on')" style="padding:10px 14px; background:var(--ink-50); color:var(--ink-800); border-radius:999px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid transparent;">অন্যান্য</div>
+          </div>
+
+          <button onclick="document.querySelectorAll('.category-chip.on').length === 0 ? null : (document.getElementById('cat-saved-toast').style.display='flex', setTimeout(function(){document.getElementById('cat-saved-toast').style.display='none'}, 1800), document.querySelectorAll('.category-chip').forEach(c=>c.classList.remove('on')))"
+                  style="margin-top:8px; width:100%; height:52px; background:var(--grad-primary); color:white; border:none; border-radius:14px; font-weight:600; font-size:15px; cursor:pointer;">
+            সংরক্ষণ করুন
+          </button>
+          <button data-nav="21" style="margin-top:8px; width:100%; height:44px; background:transparent; color:var(--ink-500); border:none; font-weight:500; font-size:14px; cursor:pointer;">
+            পরে করব
+          </button>
+        </div>
+      </div>
+
+      <div id="cat-saved-toast" role="status" aria-live="polite" style="display:none; position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink-900); color:white; padding:12px 20px; border-radius:999px; font-size:13px; font-weight:500; z-index:400; box-shadow:0 8px 24px rgba(0,0,0,0.25);">
+        ধরন সংরক্ষিত
+      </div>
+
+      <!-- ========== SCREEN 22: History Distribution ========== -->
+      <div class="screen" data-screen="22" data-name="History Distribution">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="app-bar-title">ক্রাইম হিস্ট্রি</div>
+          <div style="width:40px;"></div>
+        </div>
+        <div class="content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 24px;">
+          <div style="width:88px;height:88px;border-radius:50%;background:rgba(124,58,237,0.12);color:var(--violet-700);display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+            <span class="material-symbols-outlined" style="font-size:48px;">map</span>
+          </div>
+          <h2 style="font-size:20px; font-weight:700; color:var(--ink-950); margin:0 0 8px;">Map + list view coming soon</h2>
+          <p style="font-size:14px; color:var(--ink-600); line-height:1.5; max-width:280px; margin:0 0 24px;">
+            We don't show crime statistics, heatmaps, or hotspot rankings —
+            Nagar Shield is for live reports, not aggregator data. A map view
+            of nearby reports is in design.
+          </p>
+          <button data-nav="14" style="background:var(--grad-primary);color:white;border:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;">
+            Back to Home
+          </button>
+        </div>
+      </div>
+
+      <!-- ========== SCREEN 23: Full Chart View (descoped to admin app) ========== -->
+      <div class="screen" data-screen="23" data-name="Charts (Admin App)">
+        <div class="ios-status">
+          <span>9:41</span>
+          <div class="right">
+            <span class="material-symbols-outlined" style="font-size:14px;">signal_cellular_alt</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">wifi</span>
+            <span class="material-symbols-outlined" style="font-size:14px;">battery_full</span>
+          </div>
+        </div>
+        <div class="app-bar">
+          <button class="back-btn" data-nav="14">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+          <div class="app-bar-title">ক্রাইম বিশ্লেষণ</div>
+          <button class="icon-btn">
+            <span class="material-symbols-outlined">ios_share</span>
+          </button>
+        </div>
+        <div class="content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 24px;">
+          <div style="width:88px;height:88px;border-radius:50%;background:rgba(124,58,237,0.12);color:var(--violet-700);display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+            <span class="material-symbols-outlined" style="font-size:48px;">analytics</span>
+          </div>
+          <h2 style="font-size:20px; font-weight:700; color:var(--ink-950); margin:0 0 8px;">Coming soon — admin app</h2>
+          <p style="font-size:14px; color:var(--ink-600); line-height:1.5; max-width:280px; margin:0 0 24px;">
+            Detailed crime analytics live in the separate Nagar Shield admin app. Citizen users see live alerts only.
+          </p>
+          <button data-nav="14" style="background:var(--grad-primary);color:white;border:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;">
+            Back to Home
+          </button>
+
+          <div style="display:none;">
+            <div class="time-chips">
+              <div class="time-chip">৭ দিন</div>
+              <div class="time-chip active">৩০ দিন</div>
+              <div class="time-chip">৬ মাস</div>
+              <div class="time-chip">১ বছর</div>
+            </div>
+
+            <div class="stats-row" style="margin-bottom:24px;">
+            <div class="stat-card">
+              <div class="big-num">৪৭</div>
+              <div class="label">মোট</div>
+            </div>
+            <div class="stat-card">
+              <div class="big-num">১.৫</div>
+              <div class="label">গড়/দিন</div>
+            </div>
+            <div class="stat-card">
+              <div class="big-num">৫</div>
+              <div class="label">সর্বোচ্চ</div>
+            </div>
+          </div>
+
+          <div style="margin:0 20px; background:white; border-radius:16px; padding:20px; border:1px solid var(--ink-100);">
+            <div style="font-size:13px; font-weight:600; color:var(--ink-950); margin-bottom:16px;">দৈনিক ক্রাইম প্রবণতা</div>
+            <svg width="100%" height="180" viewBox="0 0 320 180">
+              <!-- Grid lines -->
+              <line x1="0" y1="40" x2="320" y2="40" stroke="var(--ink-100)" stroke-width="1"/>
+              <line x1="0" y1="80" x2="320" y2="80" stroke="var(--ink-100)" stroke-width="1"/>
+              <line x1="0" y1="120" x2="320" y2="120" stroke="var(--ink-100)" stroke-width="1"/>
+              <!-- Bars -->
+              <g>
+                <rect x="10" y="120" width="8" height="40" rx="2" fill="var(--purple-500)"/>
+                <rect x="25" y="100" width="8" height="60" rx="2" fill="var(--purple-500)"/>
+                <rect x="40" y="80" width="8" height="80" rx="2" fill="var(--purple-500)"/>
+                <rect x="55" y="60" width="8" height="100" rx="2" fill="var(--purple-500)"/>
+                <rect x="70" y="90" width="8" height="70" rx="2" fill="var(--purple-500)"/>
+                <rect x="85" y="70" width="8" height="90" rx="2" fill="var(--purple-500)"/>
+                <rect x="100" y="50" width="8" height="110" rx="2" fill="var(--purple-700)"/>
+                <rect x="115" y="65" width="8" height="95" rx="2" fill="var(--purple-500)"/>
+                <rect x="130" y="85" width="8" height="75" rx="2" fill="var(--purple-500)"/>
+                <rect x="145" y="40" width="8" height="120" rx="2" fill="var(--purple-700)"/>
+                <rect x="160" y="75" width="8" height="85" rx="2" fill="var(--purple-500)"/>
+                <rect x="175" y="95" width="8" height="65" rx="2" fill="var(--purple-500)"/>
+                <rect x="190" y="60" width="8" height="100" rx="2" fill="var(--purple-500)"/>
+                <rect x="205" y="80" width="8" height="80" rx="2" fill="var(--purple-500)"/>
+                <rect x="220" y="105" width="8" height="55" rx="2" fill="var(--purple-500)"/>
+                <rect x="235" y="55" width="8" height="105" rx="2" fill="var(--purple-700)"/>
+                <rect x="250" y="70" width="8" height="90" rx="2" fill="var(--purple-500)"/>
+                <rect x="265" y="45" width="8" height="115" rx="2" fill="var(--purple-700)"/>
+                <rect x="280" y="65" width="8" height="95" rx="2" fill="var(--purple-500)"/>
+                <rect x="295" y="85" width="8" height="75" rx="2" fill="var(--purple-500)"/>
+                <rect x="310" y="95" width="8" height="65" rx="2" fill="var(--purple-500)"/>
+              </g>
+              <!-- Trend line -->
+              <path d="M 14,110 L 29,100 L 44,80 L 59,60 L 74,80 L 89,70 L 104,55 L 119,65 L 134,75 L 149,40 L 164,65 L 179,85 L 194,65 L 209,75 L 224,90 L 239,65 L 254,70 L 269,50 L 284,65 L 299,80 L 314,90"
+                stroke="var(--green-500)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="149" cy="40" r="4" fill="white" stroke="var(--green-500)" stroke-width="2"/>
+            </svg>
+            <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:10px; color:var(--ink-500);">
+              <span>১ সেপ</span>
+              <span>১০ সেপ</span>
+              <span>২০ সেপ</span>
+              <span>৩০ সেপ</span>
+            </div>
+          </div>
+
+          <div style="margin:16px 20px; background:white; border-radius:16px; padding:16px; border:1px solid var(--ink-100);">
+            <div style="font-size:13px; font-weight:600; color:var(--ink-950); margin-bottom:12px;">ক্রাইম ধরন বিশ্লেষণ</div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--ink-50);">
+              <div style="font-size:13px; color:var(--ink-700);">চুরি</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div style="width:60px; height:6px; background:var(--purple-500); border-radius:3px;"></div>
+                <span style="font-size:13px; font-weight:600; color:var(--ink-950);">৪০</span>
+                <span style="font-size:11px; color:var(--ink-500);">৮৫%</span>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--ink-50);">
+              <div style="font-size:13px; color:var(--ink-700);">সম্পত্তি ক্ষতি</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div style="width:42px; height:6px; background:var(--red-500); border-radius:3px;"></div>
+                <span style="font-size:13px; font-weight:600; color:var(--ink-950);">২৮</span>
+                <span style="font-size:11px; color:var(--ink-500);">৬০%</span>
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0;">
+              <div style="font-size:13px; color:var(--ink-700);">অন্যান্য</div>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div style="width:30px; height:6px; background:var(--amber-600); border-radius:3px;"></div>
+                <span style="font-size:13px; font-weight:600; color:var(--ink-950);">২১</span>
+                <span style="font-size:11px; color:var(--ink-500);">৪৫%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  </div><!-- /.phone-stage -->
+  </div><!-- /.phone-column -->
+
+  <!-- RIGHT COLUMN: brand + nav controls + screen map -->
+  <div class="sidebar-column">
+
+  <!-- Sidebar Brand (top of right panel) -->
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-mark">
+      <span class="material-symbols-rounded">verified_user</span>
+    </div>
+    <div class="sidebar-brand-text">
+      <h1>Nagar Shield</h1>
+      <p>Interactive Prototype</p>
+    </div>
+  </div>
+
+  <!-- Navigation Controls -->
+  <div class="nav-controls">
+    <button class="nav-btn" id="prev-btn" onclick="prevScreen()">
+      <span class="material-symbols-outlined">arrow_back</span>
+    </button>
+    <div class="screen-indicator" id="screen-indicator">Splash</div>
+    <button class="nav-btn" id="next-btn" onclick="nextScreen()">
+      <span class="material-symbols-outlined">arrow_forward</span>
+    </button>
+  </div>
+
+  <!-- Screen Map -->
+  <div class="screen-map">
+    <div class="screen-map-title">দ্রুত নেভিগেট করুন</div>
+    <button class="active" data-nav="0">S-00 Splash</button>
+    <button data-nav="1">S-01 Welcome</button>
+    <button data-nav="2">S-02 Phone</button>
+    <button data-nav="3">S-03 Alt Phone</button>
+    <button data-nav="5">S-05 Contact 1</button>
+    <button data-nav="6">S-06 Contact 2</button>
+    <button data-nav="7">S-07 Contact 3</button>
+    <button data-nav="8">S-08 Location</button>
+    <button data-nav="9">S-09 Done</button>
+    <button data-nav="11">S-11 Login</button>
+    <button data-nav="12">S-12 Sign up</button>
+    <button data-nav="13">S-13 Reset</button>
+    <button data-nav="14">S-14 Home</button>
+    <button data-nav="15">S-15 More</button>
+    <button data-nav="16">S-16 Settings</button>
+    <button data-nav="17">S-17 Capture</button>
+    <button data-nav="18">S-18 Help Alert</button>
+    <button data-nav="19">S-19 Share</button>
+    <button data-nav="20">S-20 Contacts</button>
+    <button data-nav="21">S-21 History</button>
+    <button data-nav="21a">S-21a Detail</button>
+    <button data-nav="22">S-22 Distribute</button>
+    <button data-nav="23">S-23 Chart</button>
+  </div>
+
+  </div><!-- /.sidebar-column -->
+
+</div>
+
+<script>
+let currentScreen = 0;
+const screens = document.querySelectorAll('.screen');
+// Ordered list of screen ids (string). Includes "21a" sub-screens.
+const screenOrder = Array.from(screens).map(s => s.dataset.screen);
+
+function goToScreen(target) {
+  // Accept either a string id (e.g. "3", "21a") or a numeric index into screenOrder.
+  let id;
+  if (typeof target === 'number') {
+    if (target < 0 || target >= screenOrder.length) return;
+    id = screenOrder[target];
+  } else {
+    id = String(target);
+    if (!screenOrder.includes(id)) return;
+  }
+  const index = screenOrder.indexOf(id);
+  const currentEl = document.querySelector(`.screen[data-screen="${currentScreen}"]`);
+  const targetEl = document.querySelector(`.screen[data-screen="${id}"]`);
+  if (currentScreen === id) return;
+
+  currentEl.classList.remove('active');
+  currentEl.classList.add('exit-left');
+
+  setTimeout(() => currentEl.classList.remove('exit-left'), 350);
+
+  targetEl.classList.add('active');
+  currentScreen = id;
+
+  // Update indicator
+  document.getElementById('screen-indicator').textContent = targetEl.dataset.name;
+
+  // Update buttons
+  document.getElementById('prev-btn').disabled = (index === 0);
+  document.getElementById('next-btn').disabled = (index === screenOrder.length - 1);
+
+  // Update screen-map buttons (compare as strings — works for "21a")
+  document.querySelectorAll('.screen-map button').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.nav === String(id)) btn.classList.add('active');
+  });
+
+  // Scroll to top of new screen
+  setTimeout(() => {
+    const content = targetEl.querySelector('.content');
+    if (content) content.scrollTop = 0;
+    targetEl.scrollTop = 0;
+  }, 50);
+}
+
+function nextScreen() {
+  const idx = screenOrder.indexOf(currentScreen);
+  if (idx < screenOrder.length - 1) goToScreen(screenOrder[idx + 1]);
+}
+function prevScreen() {
+  const idx = screenOrder.indexOf(currentScreen);
+  if (idx > 0) goToScreen(screenOrder[idx - 1]);
+}
+
+// In-screen navigation (data-nav attribute on any element)
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-nav]');
+  if (target) {
+    const to = target.dataset.nav;
+    if (to !== undefined && to !== '') goToScreen(to);
+  }
+});
+
+// Direct nav buttons
+document.querySelectorAll('.screen-map button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const to = btn.dataset.nav;
+    if (to !== undefined && to !== '') goToScreen(to);
+  });
+});
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextScreen(); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevScreen(); }
+});
+
+// SMS-OTP opt-in helpers (FR-AUTH-3, auth-edge-cases.md L72)
+// Per-session: the disclosure modal shows the first time the user
+// interacts with the toggle. After confirming, sessionStorage records
+// sms_disclosure_acked; subsequent clicks flip the toggle directly.
+// Real implementation also fires `otp_channel_switched` telemetry here.
+const SMS_DISCLOSURE_KEY = 'sms_disclosure_acked';
+const SMS_OPTIN_KEY = 'sms_opted_in';
+
+function smsToggleClick() {
+  const toggle = document.getElementById('sms-otp-toggle');
+  const acked = sessionStorage.getItem(SMS_DISCLOSURE_KEY) === 'true';
+  if (acked) {
+    // Already acknowledged this session — flip the toggle directly.
+    toggle.classList.toggle('on');
+    const isOn = toggle.classList.contains('on');
+    if (isOn) {
+      sessionStorage.setItem(SMS_OPTIN_KEY, 'true');
+      const toast = document.getElementById('sms-optin-toast');
+      toast.style.display = 'flex';
+      setTimeout(() => toast.style.display = 'none', 2400);
+    } else {
+      sessionStorage.removeItem(SMS_OPTIN_KEY);
+    }
+  } else {
+    // First interaction this session — show the disclosure modal.
+    document.getElementById('sms-disclosure-dialog').style.display = 'flex';
+  }
+}
+
+function smsConfirmOptIn() {
+  // User confirmed in the disclosure modal.
+  sessionStorage.setItem(SMS_DISCLOSURE_KEY, 'true');
+  sessionStorage.setItem(SMS_OPTIN_KEY, 'true');
+  // Fire telemetry (logged to console in prototype; real impl posts to backend).
+  console.info('[telemetry] otp_channel_switched: sms');
+  console.info('[telemetry] disclosure_acknowledged', { surface: 'sms-otp' });
+  document.getElementById('sms-disclosure-dialog').style.display = 'none';
+  document.getElementById('sms-otp-toggle').classList.add('on');
+  const toast = document.getElementById('sms-optin-toast');
+  toast.style.display = 'flex';
+  setTimeout(() => toast.style.display = 'none', 2400);
+}
+
+function smsCancelOptIn() {
+  // User cancelled — close modal, do NOT flip the toggle, do NOT persist.
+  document.getElementById('sms-disclosure-dialog').style.display = 'none';
+  // Ensure the toggle stays off (it may not have been on in the first place).
+  document.getElementById('sms-otp-toggle').classList.remove('on');
+  sessionStorage.removeItem(SMS_OPTIN_KEY);
+  console.info('[telemetry] disclosure_cancelled', { surface: 'sms-otp' });
+}
+
+// Help Alert telemetry — called from each help-card click in S18.
+// Confirms the tap reached the dialer intent (consent sheet is a future
+// epic; this logs the discovery moment so we can measure dial-rate later).
+function helpAlertTap(surface, number) {
+  console.info('[telemetry] help_alert_tap', { surface, number });
+}
+
+// On page load, restore the toggle state if the user opted in earlier
+// in the session (e.g. navigated away to Settings and back).
+(function restoreSmsOptIn() {
+  if (sessionStorage.getItem(SMS_OPTIN_KEY) === 'true') {
+    const toggle = document.getElementById('sms-otp-toggle');
+    if (toggle) toggle.classList.add('on');
+  }
+})();
+
+// ---------------------------------------------------------------------------
+// Dark-mode toggle (S16 Settings)
+// ---------------------------------------------------------------------------
+//
+// DESIGN.md marks dark as the default panic-moment theme; this toggle lets
+// the user opt back to light. Preference persists in localStorage so it
+// survives reloads — this is a deliberate UX setting, not a session-start
+// disclosure like the SMS-OTP carrier-charge modal.
+
+const THEME_KEY = 'nagar_shield_theme';
+
+function applyTheme(theme) {
+  // Reflect on <html data-theme="...">; CSS handles the override block.
+  document.documentElement.dataset.theme = theme;
+  const toggle = document.getElementById('dark-mode-toggle');
+  if (toggle) {
+    // Toggle is "on" when in dark mode.
+    toggle.classList.toggle('on', theme === 'dark');
+    toggle.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+  }
+}
+
+function toggleDarkMode(el) {
+  const current = document.documentElement.dataset.theme || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* private mode */ }
+}
+
+// On page load, restore the user's saved preference; default to dark.
+(function restoreTheme() {
+  let theme = 'dark';
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'light' || saved === 'dark') theme = saved;
+  } catch (e) { /* private mode: fall back to default */ }
+  applyTheme(theme);
+})();
+
+// Splash → S-00 Welcome auto-advance after 2.8s
+setTimeout(() => {
+  if (currentScreen === 0) goToScreen(1);
+}, 2800);
+
+// Safety Profile wizard — single-select chip picker (used on Blood Group screen)
+document.querySelectorAll('.chip-grid, .blood-group-grid').forEach((grid) => {
+  grid.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    grid.querySelectorAll('.chip').forEach((c) => c.classList.remove('selected'));
+    chip.classList.add('selected');
+  });
+});
+
+/* ===== Phone Frame Auto-Fit =====
+   Sizes the .phone-stage wrapper so it matches the visually
+   scaled .phone-frame, keeping the phone fully inside the
+   viewport. Layout is horizontal: phone on the left, brand +
+   nav + screen map on the right. Phone now uses nearly the
+   full viewport height (header was moved to the sidebar). */
+(function fitPhone() {
+  const stage = document.querySelector('.phone-stage');
+  const phone = document.querySelector('.phone-frame');
+  const sidebar = document.querySelector('.sidebar-column');
+  if (!stage || !phone) return;
+
+  const NATIVE_W = 390;
+  const NATIVE_H = 844;
+  const SAFETY = 12;
+
+  function compute() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const padX = vw <= 768 ? 16 : 40;
+    const padY = vw <= 768 ? 16 : 40;
+
+    const availableW = vw - padX;
+    const availableH = vh - padY - SAFETY;
+
+    // Account for the sidebar's width so the phone doesn't push it off-screen.
+    const sidebarW = sidebar ? sidebar.getBoundingClientRect().width : 0;
+    const containerGap = 32; // matches .app-container gap
+    const widthForPhone = availableW - sidebarW - containerGap;
+    const scaleW = Math.max(0.3, widthForPhone / NATIVE_W);
+    const scaleH = availableH / NATIVE_H;
+
+    // Higher cap so phone grows taller on laptops; floor so it stays usable.
+    const scale = Math.min(scaleW, scaleH, 1.6);
+    const clamped = Math.max(0.5, scale);
+
+    stage.style.setProperty('--phone-scale', clamped.toFixed(4));
+    document.documentElement.style.setProperty('--phone-scale', clamped.toFixed(4));
+  }
+
+  compute();
+  window.addEventListener('resize', compute, { passive: true });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(compute).catch(() => {});
+  }
+  setTimeout(compute, 100);
+  setTimeout(compute, 500);
+})();
+</script>
+
+<!-- SMS-OTP opt-in disclosure modal (FR-AUTH-3, auth-edge-cases.md L11/L72) -->
+<div id="sms-disclosure-dialog" role="dialog" aria-modal="true" aria-labelledby="sms-disclosure-title" onclick="if(event.target===this) this.style.display='none'" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:250; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--surface-white); width:100%; max-width:480px; border-radius:24px 24px 0 0; padding:24px 20px 20px; align-self:flex-end;">
+    <div style="width:40px;height:4px;background:var(--ink-200);border-radius:2px;margin:0 auto 14px;"></div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+      <div class="list-row-icon amber"><span class="material-symbols-outlined">sms</span></div>
+      <div style="font-size:18px; font-weight:700; color:var(--ink-950);">SMS-এ ও OTP চালু করবেন?</div>
+    </div>
+    <p style="font-size:14px; color:var(--ink-700); line-height:1.6; margin:8px 0 4px;">
+      Switching to SMS may incur carrier charges.
+    </p>
+    <p style="font-size:14px; color:var(--ink-700); line-height:1.6; margin:4px 0 16px;">
+      Nagar Shield does not profit from this.
+    </p>
+    <p style="font-size:12px; color:var(--ink-500); line-height:1.5; margin:0 0 16px;">
+      ইমেইল OTP সবসময় বিনামূল্যে কাজ করবে — SMS শুধু বিকল্প হিসেবে চালু হচ্ছে।
+      এই নিশ্চিতকরণ প্রতি সেশনে একবার দেখানো হয়।
+    </p>
+    <button onclick="smsConfirmOptIn()" style="width:100%; height:52px; background:var(--grad-primary); color:white; border:none; border-radius:14px; font-weight:600; font-size:15px; cursor:pointer;">
+      হ্যাঁ, SMS চালু করুন
+    </button>
+    <button onclick="smsCancelOptIn()" style="margin-top:8px; width:100%; height:44px; background:transparent; color:var(--ink-500); border:none; font-weight:500; font-size:14px; cursor:pointer;">
+      বাতিল
+    </button>
+  </div>
+</div>
+
+<div id="sms-optin-toast" role="status" aria-live="polite" style="display:none; position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink-900); color:white; padding:12px 20px; border-radius:999px; font-size:13px; font-weight:500; z-index:400; box-shadow:0 8px 24px rgba(0,0,0,0.25);">
+  SMS-OTP চালু হয়েছে
+</div>
+
+<div id="wrong-number-dialog" role="dialog" aria-modal="true" aria-labelledby="wrong-number-title" onclick="if(event.target===this) this.style.display='none'" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:260; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--surface-white); width:100%; max-width:480px; border-radius:24px 24px 0 0; padding:24px 20px 20px; align-self:flex-end;">
+    <div style="width:40px;height:4px;background:var(--ink-200);border-radius:2px;margin:0 auto 14px;"></div>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+      <div class="list-row-icon amber"><span class="material-symbols-outlined">report</span></div>
+      <div id="wrong-number-title" style="font-size:18px; font-weight:700; color:var(--ink-950);">ভুল নম্বর রিপোর্ট করুন</div>
+    </div>
+    <p style="font-size:13px; color:var(--ink-700); line-height:1.5; margin:0 0 14px;">
+      কোন নম্বরটি ভুল মনে হচ্ছে এবং সঠিক নম্বর কী হওয়া উচিত — লিখে পাঠান।
+      মডারেশন টিম যাচাই করে আপডেট করবে।
+    </p>
+    <textarea rows="3" placeholder="উদাহরণ: ১৬১১৬ এর বদলে ১৬১১৭ হওয়া উচিত" aria-label="ভুল নম্বরের বিবরণ"
+              style="width:100%; padding:12px 14px; border:1.5px solid var(--surface-outline); border-radius:12px; font-family:inherit; font-size:14px; resize:vertical; background:var(--surface-white); color:var(--ink-950); box-sizing:border-box;"></textarea>
+    <button onclick="document.getElementById('wrong-number-dialog').style.display='none'; document.getElementById('wrong-number-toast').style.display='flex'; setTimeout(function(){document.getElementById('wrong-number-toast').style.display='none'},2200);"
+            style="margin-top:14px; width:100%; height:52px; background:var(--grad-primary); color:white; border:none; border-radius:14px; font-weight:600; font-size:15px; cursor:pointer;">
+      রিপোর্ট পাঠান
+    </button>
+    <button onclick="document.getElementById('wrong-number-dialog').style.display='none'"
+            style="margin-top:8px; width:100%; height:44px; background:transparent; color:var(--ink-500); border:none; font-weight:500; font-size:14px; cursor:pointer;">
+      বাতিল
+    </button>
+  </div>
+</div>
+
+<div id="wrong-number-toast" role="status" aria-live="polite" style="display:none; position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:var(--ink-900); color:white; padding:12px 20px; border-radius:999px; font-size:13px; font-weight:500; z-index:400; box-shadow:0 8px 24px rgba(0,0,0,0.25);">
+  রিপোর্ট পাঠানো হয়েছে
+</div>
+
+<!-- Shared flag/report dialog (CAP-7 / FR-MOD-1) -->
+<div id="flag-dialog" role="dialog" aria-modal="true" aria-labelledby="flag-dialog-title" data-open="false" onclick="if(event.target===this) this.dataset.open='false'" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300; align-items:flex-end; justify-content:center;">
+  <div style="background:var(--surface-white); border-radius:24px 24px 0 0; padding:24px 20px calc(20px + 24px); width:100%; max-width:390px;">
+    <div style="width:40px;height:4px;background:var(--ink-200);border-radius:2px;margin:0 auto 16px;"></div>
+    <h3 id="flag-dialog-title" style="font-size:18px;font-weight:700;color:var(--ink-950);margin-bottom:4px;">এই সতর্কতা রিপোর্ট করুন</h3>
+    <p style="font-size:13px;color:var(--ink-500);margin-bottom:16px;">সঠিক কারণ বাছাই করুন — মডারেটর পর্যালোচনা করবেন</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--ink-50);border-radius:12px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="flag-reason" value="misinformation" style="accent-color:var(--violet-600);">
+        <span>ভুল তথ্য — misinformation</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--ink-50);border-radius:12px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="flag-reason" value="harassment" style="accent-color:var(--violet-600);">
+        <span>হয়রানি — harassment</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--ink-50);border-radius:12px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="flag-reason" value="duplicate" style="accent-color:var(--violet-600);">
+        <span>পুনরাবৃত্তি — duplicate</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--ink-50);border-radius:12px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="flag-reason" value="off_topic" style="accent-color:var(--violet-600);">
+        <span>অপ্রাসঙ্গিক — off-topic</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--ink-50);border-radius:12px;cursor:pointer;font-size:14px;">
+        <input type="radio" name="flag-reason" value="other" style="accent-color:var(--violet-600);">
+        <span>অন্যান্য — other</span>
+      </label>
+    </div>
+    <textarea placeholder="ঐচ্ছিক নোট (১৪০ অক্ষর)" maxlength="140" style="width:100%;min-height:60px;padding:12px 14px;border:1.5px solid var(--ink-200);border-radius:12px;font-family:inherit;font-size:14px;resize:none;outline:none;background:var(--surface-white);color:var(--ink-950);margin-bottom:16px;"></textarea>
+    <button onclick="document.getElementById('flag-dialog').style.display='none'; document.getElementById('flag-toast').style.display='flex'" style="width:100%;height:52px;background:var(--grad-primary);color:white;border:none;border-radius:14px;font-weight:600;font-size:15px;">রিপোর্ট পাঠান</button>
+    <button onclick="document.getElementById('flag-dialog').style.display='none'" style="margin-top:8px;width:100%;height:44px;background:transparent;color:var(--ink-500);border:none;font-weight:500;font-size:14px;">বাতিল</button>
+  </div>
+</div>
+<div id="flag-toast" style="display:none; position:fixed; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink-950); color:white; padding:12px 20px; border-radius:999px; font-size:14px; font-weight:600; align-items:center; gap:8px; z-index:400; box-shadow:0 12px 28px rgba(0,0,0,0.28);">
+  <span class="material-symbols-outlined" style="font-size:18px;">check_circle</span>
+  রিপোর্ট পাঠানো হয়েছে — ধন্যবাদ
+</div>
+<script>
+document.addEventListener('click', (e) => {
+  const flag = e.target.closest('[data-dialog="flag"]');
+  if (flag) { e.preventDefault(); document.getElementById('flag-dialog').style.display='flex'; }
+});
+</script>
+</body>
+</html>

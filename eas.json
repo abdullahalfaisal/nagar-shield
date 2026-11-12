@@ -1,0 +1,49 @@
+{
+  "cli": {
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "dev": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "http://127.0.0.1:54321",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "<anon-key>",
+        "EXPO_PUBLIC_SMS_OTP_ENABLED": "false"
+      },
+      "android": {
+        "buildType": "apk",
+        "package": "com.nagarshield.app"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://<staging-ref>.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "<staging-anon-key>",
+        "EXPO_PUBLIC_SMS_OTP_ENABLED": "false"
+      },
+      "android": {
+        "buildType": "apk",
+        "package": "com.nagarshield.app"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://<production-ref>.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "<production-anon-key>",
+        "EXPO_PUBLIC_SMS_OTP_ENABLED": "false",
+        "EXPO_PUBLIC_API_HOST": "<production-ref>.supabase.co",
+        "EXPO_PUBLIC_CERT_PIN_PUBLIC_KEYS": "<sha256-pin-set>"
+      },
+      "android": {
+        "buildType": "apk",
+        "package": "com.nagarshield.app",
+        "versionCode": 1,
+        "version": "1.0.0"
+      }
+    }
+  }
+}

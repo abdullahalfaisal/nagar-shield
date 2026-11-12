@@ -1,0 +1,582 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { CAPTURE_DESCRIPTION_MAX_LENGTH } from '@nagar-shield/shared';
+import { useTheme } from '@/shared/theme';
+import { BottomSheet, Button, Icon, Toggle } from '@/shared/ui';
+import { useCurrentFix } from '@/shared/services/location';
+import { useReverseGeocode, formatAddressLine } from '@/shared/api/geocode';
+import {
+  capturePhoto,
+  captureVideo,
+  pickDocument,
+  pickFromGallery,
+} from '@/shared/services/mediaSources';
+import { preparePickedMedia, useCaptureSubmit, type MediaKind } from '@/shared/services/captureFlow';
+import type { PreparedMedia } from '@/shared/services/mediaPipeline';
+import { toBengaliDigits } from '@/shared/utils/relativeTime';
+
+/**
+ * Screen 17 — Capture (Report Crime).
+ *
+ * A 1:1 port of the prototype's Capture screen:
+ *   - the anonymous-report card with the visibility-off icon and a toggle
+ *   - three dashed upload cards (video, photo, file)
+ *   - the description textarea with a `0 / 140` counter
+ *   - the location card with the resolved address and accuracy
+ *   - the sticky "Send report" CTA
+ *
+ * **Copy deviation (PRD-X-4 wins over the prototype):** the prototype's video
+ * card says `সর্বোচ্চ ৬০ সেকেন্ড`; the PRD locks the video cap at **30 s**.
+ * The copy here reads 30 seconds. The layout is unchanged.
+ *
+ * **No category picker.** FR-CAPTURE-5 was overridden on 2026-09-11: the
+ * category is nullable at creation and the author sets it later from History
+ * → Report detail. The prototype has no category field either, so adding one
+ * would be a visible 1:1 port defect.
+ */
+export default function CaptureScreen() {
+  const theme = useTheme();
+  const router = useRouter();
+  const { t } = useTranslation();
+
+  const [anonymous, setAnonymous] = useState(true);
+  const [description, setDescription] = useState('');
+  const [media, setMedia] = useState<PreparedMedia | null>(null);
+  const [mediaKind, setMediaKind] = useState<MediaKind | null>(null);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerKind, setPickerKind] = useState<MediaKind>('photo');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const { state: fixState } = useCurrentFix();
+  const { data: geocode } = useReverseGeocode(
+    fixState.status === 'ready' ? fixState.fix.lat : null,
+    fixState.status === 'ready' ? fixState.fix.lng : null,
+    fixState.status === 'ready' ? fixState.fix.accuracyM : null,
+  );
+
+  const { isSubmitting, error, submit } = useCaptureSubmit();
+
+  const counter = useMemo(() => `${description.length} / ${CAPTURE_DESCRIPTION_MAX_LENGTH}`, [
+    description.length,
+  ]);
+
+  const canSubmit = media !== null && !isSubmitting;
+
+  // The submit result is a one-shot signal — the screen navigates away on a
+  // successful send and on a queued send.
+  useEffect(() => {
+    if (!sent) return;
+    router.back();
+  }, [sent, router]);
+
+  const openPicker = useCallback((kind: MediaKind) => {
+    setPickerKind(kind);
+    setPickerOpen(true);
+  }, []);
+
+  const pick = useCallback(
+    async (source: 'camera' | 'gallery' | 'file') => {
+      setPickerOpen(false);
+      setNotice(null);
+
+      try {
+        const asset =
+          source === 'file'
+            ? await pickDocument()
+            : source === 'camera'
+              ? pickerKind === 'video'
+                ? await captureVideo()
+                : await capturePhoto()
+              : await pickFromGallery(pickerKind === 'video' ? ['videos'] : ['images']);
+
+        if (!asset) return;
+
+        const prepared = await preparePickedMedia(pickerKind, asset);
+        setMedia(prepared);
+        setMediaKind(pickerKind);
+      } catch (caught) {
+        setNotice(mapMediaError(caught, t));
+      }
+    },
+    [pickerKind, t],
+  );
+
+  const onSubmit = useCallback(async () => {
+    if (!media) return;
+
+    const outcome = await submit({
+      media,
+      draft: {
+        description: description.trim().length > 0 ? description.trim() : null,
+        publicVisibility: anonymous ? 'anonymous' : 'identified',
+        lat: fixState.status === 'ready' ? fixState.fix.lat : 0,
+        lng: fixState.status === 'ready' ? fixState.fix.lng : 0,
+        capturedAt: new Date().toISOString(),
+      },
+    });
+
+    if (outcome.status === 'sent' || outcome.status === 'queued') {
+      setSent(true);
+    }
+  }, [anonymous, description, fixState, media, submit]);
+
+  const addressLine = geocode ? formatAddressLine(geocode) : '';
+  const hasFix = fixState.status === 'ready';
+
+  return (
+    <View style={[styles.root, { backgroundColor: theme.colors.surface.white }]}>
+      {/* `.app-bar-no-border` */}
+      <View
+        style={[
+          styles.appBar,
+          {
+            backgroundColor: theme.colors.surface.white,
+            borderBottomColor: theme.colors.ink[100],
+          },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+          onPress={() => router.back()}
+          style={styles.iconBtn}
+        >
+          <Icon name="close" size={22} color={theme.colors.ink[700]} />
+        </Pressable>
+        <View style={styles.appBarCenter}>
+          <Text style={[styles.appBarTitle, { color: theme.colors.ink[950] }]}>
+            {t('capture.title')}
+          </Text>
+          <Text style={[styles.appBarSub, { color: theme.colors.ink[500] }]}>
+            {t('capture.subtitle')}
+          </Text>
+        </View>
+        <View style={styles.iconBtn} />
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* `.capture-anon` */}
+        <View
+          style={[
+            styles.anonCard,
+            { backgroundColor: theme.palette.violet[50], borderColor: theme.palette.violet[100] },
+          ]}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: theme.palette.violet[100] }]}>
+            <Icon name="visibility_off" size={20} color={theme.palette.violet[700]} filled />
+          </View>
+          <View style={styles.anonContent}>
+            <Text style={[styles.anonLabel, { color: theme.colors.ink[950] }]}>
+              {anonymous ? t('capture.anonymous') : t('capture.identified')}
+            </Text>
+            <Text style={[styles.anonHelper, { color: theme.colors.ink[500] }]}>
+              {t('capture.anonymousHelper')}
+            </Text>
+          </View>
+          <Toggle
+            value={anonymous}
+            onValueChange={setAnonymous}
+            accessibilityLabel={t('capture.anonymous')}
+          />
+        </View>
+
+        {/* Upload cards */}
+        <UploadCard
+          icon="videocam"
+          title={t('capture.takeVideo')}
+          sub={t('capture.maxVideo')}
+          selected={mediaKind === 'video'}
+          onPress={() => openPicker('video')}
+        />
+        <UploadCard
+          icon="photo_camera"
+          title={t('capture.takePhoto')}
+          sub={t('capture.photoSub')}
+          selected={mediaKind === 'photo'}
+          onPress={() => openPicker('photo')}
+        />
+        <UploadCard
+          icon="attach_file"
+          title={t('capture.chooseFile')}
+          sub={t('capture.fileSub')}
+          selected={mediaKind === 'file'}
+          onPress={() => openPicker('file')}
+        />
+
+        {notice ? (
+          <Text style={[styles.notice, { color: theme.palette.red[600] }]}>{notice}</Text>
+        ) : null}
+
+        {error ? (
+          <Text style={[styles.notice, { color: theme.palette.red[600] }]}>
+            {error.code === 'CAPTURE_RATE_LIMIT'
+              ? t('capture.uploadFailed')
+              : t('capture.uploadFailed')}
+          </Text>
+        ) : null}
+
+        {/* Description */}
+        <View style={styles.descriptionBlock}>
+          <Text style={[styles.descriptionLabel, { color: theme.colors.ink[950] }]}>
+            {t('capture.descriptionLabel')}
+          </Text>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t('capture.descriptionPlaceholder')}
+            placeholderTextColor={theme.colors.ink[400]}
+            multiline
+            maxLength={CAPTURE_DESCRIPTION_MAX_LENGTH}
+            accessibilityLabel={t('capture.descriptionLabel')}
+            style={[
+              styles.textarea,
+              {
+                backgroundColor: theme.colors.surface.white,
+                borderColor: theme.colors.ink[200],
+                color: theme.colors.ink[950],
+              },
+            ]}
+          />
+          <Text style={[styles.counter, { color: theme.colors.ink[500] }]}>{counter}</Text>
+        </View>
+
+        {/* `.location-card` */}
+        <View
+          style={[
+            styles.locationCard,
+            {
+              backgroundColor: theme.colors.surface.white,
+              borderColor: theme.colors.ink[100],
+            },
+          ]}
+        >
+          <Icon name="location_on" size={22} color={theme.palette.violet[700]} filled />
+          <View style={styles.locationInfo}>
+            <Text style={[styles.locationTitle, { color: theme.colors.ink[950] }]}>
+              {hasFix ? addressLine || t('capture.locationPending') : t('capture.locationUnavailable')}
+            </Text>
+            <Text style={[styles.locationSub, { color: theme.colors.ink[500] }]}>
+              {hasFix && fixState.fix.accuracyM !== null
+                ? t('capture.locationAccuracy', { accuracy: toBengaliDigits(String(Math.round(fixState.fix.accuracyM))) })
+                : t('capture.locationUnavailableSub')}
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* The media-source sheet. */}
+      <BottomSheet
+        visible={pickerOpen}
+        title={t('capture.sourcePickerTitle')}
+        onClose={() => setPickerOpen(false)}
+      >
+        <View style={styles.pickerRows}>
+          {pickerKind !== 'file' ? (
+            <PickerRow
+              icon="photo_camera"
+              label={t('capture.cameraOption')}
+              onPress={() => void pick('camera')}
+            />
+          ) : null}
+          {pickerKind !== 'file' ? (
+            <PickerRow
+              icon="photo_library"
+              label={t('capture.galleryOption')}
+              onPress={() => void pick('gallery')}
+            />
+          ) : (
+            <PickerRow
+              icon="attach_file"
+              label={t('capture.sourceFile')}
+              onPress={() => void pick('file')}
+            />
+          )}
+        </View>
+      </BottomSheet>
+
+      {/* `.sticky-cta` */}
+      <View style={styles.stickyCta}>
+        {!canSubmit && !isSubmitting ? (
+          <Text style={[styles.validationHint, { color: theme.palette.red[600] }]}>
+            {t('capture.mediaRequired')}
+          </Text>
+        ) : null}
+        <Button
+          label={isSubmitting ? t('capture.uploading') : t('capture.submit')}
+          icon="send"
+          variant="primary"
+          size="lg"
+          disabled={!canSubmit}
+          onPress={() => void onSubmit()}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** One row of the media-source sheet. */
+function PickerRow({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.pickerRow, { backgroundColor: theme.colors.ink[50] }]}
+    >
+      <Icon name={icon} size={20} color={theme.palette.violet[700]} />
+      <Text style={[styles.pickerRowText, { color: theme.colors.ink[950] }]}>{label}</Text>
+      <Icon name="chevron_right" size={20} color={theme.colors.ink[400]} />
+    </Pressable>
+  );
+}
+
+/** Maps a media failure to a localized message. */
+function mapMediaError(error: unknown, t: (key: string) => string): string {
+  const code = (error as { code?: string } | null)?.code;
+
+  switch (code) {
+    case 'MEDIA_TOO_LARGE':
+      return t('capture.mediaTooLong');
+    case 'UNSUPPORTED_MEDIA':
+      return t('capture.unsupportedFile');
+    case 'FORBIDDEN':
+      return t('capture.cameraDenied');
+    default:
+      return t('capture.uploadFailed');
+  }
+}
+
+function UploadCard({
+  icon,
+  title,
+  sub,
+  selected,
+  onPress,
+}: {
+  icon: string;
+  title: string;
+  sub: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${sub}`}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[
+        styles.uploadCard,
+        {
+          backgroundColor: selected ? theme.palette.violet[50] : theme.palette.violet[25],
+          borderColor: selected ? theme.palette.violet[500] : theme.palette.violet[300],
+          borderStyle: selected ? 'solid' : 'dashed',
+        },
+      ]}
+    >
+      <View style={[styles.uploadIcon, { backgroundColor: theme.palette.violet[100] }]}>
+        <Icon name={icon} size={22} color={theme.palette.violet[700]} filled />
+      </View>
+      <View style={styles.uploadInfo}>
+        <Text style={[styles.uploadTitle, { color: theme.colors.ink[950] }]}>{title}</Text>
+        <Text style={[styles.uploadSub, { color: theme.colors.ink[500] }]}>{sub}</Text>
+      </View>
+      <Icon name="arrow_forward_ios" size={18} color={theme.colors.ink[400]} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  appBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appBarCenter: {
+    alignItems: 'center',
+  },
+  appBarTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.01,
+  },
+  appBarSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  contentInner: {
+    paddingBottom: 16,
+  },
+  anonCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  anonContent: {
+    flex: 1,
+  },
+  anonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  anonHelper: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  uploadCard: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 20,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  uploadIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadInfo: {
+    flex: 1,
+  },
+  uploadTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.01,
+  },
+  uploadSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  notice: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  descriptionBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  descriptionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  textarea: {
+    minHeight: 120,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    fontSize: 15,
+    textAlignVertical: 'top',
+  },
+  counter: {
+    textAlign: 'right',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  locationCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationInfo: {
+    flex: 1,
+  },
+  locationTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  locationSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  pickerRows: {
+    gap: 8,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    minHeight: 48,
+  },
+  pickerRowText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  stickyCta: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+  },
+  validationHint: {
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+});
