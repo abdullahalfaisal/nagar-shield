@@ -17,6 +17,19 @@ import {
   reportCategorySchema,
 } from '@shared/schemas/index.ts';
 
+/**
+ * The password-reset request bodies.
+ *
+ * They live in `packages/shared` so the client and the server validate the
+ * same shape — the same reasoning as the capture contract above.
+ */
+export {
+  passwordResetRequestBodySchema,
+  passwordResetVerifyBodySchema,
+  type PasswordResetRequestBody,
+  type PasswordResetVerifyBody,
+} from '@shared/schemas/index.ts';
+
 /** The accepted media kinds. */
 export const mediaTypeSchema = z.enum(['photo', 'video', 'file']);
 

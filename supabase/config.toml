@@ -55,6 +55,19 @@ policy = "per_worker"
 inspector_port = 8083
 
 # -----------------------------------------------------------------------------
+# The edge runtime's environment comes from `supabase/functions/.env`, which
+# is **committed** — it carries no credential, and CI boots the stack with no
+# developer override, so the password-reset probe needs a mail transport that
+# exists without anyone writing one by hand. `supabase/functions/.env.local`
+# is the gitignored developer override; `.env.local` wins over `.env`.
+#
+# There is deliberately **no** `[edge_runtime.env]` block: the CLI version
+# this repo pins (2.122.0) does not pass one into the container, so a block
+# here would read as wiring while doing nothing.
+# -----------------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
 # The Edge Functions' gateway posture.
 #
 # The two groups are different on purpose:

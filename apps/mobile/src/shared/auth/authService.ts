@@ -179,18 +179,16 @@ export async function logOut(): Promise<void> {
   if (error) throw fromSupabaseError(error);
 }
 
-export async function requestPasswordReset(identifier: string): Promise<void> {
-  const email = await resolveEmail(identifier);
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'nagarshield://auth/reset',
-  });
-  if (error) throw fromSupabaseError(error);
-}
-
-export async function updatePassword(newPassword: string): Promise<void> {
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
-  if (error) throw fromSupabaseError(error);
-}
+/**
+ * The password reset lives in `passwordResetService.ts`, not here.
+ *
+ * `supabase.auth.resetPasswordForEmail` sends GoTrue's recovery **link**, and
+ * the flow it opens redeems a token rather than checking a code — there is
+ * nowhere in it to enter an OTP, and nowhere for the 10-minute validity, the
+ * three-attempt limit or the 30-minute cooldown to live. The app's own
+ * `password-reset` Edge Function owns the challenge instead, and
+ * `sendPasswordResetOtp` / `verifyPasswordResetOtp` are its client half.
+ */
 
 /**
  * Loads the profile row for the signed-in user.

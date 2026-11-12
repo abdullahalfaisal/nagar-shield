@@ -123,7 +123,7 @@ the staging ones. The command exits non-zero when any assertion fails.
 
 #### The live database probes
 
-Four of the checks prove behaviour that only exists over the wire, through
+Five of the checks prove behaviour that only exists over the wire, through
 the door the app actually uses. They need the local stack running
 (`npx supabase start`) and are wired into the `rls-integration` CI job.
 
@@ -132,6 +132,7 @@ pnpm guard:check       # a disabled account cannot write
 pnpm biometric:check   # the biometric failure accounting
 pnpm alternate:check   # the alternate phone constraint
 pnpm signup:check      # the signup contract
+pnpm reset:check       # the password-reset contract
 ```
 
 `guard:check` proves that a moderator-disabled account is refused every
@@ -179,12 +180,34 @@ exist. The uniqueness guarantee is entirely the `UNIQUE` constraint inside
 the trigger, which is the stronger guarantee — the pre-flight could only
 ever have been advisory.
 
-All four create their own throwaway account (`disabled@nagar.local`,
+`reset:check` proves the password-reset contract end to end: a code is
+generated, mailed, read back out of the mailbox, and redeemed. A wrong code
+is refused and the refusal reports the remaining attempts; a third failure
+opens a 30-minute cooldown that **refuses the correct code too**; a fresh
+code is accepted and returns a session; the new password signs in and the
+old one is rejected; the code cannot be redeemed twice; and a superseded
+code is refused.
+
+Two of those assertions earn their keep. The cooldown one proves the refusal
+is server-side rather than a client countdown — a client that ignores its own
+timer gains nothing. The replay one proves the challenge is consumed, so a
+code captured from the mailbox is worthless once it has been used.
+
+The probe reads the code out of the **mailbox**, which is the only place it
+can be read from in production too. It needs the mail transport configured;
+the local stack's own mail server is the default, and a deployment with no
+transport at all fails loudly with `password_reset_mail_unconfigured`
+rather than pretending the code was delivered.
+
+All five create their own throwaway account (`disabled@nagar.local`,
 `biometric-probe@nagar.local`, `alt-phone-a@nagar.local` and
 `alt-phone-b@nagar.local`) and are safe to re-run. `signup:check` uses
 `signup-probe@nagar.local` and two siblings, and cleans up after itself:
 both the Auth users **and** the orphaned profile rows, because migration
 016's `ON DELETE SET NULL` leaves the profile behind still holding the phone.
+`reset:check` uses `reset-probe@nagar.local` and leaves it behind on
+purpose — it changes the account's password each run, so deleting it would
+break the next run's sign-in assertion.
 
 ### 4. Staging
 

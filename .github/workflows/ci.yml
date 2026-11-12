@@ -330,6 +330,18 @@ jobs:
       - name: start the local stack
         run: npx supabase start
 
+      # The edge runtime reads `supabase/functions/.env`, which is committed
+      # and carries no credential. It points the mail transport at the local
+      # stack's own mail server, so the password-reset probe below can read a
+      # real code out of the mailbox. If this file is missing the function
+      # reports `password_reset_mail_unconfigured` and the probe fails on
+      # "the code was delivered to the mailbox" — which is the intended
+      # behaviour: a missing transport must fail loudly, not silently.
+      - name: the mail transport is configured
+        run: |
+          test -f supabase/functions/.env
+          grep -q '^MAIL_HTTP_ENDPOINT=' supabase/functions/.env
+
       # The REST smoke tests exercise the read models and the RPCs as the
       # anon, citizen, and moderator roles against the local stack.
       - name: the REST read models and RPCs
@@ -371,6 +383,20 @@ jobs:
       # half-created account — an Auth identity with no profile.
       - name: the signup contract
         run: pnpm signup:check
+
+      # The password-reset contract, proved end to end: the code is generated,
+      # mailed, read back out of the mailbox, and redeemed.
+      #
+      # The SQL suite cannot prove this half. It can show that a wrong code is
+      # refused and that the attempt counter survives the rejection, but only
+      # the live probe can show that the code reaches the user at all — and
+      # that the whole path from the mailbox to a GoTrue session works.
+      #
+      # It also proves the property that matters most: the **correct** code is
+      # refused while the cooldown runs, so the refusal is server-side rather
+      # than a client timer.
+      - name: the password-reset contract
+        run: pnpm reset:check
 
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the

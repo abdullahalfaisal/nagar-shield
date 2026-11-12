@@ -96,11 +96,45 @@ export const passwordResetRequestSchema = z.object({
   identifier: z.string().trim().min(1, 'Enter your phone number or email'),
 });
 
+/**
+ * The 6-digit OTP.
+ *
+ * The code is a **string**, not a number: `000123` is a valid code and
+ * `parseInt` would turn it into `123`, which is a different code.
+ *
+ * The 6-digit shape is checked **client-side** so a malformed entry never
+ * consumes a server-side attempt — the story's edge-case table: "rejected
+ * client-side by the shared OTP schema; no attempt is consumed server-side".
+ */
+export const otpCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'Enter the 6-digit code');
+
 export const passwordResetVerifySchema = z.object({
   token: z.string().min(1),
-  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+  code: otpCodeSchema,
   newPassword: passwordSchema,
 });
+
+/**
+ * The password-reset wire contract.
+ *
+ * These are the request bodies the `password-reset` Edge Function accepts.
+ * They live here so the client and the server validate the same shape.
+ */
+export const passwordResetRequestBodySchema = z.object({
+  identifier: z.string().trim().min(1, 'Enter your phone number or email'),
+});
+
+export const passwordResetVerifyBodySchema = z.object({
+  identifier: z.string().trim().min(1, 'Enter your phone number or email'),
+  code: otpCodeSchema,
+  new_password: passwordSchema,
+});
+
+export type PasswordResetRequestBody = z.infer<typeof passwordResetRequestBodySchema>;
+export type PasswordResetVerifyBody = z.infer<typeof passwordResetVerifyBodySchema>;
 
 /** FR-AUTH-3 — 10-minute OTP validity, 3 attempts, then a 30-minute cooldown. */
 export const OTP_TTL_MINUTES = 10;

@@ -28,6 +28,7 @@ const SUITES = [
   'business_rules.sql',
   'read_models.sql',
   'write_guards.sql',
+  'password_reset.sql',
 ];
 
 /** Counts the `| t` / `| f` assertion rows in a psql transcript. */

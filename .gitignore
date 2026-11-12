@@ -12,6 +12,12 @@ coverage/
 !.env.example
 supabase/functions/.env.local
 
+# The local Edge Function environment is **committed** on purpose: it carries
+# no credential, and CI runs `supabase start` with no developer override, so
+# the password-reset probe needs a mail transport that exists without anyone
+# writing one by hand. The gitignored `.env.local` is the developer override.
+!supabase/functions/.env
+
 *.log
 npm-debug.log*
 pnpm-debug.log*

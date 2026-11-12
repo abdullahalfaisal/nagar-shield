@@ -4,27 +4,35 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { AppError } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
-import { Button, InputField } from '@/shared/ui';
-import { requestPasswordReset, updatePassword } from '@/shared/auth/authService';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { AppBar, Button, InputField } from '@/shared/ui';
+import { sendPasswordResetOtp, stagePasswordReset } from '@/shared/auth/passwordResetService';
 
 /**
  * Screen 13 — Forgot Password.
  *
- * Requests a password-reset email (email-primary, waiver W-1) and then lets
- * the user set a new password. The two steps live on one screen because the
- * reset link lands the user straight into the new-password field.
+ * The prototype's screen-13 layout: the back button, the "অ্যাকাউন্ট পুনরুদ্ধার"
+ * app-bar title, the "পাসওয়ার্ড ভুলে গেছেন?" heading, the `mail` icon, the
+ * identifier input and the "OTP কোড পাঠান" primary button, with the
+ * "← লগইনে ফিরে যান" escape link.
+ *
+ * The prototype's copy says a reset **link** is sent. The shipped flow sends
+ * a **code**, so the helper copy is reworded through i18n to describe a code
+ * — and it never claims delivery. Email deliverability on a free tier is not
+ * guaranteed, so the app says a code was *sent*, never that it *arrived*.
  *
  * **No account-existence oracle.** An unknown identifier and a registered one
- * produce the same screen and the same message — the identifier is resolved
- * server-side by `resolve_login_identifier`, which deliberately does not
- * distinguish the two cases.
+ * produce the same answer and the same screen — the identifier is resolved
+ * server-side, and the server's answer does not vary.
  *
- * **The recovery session is the authority.** The emailed link opens the app
- * with a recovery token that Supabase exchanges for a session. The new
- * password is applied to **that** session, so the reset can only ever be
- * completed by someone who followed the emailed link.
+ * **The code step is a separate screen.** The prototype put the new-password
+ * field on the same screen because the reset *link* landed the user straight
+ * there. A code has to be typed first, so the flow is: this screen asks for
+ * the identifier and sends the code, `verify-otp` collects the code, and
+ * `reset-password` collects the new password.
+ *
+ * **No SMS.** `EXPO_PUBLIC_SMS_OTP_ENABLED` is off for Phase 1. There is no
+ * SMS option, no SMS delivery claim and no carrier-charge copy in this
+ * screen — the channel is email only.
  */
 export default function ForgotPasswordScreen() {
   const theme = useTheme();
@@ -32,54 +40,37 @@ export default function ForgotPasswordScreen() {
   const { t } = useTranslation();
 
   const [identifier, setIdentifier] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [stage, setStage] = useState<'request' | 'verify'>('request');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
-  const onRequestCode = async () => {
-    const nextErrors: Record<string, string> = {};
-    if (identifier.trim().length === 0) nextErrors.identifier = t('errors.validationFailed');
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+  const onSendCode = async () => {
+    const trimmed = identifier.trim();
 
-    setSubmitting(true);
-    setFormError(undefined);
-    try {
-      await requestPasswordReset(identifier);
-      setStage('verify');
-    } catch (error) {
-      const appError = error instanceof AppError ? error : fromSupabaseError(error);
-      setFormError(t(`errors.${appError.code.toLowerCase()}`));
-    } finally {
-      setSubmitting(false);
+    if (trimmed.length === 0) {
+      setErrors({ identifier: t('errors.validationFailed') });
+      return;
     }
-  };
 
-  const onResetPassword = async () => {
-    const nextErrors: Record<string, string> = {};
-    if (newPassword.length < 8) nextErrors.newPassword = t('errors.validationFailed');
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
-
+    setErrors({});
     setSubmitting(true);
     setFormError(undefined);
-    try {
-      // The recovery link established the session; the new password is applied
-      // to it. Without that session the update is rejected by the server.
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        setFormError(t('errors.authRequired'));
-        setStage('request');
-        return;
-      }
 
-      await updatePassword(newPassword);
-      router.replace('/(auth)/login');
+    try {
+      await sendPasswordResetOtp(trimmed);
+
+      // The answer is the same for a known identifier and an unknown one, so
+      // the screen cannot say which happened — and does not try.
+      //
+      // The identifier travels in **memory**, not in the route params: it is
+      // PII, and a route param is part of a URL.
+      stagePasswordReset(trimmed, '');
+      router.push('/(auth)/verify-otp');
     } catch (error) {
-      const appError = error instanceof AppError ? error : fromSupabaseError(error);
-      setFormError(t(`errors.${appError.code.toLowerCase()}`));
+      const appError = error instanceof AppError ? error : null;
+      setFormError(
+        appError ? t(`errors.${appError.code.toLowerCase()}`) : t('errors.internal'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -87,12 +78,14 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
+      <AppBar title={t('auth.accountRecovery')} onBack={() => router.back()} />
+
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
           {t('auth.forgotTitle')}
         </Text>
         <Text style={[styles.subtitle, { color: theme.colors.ink[600] }]}>
-          {stage === 'request' ? t('auth.forgotSubtitle') : t('auth.newPasswordSubtitle')}
+          {t('auth.forgotSubtitle')}
         </Text>
 
         {formError ? (
@@ -101,57 +94,35 @@ export default function ForgotPasswordScreen() {
           </View>
         ) : null}
 
-        {stage === 'request' ? (
-          <>
-            <InputField
-              label={t('auth.identifierLabel')}
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder={t('auth.phonePlaceholder')}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              icon="mail"
-              error={errors.identifier}
-              testID="forgot-identifier"
-            />
-            <Button
-              label={submitting ? t('capture.submitting') : t('auth.resetCta')}
-              variant="primary"
-              size="lg"
-              disabled={identifier.trim().length === 0 || submitting}
-              onPress={onRequestCode}
-              style={styles.cta}
-            />
-          </>
-        ) : (
-          <>
-            <InputField
-              label={t('auth.newPasswordTitle')}
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              icon="lock"
-              error={errors.newPassword}
-              testID="forgot-password"
-            />
-            <Button
-              label={submitting ? t('capture.submitting') : t('common.save')}
-              variant="primary"
-              size="lg"
-              disabled={newPassword.length < 8 || submitting}
-              onPress={onResetPassword}
-              style={styles.cta}
-            />
-            <Text
-              accessibilityRole="button"
-              onPress={onRequestCode}
-              style={[styles.resend, { color: theme.palette.violet[700] }]}
-            >
-              {t('auth.resendOtp')}
-            </Text>
-          </>
-        )}
+        <InputField
+          label={t('auth.identifierLabel')}
+          value={identifier}
+          onChangeText={setIdentifier}
+          placeholder={t('auth.phonePlaceholder')}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          icon="mail"
+          error={errors.identifier}
+          testID="forgot-identifier"
+        />
+
+        <Button
+          label={submitting ? t('capture.submitting') : t('auth.resetCta')}
+          variant="primary"
+          size="lg"
+          disabled={identifier.trim().length === 0 || submitting}
+          onPress={onSendCode}
+          style={styles.cta}
+        />
+
+        <Text
+          accessibilityRole="button"
+          onPress={() => router.replace('/(auth)/login')}
+          style={[styles.backToLogin, { color: theme.colors.ink[500] }]}
+        >
+          ← {t('auth.backToLogin')}
+        </Text>
       </View>
     </View>
   );
@@ -164,18 +135,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 28,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.6,
+    letterSpacing: -0.52,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     lineHeight: 21,
-    marginBottom: 28,
+    marginBottom: 24,
   },
   errorBanner: {
     borderRadius: 12,
@@ -183,12 +154,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cta: {
-    marginTop: 16,
+    marginTop: 20,
   },
-  resend: {
+  backToLogin: {
     alignSelf: 'center',
     fontSize: 13,
-    fontWeight: '600',
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
 });

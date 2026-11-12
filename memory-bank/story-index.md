@@ -1,7 +1,10 @@
 # Story Index — Nagar Shield MVP Phase 1
 
 > Single-file story index for the intent `001-nagar-shield-mvp1`.
-> 62 stories across 8 units, mapped to 27 bolts.
+> 54 stories across 8 units, mapped to 27 bolts.
+>
+> The Status column is derived from each story file's `implemented`
+> frontmatter, which is the authoritative source.
 
 | Story | Title | Unit | Bolt | Priority | Status |
 |---|---|---|---|---|---|
@@ -12,11 +15,11 @@
 | 005-admin-skeleton-and-ci | Admin app skeleton and CI pipeline | 001-foundation | 003-foundation | must | planned |
 | 001-signup-with-email-and-phone | Signup with email and phone | 002-identity | 004-identity | must | complete |
 | 002-dual-identifier-login | Dual-identifier login + Remember me | 002-identity | 004-identity | must | planned |
-| 003-email-otp-password-reset | Email-OTP password reset | 002-identity | 005-identity | must | planned |
+| 003-email-otp-password-reset | Email-OTP password reset | 002-identity | 005-identity | must | complete |
 | 004-biometric-reauth-gate | Biometric re-auth gate | 002-identity | 005-identity | must | complete |
 | 006-emergency-contacts-crud | Emergency contacts CRUD | 002-identity | 006-identity | must | planned |
 | 005-remote-account-disable | Remote account disable | 002-identity | 006-identity | must | complete |
-| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | complete |
+| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | planned |
 | 001-home-and-help-alert-grid | Home surface + Help Alert panic grid | 003-help-seek | 007-help-seek | must | planned |
 | 002-personal-emergency-picker | Personal Emergency contact picker | 003-help-seek | 007-help-seek | must | planned |
 | 003-bundled-station-hotline-dataset | Bundled station + hotline dataset | 003-help-seek | 008-help-seek | must | planned |
@@ -52,10 +55,10 @@
 | 004-disable-a-user | Disable a user | 007-moderation | 023-moderation | must | planned |
 | 005-author-auto-hide-queue | Author-auto-hidden queue group | 007-moderation | 024-moderation | should | planned |
 | 006-moderator-action-audit-log | Moderator action audit log | 007-moderation | 024-moderation | must | planned |
-| 001-media-purge-job | Media purge job (90-day) | 008-jobs-operations | 025-jobs-operations | must | planned |
-| 002-deleted-account-pii-purge | Deleted-account PII purge (30-day) | 008-jobs-operations | 025-jobs-operations | must | planned |
-| 003-geocode-cache-cleanup | Geocode cache cleanup | 008-jobs-operations | 025-jobs-operations | should | planned |
-| 004-eas-build-profiles | EAS build profiles | 008-jobs-operations | 026-jobs-operations | must | planned |
-| 005-ci-pipeline | CI pipeline | 008-jobs-operations | 026-jobs-operations | must | planned |
-| 006-release-runbook | Release runbook | 008-jobs-operations | 027-jobs-operations | must | planned |
+| 001-media-purge-job | Media purge job (90-day) | 008-jobs-operations | 025-jobs-operations | must | complete |
+| 002-deleted-account-pii-purge | Deleted-account PII purge (30-day) | 008-jobs-operations | 025-jobs-operations | must | complete |
+| 003-geocode-cache-cleanup | Geocode cache cleanup | 008-jobs-operations | 025-jobs-operations | should | complete |
+| 004-eas-build-profiles | EAS build profiles | 008-jobs-operations | 026-jobs-operations | must | complete |
+| 005-ci-pipeline | CI pipeline | 008-jobs-operations | 026-jobs-operations | must | complete |
+| 006-release-runbook | Release runbook | 008-jobs-operations | 027-jobs-operations | must | complete |
 | 007-secrets-and-environments | Secrets and environments | 008-jobs-operations | 027-jobs-operations | must | complete |

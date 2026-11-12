@@ -4,14 +4,14 @@
 > **broken**, and what to do **next**, in that order.
 >
 > Last updated: 2026-11-13 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
-> Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 62 stories / 27 bolts
+> Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
 
 ---
 
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **55 of 62 stories still carry `implemented: false`** — the
+built and verified. **43 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -38,15 +38,16 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
-| Database | **21 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs |
+| Database | **22 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **176 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78) |
+| SQL test suites | **223 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78), `password_reset` (47) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
 | Alternate phone | `tools/probe-alternate-phone.cjs` — **9/9** over the real PostgREST path |
 | Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
-| Edge Functions | 7 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture |
+| Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
+| Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html` |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
@@ -62,13 +63,14 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 156 tests
-pnpm db:test          # 176 SQL assertions
+pnpm test             # 170 tests
+pnpm db:test          # 223 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
 pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
+pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -255,7 +257,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 55 of 62 stories
+## 4. What is NOT DONE — 43 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -267,7 +269,7 @@ Ordered by dependency. Bolt numbers in brackets.
 | I2 | ✅ **FIXED** — the biometric gate is live: `src/shared/auth/biometricService.ts` wraps `expo-local-authentication`, `useBiometricGate` decides when the gate applies, and `app/(auth)/biometric-gate.tsx` runs the prompt. The thresholds come from the `record_biometric_attempt` RPC (the authority), not from an app-local counter. The Settings toggle now persists `biometric_opt_in`. `pnpm biometric:check` proves the FR-AUTH-5 thresholds over PostgREST (10/10). | [005] |
 | I3 | ✅ **FIXED** (folded into I1) — the Settings "Delete account" row now confirms and calls `soft_delete_account`; a soft-deleted account that signs back in lands on `app/(auth)/account-deleted.tsx`, which can restore it inside the 30-day window. | [006] story 007 |
 | I4 | ✅ **FIXED** — the alternate-phone step is live: `phone.tsx` routes to `app/(auth)/alternate-phone.tsx` with the **normalised** primary number, the step rejects an alternate equal to the primary (both sides normalised, so `01711-111111` and `+8801711111111` compare equal), and `register.tsx` writes the column after the signup via `setAlternatePhone` — the `handle_new_user` trigger does not carry it. Migration 020 adds the format CHECK the schema never had. `pnpm alternate:check` proves the constraint over PostgREST (9/9); `pnpm signup:check` proves the signup contract (13/13). | [004] story 001 |
-| I5 | `verify-otp` and `reset-password` are declared in the auth `_layout.tsx` but have **no file**. | [005] |
+| I5 | ✅ **FIXED** — the password-reset OTP flow is live end to end. `app/(auth)/forgot-password.tsx` sends the code; `app/(auth)/verify-otp.tsx` takes it; `app/(auth)/reset-password.tsx` sets the new password and adopts the session. The challenge lives in `public.password_reset_challenges` (migration 021) and the **database owns the code** — bcrypt hash, `extensions.crypt(code, hash) = hash` — because GoTrue's `verify` endpoint accepts only `{type, token_hash}` / `{type, token}` and **silently ignores a 6-digit code**. The GoTrue token is released only after the comparison succeeds. The app owns the mail (`supabase/functions/_shared/mailer.ts`). `pnpm reset:check` proves the whole path over the real GoTrue + mailbox (30/30); `supabase/tests/password_reset.sql` adds 47 DB-side assertions. | [005] story 003 |
 
 ### 4.2 Contacts — unit `002-identity`
 
@@ -340,15 +342,21 @@ Ordered by dependency. Bolt numbers in brackets.
    restore paths that were already in the database but had no caller. I2's
    biometric gate is live, with the FR-AUTH-5 thresholds read from the RPC
    rather than from an app-local counter.
-6. **I5 → C1** — the rest of unit `002-identity`: the two missing auth
-   screens (`verify-otp`, `reset-password`) and contacts CRUD. I4 is done:
-   the alternate-phone step is reachable, the column is written, and the
-   format CHECK exists.
-7. **P1 → P2 → P3** — unit `004-capture`.
-8. **L1 → L2** — unit `005-location`.
-9. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
-10. **B4, R5, and the git remote** — release readiness.
-11. Final `pnpm verify` → **one** commit → push.
+6. ~~**I5** — the two missing auth screens (`verify-otp`, `reset-password`).~~ ✅ **DONE.**
+   The password-reset OTP flow is live end to end: the code is generated,
+   mailed, compared **in the database** (bcrypt), and only then does GoTrue
+   issue the session. The ownership is inverted from the story's original
+   description because GoTrue's `verify` endpoint silently ignores a 6-digit
+   code — that defect would have shipped a fail-open reset. `pnpm reset:check`
+   proves the whole path (30/30).
+7. **C1** — contacts CRUD, the rest of unit `002-identity`. I4 is done: the
+   alternate-phone step is reachable, the column is written, and the format
+   CHECK exists.
+8. **P1 → P2 → P3** — unit `004-capture`.
+9. **L1 → L2** — unit `005-location`.
+10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
+11. **B4, R5, and the git remote** — release readiness.
+12. Final `pnpm verify` → **one** commit → push.
 
 ---
 
@@ -361,10 +369,14 @@ session.
   artifacts, although the code for their stories **is built**. Only bolts
   `025`–`027` have `implementation-plan.md` / `implementation-walkthrough.md` /
   `test-walkthrough.md` and `status: complete`.
-- `memory-bank/story-index.md` lists every story as `planned` except
-  `007-secrets-and-environments`.
-- 55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.
+- ~~`memory-bank/story-index.md` lists every story as `planned` except
+  `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
+  now synced from the story files' `implemented` frontmatter, which is the
+  authoritative source. 11 stories are `complete`, 43 are `planned`.
+- ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 11 story files
+  now say `true`; 43 still say `false`. The count is **43 of 54 stories**,
+  not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
   (`supabase/migrations/20261105000001_initial_schema.sql:75`) and the wizard
@@ -381,8 +393,8 @@ not in a separate pass.
 
 ```text
 apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
-                             register, forgot-password, verify-otp*,
-                             reset-password*, account-disabled,
+                             register, forgot-password, verify-otp,
+                             reset-password, account-disabled,
                              account-deleted, biometric-gate
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              location-sharing, contacts, alerts,
@@ -391,20 +403,22 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              stations, geocode, flags, errors, profile,
                              account), auth/ (useAuthSession,
                              useAccountStatus, useBiometricGate,
-                             biometricService, authService), services/
+                             biometricService, authService,
+                             passwordResetService), services/
                              (captureFlow, submitCapture, uploadQueue,
                              prepareMedia, location, dialer), i18n/ (bn.ts,
                              en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         21 forward-only migrations
-supabase/tests/              4 SQL suites (176 assertions)
-supabase/functions/          7 Edge Functions + _shared/
+supabase/migrations/         22 forward-only migrations
+supabase/tests/              5 SQL suites (223 assertions)
+supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
                              probe-disabled-write, probe-biometric-gate,
-                             probe-alternate-phone, probe-signup-contract
+                             probe-alternate-phone, probe-signup-contract,
+                             probe-password-reset
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md

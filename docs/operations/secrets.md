@@ -30,6 +30,9 @@ GitHub Environment secret. **Nothing is in between.**
 | `EAS_TOKEN` | `eas login` (CLI credential store) | — | — | `staging` / `production` | **no** |
 | `VERCEL_TOKEN` | `vercel login` (CLI credential store) | — | — | `staging` / `production` | **no** |
 | `GEOCODE_BASE_URL` | `supabase/functions/.env.local` (gitignored) | — | — | — | **no** — a server-side allowlist URL |
+| `MAIL_HTTP_ENDPOINT` | `supabase/functions/.env` (**committed**) — the local stack's mail server | — | — | — | **no** — a server-side transport URL |
+| `MAIL_FROM` | `supabase/functions/.env` (**committed**) | — | — | — | **no** — the envelope sender |
+| `MAIL_SMTP_URL` | — (the local path uses the HTTP transport) | — | — | `staging` / `production` **Environment** secrets only | **no** — a relay credential |
 | `nagar_project_url` (Vault) | seeded locally | — | — | — | **no** — encrypted at rest |
 | `nagar_service_role_key` (Vault) | seeded locally | — | — | — | **no** — encrypted at rest |
 
@@ -187,6 +190,21 @@ scan fails the build if a real credential is committed.
 It is **gitignored** and is the only local file that holds the service-role
 key.
 
+`supabase/functions/.env` is the **committed** exception. It holds
+`MAIL_HTTP_ENDPOINT` and `MAIL_FROM` — the local stack's mail transport and
+its envelope sender — and carries **no credential**: the local mail server
+accepts anonymous sends. It is committed on purpose because CI boots the
+stack with no developer override, and the password-reset probe needs a mail
+transport that exists without anyone writing one by hand. `.env.local` wins
+over it when both are present.
+
 The geocoder URL is an **allowlist**: there is no user-supplied host, and
 the value must point at the configured Nominatim-compatible service. It is
 the SSRF closure.
+
+The mail transport is **exactly one** of `MAIL_SMTP_URL` (the production
+path — a relay credential, held as a GitHub Environment secret) or
+`MAIL_HTTP_ENDPOINT` (the local path — the committed file above). There is
+no fallback between them: a deployment with neither cannot send a password-reset
+code, and the function says so with `password_reset_mail_unconfigured`
+rather than pretending the code was delivered.
