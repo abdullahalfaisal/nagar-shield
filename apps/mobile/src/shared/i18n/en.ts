@@ -282,6 +282,18 @@ export const en: TranslationSchema = {
     distributionNote: 'Counts only — no charts and no heatmaps.',
     viewOnMap: 'View on map',
   },
+  disabled: {
+    title: 'Account disabled',
+    subtitle: 'This account has been disabled, so it can no longer send reports or share your location.',
+    whatYouCanDo: 'What you can still do',
+    deleteTitle: 'Delete your account',
+    deleteBody: 'Your data is kept for 30 days, then permanently deleted.',
+    signOut: 'Sign out',
+    support: 'If you think this is a mistake, contact support.',
+    deletedTitle: 'Account deleted',
+    deletedBody: 'Your account was deleted. Sign in again within 30 days to restore it.',
+    restore: 'Restore my account',
+  },
   settings: {
     title: 'Settings',
     appearance: 'Appearance',
@@ -305,6 +317,9 @@ export const en: TranslationSchema = {
     shareApp: 'Share the app',
     deleteAccount: 'Delete account',
     deleteWarning: 'Your data is kept for 30 days, then permanently deleted.',
+    deleteBody:
+      'Deleting your account signs you out. Sign in again within 30 days and it comes back — after that it is permanently deleted.',
+    deleteConfirm: 'Delete it',
     version: 'Version',
   },
   more: {

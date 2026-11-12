@@ -15,6 +15,7 @@ export function fromSupabaseError(error: unknown): AppError {
   };
 
   const code = candidate.code ?? '';
+  const message = candidate.message ?? '';
 
   // Postgres error codes we map explicitly.
   switch (code) {
@@ -25,6 +26,14 @@ export function fromSupabaseError(error: unknown): AppError {
     case '23514': // check_violation
       return new AppError('VALIDATION_FAILED');
     case '42501': // insufficient_privilege
+      // The disabled-account guard raises `ACCOUNT_DISABLED` with this code.
+      // It is the one 42501 that is not a plain permission problem, and the
+      // user needs to be told their account is disabled — not that they
+      // lack permission — so it is matched on the message before the
+      // generic FORBIDDEN.
+      if (/ACCOUNT_DISABLED/i.test(message)) {
+        return new AppError('AUTH_DISABLED');
+      }
       return new AppError('FORBIDDEN');
     case 'PGRST116': // no rows returned for a single-row select
       return new AppError('NOT_FOUND');
@@ -35,8 +44,6 @@ export function fromSupabaseError(error: unknown): AppError {
     default:
       break;
   }
-
-  const message = candidate.message ?? '';
 
   // PostgREST surfaces RLS denials as a permission error without a code.
   if (/row-level security|permission denied/i.test(message)) {

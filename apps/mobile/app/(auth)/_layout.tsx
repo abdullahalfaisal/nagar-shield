@@ -2,6 +2,10 @@ import { Stack } from 'expo-router';
 
 /**
  * The auth group. Screens here are only reachable while signed out.
+ *
+ * `account-disabled` is the exception: a disabled account still holds a
+ * session, so the app group hands it over to this screen rather than
+ * signing the user out (see `useAccountStatus`).
  */
 export default function AuthLayout() {
   return (
@@ -14,6 +18,8 @@ export default function AuthLayout() {
       <Stack.Screen name="register" />
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
+      <Stack.Screen name="account-disabled" options={{ animation: 'fade' }} />
+      <Stack.Screen name="account-deleted" options={{ animation: 'fade' }} />
     </Stack>
   );
 }

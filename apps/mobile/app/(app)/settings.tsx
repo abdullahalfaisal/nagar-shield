@@ -3,9 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme, useThemeControls } from '@/shared/theme';
-import { Icon, ListRow, Screen, Toggle } from '@/shared/ui';
+import { Button, Icon, ListRow, Screen, Toggle } from '@/shared/ui';
+import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { setLocale } from '@/shared/i18n';
 import { logOut } from '@/shared/auth/authService';
+import { softDeleteAccount } from '@/shared/api/account';
 
 /**
  * Screen 16 — Settings.
@@ -26,8 +28,32 @@ export default function SettingsScreen() {
   const { toggleTheme, setTheme } = useThemeControls();
 
   const [biometric, setBiometric] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const isBangla = i18n.language === 'bn';
+
+  /**
+   * Soft-deletes the account, then ends the local session.
+   *
+   * The delete is a **soft** delete: the row is kept for the 30-day recovery
+   * window and the PII purge job removes it after that. The session is ended
+   * locally — the server-side refresh token is not revoked, so signing back in
+   * within the window restores the account.
+   */
+  const onConfirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(undefined);
+    try {
+      await softDeleteAccount();
+      await logOut();
+      router.replace('/(auth)/welcome');
+    } catch {
+      setDeleteError(t('errors.internal'));
+      setDeleting(false);
+    }
+  };
 
   return (
     <Screen title={t('settings.title')} onBack={() => router.back()} scroll>
@@ -139,6 +165,10 @@ export default function SettingsScreen() {
           tone="red"
           title={t('settings.deleteAccount')}
           subtitle={t('settings.deleteWarning')}
+          onPress={() => {
+            setDeleteError(undefined);
+            setConfirmDelete(true);
+          }}
         />
       </Section>
 
@@ -160,6 +190,47 @@ export default function SettingsScreen() {
         <Icon name="logout" size={20} color={theme.palette.red[600]} />
         {t('more.logout')}
       </Text>
+
+      {/*
+        The delete confirmation. It states plainly what happens and — more
+        importantly — what does NOT happen: the account is not erased on the
+        spot. It is kept for 30 days, and signing back in inside that window
+        restores it. A delete that sounds irreversible but is not would train
+        users not to believe the warning.
+      */}
+      <BottomSheet
+        visible={confirmDelete}
+        title={t('settings.deleteAccount')}
+        helper={t('settings.deleteWarning')}
+        onClose={() => {
+          if (!deleting) setConfirmDelete(false);
+        }}
+      >
+        <Text style={[styles.deleteBody, { color: theme.colors.ink[600] }]}>
+          {t('settings.deleteBody')}
+        </Text>
+
+        {deleteError ? (
+          <Text style={[styles.deleteError, { color: theme.palette.red[600] }]}>{deleteError}</Text>
+        ) : null}
+
+        <View style={styles.deleteActions}>
+          <Button
+            label={t('common.cancel')}
+            variant="secondary"
+            size="lg"
+            disabled={deleting}
+            onPress={() => setConfirmDelete(false)}
+          />
+          <Button
+            label={t('settings.deleteConfirm')}
+            variant="emergency"
+            size="lg"
+            disabled={deleting}
+            onPress={onConfirmDelete}
+          />
+        </View>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -248,10 +319,22 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 8,
   },
+  deleteBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  deleteError: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  deleteActions: {
+    gap: 8,
+  },
   logoutRow: {
     marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 32,
+    marginTop: 8,    marginBottom: 32,
     padding: 16,
     textAlign: 'center',
     borderRadius: 18,
