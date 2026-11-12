@@ -52,10 +52,11 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 121 tests
+pnpm test             # 146 tests
 pnpm db:test          # 163 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
+pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -155,6 +156,33 @@ a `testID` that exists in the app, and every Bengali selector is a string
 that exists in `bn.ts`. A typo fails CI in seconds instead of the nightly
 build after a full APK build.
 
+### ✅ I2 — The biometric gate — FIXED
+
+`expo-local-authentication` was a dependency imported nowhere, and
+`record_biometric_attempt` had no caller — so the FR-AUTH-5 thresholds
+(3 fails → password, 5 fails in 24 h → auto-disable) were never enforced.
+
+**The fix.** `src/shared/auth/biometricService.ts` wraps the device prompt;
+`useBiometricGate` decides when the gate applies; `app/(auth)/biometric-gate.tsx`
+runs it. Three decisions worth keeping:
+
+- **The thresholds come from the RPC, not from the app.** An app-local
+  counter is cleared by a reinstall and cannot enforce "5 fails in 24 h".
+  The app renders the server's answer.
+- **A cancelled prompt is not a failure.** A user who dismisses the sheet
+  has not failed to identify themselves; counting it would lock biometric
+  out after three dismissals for a user who never touched the sensor.
+- **The gate is for a returning session only.** A user who just typed their
+  password has already proved who they are. The "signed in with a password"
+  flag lives in SecureStore and is cleared on background, so the next
+  foreground is gated again.
+
+`tools/probe-biometric-gate.cjs` (`pnpm biometric:check`) proves the
+thresholds over the **real PostgREST path** — 10 checks, including that the
+auto-disable is durable, that a success clears the counter without silently
+re-enabling biometric, and that an anonymous caller cannot record an
+attempt.
+
 ### ✅ B3 — Stray scratch files at the repo root — FIXED
 
 The scratch files were deleted before the baseline commit, so they never
@@ -185,9 +213,9 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| I1 | **Disable check on session resume.** `useAuthSession` never reads `disabled_at`; no disable screen exists. `AUTH_DISABLED` is mapped in i18n but never surfaced. | `src/shared/auth/useAuthSession.ts`, new screen in `app/(auth)/` |
-| I2 | **Biometric gate.** `expo-local-authentication` is a dependency but imported nowhere; `record_biometric_attempt` RPC has no caller; failure accounting never runs. | [005] |
-| I3 | **Account deletion + recovery.** `soft_delete_account` / `restore_account` exist; the Settings "Delete account" row has no `onPress`. | [006] story 007 |
+| I1 | ✅ **FIXED** — `useAccountStatus` reads `disabled_at` on session resume and every foreground; a disabled account is routed to `app/(auth)/account-disabled.tsx`, which explains the disable and offers delete-or-sign-out. `fromSupabaseError` maps the guard's `ACCOUNT_DISABLED` to `AUTH_DISABLED` before the generic 42501 → FORBIDDEN. | `src/shared/auth/useAccountStatus.ts`, `app/(auth)/account-disabled.tsx` |
+| I2 | ✅ **FIXED** — the biometric gate is live: `src/shared/auth/biometricService.ts` wraps `expo-local-authentication`, `useBiometricGate` decides when the gate applies, and `app/(auth)/biometric-gate.tsx` runs the prompt. The thresholds come from the `record_biometric_attempt` RPC (the authority), not from an app-local counter. The Settings toggle now persists `biometric_opt_in`. `pnpm biometric:check` proves the FR-AUTH-5 thresholds over PostgREST (10/10). | [005] |
+| I3 | ✅ **FIXED** (folded into I1) — the Settings "Delete account" row now confirms and calls `soft_delete_account`; a soft-deleted account that signs back in lands on `app/(auth)/account-deleted.tsx`, which can restore it inside the 30-day window. | [006] story 007 |
 | I4 | **Alternate-phone step bypassed.** `phone.tsx` routes straight to `register`; `alternate-phone.tsx` is unreachable. **Q-1 in the inception log is stale** — `profiles.alternate_phone` *does* exist in the schema. | [004] story 001 |
 | I5 | `verify-otp` and `reset-password` are declared in the auth `_layout.tsx` but have **no file**. | [005] |
 
@@ -256,15 +284,19 @@ Ordered by dependency. Bolt numbers in brackets.
 2. ~~**B1** — the disabled-write bypass, plus regression tests.~~ ✅ **DONE**
 3. ~~**B3** — delete / ignore the scratch files.~~ ✅ **DONE**
 4. ~~**B2** — the Maestro panic-path flow.~~ ✅ **DONE**
-5. **I1 → I2 → I4 → I5 → I3 → C1** — unit `002-identity` in full.
-   I1 (the disable check on session resume) now has a **database-side** guard
-   behind it, so the mobile screen that surfaces `AUTH_DISABLED` is the last
-   piece of the story.
-6. **P1 → P2 → P3** — unit `004-capture`.
-7. **L1 → L2** — unit `005-location`.
-8. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
-9. **B4, R5, and the git remote** — release readiness.
-10. Final `pnpm verify` → **one** commit → push.
+5. ~~**I1 → I2 → I3** — the identity lifecycle.~~ ✅ **DONE.** I1's
+   database-side guard (migration 019) now has its mobile half: the disable
+   check on session resume, the disable screen, and the account-deletion and
+   restore paths that were already in the database but had no caller. I2's
+   biometric gate is live, with the FR-AUTH-5 thresholds read from the RPC
+   rather than from an app-local counter.
+6. **I4 → I5 → C1** — the rest of unit `002-identity`: the unreachable
+   alternate-phone step, the two missing auth screens, and contacts CRUD.
+7. **P1 → P2 → P3** — unit `004-capture`.
+8. **L1 → L2** — unit `005-location`.
+9. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
+10. **B4, R5, and the git remote** — release readiness.
+11. Final `pnpm verify` → **one** commit → push.
 
 ---
 
@@ -295,16 +327,21 @@ not in a separate pass.
 ## 8. Where things live
 
 ```text
-apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
-                             register, forgot-password
+apps/mobile/app/(auth)/      welcome, phone, alternate-phone*, login,
+                             register, forgot-password, verify-otp*,
+                             reset-password*, account-disabled,
+                             account-deleted, biometric-gate
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              location-sharing, contacts, alerts,
                              alert-detail*, history*, more-help*, station-map*
 apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
-                             stations, geocode, flags, errors), auth/,
-                             services/ (captureFlow, submitCapture,
-                             uploadQueue, prepareMedia, location, dialer),
-                             i18n/ (bn.ts, en.ts), theme/, ui/
+                             stations, geocode, flags, errors, profile,
+                             account), auth/ (useAuthSession,
+                             useAccountStatus, useBiometricGate,
+                             biometricService, authService), services/
+                             (captureFlow, submitCapture, uploadQueue,
+                             prepareMedia, location, dialer), i18n/ (bn.ts,
+                             en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
 supabase/migrations/         20 forward-only migrations
@@ -313,7 +350,7 @@ supabase/functions/          7 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
-                             probe-disabled-write
+                             probe-disabled-write, probe-biometric-gate
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md

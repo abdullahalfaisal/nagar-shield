@@ -121,6 +121,31 @@ pnpm release:verify --env staging
 matches, the migration state matches the repo, and the build's env vars are
 the staging ones. The command exits non-zero when any assertion fails.
 
+#### The live database probes
+
+Two of the checks prove behaviour that only exists over the wire, through
+the door the app actually uses. They need the local stack running
+(`npx supabase start`) and are wired into the `rls-integration` CI job.
+
+```bash
+pnpm guard:check       # a disabled account cannot write
+pnpm biometric:check   # the biometric failure accounting
+```
+
+`guard:check` proves that a moderator-disabled account is refused every
+write path — contacts, location shares, wrong-number reports, reports,
+`finalize_capture`, and the media bucket — while its own profile read and
+an enabled account's insert still work.
+
+`biometric:check` proves the FR-AUTH-5 thresholds over PostgREST: two
+failures stay under the password fallback, the third answers
+`fallback: 'password'`, the fifth clears `biometric_opt_in`, a success
+resets the counter without silently re-enabling biometric, and an anonymous
+caller cannot record an attempt at all.
+
+Both create their own throwaway account (`disabled@nagar.local`,
+`biometric-probe@nagar.local`) and are safe to re-run.
+
 ### 4. Staging
 
 ```bash

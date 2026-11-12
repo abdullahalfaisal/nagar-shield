@@ -342,6 +342,13 @@ jobs:
       - name: a disabled account cannot write
         run: pnpm guard:check
 
+      # The biometric failure accounting (FR-AUTH-5), proved over the same
+      # door. The SQL suite proves the thresholds inside Postgres; this
+      # proves the client actually receives the answer the gate screen
+      # renders — 3 fails → password, 5 fails → auto-disabled.
+      - name: the biometric failure accounting
+        run: pnpm biometric:check
+
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the
       # scheduler" posture.

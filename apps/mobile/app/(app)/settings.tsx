@@ -1,4 +1,4 @@
-import { Children, useState, type ReactNode } from 'react';
+import { Children, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,9 @@ import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { setLocale } from '@/shared/i18n';
 import { logOut } from '@/shared/auth/authService';
 import { softDeleteAccount } from '@/shared/api/account';
+import { loadProfile, updateProfile } from '@/shared/api/profile';
+import { isBiometricAvailable } from '@/shared/auth/biometricService';
+import { useAuthSession } from '@/shared/auth/useAuthSession';
 
 /**
  * Screen 16 — Settings.
@@ -26,13 +29,66 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { toggleTheme, setTheme } = useThemeControls();
+  const { session } = useAuthSession();
 
   const [biometric, setBiometric] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | undefined>();
 
   const isBangla = i18n.language === 'bn';
+
+  // The biometric preference is server-side: `profiles.biometric_opt_in` is
+  // what the gate reads on the next launch, and it is what the failure
+  // accounting clears when the user fails five times. A local-only toggle
+  // would be a promise the app cannot keep.
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const available = await isBiometricAvailable();
+      if (!active) return;
+      setBiometricAvailable(available);
+
+      const userId = session?.user?.id;
+      if (!userId) return;
+
+      try {
+        const profile = await loadProfile(userId);
+        if (active) setBiometric(profile.biometric_opt_in);
+      } catch {
+        // Leave the toggle off. Opting in is the user's action, and
+        // failing to read the current value must not silently turn it on.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
+
+  /**
+   * Turns biometric re-auth on or off.
+   *
+   * The preference is written to the server so the gate and the failure
+   * accounting agree with what the user sees here.
+   */
+  const onToggleBiometric = async (next: boolean) => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    setBiometric(next);
+
+    try {
+      await updateProfile(userId, { biometric_opt_in: next });
+    } catch {
+      // The write failed, so the server still holds the old value. The
+      // toggle is put back to match, rather than leaving the screen
+      // claiming something the app does not actually do.
+      setBiometric(!next);
+    }
+  };
 
   /**
    * Soft-deletes the account, then ends the local session.
@@ -132,13 +188,16 @@ export default function SettingsScreen() {
           icon="fingerprint"
           tone="amber"
           title={t('settings.biometric')}
-          subtitle={t('settings.biometricSub')}
-          onPress={() => setBiometric((value) => !value)}
+          subtitle={
+            biometricAvailable ? t('settings.biometricSub') : t('settings.biometricUnavailable')
+          }
+          onPress={biometricAvailable ? () => void onToggleBiometric(!biometric) : undefined}
           showArrow={false}
           trailing={
             <Toggle
               value={biometric}
-              onValueChange={setBiometric}
+              onValueChange={(next) => void onToggleBiometric(next)}
+              disabled={!biometricAvailable}
               accessibilityLabel={t('settings.biometric')}
             />
           }

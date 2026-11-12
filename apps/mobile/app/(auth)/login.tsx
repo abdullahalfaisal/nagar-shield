@@ -7,6 +7,8 @@ import { useTheme } from '@/shared/theme';
 import { Button, InputField, Toggle } from '@/shared/ui';
 import { Icon } from '@/shared/ui/Icon';
 import { logIn } from '@/shared/auth/authService';
+import { markPasswordSignIn } from '@/shared/auth/useBiometricGate';
+import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService';
 import { fromSupabaseError } from '@/shared/api/errors';
 
 /**
@@ -40,6 +42,18 @@ export default function LoginScreen() {
     setErrors({});
     try {
       await logIn({ identifier, password, rememberMe });
+
+      // The user just proved who they are with a password. Two things
+      // follow from that:
+      //
+      //   * the biometric gate is not shown for this session — asking for a
+      //     fingerprint right after a password would be theatre;
+      //   * the biometric failure count is cleared — the failures that led
+      //     here must not follow the user to the next session.
+      await markPasswordSignIn();
+      await resetBiometricFailures();
+      await clearLocalBiometricState();
+
       router.replace('/(app)/home');
     } catch (error) {
       const appError = error instanceof AppError ? error : fromSupabaseError(error);

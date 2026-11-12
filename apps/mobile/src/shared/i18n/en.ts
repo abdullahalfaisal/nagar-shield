@@ -304,6 +304,7 @@ export const en: TranslationSchema = {
     notifications: 'Notifications',
     smsOtp: 'OTP over SMS',
     biometric: 'Biometric sign-in',
+    biometricUnavailable: 'No fingerprint or face is enrolled on this device.',
     privacy: 'Privacy',
     privacyPolicy: 'Privacy policy',
     preferences: 'Preferences',

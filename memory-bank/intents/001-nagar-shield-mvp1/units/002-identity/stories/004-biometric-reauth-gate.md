@@ -2,11 +2,11 @@
 id: 004-biometric-reauth-gate
 unit: 002-identity
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 004-biometric-reauth-gate
@@ -19,15 +19,15 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** biometric opt-in is enabled and a valid session exists, **When** the app opens, **Then** a biometric prompt appears and a successful match lands the user on Home
-- [ ] **Given** the biometric prompt, **When** it is shown, **Then** no biometric template, fingerprint image, or biometric-derived material is transmitted to Supabase or stored server-side — the biometric is only a local device unlock of the existing session
-- [ ] **Given** three consecutive biometric failures, **When** the third failure is recorded, **Then** the identifier + password screen is shown, no lockout screen is reachable, and no credential is locked
-- [ ] **Given** five biometric failures within a rolling 24-hour window, **When** the fifth failure is recorded, **Then** `profiles.biometric_opt_in` is set to `false` and the next session goes straight to password login
-- [ ] **Given** the failure counters, **When** an attempt is recorded, **Then** the count is written to the device key-value store **and** mirrored on `profiles.biometric_fail_count` / `profiles.biometric_fail_window_started_at`
-- [ ] **Given** the app was uninstalled and reinstalled after an auto-disable, **When** the user signs in again, **Then** the biometric preference is still `false` and no biometric prompt is shown
-- [ ] **Given** a successful biometric match, **When** it is recorded, **Then** the failure counter and the 24-hour window are reset to zero
-- [ ] **Given** the device has no enrolled biometrics or the hardware is unavailable, **When** the gate evaluates the session, **Then** it degrades to the identifier + password screen without an error state
-- [ ] **Given** any screen in this story, **When** it renders, **Then** no Google, Facebook, or Apple sign-in control is present and biometric is never offered as an alternative credential (FR-AUTH-6)
+- [x] **Given** biometric opt-in is enabled and a valid session exists, **When** the app opens, **Then** a biometric prompt appears and a successful match lands the user on Home
+- [x] **Given** the biometric prompt, **When** it is shown, **Then** no biometric template, fingerprint image, or biometric-derived material is transmitted to Supabase or stored server-side — the biometric is only a local device unlock of the existing session
+- [x] **Given** three consecutive biometric failures, **When** the third failure is recorded, **Then** the identifier + password screen is shown, no lockout screen is reachable, and no credential is locked
+- [x] **Given** five biometric failures within a rolling 24-hour window, **When** the fifth failure is recorded, **Then** `profiles.biometric_opt_in` is set to `false` and the next session goes straight to password login
+- [x] **Given** the failure counters, **When** an attempt is recorded, **Then** the count is written to the device key-value store **and** mirrored on `profiles.biometric_fail_count` / `profiles.biometric_fail_window_started_at`
+- [x] **Given** the app was uninstalled and reinstalled after an auto-disable, **When** the user signs in again, **Then** the biometric preference is still `false` and no biometric prompt is shown
+- [x] **Given** a successful biometric match, **When** it is recorded, **Then** the failure counter and the 24-hour window are reset to zero
+- [x] **Given** the device has no enrolled biometrics or the hardware is unavailable, **When** the gate evaluates the session, **Then** it degrades to the identifier + password screen without an error state
+- [x] **Given** any screen in this story, **When** it renders, **Then** no Google, Facebook, or Apple sign-in control is present and biometric is never offered as an alternative credential (FR-AUTH-6)
 
 ## Technical Notes
 

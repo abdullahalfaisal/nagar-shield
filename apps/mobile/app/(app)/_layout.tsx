@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import { useAuthSession } from '@/shared/auth/useAuthSession';
 import { useAccountStatus } from '@/shared/auth/useAccountStatus';
+import { useBiometricGate, clearPasswordSignIn, clearGatePassed } from '@/shared/auth/useBiometricGate';
 import { Redirect } from 'expo-router';
 import { SplashView } from '@/shared/ui/SplashView';
 
@@ -20,6 +23,23 @@ import { SplashView } from '@/shared/ui/SplashView';
 export default function AppLayout() {
   const { session, loading } = useAuthSession();
   const { status } = useAccountStatus(session?.user?.id);
+  const { state: gate } = useBiometricGate(session?.user?.id);
+
+  // The app going to the background ends the "signed in with a password"
+  // grace and the "gate already passed" grace. The next foreground is a
+  // returning session, and the biometric gate applies to it.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') {
+        void clearPasswordSignIn();
+        void clearGatePassed();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   if (loading) {
     return <SplashView />;
@@ -35,6 +55,12 @@ export default function AppLayout() {
 
   if (status === 'deleted') {
     return <Redirect href="/(auth)/account-deleted" />;
+  }
+
+  // The biometric gate (FR-AUTH-4). A user who opted in and whose device
+  // can do it must pass the fingerprint check before the app opens.
+  if (gate === 'required') {
+    return <Redirect href="/(auth)/biometric-gate" />;
   }
 
   return (

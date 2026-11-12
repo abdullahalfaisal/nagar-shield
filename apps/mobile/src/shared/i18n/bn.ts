@@ -297,6 +297,7 @@ export const bn = {
     notifications: 'নোটিফিকেশন',
     smsOtp: 'SMS-এ OTP',
     biometric: 'বায়োমেট্রিক লগ ইন',
+    biometricUnavailable: 'এই ডিভাইসে আঙুলের ছাপ বা চেহারা শনাক্তকরণ সেট করা নেই।',
     privacy: 'প্রাইভেসি',
     privacyPolicy: 'প্রাইভেসি পলিসি',
     preferences: 'পছন্দসমূহ',

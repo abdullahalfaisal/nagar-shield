@@ -20,6 +20,7 @@ export default function AuthLayout() {
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="account-disabled" options={{ animation: 'fade' }} />
       <Stack.Screen name="account-deleted" options={{ animation: 'fade' }} />
+      <Stack.Screen name="biometric-gate" options={{ animation: 'fade' }} />
     </Stack>
   );
 }
