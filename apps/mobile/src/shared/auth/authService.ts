@@ -73,7 +73,7 @@ async function resolveEmail(identifier: string): Promise<string> {
   return email;
 }
 
-export async function signUp({ email, password, phone, fullName }: SignupParams): Promise<void> {
+export async function signUp({ email, password, phone, fullName }: SignupParams): Promise<string> {
   // The shared schema is the single definition of the signup contract, and it
   // **normalises** the phone to E.164 on the way through. The server stores
   // the E.164 form and the login resolver compares against it, so sending the
@@ -99,18 +99,52 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
   });
 
   if (error) {
+    // A **duplicate phone** is a field validation failure, not a state
+    // conflict, and the story says so: "the request fails with the error code
+    // `VALIDATION_FAILED`".
+    //
+    // The server signals it as a `23505` unique violation on
+    // `profiles_phone_key` — the `UNIQUE` constraint inside the signup
+    // trigger's transaction. The generic mapping would turn that into
+    // `CONFLICT`, which tells the user nothing about which field is wrong.
+    //
+    // The constraint name is the signal, so the mapping is precise rather
+    // than a guess on the message text.
+    //
+    // Postgres puts the constraint name in the **message**
+    // (`duplicate key value violates unique constraint
+    // "profiles_phone_key"`), not in `detail` — `detail` carries the values.
+    // The Supabase client surfaces both, so the message is checked first and
+    // the detail second.
+    const message = error.message ?? '';
+    const details = (error as { details?: string }).details ?? '';
+
+    if (/profiles_phone_key/i.test(message) || /profiles_phone_key/i.test(details)) {
+      throw new AppError('VALIDATION_FAILED', { field: 'phone' });
+    }
+
     if (/already registered|already exists/i.test(error.message)) {
       throw new AppError('CONFLICT');
     }
     throw fromSupabaseError(error);
   }
 
-  // With email confirmation ON the user must verify before a session exists.
   // The profile row is created by a trigger on `auth.users`; nothing to do
   // client-side here.
+  //
+  // The new user's id is returned so the caller can write the columns the
+  // trigger does not carry — the alternate phone, above all. The trigger
+  // writes `id, email, phone, full_name` and nothing else, so there is no
+  // other way to set `alternate_phone` at signup time.
+  //
+  // With email confirmation ON the user must verify before a session exists,
+  // and this id is the only handle on the new account until they do. It is
+  // still the right id to return: the account exists either way.
   if (!data.user) {
     throw new AppError('INTERNAL');
   }
+
+  return data.user.id;
 }
 
 export async function logIn({ identifier, password, rememberMe }: LoginParams): Promise<void> {

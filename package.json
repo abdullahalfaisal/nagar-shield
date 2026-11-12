@@ -29,6 +29,8 @@
     "maestro:check": "node tools/check-maestro-flow.cjs",
     "guard:check": "node tools/probe-disabled-write.cjs",
     "biometric:check": "node tools/probe-biometric-gate.cjs",
+    "alternate:check": "node tools/probe-alternate-phone.cjs",
+    "signup:check": "node tools/probe-signup-contract.cjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm maestro:check && pnpm fn:typecheck",
     "mobile": "pnpm --filter @nagar-shield/mobile",
     "admin": "pnpm --filter @nagar-shield/admin",

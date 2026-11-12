@@ -636,4 +636,107 @@ select 'Test G30: an enabled account can still edit its report category' as test
 select 'Test G31: the category was changed' as test,
        (select category from public.reports where id = '22222222-2222-2222-2222-222222222201') = 'harassment' as passed;
 
+-- =============================================================================
+-- Test H — the alternate phone format constraint
+-- =============================================================================
+--
+-- `002-identity / 001-signup-with-email-and-phone` AC #10: the alternate
+-- phone is stored in `profiles.alternate_phone` as E.164, and the column is
+-- NOT unique — a second account may store the same number.
+--
+-- The constraint is `profiles_alternate_phone_format` (migration 020).
+--
+-- The subtle case is the last one. The obvious form of the check —
+-- `normalise_bd_phone(alternate_phone) = alternate_phone` — does NOT refuse a
+-- non-BD number, because `normalise_bd_phone` returns NULL for one, and
+-- `NULL = '…'` is NULL, and a CHECK constraint only rejects FALSE. That bug
+-- was caught by `pnpm alternate:check` (the live probe), and these assertions
+-- are here so it cannot come back.
+
+-- A second account, so the non-uniqueness rule can be tested.
+insert into auth.users (id, email, raw_user_meta_data)
+values ('11111111-1111-1111-1111-111111111107', 'altphone@test.local',
+        json_build_object('phone', '+8801711000107'));
+
+-- --- The happy path ---------------------------------------------------------
+
+select 'Test H1: an owner can store a valid E.164 alternate phone' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = '+8801711007777'
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) = '' as passed;
+
+select 'Test H2: the alternate phone landed' as test,
+       (select alternate_phone from public.profiles
+         where id = '11111111-1111-1111-1111-111111111101') = '+8801711007777' as passed;
+
+select 'Test H3: the column is NOT unique — a second account may store the same number' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111107',
+         $w$update public.profiles set alternate_phone = '+8801711007777'
+           where id = '11111111-1111-1111-1111-111111111107'$w$
+       ) = '' as passed;
+
+select 'Test H4: both accounts hold the same alternate number' as test,
+       (select count(*) from public.profiles where alternate_phone = '+8801711007777') = 2 as passed;
+
+select 'Test H5: the alternate phone can be cleared' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = null
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) = '' as passed;
+
+select 'Test H6: a NULL alternate phone is allowed' as test,
+       (select alternate_phone from public.profiles
+         where id = '11111111-1111-1111-1111-111111111101') is null as passed;
+
+-- --- The refusals -----------------------------------------------------------
+
+select 'Test H7: the local format is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = '01712345678'
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) <> '' as passed;
+
+select 'Test H8: a non-BD number is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = '+14155550123'
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) <> '' as passed;
+
+select 'Test H9: a non-number is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = 'not a number'
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) <> '' as passed;
+
+select 'Test H10: a too-short number is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = '+8801234'
+           where id = '11111111-1111-1111-1111-111111111101'$w$
+       ) <> '' as passed;
+
+select 'Test H11: a refused write leaves the stored value untouched' as test,
+       (select alternate_phone from public.profiles
+         where id = '11111111-1111-1111-1111-111111111101') is null as passed;
+
+-- --- The ownership rules ----------------------------------------------------
+
+select 'Test H12: a client cannot write another account''s alternate phone' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$update public.profiles set alternate_phone = '+8801711008888'
+           where id = '11111111-1111-1111-1111-111111111107'$w$
+       ) = '' as passed;
+
+select 'Test H13: the other account''s alternate phone did not change' as test,
+       (select alternate_phone from public.profiles
+         where id = '11111111-1111-1111-1111-111111111107') = '+8801711007777' as passed;
+
 rollback;

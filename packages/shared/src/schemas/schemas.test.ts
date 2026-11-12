@@ -1,4 +1,5 @@
 import {
+  alternatePhoneSchema,
   captureDescriptionSchema,
   CAPTURE_DESCRIPTION_MAX_LENGTH,
   emergencyContactSchema,
@@ -41,6 +42,34 @@ describe('phone normalisation', () => {
     if (parsed.success) {
       expect(parsed.data).toMatch(E164_PHONE_REGEX);
     }
+  });
+});
+
+describe('the alternate phone', () => {
+  it('normalises to the same E.164 form as the primary phone', () => {
+    // The wizard compares the two numbers to enforce "must be different", and
+    // a comparison is only meaningful in one canonical form.
+    const parsed = alternatePhoneSchema.safeParse('01711-111111');
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).toBe('+8801711111111');
+      expect(parsed.data).toBe(phoneSchema.safeParse('+8801711111111').data);
+    }
+  });
+
+  it('makes the two spellings of one number comparable', () => {
+    // This is the case the raw-string comparison got wrong: the same number
+    // written two ways must compare equal after normalisation, or the
+    // "must be different from your primary number" rule is trivially evaded.
+    const primary = phoneSchema.safeParse('01711111111').data;
+    const alternate = alternatePhoneSchema.safeParse('01711-111111').data;
+
+    expect(primary).toBe(alternate);
+  });
+
+  it('still refuses a non-Bangladesh number', () => {
+    expect(alternatePhoneSchema.safeParse('+14155550123').success).toBe(false);
+    expect(alternatePhoneSchema.safeParse('12345').success).toBe(false);
   });
 });
 

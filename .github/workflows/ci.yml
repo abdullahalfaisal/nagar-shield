@@ -349,6 +349,29 @@ jobs:
       - name: the biometric failure accounting
         run: pnpm biometric:check
 
+      # The alternate phone's format constraint. The SQL suite proves the
+      # CHECK inside Postgres; this proves the client's own write path — the
+      # normalised value it sends, and the fact that the column is NOT
+      # unique, so two accounts may hold the same family number.
+      #
+      # The non-BD assertion is the one that earns its keep: the obvious form
+      # of the CHECK silently accepts every non-BD number, because a CHECK
+      # only rejects FALSE and `NULL = '…'` is NULL.
+      - name: the alternate phone constraint
+        run: pnpm alternate:check
+
+      # The signup contract, proved over the public Auth door — the same
+      # door the app uses. The SQL suite cannot prove this half: the signup
+      # trigger, the phone normalisation, and the UNIQUE constraint all live
+      # in one transaction, and only the transaction can show that a rejected
+      # signup leaves **no** `auth.users` row behind.
+      #
+      # The "gains NO auth.users row" assertions are the ones that earn
+      # their keep. A rejected signup that still left a row would be a
+      # half-created account — an Auth identity with no profile.
+      - name: the signup contract
+        run: pnpm signup:check
+
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the
       # scheduler" posture.

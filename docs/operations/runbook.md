@@ -123,13 +123,15 @@ the staging ones. The command exits non-zero when any assertion fails.
 
 #### The live database probes
 
-Two of the checks prove behaviour that only exists over the wire, through
+Four of the checks prove behaviour that only exists over the wire, through
 the door the app actually uses. They need the local stack running
 (`npx supabase start`) and are wired into the `rls-integration` CI job.
 
 ```bash
 pnpm guard:check       # a disabled account cannot write
 pnpm biometric:check   # the biometric failure accounting
+pnpm alternate:check   # the alternate phone constraint
+pnpm signup:check      # the signup contract
 ```
 
 `guard:check` proves that a moderator-disabled account is refused every
@@ -143,8 +145,46 @@ failures stay under the password fallback, the third answers
 resets the counter without silently re-enabling biometric, and an anonymous
 caller cannot record an attempt at all.
 
-Both create their own throwaway account (`disabled@nagar.local`,
-`biometric-probe@nagar.local`) and are safe to re-run.
+`alternate:check` proves the `profiles.alternate_phone` format constraint
+over PostgREST: a valid E.164 number is stored, the local format and a
+non-BD number are refused, a refused write leaves the stored value
+untouched, the column can be cleared, and — the rule that is easy to break
+by accident — the column is **not** unique, so two accounts may hold the
+same family number.
+
+The non-BD assertion is the one that earns its keep. The obvious form of
+the CHECK — `normalise_bd_phone(value) = value` — silently accepts every
+non-BD number, because `normalise_bd_phone` returns NULL for one, `NULL =
+'…'` is NULL, and a CHECK constraint only rejects FALSE. This probe is what
+caught that.
+
+`signup:check` proves the signup contract over the **public Auth door** —
+the same door the app uses. A valid signup creates exactly one `auth.users`
+row and exactly one `profiles` row carrying the same id, the stored phone is
+the E.164 form, and the role is `citizen`. A duplicate phone is refused with
+a `23505` unique violation on `profiles_phone_key`, a non-BD number is
+refused with a `23502` `PHONE_REQUIRED`, and an already-registered email is
+refused with a `422`.
+
+The "gains NO auth.users row" assertions are the ones that earn their keep
+here. The `UNIQUE` constraint on `profiles.phone` lives inside the signup
+trigger's transaction, so a rejected signup rolls the insert back. If the
+uniqueness guarantee were only an application-level pre-flight, a race
+between two signups would leave a second Auth identity behind with no
+profile — an account that exists but cannot be used. The SQL suite cannot
+prove this half; only the transaction can.
+
+Note that the story's `check_phone_available` pre-flight RPC does **not**
+exist. The uniqueness guarantee is entirely the `UNIQUE` constraint inside
+the trigger, which is the stronger guarantee — the pre-flight could only
+ever have been advisory.
+
+All four create their own throwaway account (`disabled@nagar.local`,
+`biometric-probe@nagar.local`, `alt-phone-a@nagar.local` and
+`alt-phone-b@nagar.local`) and are safe to re-run. `signup:check` uses
+`signup-probe@nagar.local` and two siblings, and cleans up after itself:
+both the Auth users **and** the orphaned profile rows, because migration
+016's `ON DELETE SET NULL` leaves the profile behind still holding the phone.
 
 ### 4. Staging
 

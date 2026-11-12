@@ -26,6 +26,8 @@ export const en: TranslationSchema = {
   },
   errors: {
     validationFailed: 'Some details were not valid. Please try again.',
+    alternatePhoneSameAsPrimary: 'This must be different from your primary number.',
+    phoneAlreadyRegistered: 'This number is already registered to an account.',
     authRequired: 'Please sign in again.',
     authDisabled: 'This account has been disabled.',
     forbidden: 'You do not have permission to do that.',
@@ -54,6 +56,10 @@ export const en: TranslationSchema = {
     alternatePhoneTitle: 'Alternative number',
     alternatePhoneSubtitle:
       'Add a family member’s number so they can be reached in an emergency.',
+    alternatePhoneLabel: 'Alternative mobile number',
+    alternatePhoneMustDiffer: 'Must be different from your primary number.',
+    alternatePhoneOptional: 'An alternative number is optional — you can continue without one.',
+    alternatePhoneNotSaved: 'Your account was created, but the alternative number could not be saved.',
     sendOtp: 'Send code',
     stepOf: 'Step {{current}} of {{total}}',
     loginTitle: 'Sign in',

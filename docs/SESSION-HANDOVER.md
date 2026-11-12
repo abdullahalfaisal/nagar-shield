@@ -21,6 +21,13 @@ pushed-ready, and there is a baseline commit to fall back to.
 F) was fixed in migration `20261105000019_disabled_account_write_guard.sql`,
 covered by 31 new SQL assertions and an 8-check live API probe. See §3.
 
+**One pre-existing quirk worth knowing.** After `pnpm db:reset`, the
+`alerts_feed` read model returns **zero items** — the seeded reports fall
+outside the feed's own window. This is not a regression: it reproduces on
+an unmodified tree (`git stash` + `db:reset`). The smoke test only asserts
+the response *shape*, so it passes silently. If the Alerts screen ever
+appears empty in a dev session, this is why.
+
 ---
 
 ## 2. What is DONE and verified
@@ -30,12 +37,15 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **72 unit tests** |
-| Database | **20 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
+| Database | **21 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **163 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (65) |
+| SQL test suites | **176 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
+| Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
+| Alternate phone | `tools/probe-alternate-phone.cjs` — **9/9** over the real PostgREST path |
+| Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
 | Edge Functions | 7 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html` |
@@ -52,11 +62,13 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 146 tests
-pnpm db:test          # 163 SQL assertions
+pnpm test             # 156 tests
+pnpm db:test          # 176 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
+pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
+pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -183,6 +195,44 @@ auto-disable is durable, that a success clears the counter without silently
 re-enabling biometric, and that an anonymous caller cannot record an
 attempt.
 
+### ✅ I4 — The alternate-phone step was bypassed — FIXED
+
+`phone.tsx` routed straight to `register`, so `alternate-phone.tsx` was
+unreachable and the column the story asks for was never written.
+
+**The fix.** `phone.tsx` now routes to the alternate-phone step carrying the
+**normalised** primary number; the step rejects an alternate equal to the
+primary; `register.tsx` writes the column after the signup and tells the
+user if that write fails without failing the signup.
+
+Three decisions worth keeping:
+
+- **The alternate phone is written *after* the signup.** The `profiles` row
+  is created by the `handle_new_user()` trigger, which writes `id, email,
+  phone, full_name` and nothing else — there is no way to set the column as
+  part of the signup. `signUp` therefore returns the new user's id.
+- **Both sides of the "must differ" comparison are normalised.** Comparing
+  raw strings let `01711-111111` and `+8801711111111` — the same number,
+  two spellings — pass the rule.
+- **The column is deliberately NOT unique.** A shared family number is
+  legitimate, and the story's edge-case table says so. The uniqueness
+  guarantee belongs to the *primary* phone only.
+
+Migration 020 adds the format CHECK the schema never had. It is written
+against the **three-valued** trap: the obvious form
+(`normalise_bd_phone(x) = x`) silently accepts every non-BD number, because
+a CHECK rejects only FALSE and `NULL = '…'` is NULL. The shipped form
+requires `is not null AND =`. `pnpm alternate:check` is what caught that,
+and it is in CI for exactly that reason. The constraint is added **after**
+the backfill — a row holding `01712345678` fails the check as written.
+
+`pnpm signup:check` (`tools/probe-signup-contract.cjs`) proves the signup
+contract over the **public Auth door** — 13 checks. The ones that earn
+their keep are the "gains NO auth.users row" assertions: the `UNIQUE`
+constraint on `profiles.phone` lives inside the trigger's transaction, so a
+rejected signup rolls the insert back. The SQL suite cannot prove this
+half; only the transaction can.
+
 ### ✅ B3 — Stray scratch files at the repo root — FIXED
 
 The scratch files were deleted before the baseline commit, so they never
@@ -216,7 +266,7 @@ Ordered by dependency. Bolt numbers in brackets.
 | I1 | ✅ **FIXED** — `useAccountStatus` reads `disabled_at` on session resume and every foreground; a disabled account is routed to `app/(auth)/account-disabled.tsx`, which explains the disable and offers delete-or-sign-out. `fromSupabaseError` maps the guard's `ACCOUNT_DISABLED` to `AUTH_DISABLED` before the generic 42501 → FORBIDDEN. | `src/shared/auth/useAccountStatus.ts`, `app/(auth)/account-disabled.tsx` |
 | I2 | ✅ **FIXED** — the biometric gate is live: `src/shared/auth/biometricService.ts` wraps `expo-local-authentication`, `useBiometricGate` decides when the gate applies, and `app/(auth)/biometric-gate.tsx` runs the prompt. The thresholds come from the `record_biometric_attempt` RPC (the authority), not from an app-local counter. The Settings toggle now persists `biometric_opt_in`. `pnpm biometric:check` proves the FR-AUTH-5 thresholds over PostgREST (10/10). | [005] |
 | I3 | ✅ **FIXED** (folded into I1) — the Settings "Delete account" row now confirms and calls `soft_delete_account`; a soft-deleted account that signs back in lands on `app/(auth)/account-deleted.tsx`, which can restore it inside the 30-day window. | [006] story 007 |
-| I4 | **Alternate-phone step bypassed.** `phone.tsx` routes straight to `register`; `alternate-phone.tsx` is unreachable. **Q-1 in the inception log is stale** — `profiles.alternate_phone` *does* exist in the schema. | [004] story 001 |
+| I4 | ✅ **FIXED** — the alternate-phone step is live: `phone.tsx` routes to `app/(auth)/alternate-phone.tsx` with the **normalised** primary number, the step rejects an alternate equal to the primary (both sides normalised, so `01711-111111` and `+8801711111111` compare equal), and `register.tsx` writes the column after the signup via `setAlternatePhone` — the `handle_new_user` trigger does not carry it. Migration 020 adds the format CHECK the schema never had. `pnpm alternate:check` proves the constraint over PostgREST (9/9); `pnpm signup:check` proves the signup contract (13/13). | [004] story 001 |
 | I5 | `verify-otp` and `reset-password` are declared in the auth `_layout.tsx` but have **no file**. | [005] |
 
 ### 4.2 Contacts — unit `002-identity`
@@ -290,8 +340,10 @@ Ordered by dependency. Bolt numbers in brackets.
    restore paths that were already in the database but had no caller. I2's
    biometric gate is live, with the FR-AUTH-5 thresholds read from the RPC
    rather than from an app-local counter.
-6. **I4 → I5 → C1** — the rest of unit `002-identity`: the unreachable
-   alternate-phone step, the two missing auth screens, and contacts CRUD.
+6. **I5 → C1** — the rest of unit `002-identity`: the two missing auth
+   screens (`verify-otp`, `reset-password`) and contacts CRUD. I4 is done:
+   the alternate-phone step is reachable, the column is written, and the
+   format CHECK exists.
 7. **P1 → P2 → P3** — unit `004-capture`.
 8. **L1 → L2** — unit `005-location`.
 9. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
@@ -315,7 +367,8 @@ session.
   unit `008-jobs-operations` say `true`.
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
-  (`supabase/migrations/20261105000001_initial_schema.sql:75`).
+  (`supabase/migrations/20261105000001_initial_schema.sql:75`) and the wizard
+  step now writes it.
 
 **Fix:** when a bolt's work is done, update `bolt.md` (`status: complete`,
 `current_stage: null`, the three `stages_completed` entries), flip the story's
@@ -327,7 +380,7 @@ not in a separate pass.
 ## 8. Where things live
 
 ```text
-apps/mobile/app/(auth)/      welcome, phone, alternate-phone*, login,
+apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
                              register, forgot-password, verify-otp*,
                              reset-password*, account-disabled,
                              account-deleted, biometric-gate
@@ -344,13 +397,14 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         20 forward-only migrations
-supabase/tests/              4 SQL suites (163 assertions)
+supabase/migrations/         21 forward-only migrations
+supabase/tests/              4 SQL suites (176 assertions)
 supabase/functions/          7 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
-                             probe-disabled-write, probe-biometric-gate
+                             probe-disabled-write, probe-biometric-gate,
+                             probe-alternate-phone, probe-signup-contract
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md
@@ -397,7 +451,7 @@ Dev accounts: `mod@nagar.local` / `citizen@nagar.local`, password
 
 | # | Question | Impact |
 |---|---|---|
-| Q-1 | ~~`profiles.alternate_phone`~~ — **resolved**: the column exists. The remaining choice is whether the wizard step persists it or is dropped. | low |
+| Q-1 | ~~`profiles.alternate_phone`~~ — **resolved**: the column exists **and** the wizard step now persists it (I4 is done). The format CHECK landed in migration 020. | none |
 | Q-2 | FR-PERMS-3 battery-saver detection has no first-class Expo API — ship a native module, or downgrade to best-effort? | medium |
 | Q-3 | More Help: three categories (FR-SEEK-1) vs six flat rows (prototype). Currently 1:1 to the prototype. | low |
 | Q-4 | Video copy says 30 s (PRD-X-4) vs the prototype's 60 s. PRD wins by default. | low |

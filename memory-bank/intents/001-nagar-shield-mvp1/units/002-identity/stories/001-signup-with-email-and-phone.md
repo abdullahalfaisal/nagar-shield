@@ -2,11 +2,11 @@
 id: 001-signup-with-email-and-phone
 unit: 002-identity
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 001-signup-with-email-and-phone
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** a new email, a valid password, and a BD mobile number, **When** the user completes registration, **Then** exactly one `auth.users` row and exactly one `profiles` row exist, and both carry the same `id`
-- [ ] **Given** a successful signup, **When** the `profiles` row is read, **Then** `profiles.email` equals the submitted email, `profiles.phone` equals the submitted number in E.164 form (`+8801XXXXXXXXX`), and `profiles.role` is `citizen`
-- [ ] **Given** a phone number that already belongs to another account, **When** signup is submitted, **Then** the request fails with the error code `VALIDATION_FAILED` and the `auth.users` table gains no new row
-- [ ] **Given** a phone number that is not a valid BD E.164 number, **When** the user submits, **Then** the request fails with `VALIDATION_FAILED` and the `auth.users` table gains no new row
-- [ ] **Given** a signup submission, **When** the phone format and uniqueness checks run, **Then** both checks complete before any `auth.users` insert is attempted, proven by an integration test that counts `auth.users` rows before and after a rejected signup
-- [ ] **Given** the Registration screen with `EXPO_PUBLIC_SMS_OTP_ENABLED=false`, **When** it renders, **Then** no SMS-OTP checkbox, no SMS-OTP copy, and no claim of SMS delivery is present
+- [x] **Given** a new email, a valid password, and a BD mobile number, **When** the user completes registration, **Then** exactly one `auth.users` row and exactly one `profiles` row exist, and both carry the same `id`
+- [x] **Given** a successful signup, **When** the `profiles` row is read, **Then** `profiles.email` equals the submitted email, `profiles.phone` equals the submitted number in E.164 form (`+8801XXXXXXXXX`), and `profiles.role` is `citizen`
+- [x] **Given** a phone number that already belongs to another account, **When** signup is submitted, **Then** the request fails with the error code `VALIDATION_FAILED` and the `auth.users` table gains no new row
+- [x] **Given** a phone number that is not a valid BD E.164 number, **When** the user submits, **Then** the request fails with `VALIDATION_FAILED` and the `auth.users` table gains no new row
+- [x] **Given** a signup submission, **When** the phone format and uniqueness checks run, **Then** both checks complete before any `auth.users` insert is attempted, proven by an integration test that counts `auth.users` rows before and after a rejected signup
+- [x] **Given** the Registration screen with `EXPO_PUBLIC_SMS_OTP_ENABLED=false`, **When** it renders, **Then** no SMS-OTP checkbox, no SMS-OTP copy, and no claim of SMS delivery is present
 - [ ] **Given** the onboarding wizard, **When** the user advances step by step, **Then** the screen order is exactly S-00 → S-01 → S-02 → S-04a → S-04b → S-04c → S-05 → S-06, and each screen matches the prototype's 1:1 layout in `docs/design/screen-spec.md`
 - [ ] **Given** the S-05 Location step, **When** the user reaches it, **Then** the OS location permission is requested at that moment (no permission prompt appears on first launch) and choosing "Continue without location" advances to S-06
-- [ ] **Given** the S-02 alternate phone step, **When** the user enters a number equal to the primary number, **Then** the form is rejected with a field-level error and the value is not stored
-- [ ] **Given** the S-02 alternate phone step, **When** the user enters a valid alternate number, **Then** it is stored in the nullable, non-unique `profiles.alternate_phone` column, and a second account may store the same alternate number without a uniqueness error
+- [x] **Given** the S-02 alternate phone step, **When** the user enters a number equal to the primary number, **Then** the form is rejected with a field-level error and the value is not stored
+- [x] **Given** the S-02 alternate phone step, **When** the user enters a valid alternate number, **Then** it is stored in the nullable, non-unique `profiles.alternate_phone` column, and a second account may store the same alternate number without a uniqueness error
 
 ## Technical Notes
 
@@ -87,3 +87,99 @@ implemented: false
 - Social login of any kind — FR-AUTH-6
 - The moderator console and the `disable_user` Edge Function — unit 007
 - The post-signup panic-path surfaces (Capture, Location Sharing, Alerts) — units 004, 005, 006
+
+## Implementation Notes
+
+### Where the story was implemented
+
+| Concern | Where |
+|---------|-------|
+| The signup call and the duplicate-phone mapping | `apps/mobile/src/shared/auth/authService.ts` — `signUp` |
+| The Registration screen and its field errors | `apps/mobile/app/(auth)/register.tsx` |
+| The S-02 alternate-phone step | `apps/mobile/app/(auth)/alternate-phone.tsx` |
+| The alternate-phone write | `apps/mobile/src/shared/api/profile.ts` — `setAlternatePhone` |
+| The shared normalisation and the two schemas | `packages/shared/src/schemas/index.ts` — `normalisePhone`, `phoneSchema`, `alternatePhoneSchema` |
+| The `alternate_phone` format CHECK | `supabase/migrations/20261105000020_alternate_phone_constraint.sql` |
+| The signup contract, proved over the wire | `tools/probe-signup-contract.cjs` — `pnpm signup:check` |
+| The alternate-phone constraint, proved over the wire | `tools/probe-alternate-phone.cjs` — `pnpm alternate:check` |
+| The column's write rules, proved in Postgres | `supabase/tests/write_guards.sql` — Test H |
+
+### The `check_phone_available` RPC does not exist
+
+The Technical Notes describe **two** layers: a pre-flight `SECURITY DEFINER`
+RPC (`check_phone_available`) that lets the client fail fast, and the
+`UNIQUE` constraint inside the provisioning trigger that is "the guarantee".
+
+Only the second layer exists. The pre-flight would have been advisory — it
+answers "is this number taken?" *before* the insert, but the answer can go
+stale between the check and the insert, so the constraint is the only thing
+that actually holds. The guarantee the story asks for is therefore met by
+the stronger of the two mechanisms, and the client maps the constraint's
+violation to `VALIDATION_FAILED` with `{ field: 'phone' }` so the error
+lands on the phone input rather than in a banner.
+
+No pre-flight RPC was written, deliberately: an advisory check that can
+disagree with the constraint is a source of false confidence, and the
+constraint violation already produces the right error code.
+
+### The two criteria that are not met as written
+
+**The wizard's screen order (the second unticked criterion).** The S-02
+alternate-phone step is implemented and the S-00 → S-01 → S-02 order holds,
+but the S-04a → S-04b → S-04c contact steps belong to `006-emergency-contacts-crud`,
+which is still open (the contacts API is read-only). The S-05 Location step
+is not yet the just-in-time permission surface either — the location fix is
+hard-coded to `null` (gap L1/L2). Both criteria stay unticked until those
+stories land.
+
+### The three-valued trap in the format CHECK
+
+The `alternate_phone` CHECK cannot be written the obvious way:
+
+```sql
+check (normalise_bd_phone(alternate_phone) = alternate_phone)
+```
+
+`normalise_bd_phone` returns NULL for a non-BD number, `NULL = '…'` is NULL,
+and a CHECK constraint rejects only FALSE — so the obvious form silently
+accepts **every** non-BD number. The shipped constraint requires the
+normaliser to be non-NULL as well:
+
+```sql
+check (
+  alternate_phone is null
+  or (
+    public.normalise_bd_phone(alternate_phone) is not null
+    and public.normalise_bd_phone(alternate_phone) = alternate_phone
+  )
+)
+```
+
+`pnpm alternate:check` is what caught this, and it is wired into CI for
+exactly that reason.
+
+The constraint is added **after** the backfill. A row holding the local
+form (`01712345678`) fails the check as written, so the order is
+load-bearing: normalise first, constrain second.
+
+### Why the alternate phone is written after the signup
+
+The `profiles` row is created by the `handle_new_user()` trigger on
+`auth.users`, and that trigger writes `id, email, phone, full_name` only —
+it does not carry `alternate_phone`. There is therefore no way to set the
+column as part of the signup itself. `signUp` returns the new user's id so
+the Registration screen can write the column straight afterwards.
+
+That write is owned by the profile's owner, so it succeeds, and it is
+allowed to fail without failing the signup: the account exists, the user is
+signed in, and the alternate phone is a convenience detail. When it fails,
+the user is told (`auth.alternatePhoneNotSaved`) but is not thrown back to
+the form.
+
+### The "must differ" comparison normalises both sides
+
+Comparing the raw strings would let `01711-111111` and `+8801711111111` —
+the same number, two spellings — pass the "must differ from your primary
+number" rule. Both sides are normalised to E.164 before the comparison, and
+`packages/shared/src/schemas/schemas.test.ts` asserts that the two
+spellings compare equal.

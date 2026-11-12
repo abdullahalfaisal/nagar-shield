@@ -55,7 +55,7 @@ These were surfaced by the unit briefs. None block the first bolt.
 
 | # | Question | Where | Impact if unresolved |
 |---|---|---|---|
-| Q-1 | `profiles.alternate_phone` — the prototype's S-02 "Alternate Phone" step has no persistence target in the specified schema. Add a nullable non-unique column, or drop the step? | `002-identity` | A migration column, or a wizard step to remove |
+| Q-1 | ~~`profiles.alternate_phone` — the prototype's S-02 "Alternate Phone" step has no persistence target in the specified schema. Add a nullable non-unique column, or drop the step?~~ **RESOLVED**: the column was added (`supabase/migrations/20261105000001_initial_schema.sql:75`) as nullable and non-unique, the format CHECK landed in migration 020, and the S-02 step now writes it. | `002-identity` | none — closed |
 | Q-2 | FR-PERMS-3 battery-saver detection has **no first-class Expo API** — it likely needs a thin native module (Expo Modules API / `react-native-power-manager`). Ship it, or downgrade FR-PERMS-3 to "detect best-effort"? | `003-help-seek` | A native module, or an unmet FR |
 | Q-3 | FR-SEEK-1 names three More Help categories; the prototype sheet shows six flat rows. The brief keeps all six rows 1:1 and makes each open its category. Confirm? | `003-help-seek` | Low — the brief's resolution is already the 1:1-safe choice |
 | Q-4 | The prototype's screen 17 video copy says `সর্বোচ্চ ৬০ সেকেন্ড`; PRD-X-4 locks the cap at **30 s**. The brief changes the copy to 30 s. Confirm? | `004-capture` | Low — PRD wins by default |

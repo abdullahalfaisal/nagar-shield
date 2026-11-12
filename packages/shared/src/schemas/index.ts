@@ -27,6 +27,22 @@ export const phoneSchema = z
 export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address');
 
 /**
+ * The alternate phone — a second way to reach the user.
+ *
+ * The same E.164 rule as the primary phone, and the same normaliser, so the
+ * two are always comparable. That comparability is the point: the wizard
+ * must be able to answer "is this the same number as the primary one?",
+ * and it can only answer that if both are in one canonical form. A raw
+ * string comparison would let `01711-111111` and `+8801711111111` — the same
+ * number, written two ways — pass as different.
+ *
+ * Unlike the primary phone it is **not unique**: two accounts may store the
+ * same alternate number. A shared family number is a legitimate thing for
+ * two people to list.
+ */
+export const alternatePhoneSchema = phoneSchema;
+
+/**
  * Password policy. Deliberately length-first — NIST SP 800-63B guidance
  * rather than composition rules the user will fight.
  */

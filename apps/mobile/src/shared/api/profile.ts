@@ -1,4 +1,4 @@
-import { AppError } from '@nagar-shield/shared';
+import { AppError, alternatePhoneSchema } from '@nagar-shield/shared';
 import { supabase } from '@/shared/api/supabase';
 import { fromSupabaseError } from '@/shared/api/errors';
 import type { Database } from '@/shared/api/database.types';
@@ -98,4 +98,43 @@ export async function updateProfile(
   if (error) throw fromSupabaseError(error);
   if (!data) throw new AppError('NOT_FOUND');
   return data;
+}
+
+/**
+ * Sets the alternate phone.
+ *
+ * The value is normalised to E.164 **before** it is written, because the
+ * database now enforces that shape with a CHECK constraint (migration 020).
+ * Normalising on the client means the app never triggers a constraint
+ * violation it could have avoided, and the value that lands is the value
+ * every reader expects.
+ *
+ * An empty value clears the column — the alternate phone is optional, and
+ * the user must be able to remove one they no longer want shared.
+ *
+ * The number is **not** unique. Two accounts may hold the same alternate
+ * number: a shared family number is a legitimate thing for two people to
+ * list, and the story's edge-case table says so explicitly. Nothing here
+ * checks for a duplicate, and nothing in the database should.
+ */
+export async function setAlternatePhone(
+  userId: string,
+  value: string | null,
+): Promise<void> {
+  const trimmed = value?.trim() ?? '';
+
+  if (!trimmed) {
+    await updateProfile(userId, { alternate_phone: null });
+    return;
+  }
+
+  const parsed = alternatePhoneSchema.safeParse(trimmed);
+  if (!parsed.success) {
+    // A number that is not a valid Bangladesh number never reaches the
+    // server — the CHECK constraint would refuse it, and a typed failure
+    // tells the user which field is wrong.
+    throw new AppError('VALIDATION_FAILED');
+  }
+
+  await updateProfile(userId, { alternate_phone: parsed.data });
 }

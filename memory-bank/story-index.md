@@ -10,13 +10,13 @@
 | 003-mobile-design-system | Mobile design system (theme tokens + UI primitives) | 001-foundation | 002-foundation | must | planned |
 | 004-mobile-app-shell | Mobile app shell (Router groups, i18n, Supabase client) | 001-foundation | 003-foundation | must | planned |
 | 005-admin-skeleton-and-ci | Admin app skeleton and CI pipeline | 001-foundation | 003-foundation | must | planned |
-| 001-signup-with-email-and-phone | Signup with email and phone | 002-identity | 004-identity | must | planned |
+| 001-signup-with-email-and-phone | Signup with email and phone | 002-identity | 004-identity | must | complete |
 | 002-dual-identifier-login | Dual-identifier login + Remember me | 002-identity | 004-identity | must | planned |
 | 003-email-otp-password-reset | Email-OTP password reset | 002-identity | 005-identity | must | planned |
-| 004-biometric-reauth-gate | Biometric re-auth gate | 002-identity | 005-identity | must | planned |
+| 004-biometric-reauth-gate | Biometric re-auth gate | 002-identity | 005-identity | must | complete |
 | 006-emergency-contacts-crud | Emergency contacts CRUD | 002-identity | 006-identity | must | planned |
-| 005-remote-account-disable | Remote account disable | 002-identity | 006-identity | must | planned |
-| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | planned |
+| 005-remote-account-disable | Remote account disable | 002-identity | 006-identity | must | complete |
+| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | complete |
 | 001-home-and-help-alert-grid | Home surface + Help Alert panic grid | 003-help-seek | 007-help-seek | must | planned |
 | 002-personal-emergency-picker | Personal Emergency contact picker | 003-help-seek | 007-help-seek | must | planned |
 | 003-bundled-station-hotline-dataset | Bundled station + hotline dataset | 003-help-seek | 008-help-seek | must | planned |

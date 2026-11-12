@@ -384,12 +384,15 @@ Every screen below is a **1:1 port** of `docs/design/screen-spec.md` and
   set follows the screens that exist in the spec (S-00, S-01, S-02, S-04a/b/c,
   S-05, S-06) and the step labels are ported verbatim — the copy is the
   contract, so the discrepancy is flagged here rather than "fixed" in the UI.
-- **The alternate phone (S-02) has no column in the specified `profiles`
-  schema.** Recommendation: add a nullable, non-unique
+- **The alternate phone (S-02) had no column in the specified `profiles`
+  schema.** ~~Recommendation: add a nullable, non-unique
   `profiles.alternate_phone text` (E.164) in `0001_identity.sql`. It is
   explicitly **not** a login identifier and does not affect uniqueness. If
   the schema is frozen without it, the S-02 field cannot be persisted and the
-  screen must be reduced — raise with the parent before implementation.
+  screen must be reduced — raise with the parent before implementation.~~
+  **RESOLVED**: the column was added exactly as recommended — nullable and
+  non-unique — and the format CHECK landed in migration 020. The S-02 step
+  now persists it. The "raise with the parent" branch was not needed.
 - **The prototype's Settings screen shows an "SMS-এ ও OTP পাঠান" toggle**
   under নিরাপত্তা. It is hidden while the flag is off; the biometric opt-in
   toggle and the delete-account entry are added to the account section.

@@ -15,9 +15,11 @@ import { Icon } from '@/shared/ui/Icon';
  * collects the email and password that the Auth user is actually created
  * with. The phone stays a required unique profile attribute.
  *
- * Open decision Q-1: `profiles.alternate_phone` has no locked column in the
- * confirmed schema — the alternate-phone step stores nothing until that is
- * resolved.
+ * The primary phone is normalised to E.164 **here**, before it is handed to
+ * the next screen. The alternate-phone step has to compare the two numbers
+ * to enforce "must be different from your primary number", and a comparison
+ * is only meaningful in one canonical form — `01711-111111` and
+ * `+8801711111111` are the same number written two ways.
  */
 export default function PhoneScreen() {
   const theme = useTheme();
@@ -32,21 +34,27 @@ export default function PhoneScreen() {
   // The phone is checked with the shared schema, not a length test: the schema
   // normalises the number to E.164 and refuses anything that is not a valid
   // Bangladesh number.
-  const isPhoneValid = phoneSchema.safeParse(phone).success;
+  const parsedPhone = phoneSchema.safeParse(phone);
 
-  const canContinue = isPhoneValid && email.includes('@') && password.length >= 8;
+  const canContinue = parsedPhone.success && email.includes('@') && password.length >= 8;
 
   const onContinue = () => {
     const nextErrors: Record<string, string> = {};
-    if (!isPhoneValid) nextErrors.phone = t('errors.validationFailed');
+    if (!parsedPhone.success) nextErrors.phone = t('errors.validationFailed');
     if (!email.includes('@')) nextErrors.email = t('errors.validationFailed');
     if (password.length < 8) nextErrors.password = t('errors.validationFailed');
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     router.push({
-      pathname: '/(auth)/register',
-      params: { phone, email, password },
+      pathname: '/(auth)/alternate-phone',
+      params: {
+        // The **normalised** number, so the next screen compares like with
+        // like.
+        phone: parsedPhone.data,
+        email,
+        password,
+      },
     });
   };
 
