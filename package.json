@@ -24,6 +24,8 @@
     "shared:check": "node tools/mirror-shared-to-functions.cjs --check",
     "shared:mirror": "node tools/mirror-shared-to-functions.cjs",
     "secret:scan": "node tools/secret-scan.cjs",
+    "story:index:check": "node tools/reconcile-story-index.cjs",
+    "story:index:write": "node tools/reconcile-story-index.cjs --write",
     "release:verify": "node tools/release-verify.cjs",
     "purge:dry-run": "node tools/purge-media-dry-run.cjs",
     "maestro:check": "node tools/check-maestro-flow.cjs",
@@ -37,7 +39,7 @@
     "alert:check": "node tools/probe-public-alert.cjs",
     "capture:check": "node tools/probe-capture-submit.cjs",
     "deletion:check": "node tools/probe-account-deletion.cjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm alert:check && pnpm maestro:check && pnpm fn:typecheck",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm story:index:check && pnpm db:test && pnpm db:smoke && pnpm alert:check && pnpm maestro:check && pnpm fn:typecheck",
     "mobile": "pnpm --filter @nagar-shield/mobile",
     "admin": "pnpm --filter @nagar-shield/admin",
     "shared": "pnpm --filter @nagar-shield/shared"

@@ -6,7 +6,7 @@
 > The Status column is derived from each story file's `implemented`
 > frontmatter, which is the authoritative source.
 >
-> **30 complete · 24 planned.** The index is reconciled against the story
+> **31 complete · 23 planned.** The index is reconciled against the story
 > files on disk: 54 files, 54 rows, no duplicates, no orphans.
 
 | Story | Title | Unit | Bolt | Priority | Status |
@@ -30,7 +30,7 @@
 | 006-thana-line-fallback | Thana line + 10 km → 999 fallback | 003-help-seek | 009-help-seek | must | complete |
 | 008-wrong-number-report | Wrong-number report flow | 003-help-seek | 009-help-seek | should | complete |
 | 007-find-a-station-map | Find-a-station map | 003-help-seek | 010-help-seek | should | complete |
-| 004-graceful-degradation | Graceful degradation (location / battery) | 003-help-seek | 010-help-seek | must | planned |
+| 004-graceful-degradation | Graceful degradation (location / battery) | 003-help-seek | 010-help-seek | must | complete |
 | 001-capture-screen | Capture screen | 004-capture | 011-capture | must | planned |
 | 004-exif-strip-and-media-caps | EXIF strip + media caps | 004-capture | 012-capture | must | planned |
 | 007-storage-upload-and-finalize | Storage upload + finalize_capture | 004-capture | 012-capture | must | planned |

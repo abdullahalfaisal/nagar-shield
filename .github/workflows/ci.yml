@@ -106,6 +106,16 @@ jobs:
 
       - run: pnpm fn:typecheck
 
+      # The story index must agree with the story files on disk. The Status
+      # column and the header count are **derived** — a story file's
+      # `implemented` frontmatter is the authority.
+      #
+      # This gate exists because a hand-maintained index drifts, and a drifted
+      # index is how a project ends up believing a story is done when it is
+      # not. The tool needs no database and no build, so it runs here.
+      - name: the story index matches the story files
+        run: pnpm story:index:check
+
   # ---------------------------------------------------------------------------
   # The shared contracts — the first test signal, and the gate for every
   # other test job.
