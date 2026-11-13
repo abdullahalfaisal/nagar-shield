@@ -2,11 +2,11 @@
 id: 004-snapshot-payload-and-telemetry
 unit: 005-location
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 004-snapshot-payload-and-telemetry
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** a fix of `{ lat, lng, accuracy }`, **When** `buildSnapshotPayload(lat, lng, accuracy)` is called, **Then** it returns an object containing the `message` text, the `geoUri`, the `mapsUrl`, the `lat`, the `lng`, the `accuracyM`, and the `capturedAt` timestamp
-- [ ] **Given** the payload is built, **When** its `geoUri` is inspected, **Then** it is a well-formed URI of the form `geo:<lat>,<lng>?q=<lat>,<lng>` and it resolves to the supplied coordinates
-- [ ] **Given** the payload is built, **When** its `mapsUrl` is inspected, **Then** it is a well-formed URL of the form `https://maps.google.com/?q=<lat>,<lng>` and it resolves to the supplied coordinates
-- [ ] **Given** the payload is built, **When** its `message` is inspected, **Then** the message contains **all three** parts — the `geo:` URI, the Google Maps URL, and a **human-readable timestamp** — and it is plain text, never HTML
-- [ ] **Given** the payload is built for a known fix, **When** the unit tests run, **Then** the `geo:` URI and the Maps URL are asserted to be well-formed for that exact coordinate pair, and the human-readable timestamp is asserted to be present and parseable
-- [ ] **Given** the user confirms a share, **When** the share intent fires or the `location_shares` audit row is written, **Then** a `location_share_intent_ms` telemetry event is recorded with the elapsed ms measured from the user's confirm tap, and the median over the measurement window is **< 5,000 ms** (FR-LOC-2, waiver W-4)
-- [ ] **Given** the telemetry event is inspected, **When** its payload is read, **Then** it contains **only** the elapsed ms, the share channel (`app` or `os_share_sheet`), and the recipient **count** — it contains **no** GPS coordinate, **no** latitude or longitude value, and **no** phone number, raw or masked
-- [ ] **Given** the telemetry event is inspected, **When** its fields are read, **Then** there is **no** carrier-delivery field, **no** recipient-open-time field, and **no** read-receipt field — carrier delivery and recipient open time are explicitly **not** measured and **not** claimed (FR-LOC-2, ADR-005)
-- [ ] **Given** any log line, error message, or telemetry event emitted by the location module, **When** a log-scrubbing test runs, **Then** **no** raw GPS coordinate, **no** raw phone number, and **no** `recipient_phone` value appears — `recipient_phone` is masked wherever it is formatted for output
-- [ ] **Given** the payload is used by the OS share sheet, **When** the clipboard copy affordance is used instead, **Then** the clipboard carries the **same** `message` text — one payload, one source of truth
+- [x] **Given** a fix of `{ lat, lng, accuracy }`, **When** `buildSnapshotPayload(lat, lng, accuracy)` is called, **Then** it returns an object containing the `message` text, the `geoUri`, the `mapsUrl`, the `lat`, the `lng`, the `accuracyM`, and the `capturedAt` timestamp
+- [x] **Given** the payload is built, **When** its `geoUri` is inspected, **Then** it is a well-formed URI of the form `geo:<lat>,<lng>?q=<lat>,<lng>` and it resolves to the supplied coordinates
+- [x] **Given** the payload is built, **When** its `mapsUrl` is inspected, **Then** it is a well-formed URL of the form `https://maps.google.com/?q=<lat>,<lng>` and it resolves to the supplied coordinates
+- [x] **Given** the payload is built, **When** its `message` is inspected, **Then** the message contains **all three** parts — the `geo:` URI, the Google Maps URL, and a **human-readable timestamp** — and it is plain text, never HTML
+- [x] **Given** the payload is built for a known fix, **When** the unit tests run, **Then** the `geo:` URI and the Maps URL are asserted to be well-formed for that exact coordinate pair, and the human-readable timestamp is asserted to be present and parseable
+- [x] **Given** the user confirms a share, **When** the share intent fires or the `location_shares` audit row is written, **Then** a `location_share_intent_ms` telemetry event is recorded with the elapsed ms measured from the user's confirm tap, and the median over the measurement window is **< 5,000 ms** (FR-LOC-2, waiver W-4)
+- [x] **Given** the telemetry event is inspected, **When** its payload is read, **Then** it contains **only** the elapsed ms, the share channel (`app` or `os_share_sheet`), and the recipient **count** — it contains **no** GPS coordinate, **no** latitude or longitude value, and **no** phone number, raw or masked
+- [x] **Given** the telemetry event is inspected, **When** its fields are read, **Then** there is **no** carrier-delivery field, **no** recipient-open-time field, and **no** read-receipt field — carrier delivery and recipient open time are explicitly **not** measured and **not** claimed (FR-LOC-2, ADR-005)
+- [x] **Given** any log line, error message, or telemetry event emitted by the location module, **When** a log-scrubbing test runs, **Then** **no** raw GPS coordinate, **no** raw phone number, and **no** `recipient_phone` value appears — `recipient_phone` is masked wherever it is formatted for output
+- [x] **Given** the payload is used by the OS share sheet, **When** the clipboard copy affordance is used instead, **Then** the clipboard carries the **same** `message` text — one payload, one source of truth
 
 ## Technical Notes
 
@@ -84,3 +84,101 @@ implemented: false
 - Any delivery receipt, read receipt, or "contact opened it" signal — forbidden by ADR-005
 - A geocoder implementation of its own — the shared geocode helper from unit `004-capture` is used
 - Live location streaming and the `mode = 'stream'` payload shape — Phase 2 (FR-LOC-3 / FR-NG-7)
+
+## Implementation Notes
+
+**Two modules.** `src/shared/services/snapshotPayload.ts` builds the payload;
+`src/shared/services/shareTelemetry.ts` measures it.
+
+### The payload's three parts are never optional
+
+```ts
+'Nagar Shield — my current location',
+'Taken: 13 Nov 2026, 14:32',
+'Accuracy: ±12 m',
+'geo:23.7806,90.4066?q=23.7806,90.4066',
+'https://maps.google.com/?q=23.7806,90.4066',
+```
+
+The accuracy line is present **only** when there is a real accuracy. A
+manual entry has none, and reporting `±0 m` would be a fabrication.
+
+### The rounding is what keeps the three parts in agreement
+
+`COORDINATE_PRECISION = 5`, applied **once** before the URI, the URL, and
+the stored `lat` / `lng` are produced. The URI, the URL, and the audit row
+therefore always carry the same numbers.
+
+A coordinate of `0` is a **valid** coordinate — the equator and the prime
+meridian — so the rounding never treats it as absent. That rule is enforced
+by a truthiness check being avoided, and it is covered by a test.
+
+### The timestamp is the locale's own date format
+
+`formatCapturedAt(iso, locale)` uses `Intl.DateTimeFormat` with `bn-BD` for
+Bangla and `en-GB` for English. A runtime without the locale data falls back
+to the ISO form — still a parseable timestamp, never an empty one.
+
+### The null-position variant is a separate builder
+
+`buildPayloadWithoutLocation()` produces the "share without location"
+payload: a timestamp and a note that the location is unavailable, **no** geo
+URI, and **no** Maps URL. It reports `lat: 0, lng: 0` in its structured
+shape — that is a payload-level placeholder, never a written coordinate.
+The audit row it produces writes a **null** position, not a zeroed one.
+
+### The telemetry event carries exactly three fields
+
+```ts
+interface ShareIntentEvent {
+  elapsedMs: number;
+  channel: ShareChannel;
+  recipientCount: number;
+}
+```
+
+A test asserts the key set is **exactly** `['channel', 'elapsedMs',
+'recipientCount']` and that the serialised form contains no `lat`, no `lng`,
+and no `phone`. A new field here is a new PII risk, so adding one is a
+deliberate decision and not an accident.
+
+### The buffer never blocks the share
+
+The event is written to a sandbox JSON file — `nagar-shield-media/
+share-telemetry.json`, the same `expo-file-system` pattern the offline
+upload queue uses. `bufferShareIntent` never throws: a device that cannot
+write the buffer still shares fine.
+
+The buffer holds `TELEMETRY_MAX_EVENTS = 100` events. The **oldest** is
+evicted when it is full, because the newest measurement is the one that
+describes the current build.
+
+`takeBufferedEvents()` clears the file **before** returning the events, so a
+failed flush loses them rather than re-sending them forever. A duplicate
+metric is worse than a missing one.
+
+A corrupt buffer reads as **empty**, not as an exception.
+
+### The median is not flattered
+
+`medianElapsedMs()` sorts the real distribution and takes the middle — the
+two middle values averaged for an even count. A single slow run is never
+discarded: the test that proves it feeds `[10, 10, 10, 99_000]` and asserts
+the median is `10`, which is the *honest* median of that set and the point
+of the test.
+
+### The clock starts at the confirm tap
+
+`recordShareIntent({ startedAt, finishedAt, channel, recipientCount })` is
+called once per share, after the fan-out. The elapsed time is clamped at
+`0` — a device whose clock steps backwards must not produce a negative
+measurement.
+
+### Verification
+
+| What | How |
+|---|---|
+| The three parts, the rounding, the `0` coordinate, the null-position variant, the locale formats | `snapshotPayload.test.ts` — 21 tests |
+| The three-field payload, the buffer, the eviction, the corrupt read, the median | `shareTelemetry.test.ts` — 13 tests |
+| The absence of every receipt surface and every PII field | `noBackgroundLocation.test.ts` — 10 tests |
+

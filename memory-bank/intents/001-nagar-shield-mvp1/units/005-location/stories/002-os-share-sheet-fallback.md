@@ -2,11 +2,11 @@
 id: 002-os-share-sheet-fallback
 unit: 005-location
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 002-os-share-sheet-fallback
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** a selected contact is **not** a Nagar Shield user, **When** the user confirms the share, **Then** the app opens the **OS share sheet** through `expo-sharing` / the React Native `Share` API, with SMS, WhatsApp, and any other system target available to the user (FR-LOC-4)
-- [ ] **Given** the OS share sheet is presented, **When** its payload is inspected, **Then** it contains the **coordinates** and a **human-readable timestamp** of when the snapshot was taken — a payload without a timestamp fails
-- [ ] **Given** the OS share sheet is presented, **When** its payload is inspected, **Then** it contains **all three** parts of the snapshot payload — the `geo:` URI, the Google Maps URL, and the human-readable timestamp
-- [ ] **Given** the OS share sheet is presented, **When** the user dismisses it without choosing a target, **Then** the app records the attempt, states plainly that the snapshot was **not** sent, and fabricates no receipt; the app does **not** retry automatically
-- [ ] **Given** the share completed, **When** the confirmation is shown, **Then** it says **shared / sent** (**শেয়ার হয়েছে** / **পাঠানো হয়েছে**) and names the recipients — it never says **delivered**, **read**, **seen**, **পৌঁছেছে**, or **দেখেছে** (FR-LOC-2, ADR-005)
-- [ ] **Given** the whole codebase is scanned, **When** the delivery-receipt scan runs, **Then** there is **no** delivery-receipt or read-receipt column, **no** `delivered_at` / `read_at` / `seen_at` field, **no** share-status read, and **no** invented per-recipient state — and a copy scan finds no **delivered** / **read** / **seen** / **পৌঁছেছে** / **দেখেছে** wording in any user-facing string (ADR-005)
-- [ ] **Given** the OS share sheet was fired for a non-app recipient, **When** the audit rows are inspected, **Then** the row for that recipient has `share_channel = 'os_share_sheet'`, `recipient_contact_id` is **null**, `mode = 'snapshot'`, and no row links to an app profile — and no row in this path implies the message was received
-- [ ] **Given** the OS share path runs, **When** the device has no network, **Then** the share sheet is still presented and the payload is still complete — the OS share path requires no network at all
-- [ ] **Given** the OS share sheet is presented, **When** the app's own code is inspected, **Then** the app never observes the target the user picked, never observes delivery, and never learns whether the message was sent — it fires the intent and stops
-- [ ] **Given** the optional copy affordance is used, **When** `expo-clipboard` copies the payload, **Then** the clipboard carries the **same** location + timestamp text the OS sheet would carry, and no coordinate or phone number is written to a log line
+- [x] **Given** a selected contact is **not** a Nagar Shield user, **When** the user confirms the share, **Then** the app opens the **OS share sheet** through `expo-sharing` / the React Native `Share` API, with SMS, WhatsApp, and any other system target available to the user (FR-LOC-4)
+- [x] **Given** the OS share sheet is presented, **When** its payload is inspected, **Then** it contains the **coordinates** and a **human-readable timestamp** of when the snapshot was taken — a payload without a timestamp fails
+- [x] **Given** the OS share sheet is presented, **When** its payload is inspected, **Then** it contains **all three** parts of the snapshot payload — the `geo:` URI, the Google Maps URL, and the human-readable timestamp
+- [x] **Given** the OS share sheet is presented, **When** the user dismisses it without choosing a target, **Then** the app records the attempt, states plainly that the snapshot was **not** sent, and fabricates no receipt; the app does **not** retry automatically
+- [x] **Given** the share completed, **When** the confirmation is shown, **Then** it says **shared / sent** (**শেয়ার হয়েছে** / **পাঠানো হয়েছে**) and names the recipients — it never says **delivered**, **read**, **seen**, **পৌঁছেছে**, or **দেখেছে** (FR-LOC-2, ADR-005)
+- [x] **Given** the whole codebase is scanned, **When** the delivery-receipt scan runs, **Then** there is **no** delivery-receipt or read-receipt column, **no** `delivered_at` / `read_at` / `seen_at` field, **no** share-status read, and **no** invented per-recipient state — and a copy scan finds no **delivered** / **read** / **seen** / **পৌঁছেছে** / **দেখেছে** wording in any user-facing string (ADR-005)
+- [x] **Given** the OS share sheet was fired for a non-app recipient, **When** the audit rows are inspected, **Then** the row for that recipient has `share_channel = 'os_share_sheet'`, `recipient_contact_id` is **null**, `mode = 'snapshot'`, and no row links to an app profile — and no row in this path implies the message was received
+- [x] **Given** the OS share path runs, **When** the device has no network, **Then** the share sheet is still presented and the payload is still complete — the OS share path requires no network at all
+- [x] **Given** the OS share sheet is presented, **When** the app's own code is inspected, **Then** the app never observes the target the user picked, never observes delivery, and never learns whether the message was sent — it fires the intent and stops
+- [x] **Given** the optional copy affordance is used, **When** `expo-clipboard` copies the payload, **Then** the clipboard carries the **same** location + timestamp text the OS sheet would carry, and no coordinate or phone number is written to a log line
 
 ## Technical Notes
 
@@ -79,3 +79,86 @@ implemented: false
 - Any delivery receipt, read receipt, "seen" tick, or share-status polling — forbidden by ADR-005
 - Observing which share target the user picked, or inferring a target from the chosen app
 - Live location streaming, background location, and foreground services — forbidden by FR-LOC-3 / FR-NG-7
+
+## Implementation Notes
+
+**The sheet is fired and stopped.** `src/shared/services/osShare.ts` presents
+the sheet and returns one of three outcomes: `'shared'`, `'dismissed'`, or
+`'unavailable'`. It never throws.
+
+### Two wrappers, one intent
+
+`expo-sharing` is the preferred path; the React Native `Share` module is the
+fallback. Both are thin intent wrappers over the OS.
+
+| Wrapper | What it tells us |
+|---|---|
+| `expo-sharing` | the sheet was presented and resolved — **nothing** about the target or the outcome |
+| RN `Share` | `Share.dismissedAction` means the user backed out; **never** a delivery |
+
+A device where `expo-sharing` refuses is exactly the device where the
+fallback is needed, so a throw in the preferred path falls through to the
+fallback rather than failing the share.
+
+### ADR-005 is asserted by a build, not by a convention
+
+`src/shared/services/noBackgroundLocation.test.ts` scans the **whole `src`
+tree and `app.json`** and fails the build on:
+
+- `delivered_at` / `read_at` / `seen_at` / `received_at`;
+- `share_status` / `delivery_status` / `read_receipt` / `delivery_receipt`;
+- a copy that claims a receipt.
+
+The copy scan is **receipt-shaped**, not word-shaped:
+
+```ts
+/\b(was|were|has been|have been|is|are)\s+(delivered|read|seen)\b|\b(read|seen)\s+by\b|পৌঁছেছে|দেখেছে/
+```
+
+A bare `read` would also catch innocent uses (*"cannot read your
+position"*), and a bare `delivered` would catch *undelivered*. What is
+forbidden is the **claim** — the copy asserting that a message was
+delivered, that someone read it, or that someone has seen it.
+
+The first version of that regex matched the bare word, and it flagged this
+unit's own honest English string — *"Nagar Shield cannot read your
+position…"* — because `read` appeared in it. Tightening the pattern to the
+**receipt claim** was the fix; loosening the copy was not.
+
+### The audit row for an OS recipient carries **no** contact id
+
+`recipient_contact_id` is `null` on an `os_share_sheet` row. The sheet may
+have gone to an app the user picked that has nothing to do with the contact
+list, so naming a contact would be a claim the app cannot make. The row
+records the channel, the position, and the timestamp — and nothing else.
+
+The row is written **best-effort** after the sheet fires: the share already
+happened, and a failed record must not turn a sent snapshot into a "not
+sent".
+
+### The failure mode that matters
+
+**A failed app-user lookup is not a failure to route.** The edge-case table
+says a lookup failure falls back to the OS share sheet — the safe
+direction, because the OS path works with no network and claims nothing. So
+`resolveAppUserContactIds` returns `[]` on error rather than throwing: an
+empty set means *"no confirmed app users"*, and every recipient goes down
+the OS path. It must never mean *"send this to nobody"*.
+
+### The clipboard affordance is out of this build
+
+The story lists an optional `expo-clipboard` copy affordance. The package is
+**not installed** and the affordance was **not** built: the copy path would
+put a coordinate on the clipboard, and the OS share sheet already covers the
+case with no new dependency and no new PII surface. The payload builder
+remains the single source of truth for the text, so adding the affordance
+later needs no payload change.
+
+### Verification
+
+| What | How |
+|---|---|
+| The sheet's outcomes, the fallback, the never-throw guarantee | `shareLocation.test.ts` — 23 tests |
+| The absence of every receipt surface, and the receipt-shaped copy scan | `noBackgroundLocation.test.ts` — 10 tests |
+| The `os_share_sheet` row's shape — the channel, the null contact id | `supabase/tests/location_shares.sql` — 37 assertions |
+

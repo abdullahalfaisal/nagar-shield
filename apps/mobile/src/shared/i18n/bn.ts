@@ -234,6 +234,30 @@ export const bn = {
     permissionTitle: 'লোকেশন অনুমতি দরকার',
     permissionBody: 'আপনার অবস্থান শেয়ার করতে অনুমতি দিন।',
     manualEntry: 'হাতে লিখে লাভাবেন',
+    // The degraded address card.
+    addressUnavailable: 'লোকেশন পাওয়া যাচ্ছে না',
+    addressUnavailableBody:
+      'অ্যাপ আপনার অবস্থান পড়তে পারছে না। আপনি নিজে লিখে দিতে পারেন, অথবা লোকেশন ছাড়াই শেয়ার করতে পারেন।',
+    // The manual coordinate entry.
+    manualTitle: 'অক্ষাংশ-দ্রাঘিমাংশ লিখুন',
+    manualLatLabel: 'অক্ষাংশ (Latitude)',
+    manualLngLabel: 'দ্রাঘিমাংশ (Longitude)',
+    manualSave: 'এই অবস্থান ব্যবহার করুন',
+    manualErrorInvalid:
+      'অক্ষাংশ -৯০ থেকে ৯০ এবং দ্রাঘিমাংশ -১৮০ থেকে ১৮০ এর মধ্যে লিখুন।',
+    manualSaved: 'অবস্থান সেট হয়েছে',
+    // The share-without-location path.
+    shareWithoutLocation: 'লোকেশন ছাড়াই শেয়ার করুন',
+    shareWithoutLocationNote: 'লোকেশনটি পাওয়া যায়নি।',
+    // The toggle and the fan-out.
+    shareAllPrimaries: 'আপনার সব প্রাইমারি কন্টাক্ট দেখতে পাবে',
+    shareNoPrimaries: 'শেয়ার করার মতো কোনো প্রাইমারি কন্টাক্ট নেই।',
+    // The post-share confirmation.
+    confirmedTitle: 'লোকেশন শেয়ার হয়েছে',
+    confirmedBody: 'আপনার লোকেশন শেয়ার করা হয়েছে।',
+    confirmedRecipients: 'যাদের সাথে শেয়ার করা হয়েছে: {{names}}',
+    dismissed: 'পাঠানো হয়নি — আপনি শেয়ার শিটটি বন্ধ করে দিয়েছেন।',
+    failedRecord: 'শেয়ার করা হয়েছে, কিন্তু অ্যাপে রেকর্ডটি সেভ করা যায়নি।',
   },
   alerts: {
     title: 'অ্যালার্ট',

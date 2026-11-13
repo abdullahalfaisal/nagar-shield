@@ -241,6 +241,30 @@ export const en: TranslationSchema = {
     permissionTitle: 'Location access needed',
     permissionBody: 'Allow location access to share where you are.',
     manualEntry: 'Enter it manually',
+    // The degraded address card.
+    addressUnavailable: 'Location unavailable',
+    addressUnavailableBody:
+      'Nagar Shield cannot read your position. You can type it in, or share without one.',
+    // The manual coordinate entry.
+    manualTitle: 'Type the coordinates',
+    manualLatLabel: 'Latitude',
+    manualLngLabel: 'Longitude',
+    manualSave: 'Use these coordinates',
+    manualErrorInvalid:
+      'Enter a latitude between -90 and 90, and a longitude between -180 and 180.',
+    manualSaved: 'Coordinates set',
+    // The share-without-location path.
+    shareWithoutLocation: 'Share without a location',
+    shareWithoutLocationNote: 'The location is unavailable.',
+    // The toggle and the fan-out.
+    shareAllPrimaries: 'Shared with all {{count}} primary contacts',
+    shareNoPrimaries: 'You have no primary contacts to share with.',
+    // The post-share confirmation.
+    confirmedTitle: 'Location shared',
+    confirmedBody: 'Your location was shared.',
+    confirmedRecipients: 'Shared with: {{names}}',
+    dismissed: 'Not sent — you closed the share sheet.',
+    failedRecord: 'The snapshot was handed off, but the in-app record could not be saved.',
   },
   alerts: {
     title: 'Alerts',

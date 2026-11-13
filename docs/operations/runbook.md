@@ -469,6 +469,86 @@ card that is still there means the OS still reports the permission as usable
 
 ---
 
+## The location share
+
+The Location Sharing screen sends one snapshot to N recipients. It is an
+**audit of what the sender did**, never a receipt of what the recipient did.
+
+| Rule | Value |
+|---|---|
+| The channels | `app` (an in-app `location_shares` row) and `os_share_sheet` (the OS share sheet). `share_channel` is a **channel label**, never a delivery status. |
+| The mode | Always `snapshot`. The column is the Phase-2 streaming hook; a one-value CHECK enforces it. |
+| The position | `lat` / `lng` are **all-or-nothing** — both null for a "share without location", never a zeroed pair. A zeroed position reads as a real point in the Gulf of Guinea. |
+| The accuracy | `accuracy_m` is nullable. A manual coordinate entry has no honest accuracy, and `0` would be a fabrication. |
+| The recipient | `recipient_contact_id` is the sender's own contact, or **null** for an OS recipient — the sheet may have gone to an app with nothing to do with the contact list. |
+| The prompt | **Just-in-time.** The location permission fires at the confirm tap, never on mount. |
+| The fallback | A denied permission degrades to **manual coordinate entry** or **share without location**. Both complete a share. |
+| The telemetry | `location_share_intent_ms` measures the confirm tap to the intent firing. Carrier delivery and recipient open time are **never** measured and **never** claimed. |
+
+**Operational notes.**
+
+- **Nagar Shield is not a tracking app.** There is no `watchPositionAsync`,
+  no background location permission, no background location task, and no
+  foreground service. The absence is asserted by a **source scan**
+  (`noBackgroundLocation.test.ts`), so adding one fails the build. The scan
+  covers the whole `src` tree **and** `app.json`, so a permission declared
+  in the Expo config fails too.
+- **The copy may never claim a receipt.** No "delivered", no "read", no
+  "seen", no **পৌঁছেছে**, no **দেখেছে**. The app cannot know any of these
+  (ADR-005), so the copy scan fails the build on a claim in any of the three
+  receipt forms.
+- **A failed app-user lookup falls back to the OS share sheet.** That is the
+  safe direction: the OS path works with no network and claims nothing. A
+  lookup failure must never mean "send this to nobody".
+- **The app-user lookup reveals nothing.** `resolve_app_contacts` returns the
+  matching **contact ids** and nothing else — no phone, no name, no email, no
+  user id. `public.profiles` stays owner-scoped; nothing is loosened.
+- **A disabled or deleted account is not a reachable in-app recipient.** The
+  snapshot would land in an account nobody can read, so that recipient goes
+  down the OS path instead.
+- **The `location_shares` table is never public.** It appears in no feed, no
+  view, no RPC output, and no admin projection, and a second user cannot
+  read another user's rows.
+
+**Diagnosing "the share says sent but nobody received it."**
+Nothing is wrong. The app fired the share and stopped — it has no visibility
+into the target the user picked and no visibility into the carrier. The
+confirmation says **shared / sent** precisely because that is the only claim
+the app can earn.
+
+---
+
+## The location audit table
+
+The `location_shares` contract is asserted **inside** Postgres by
+`supabase/tests/location_shares.sql` — 37 assertions covering the mode
+CHECK, the nullable all-or-nothing position, the channel enum, the RLS, the
+disabled-account guard, and the app-user lookup.
+
+```bash
+pnpm db:test
+```
+
+The suite impersonates a **client** — `set local role authenticated` plus
+the JWT claims, the way PostgREST does. The superuser has `BYPASSRLS`, so a
+count taken outside the impersonation would see everything and prove
+nothing; the negative tests count **inside** the impersonated session.
+
+Two of the fixtures are worth knowing about, because both were bugs in the
+tests before they were bugs in the code:
+
+- **The contact-id helper's parameter must not shadow a column name.** A
+  parameter named `name` shadows the column `c.name`, so `where c.name =
+  name` compares the column to itself — always true — and the helper
+  resolves an arbitrary contact. The test then fails for a reason that has
+  nothing to do with the behaviour under test.
+- **The helper must be scoped to the owner.** Contact names are unique
+  within one user's list, not across the table. A helper that matched on the
+  name alone would resolve another citizen's contact whenever the two share
+  a name.
+
+---
+
 ## The environment progression
 
 | Surface | Local | Staging | Production |

@@ -35,11 +35,11 @@
 | 003-report-detail-and-category-edit | Report detail + author category edit | 004-capture | 013-capture | must | complete |
 | 005-offline-upload-queue | Offline upload queue | 004-capture | 014-capture | must | complete |
 | 006-capture-permission-degradation | Capture permission degradation | 004-capture | 014-capture | must | complete |
-| 001-location-sharing-screen | Location Sharing screen | 005-location | 015-location | must | planned |
-| 002-os-share-sheet-fallback | OS share-sheet fallback | 005-location | 016-location | must | planned |
-| 003-share-with-all-primary-contacts | Share with all primary contacts | 005-location | 016-location | must | planned |
-| 004-snapshot-payload-and-telemetry | Snapshot payload + telemetry | 005-location | 017-location | must | planned |
-| 005-location-permission-degradation | Location permission degradation | 005-location | 017-location | should | planned |
+| 001-location-sharing-screen | Location Sharing screen | 005-location | 015-location | must | complete |
+| 002-os-share-sheet-fallback | OS share-sheet fallback | 005-location | 016-location | must | complete |
+| 003-share-with-all-primary-contacts | Share with all primary contacts | 005-location | 016-location | must | complete |
+| 004-snapshot-payload-and-telemetry | Snapshot payload + telemetry | 005-location | 017-location | must | complete |
+| 005-location-permission-degradation | Location permission degradation | 005-location | 017-location | should | complete |
 | 001-alerts-feed-list | Alerts feed list | 006-alerts | 018-alerts | must | planned |
 | 003-area-filter-chips | Area filter chips | 006-alerts | 018-alerts | must | planned |
 | 002-auto-refresh-and-pull-to-refresh | Auto-refresh + pull-to-refresh | 006-alerts | 019-alerts | must | planned |

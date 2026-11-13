@@ -2,11 +2,11 @@
 id: 003-share-with-all-primary-contacts
 unit: 005-location
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 003-share-with-all-primary-contacts
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the "share with all" toggle row renders, **When** its sub-line is read, **Then** it says **আপনার সব প্রাইমারি কন্টাক্ট দেখতে পাবে** and **not** the prototype's **আপনার সব জরুরি কন্টাক্ট দেখতে পাবে** — the wording must match the behaviour, which is primaries only
-- [ ] **Given** the toggle is ON, **When** the user confirms the share, **Then** the fan-out resolves exactly the contacts with `is_primary = true` and shares with **each** of them — exactly **one** snapshot per primary (FR-LOC-1)
-- [ ] **Given** the toggle is ON and the user confirms, **When** the audit rows are inspected, **Then** the number of `location_shares` rows written equals the number of primary contacts, with **no duplicates** and **no** row for any non-primary contact
-- [ ] **Given** the toggle is ON and a primary contact is **not** a Nagar Shield user, **When** the share runs, **Then** that primary receives the **OS share-sheet** path exactly once — the OS sheet is fired **once** per non-app primary, never twice
-- [ ] **Given** the toggle is ON and the user **deselects an individual contact** before confirming, **When** the user taps the sticky **শেয়ার করুন** CTA, **Then** that deselected contact receives **nothing** — no audit row and no OS share — and the remaining selected primaries receive exactly one snapshot each
-- [ ] **Given** the toggle is switched **OFF**, **When** the user confirms, **Then** only the explicitly checked per-contact rows are shared and the all-primaries expansion does **not** run
-- [ ] **Given** the user has **no** primary contacts at all, **When** the toggle is ON and the user confirms, **Then** the fan-out shares with **zero** recipients, the screen states that there are no primary contacts to share with, and **no** audit row is written
-- [ ] **Given** the fan-out runs, **When** each recipient is processed, **Then** every recipient receives the **same** snapshot — one captured fix, one timestamp, one payload — and the fan-out never re-takes the GPS fix per recipient
-- [ ] **Given** the fan-out runs, **When** the result is summarised to the user, **Then** the count of recipients and the per-channel breakdown are reported, and the wording stays **shared / sent** — never **delivered** / **read** / **seen** (FR-LOC-2, ADR-005)
-- [ ] **Given** the share-with-all flow completes, **When** the elapsed time is measured, **Then** `location_share_intent_ms` is recorded from the confirm tap to the share intent fired **or** the audit row written, and carrier delivery and recipient open time are **not** measured and **not** claimed (FR-LOC-2, waiver W-4)
+- [x] **Given** the "share with all" toggle row renders, **When** its sub-line is read, **Then** it says **আপনার সব প্রাইমারি কন্টাক্ট দেখতে পাবে** and **not** the prototype's **আপনার সব জরুরি কন্টাক্ট দেখতে পাবে** — the wording must match the behaviour, which is primaries only
+- [x] **Given** the toggle is ON, **When** the user confirms the share, **Then** the fan-out resolves exactly the contacts with `is_primary = true` and shares with **each** of them — exactly **one** snapshot per primary (FR-LOC-1)
+- [x] **Given** the toggle is ON and the user confirms, **When** the audit rows are inspected, **Then** the number of `location_shares` rows written equals the number of primary contacts, with **no duplicates** and **no** row for any non-primary contact
+- [x] **Given** the toggle is ON and a primary contact is **not** a Nagar Shield user, **When** the share runs, **Then** that primary receives the **OS share-sheet** path exactly once — the OS sheet is fired **once** per non-app primary, never twice
+- [x] **Given** the toggle is ON and the user **deselects an individual contact** before confirming, **When** the user taps the sticky **শেয়ার করুন** CTA, **Then** that deselected contact receives **nothing** — no audit row and no OS share — and the remaining selected primaries receive exactly one snapshot each
+- [x] **Given** the toggle is switched **OFF**, **When** the user confirms, **Then** only the explicitly checked per-contact rows are shared and the all-primaries expansion does **not** run
+- [x] **Given** the user has **no** primary contacts at all, **When** the toggle is ON and the user confirms, **Then** the fan-out shares with **zero** recipients, the screen states that there are no primary contacts to share with, and **no** audit row is written
+- [x] **Given** the fan-out runs, **When** each recipient is processed, **Then** every recipient receives the **same** snapshot — one captured fix, one timestamp, one payload — and the fan-out never re-takes the GPS fix per recipient
+- [x] **Given** the fan-out runs, **When** the result is summarised to the user, **Then** the count of recipients and the per-channel breakdown are reported, and the wording stays **shared / sent** — never **delivered** / **read** / **seen** (FR-LOC-2, ADR-005)
+- [x] **Given** the share-with-all flow completes, **When** the elapsed time is measured, **Then** `location_share_intent_ms` is recorded from the confirm tap to the share intent fired **or** the audit row written, and carrier delivery and recipient open time are **not** measured and **not** claimed (FR-LOC-2, waiver W-4)
 
 ## Technical Notes
 
@@ -84,3 +84,77 @@ implemented: false
 - The Alerts feed, the History screens, and the area filters — unit `006-alerts`
 - Any delivery or read receipt, a "seen" tick, or a per-recipient status poll — forbidden by ADR-005
 - Live location streaming, background location, foreground services, and periodic updates — forbidden by FR-LOC-3 / FR-NG-7
+
+## Implementation Notes
+
+**The fan-out is `shareLocation()`.** It lives in
+`src/shared/services/shareLocation.ts` and takes the recipient list, the
+position (or `null`), the confirm-tap timestamp, and the locale.
+
+### Two selectors, and the toggle is one of them
+
+```ts
+selectPrimaryRecipients(contacts, deselectedIds)  // toggle ON
+selectExplicitRecipients(contacts, selectedIds)    // toggle OFF
+```
+
+`selectPrimaryRecipients` filters to `isPrimary` and sorts by `sortOrder`.
+The `deselectedIds` argument is what makes **deselection win**: a primary the
+user unchecked is removed even though the toggle selected it.
+
+**The ON default is kept** — it is the panic-friendly default — but the
+toggle is a **default selector**, not an override. The per-contact checkboxes
+are authoritative at confirm time.
+
+### One fix, one payload, N recipients
+
+The position is captured **once** before the fan-out and the payload is
+built **once**. Every recipient receives the same snapshot. Re-taking the
+fix per recipient would inflate the SLA and could produce inconsistent
+coordinates inside a single share.
+
+The payload is built from the **rounded** coordinates, and the `geo:` URI,
+the Maps URL, and the stored `lat` / `lng` all come from that same rounded
+value — so they can never disagree with each other.
+
+### De-duplication happens before anything is sent
+
+The recipient list is de-duplicated by contact id at the top of
+`shareLocation()`. A contact that is both checked manually and reached by
+the toggle receives **exactly one** snapshot: one audit row if an app user,
+one OS sheet if not — never both.
+
+### Routing is per recipient, not per batch
+
+Each recipient is classified independently against the resolved app-user
+set. The summary reports the per-channel breakdown:
+
+```ts
+shared: { app: number; os_share_sheet: number }
+failed: { app: number; os_share_sheet: number }
+```
+
+The wording stays **shared / sent** — never delivered, read, or seen
+(ADR-005).
+
+### The zero-recipient case is explicit
+
+**No primaries at all** means the fan-out shares with zero recipients, the
+screen says so (`location.shareNoPrimaries`), and **no** audit row is
+written. `shareLocation()` still returns a result — with zero counts and an
+honest elapsed time — so the caller never has to special-case `undefined`.
+
+### The SLA channel is the *first* thing the share did
+
+A fan-out that mixed both channels is reported as `app` when at least one
+recipient went down the in-app path. The metric's channel label is a
+summary of the share, not a claim about every recipient.
+
+### Verification
+
+| What | How |
+|---|---|
+| The two selectors, the deselection, the de-duplication, the per-recipient routing, the zero-recipient case | `shareLocation.test.ts` — 23 tests |
+| The payload built once for the whole fan-out | `snapshotPayload.test.ts` — 21 tests |
+| One row per recipient, no duplicates, the channel values | `supabase/tests/location_shares.sql` — 37 assertions |
+

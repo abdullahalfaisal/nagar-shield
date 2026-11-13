@@ -2,11 +2,11 @@
 id: 005-location-permission-degradation
 unit: 005-location
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 005-location-permission-degradation
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the Location Sharing screen is opened, **When** it renders, **Then** **no** location permission prompt appears — the prompt never fires on screen mount, on first launch, or as part of the first render (FR-PERMS-1)
-- [ ] **Given** the user has selected a recipient and taps the sticky **শেয়ার করুন** CTA, **When** the location permission is not yet determined, **Then** the system prompt fires **at that moment**, immediately before the fix is taken, and only then
-- [ ] **Given** the location permission is **denied**, **When** the screen renders, **Then** the screen still renders in full — the app bar, the illustration, the address card, the toggle, the contact rows, and the sticky CTA — and it **never crashes** (FR-PERMS-2)
-- [ ] **Given** the location permission is denied, **When** the address card renders, **Then** it shows a **"location unavailable"** state instead of stale coordinates and instead of the prototype's hardcoded **বাড়ি ১২, রোড ৭, বসুন্ধরা R/A, ঢাকা** — no fabricated address and no stale position
-- [ ] **Given** the location permission is denied, **When** the user chooses **manual coordinate entry**, **Then** the user can enter a latitude and a longitude, and the resulting `location_shares` row has `accuracy_m IS NULL` and the entered coordinates
-- [ ] **Given** the location permission is denied, **When** the user attempts a share, **Then** the share is **never blocked** by the missing permission — both fallback paths reach a completed share, and **share without location** completes with the timestamp and a note that the location is unavailable, fabricating no coordinate to fill the gap
-- [ ] **Given** the whole codebase is scanned, **When** the source-scan test runs, **Then** it asserts the **absence** of `watchPositionAsync`, of background-location permission strings, of background location tasks, and of foreground services — and the scan **passes** (FR-LOC-3, FR-NG-7)
-- [ ] **Given** the app is backgrounded, **When** a source scan and an Android permission audit run, **Then** the app requests **no** background location permission and never polls location while backgrounded — the only location request in the product is the single foreground fix on this screen (and unit `004-capture`'s own capture-time fix)
-- [ ] **Given** the `location_shares` table is inspected, **When** the schema and its read paths are checked, **Then** `location_shares.mode` is a CHECK of exactly `'snapshot'` — the column is retained as the Phase-2 streaming hook — and `location_shares` rows **never** appear in any public feed, view, RPC output, or admin projection (an RLS negative test proves a second user cannot read another user's share rows)
-- [ ] **Given** the location permission is revoked while the app is running, **When** the screen is next opened or foregrounded, **Then** the screen reflects the new state — the degraded card and the fallbacks — without a crash and without a stale permission flag
+- [x] **Given** the Location Sharing screen is opened, **When** it renders, **Then** **no** location permission prompt appears — the prompt never fires on screen mount, on first launch, or as part of the first render (FR-PERMS-1)
+- [x] **Given** the user has selected a recipient and taps the sticky **শেয়ার করুন** CTA, **When** the location permission is not yet determined, **Then** the system prompt fires **at that moment**, immediately before the fix is taken, and only then
+- [x] **Given** the location permission is **denied**, **When** the screen renders, **Then** the screen still renders in full — the app bar, the illustration, the address card, the toggle, the contact rows, and the sticky CTA — and it **never crashes** (FR-PERMS-2)
+- [x] **Given** the location permission is denied, **When** the address card renders, **Then** it shows a **"location unavailable"** state instead of stale coordinates and instead of the prototype's hardcoded **বাড়ি ১২, রোড ৭, বসুন্ধরা R/A, ঢাকা** — no fabricated address and no stale position
+- [x] **Given** the location permission is denied, **When** the user chooses **manual coordinate entry**, **Then** the user can enter a latitude and a longitude, and the resulting `location_shares` row has `accuracy_m IS NULL` and the entered coordinates
+- [x] **Given** the location permission is denied, **When** the user attempts a share, **Then** the share is **never blocked** by the missing permission — both fallback paths reach a completed share, and **share without location** completes with the timestamp and a note that the location is unavailable, fabricating no coordinate to fill the gap
+- [x] **Given** the whole codebase is scanned, **When** the source-scan test runs, **Then** it asserts the **absence** of `watchPositionAsync`, of background-location permission strings, of background location tasks, and of foreground services — and the scan **passes** (FR-LOC-3, FR-NG-7)
+- [x] **Given** the app is backgrounded, **When** a source scan and an Android permission audit run, **Then** the app requests **no** background location permission and never polls location while backgrounded — the only location request in the product is the single foreground fix on this screen (and unit `004-capture`'s own capture-time fix)
+- [x] **Given** the `location_shares` table is inspected, **When** the schema and its read paths are checked, **Then** `location_shares.mode` is a CHECK of exactly `'snapshot'` — the column is retained as the Phase-2 streaming hook — and `location_shares` rows **never** appear in any public feed, view, RPC output, or admin projection (an RLS negative test proves a second user cannot read another user's share rows)
+- [x] **Given** the location permission is revoked while the app is running, **When** the screen is next opened or foregrounded, **Then** the screen reflects the new state — the degraded card and the fallbacks — without a crash and without a stale permission flag
 
 ## Technical Notes
 
@@ -87,3 +87,106 @@ implemented: false
 - Background location, foreground services, geofencing, periodic updates, and live location streaming — forbidden by FR-LOC-3 / FR-NG-7
 - A location-sharing history screen, a location map of past shares, and any continuous-tracking mode — Phase 2
 - Runtime permission handling for a future iOS build — Phase 1 targets Android
+
+## Implementation Notes
+
+**The fix is a function, not a hook.** `src/shared/services/locationFix.ts`
+exports `takeLocationFix()`, and the screen calls it **from the CTA
+handler** — never from a mount effect. That is the whole of FR-PERMS-1: a
+screen that prompts on mount teaches users that the app asks for things
+before they have asked for anything.
+
+### The four outcomes, and none of them is an exception
+
+```ts
+{ status: 'ready'; lat; lng; accuracyM }
+{ status: 'denied'; permission }
+{ status: 'undetermined'; permission }
+{ status: 'unavailable' }
+```
+
+A denied permission, a dismissed prompt, a disabled provider, a fix timeout,
+and a failed permission query all take the **degraded branch**. The function
+never throws, so no failure path can crash the screen.
+
+The permission is read with `toPermissionState()` from the same wrapper
+unit `004-capture` built — the three-state read (`granted` / `denied` /
+`undetermined`) is one implementation for the whole app, not one per
+surface.
+
+### The degraded card, and what it offers
+
+With no fix the address card renders the **"location unavailable"** state —
+never a stale coordinate, never a fabricated street — and two affordances:
+
+| Affordance | What it does |
+|---|---|
+| **Enter it manually** | opens a bottom sheet with a latitude and a longitude field |
+| **Share without a location** | shares with a null position and a note |
+
+Both reach a **completed** share. The share is never gated on the
+permission.
+
+### The manual entry is validated strictly
+
+`parseManualCoordinates(latText, lngText)` rejects an empty field, a
+non-numeric value, and an out-of-range latitude or longitude. It **rejects**
+rather than clamps: a clamped coordinate is a different place, and the user
+would not know it moved.
+
+A coordinate of `0` is **valid** — the equator and the prime meridian — and
+is never treated as absent. The returned accuracy is always `null`: there is
+no honest accuracy to report for a pair of typed numbers, and a fabricated
+number is worse than none.
+
+### The null position is written as null
+
+A share without a location writes `{ lat: null, lng: null, accuracyM: null }`.
+Migration 025 made `lat` and `lng` nullable and added the
+`location_shares_position_pair_chk` CHECK, so a half-written pair is
+refused at the database. A zeroed position would read as a real point in
+the Gulf of Guinea.
+
+### The absence is asserted by a build
+
+`src/shared/services/noBackgroundLocation.test.ts` walks the **whole `src`
+tree plus `app.json`** and fails the build on any of:
+
+| Forbidden | Why |
+|---|---|
+| `watchPositionAsync` | a continuous position subscription |
+| `ACCESS_BACKGROUND_LOCATION`, `NSLocationAlways`, `isBackgroundLocationEnabled` | a background-location permission |
+| `expo-task-manager`, `TaskManager` | a background location task |
+| `foregroundService`, `FOREGROUND_SERVICE`, `startForegroundService` | a foreground service |
+| `defineTask(`, `registerTaskAsync`, `isRegisteredForTaskUpdates` | task registration |
+| `mode: 'stream'` | the Phase-2 streaming mode |
+| `delivered_at`, `read_at`, `seen_at`, `received_at` | a receipt field |
+| `share_status`, `delivery_status`, `read_receipt`, `delivery_receipt` | a status read |
+
+A convention is a note in a document; a source scan is a build failure. The
+scan excludes **its own file** — it necessarily names every forbidden thing,
+and matching its own assertions would make it fail on itself.
+
+### `location_shares` is never public
+
+The table has no public read policy and is not part of any feed RPC, view,
+moderation queue, or admin projection. The SQL suite proves it three ways:
+
+- an `E1` scan asserts no public function's body mentions `location_shares`;
+- an `E2` scan asserts no view's definition mentions it;
+- an `E3` scan asserts no SELECT policy names `anon`;
+- and a **negative** test proves a second user cannot read another user's
+  rows — counted **inside** the impersonated session, because the superuser
+  has `BYPASSRLS` and would see everything.
+
+That last one is the assertion the story actually asks for, and it is the
+one a superuser-scoped count would have quietly faked.
+
+### Verification
+
+| What | How |
+|---|---|
+| The absence of background location, streaming, foreground services, and receipts | `noBackgroundLocation.test.ts` — 10 tests |
+| The null position, the all-or-nothing pair, the `mode` CHECK, the RLS, the never-public assertion | `supabase/tests/location_shares.sql` — 37 assertions |
+| Both fallbacks completing a share, and the degraded payload | `shareLocation.test.ts` — 23 tests, `snapshotPayload.test.ts` — 21 tests |
+

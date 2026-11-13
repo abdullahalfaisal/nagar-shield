@@ -212,8 +212,8 @@ export interface Database {
           id: string;
           sender_id: string;
           recipient_contact_id: string | null;
-          lat: number;
-          lng: number;
+          lat: number | null;
+          lng: number | null;
           accuracy_m: number | null;
           mode: Database['public']['Enums']['location_share_mode'];
           share_channel: Database['public']['Enums']['share_channel'];
@@ -224,8 +224,8 @@ export interface Database {
           id?: string;
           sender_id: string;
           recipient_contact_id?: string | null;
-          lat: number;
-          lng: number;
+          lat?: number | null;
+          lng?: number | null;
           accuracy_m?: number | null;
           mode?: Database['public']['Enums']['location_share_mode'];
           share_channel?: Database['public']['Enums']['share_channel'];
@@ -467,6 +467,18 @@ export interface Database {
       geocode_key: {
         Args: { p_lat: number; p_lng: number };
         Returns: string;
+      };
+      /**
+       * Resolves which of the calling user's own contacts are Nagar Shield
+       * users.
+       *
+       * Returns **contact ids only** — no phone, name, email, or user id.
+       * `public.profiles` stays owner-scoped; nothing is loosened to make
+       * this work.
+       */
+      resolve_app_contacts: {
+        Args: { p_contact_ids: string[] };
+        Returns: string[];
       };
       /**
        * The paginated public projection (FR-ALERTS-1..4).

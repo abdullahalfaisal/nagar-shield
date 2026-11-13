@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **39 of 54 stories still carry `implemented: false`** — the
+built and verified. **34 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -38,9 +38,9 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
-| Database | **25 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category` |
+| Database | **27 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **306 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32) |
+| SQL test suites | **343 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -51,9 +51,10 @@ Every command below was run green against the local Supabase stack.
 | Report category | `tools/probe-report-category.cjs` — **22/22** over the real GoTrue + PostgREST path |
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
-| Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html` |
+| Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html`. The **location-sharing** screen's CTA now performs a real share. |
 | Offline queue | `apps/mobile/src/shared/services/` — the sandbox queue, the backoff schedule, the drain, and the drain trigger. **70 new unit tests** across three suites. |
 | Permissions | `apps/mobile/src/shared/services/permissions.ts` + `permissionRecovery.ts` — the three-state read, the entry-point degradation rules, and the just-in-time recovery routing. **88 unit tests** across four suites. |
+| Location sharing | `apps/mobile/src/shared/services/` — the just-in-time fix, the snapshot payload, the OS share sheet, the fan-out, the intent telemetry, and the app-user lookup. **67 new unit tests** across four suites, plus 37 SQL assertions. |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
@@ -67,8 +68,8 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 312 tests (201 mobile, 75 shared, 36 admin)
-pnpm db:test          # 306 SQL assertions
+pnpm test             # 379 tests (268 mobile, 75 shared, 36 admin)
+pnpm db:test          # 343 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
@@ -263,7 +264,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 39 of 54 stories
+## 4. What is NOT DONE — 34 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -302,8 +303,8 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| L1 | **Location sharing writes nothing.** The CTA is `router.back()`; no `location_shares` row, no OS share sheet, no telemetry row. | [015–017] |
-| L2 | The location fix is hard-coded to `null` — `useCurrentFix` exists but the screen does not use it. | [017] story 005 |
+| L1 | ✅ **FIXED** — the location share writes. `src/shared/services/shareLocation.ts` is the fan-out: one confirm tap, N recipients, **one** snapshot. The recipients are de-duplicated by contact id, the toggle selects **primaries only** (the prototype's "all your emergency contacts" wording would have been a lie — the build says **আপনার সব প্রাইমারি কন্টাক্ট দেখতে পাবে**), and the per-contact checkboxes are authoritative at confirm time, so **deselection wins**. Each recipient is routed independently: an app user gets a `location_shares` row with `share_channel = 'app'`, everyone else gets the OS share sheet fired **once**. `src/shared/services/snapshotPayload.ts` builds the payload — the `geo:` URI, the Maps URL, and a human-readable timestamp, all from the **same** rounded coordinate so they cannot disagree. `src/shared/services/shareTelemetry.ts` records `location_share_intent_ms` with exactly three fields and no PII. **Two database migrations** landed: 025 made `lat`/`lng` nullable with an all-or-nothing CHECK (a zeroed position would read as a real point in the Gulf of Guinea), and 026 added `resolve_app_contacts` — a `security definer` function that returns the caller's own contact ids that belong to an enabled account, and **nothing else** (no phone, no name, no email, no user id), so `public.profiles` stays owner-scoped. **A failed lookup returns `[]`** — the safe direction: the OS path works with no network and claims nothing. 67 new unit tests, 37 SQL assertions. | [015–017] |
+| L2 | ✅ **FIXED** — the location fix is taken **just-in-time**. `src/shared/services/locationFix.ts` exports `takeLocationFix()`, and the screen calls it **from the CTA handler** — never from a mount effect — so the permission prompt fires at the moment the user asked for the share (FR-PERMS-1). The function never throws: a denied permission, a dismissed prompt, a disabled provider, a fix timeout, and a failed permission query all take the degraded branch. The address card renders the **"location unavailable"** state and offers two fallbacks — **manual coordinate entry** and **share without a location** — and **both reach a completed share**. The manual entry is validated strictly (a clamped coordinate is a different place, and the user would not know it moved) and reports `accuracy_m = null`. A share without a location writes a **null** position, never a zeroed one. The absence of background location, streaming, foreground services, and receipts is asserted by a **source scan** (`noBackgroundLocation.test.ts`) that fails the build — a convention is a note in a document; a source scan is a build failure. | [017] story 005 |
 
 ### 4.6 Alerts — unit `006-alerts`
 
@@ -383,7 +384,24 @@ Ordered by dependency. Bolt numbers in brackets.
    point (which made the just-in-time prompt unreachable, because the card
    could never be tapped), and a description composer that dropped the last
    word of every description. Both are fixed and covered by tests.
-9. **L1 → L2** — unit `005-location`.
+9. ~~**L1 → L2** — unit `005-location`.~~ ✅ **BOTH DONE.** ~~**L1** — the
+   location share writes.~~ ✅ **DONE.** The fan-out, the payload, the OS
+   share sheet, the intent telemetry, and the app-user lookup are live; two
+   migrations landed (025 for the nullable all-or-nothing position, 026 for
+   the lookup function); 67 new unit tests and 37 SQL assertions. The
+   **prototype's "all your emergency contacts" sub-line was a lie** — the
+   behaviour is primaries only — and the build says
+   **আপনার সব প্রাইমারি কন্টাক্ট দেখতে পাবে**. **One defect was found while
+   building it** — the SQL suite's contact-id helper had a parameter named
+   `name` that **shadowed** the column `c.name`, so `where c.name = name`
+   compared the column to itself and the helper resolved an arbitrary
+   contact. The test was failing for a reason that had nothing to do with
+   the RPC. ~~**L2** — the location fix.~~ ✅ **DONE.** The fix is a
+   function called from the CTA handler, never from a mount effect, so the
+   prompt fires just-in-time; a denied permission degrades to manual entry
+   or a share without a location, and **both complete a share**. The
+   absence of background location, streaming, foreground services, and
+   receipts is asserted by a **source scan** that fails the build.
 10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
 11. **B4, R5, and the git remote** — release readiness.
 12. Final `pnpm verify` → **one** commit → push.
@@ -398,14 +416,16 @@ session.
 - `memory-bank/bolts/001`–`024` still say `status: planned` with no stage
   artifacts, although the code for their stories **is built**. Only bolts
   `025`–`027` have `implementation-plan.md` / `implementation-walkthrough.md` /
-  `test-walkthrough.md` and `status: complete`.
+  `test-walkthrough.md` and `status: complete`. Bolts `015`–`017`
+  (unit `005-location`) are the newest — their stories are complete but the
+  bolt records are still `planned`.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 15 stories are `complete`, 39 are `planned`.
+  authoritative source. 20 stories are `complete`, 34 are `planned`.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 15 story files
-  now say `true`; 39 still say `false`. The count is **39 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 20 story files
+  now say `true`; 34 still say `false`. The count is **34 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -434,21 +454,23 @@ apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              more-help*, station-map*
 apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              reportDetail, stations, geocode, flags, errors,
-                             profile, account), auth/ (useAuthSession,
-                             useAccountStatus, useBiometricGate,
-                             biometricService, authService,
+                             profile, account, locationShares), auth/
+                             (useAuthSession, useAccountStatus,
+                             useBiometricGate, biometricService, authService,
                              passwordResetService), wizard/
                              (ContactCaptureScreen), services/
                              (captureFlow, submitCapture, uploadQueue,
                              queueDrain, useQueueDrain, prepareMedia,
                              mediaPipeline, mediaSources, location,
                              dialer, permissions, usePermissions,
-                             permissionRecovery), i18n/ (bn.ts, en.ts), theme/, ui/
+                             permissionRecovery, locationFix, osShare,
+                             snapshotPayload, shareLocation, shareTelemetry),
+                             i18n/ (bn.ts, en.ts), theme/, ui/
                              (incl. StatusBanner, PermissionRow)
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         25 forward-only migrations
-supabase/tests/              7 SQL suites (306 assertions)
+supabase/migrations/         27 forward-only migrations
+supabase/tests/              8 SQL suites (343 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
