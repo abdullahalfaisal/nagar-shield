@@ -199,6 +199,11 @@ export const en: TranslationSchema = {
     uploading: 'Sending…',
     uploadFailed: 'Could not send — saved on your phone instead',
     savedOnDevice: 'Saved on your phone',
+    savedOnDeviceBody: 'Saved on device — will retry when network returns.',
+    savedOnDeviceCount: '{{count}} report(s) are saved on your phone.',
+    queueOverflow: 'Oldest saved report dropped',
+    queueOverflowBody:
+      'Your phone keeps only the 20 most recent unsent reports. The oldest one was dropped.',
     locationUnavailable: 'Location unavailable',
     locationUnavailableSub: 'It will be sent without location',
     locationAccuracy: 'Auto-detected · ±{{accuracy}} m',
@@ -350,6 +355,7 @@ export const en: TranslationSchema = {
     deleteBody:
       'Deleting your account signs you out. Sign in again within 30 days and it comes back — after that it is permanently deleted.',
     deleteConfirm: 'Delete it',
+    discardQueueWarning: '{{count}} unsent report(s) were saved on this phone. Signing out discards them.',
     version: 'Version',
   },
   more: {

@@ -389,6 +389,43 @@ curl -X POST "<project-url>/functions/v1/purge-media" \
 
 ---
 
+## The offline upload queue
+
+The queue lives in the **app sandbox** — a JSON file at
+`Paths.cache/nagar-shield-media/upload-queue.json`. It is never in
+AsyncStorage and it never holds the session token; the token is read fresh
+from the session at drain time.
+
+| Rule | Value |
+|---|---|
+| The bound | **20** items. The 21st evicts the **oldest**, and the eviction is reported to the user — a report is never dropped silently. |
+| The backoff | **30 s → 2 min → 8 min**, then the item is kept on the device. |
+| The attempt budget | **3**. After the third failure the item is retained with the "saved on device" state and is not retried automatically. |
+| The trigger | **connectivity regain** (`expo-network`) and **app foreground** (`AppState` → `active`). |
+| The drain | **Sequential** — one item at a time, in order. |
+| The idempotency key | Minted **once**, when the capture is first submitted, and reused for every retry of that item. |
+
+**Operational notes.**
+
+- **A queued report is evidence, not an error.** The UI shows "Saved on
+  device — will retry when network returns" as a *state*. There is no error
+  toast and no failure dialog; the evidence is safe and the user is told the
+  truth about it.
+- **A wrong device clock cannot strand a report.** The backoff is a floor,
+  not a wall: an item whose stored timestamp is more than 30 minutes ahead of
+  the current time is treated as due regardless. The schedule itself tops out
+  at 8 minutes, so the ceiling only fires for a genuinely unreachable
+  timestamp.
+- **Signing out discards the queue.** A queued item is scoped to the session
+  that created it and must never be uploaded under another account. The
+  Settings screen warns the user how many reports were discarded.
+- **A duplicate report is a privacy problem.** If a report appears twice in
+  History, the idempotency key was not reused — the retry sent a fresh
+  `client_request_id`, so `finalize_capture` saw no existing
+  `(author_id, client_request_id)` pair and inserted a second row.
+
+---
+
 ## The environment progression
 
 | Surface | Local | Staging | Production |

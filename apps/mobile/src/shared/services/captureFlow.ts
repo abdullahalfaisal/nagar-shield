@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { AppError, type PublicVisibility } from '@nagar-shield/shared';
 import { newClientRequestId, type PreparedMedia } from './mediaPipeline';
 import { prepareFile, preparePhoto, prepareVideo, type PickedAsset } from './prepareMedia';
-import { enqueueUpload } from './uploadQueue';
+import { enqueueUploadBounded } from './uploadQueue';
 import { submitCapture, type CaptureResult } from './submitCapture';
 
 /**
@@ -22,7 +22,7 @@ import { submitCapture, type CaptureResult } from './submitCapture';
 
 export type CaptureOutcome =
   | { status: 'sent'; result: CaptureResult }
-  | { status: 'queued' }
+  | { status: 'queued'; droppedOldest: boolean }
   | { status: 'cancelled' };
 
 export interface CaptureDraft {
@@ -85,7 +85,14 @@ export async function submitDraft(input: {
 
     // The upload failed on the network. The payload goes to the device queue
     // and the user is released immediately.
-    await enqueueUpload({
+    //
+    // The **same** `clientRequestId` goes with it. That key is the
+    // idempotency guarantee: the retry sends it again, so `finalize_capture`
+    // returns the original `report_id` rather than creating a second report.
+    // A fresh key here would let a submit whose response was lost in transit
+    // land twice.
+    const { dropped } = await enqueueUploadBounded({
+      clientRequestId,
       media: input.media,
       lat: input.draft.lat,
       lng: input.draft.lng,
@@ -94,7 +101,7 @@ export async function submitDraft(input: {
       publicVisibility: input.draft.publicVisibility,
     });
 
-    return { status: 'queued' };
+    return { status: 'queued', droppedOldest: dropped !== null };
   }
 }
 

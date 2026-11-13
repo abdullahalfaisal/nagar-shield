@@ -1,5 +1,5 @@
 import { Children, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme, useThemeControls } from '@/shared/theme';
@@ -234,7 +234,21 @@ export default function SettingsScreen() {
       <Text
         accessibilityRole="button"
         onPress={async () => {
-          await logOut();
+          const { discardedUploads } = await logOut();
+
+          // Unsent reports are discarded on sign-out — they are scoped to the
+          // session and must never be uploaded under another account. The user
+          // is told, because evidence that never landed is evidence they still
+          // need to know about.
+          if (discardedUploads > 0) {
+            Alert.alert(
+              t('settings.discardQueueWarning', { count: discardedUploads }),
+              undefined,
+              [{ text: t('common.done'), onPress: () => router.replace('/(auth)/welcome') }],
+            );
+            return;
+          }
+
           router.replace('/(auth)/welcome');
         }}
         style={[

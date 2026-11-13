@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { CAPTURE_DESCRIPTION_MAX_LENGTH } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
-import { BottomSheet, Button, Icon, Toggle } from '@/shared/ui';
+import { BottomSheet, Button, Icon, StatusBanner, Toggle } from '@/shared/ui';
 import { useCurrentFix } from '@/shared/services/location';
 import { useReverseGeocode, formatAddressLine } from '@/shared/api/geocode';
 import {
@@ -14,6 +14,7 @@ import {
   pickFromGallery,
 } from '@/shared/services/mediaSources';
 import { preparePickedMedia, useCaptureSubmit, type MediaKind } from '@/shared/services/captureFlow';
+import { useQueueDrain } from '@/shared/services/useQueueDrain';
 import type { PreparedMedia } from '@/shared/services/mediaPipeline';
 import { toBengaliDigits } from '@/shared/utils/relativeTime';
 
@@ -35,6 +36,17 @@ import { toBengaliDigits } from '@/shared/utils/relativeTime';
  * category is nullable at creation and the author sets it later from History
  * → Report detail. The prototype has no category field either, so adding one
  * would be a visible 1:1 port defect.
+ *
+ * **The queue states are surfaced here.** The screen mounts `useQueueDrain`, so
+ * the offline queue is drained on connectivity regain and on foreground. Two
+ * states are shown:
+ *
+ *   - **"Saved on device"** — reports are on the phone and will be sent when
+ *     the network returns. This is a *state*, not an error: the evidence is
+ *     safe, and the user is told the truth about it.
+ *   - **the overflow warning** — the queue's 20-item bound evicted the oldest
+ *     report. The user is told what was dropped, because silently deleting a
+ *     citizen's evidence is not acceptable.
  */
 export default function CaptureScreen() {
   const theme = useTheme();
@@ -50,6 +62,7 @@ export default function CaptureScreen() {
   const [pickerKind, setPickerKind] = useState<MediaKind>('photo');
   const [notice, setNotice] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [overflowed, setOverflowed] = useState(false);
 
   const { state: fixState } = useCurrentFix();
   const { data: geocode } = useReverseGeocode(
@@ -59,6 +72,10 @@ export default function CaptureScreen() {
   );
 
   const { isSubmitting, error, submit } = useCaptureSubmit();
+
+  // The drain is mounted on this screen so the queue actually empties. It
+  // runs off the render path — the capture screen is never blocked by it.
+  const { pending, savedOnDevice } = useQueueDrain();
 
   const counter = useMemo(() => `${description.length} / ${CAPTURE_DESCRIPTION_MAX_LENGTH}`, [
     description.length,
@@ -72,6 +89,15 @@ export default function CaptureScreen() {
     if (!sent) return;
     router.back();
   }, [sent, router]);
+
+  // The overflow warning. It is an alert rather than an inline banner because
+  // the screen navigates away the moment the capture is queued — an inline
+  // banner would be dismissed before it was ever read.
+  useEffect(() => {
+    if (!overflowed) return;
+
+    Alert.alert(t('capture.queueOverflow'), t('capture.queueOverflowBody'));
+  }, [overflowed, t]);
 
   const openPicker = useCallback((kind: MediaKind) => {
     setPickerKind(kind);
@@ -118,6 +144,15 @@ export default function CaptureScreen() {
         capturedAt: new Date().toISOString(),
       },
     });
+
+    if (outcome.status === 'queued' && outcome.droppedOldest) {
+      // The queue's 20-item bound evicted the oldest report. The warning has
+      // to outlive the navigation — the screen leaves as soon as the capture
+      // is queued — so it is an alert rather than an inline banner.
+      setOverflowed(true);
+      setSent(true);
+      return;
+    }
 
     if (outcome.status === 'sent' || outcome.status === 'queued') {
       setSent(true);
@@ -187,6 +222,27 @@ export default function CaptureScreen() {
             accessibilityLabel={t('capture.anonymous')}
           />
         </View>
+
+        {/*
+          The queue states. "Saved on device" is a **state**, not an error —
+          the evidence is safe and the user is told the truth about it. The
+          count is shown so the user knows how many reports are waiting.
+        */}
+        {savedOnDevice > 0 ? (
+          <StatusBanner
+            tone="saved"
+            title={t('capture.savedOnDevice')}
+            body={t('capture.savedOnDeviceCount', { count: savedOnDevice })}
+          />
+        ) : null}
+
+        {pending > 0 ? (
+          <StatusBanner
+            tone="saved"
+            title={t('capture.offlineTitle')}
+            body={t('capture.offlineBody')}
+          />
+        ) : null}
 
         {/* Upload cards */}
         <UploadCard

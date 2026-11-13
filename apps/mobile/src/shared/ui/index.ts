@@ -20,6 +20,7 @@ export { LocationPill } from './LocationPill';
 export { PulseDot } from './PulseDot';
 export { RadioGroup, RadioRow, ChoiceChip, CheckRow, type RadioReason } from './RadioGroup';
 export { Screen } from './Screen';
+export { StatusBanner, type StatusBannerTone } from './StatusBanner';
 export { SectionTitle, QuickActionGrid, ActionCard } from './SectionTitle';
 export { SegmentedTabs, type SegmentedTab } from './SegmentedTabs';
 export { SplashView } from './SplashView';

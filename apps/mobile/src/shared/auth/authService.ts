@@ -1,6 +1,7 @@
 import { AppError, signupSchema } from '@nagar-shield/shared';
 import { supabase } from '@/shared/api/supabase';
 import { fromSupabaseError } from '@/shared/api/errors';
+import { clearQueue } from '@/shared/services/uploadQueue';
 
 /**
  * Authentication operations.
@@ -174,9 +175,23 @@ export async function logIn({ identifier, password, rememberMe }: LoginParams): 
   }
 }
 
-export async function logOut(): Promise<void> {
+/**
+ * Signs the user out.
+ *
+ * The offline upload queue is **discarded** on the way out. A queued item is
+ * scoped to the session that created it: it must never be uploaded under
+ * another account, or one citizen's evidence would land in another citizen's
+ * history. The number of discarded items is returned so the caller can warn
+ * the user — evidence that was never sent is evidence the user still needs to
+ * know about.
+ */
+export async function logOut(): Promise<{ discardedUploads: number }> {
+  const discardedUploads = await clearQueue();
+
   const { error } = await supabase.auth.signOut();
   if (error) throw fromSupabaseError(error);
+
+  return { discardedUploads };
 }
 
 /**
