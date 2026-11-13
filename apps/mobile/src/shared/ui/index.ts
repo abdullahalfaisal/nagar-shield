@@ -12,6 +12,7 @@ export {
 } from './ContactAvatar';
 export { EmptyState } from './EmptyState';
 export { FlagSheet, type FlagSheetProps } from './FlagSheet';
+export { HistoryFilterSheet } from './HistoryFilterSheet';
 export { Icon, ICON_FONT, ICON_FONT_FILLED } from './Icon';
 export { InputField } from './InputField';
 export { ListRow, type IconTone } from './ListRow';

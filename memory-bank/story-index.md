@@ -44,16 +44,16 @@
 | 003-area-filter-chips | Area filter chips | 006-alerts | 018-alerts | must | planned |
 | 002-auto-refresh-and-pull-to-refresh | Auto-refresh + pull-to-refresh | 006-alerts | 019-alerts | must | planned |
 | 004-flag-an-alert | Flag an alert | 006-alerts | 019-alerts | must | planned |
-| 005-author-auto-hide | Author auto-hide (5 flags / 24 h) | 006-alerts | 019-alerts | should | planned |
-| 006-history-list | History list | 006-alerts | 020-alerts | must | planned |
-| 007-history-filters | History filters | 006-alerts | 020-alerts | must | planned |
-| 008-history-map | History map | 006-alerts | 021-alerts | should | planned |
-| 009-alert-detail-screen | Alert detail screen | 006-alerts | 021-alerts | must | planned |
+| 005-author-auto-hide | Author auto-hide (5 flags / 24 h) | 006-alerts | 019-alerts | should | complete |
+| 006-history-list | History list | 006-alerts | 020-alerts | must | complete |
+| 007-history-filters | History filters | 006-alerts | 020-alerts | must | complete |
+| 008-history-map | History map | 006-alerts | 021-alerts | should | complete |
+| 009-alert-detail-screen | Alert detail screen | 006-alerts | 021-alerts | must | complete |
 | 001-moderator-login-and-queue | Moderator login + queue | 007-moderation | 022-moderation | must | planned |
 | 002-report-review-detail | Report review detail | 007-moderation | 022-moderation | must | planned |
 | 003-restore-remove-decision | Restore / remove decision | 007-moderation | 023-moderation | must | planned |
 | 004-disable-a-user | Disable a user | 007-moderation | 023-moderation | must | planned |
-| 005-author-auto-hide-queue | Author-auto-hidden queue group | 007-moderation | 024-moderation | should | planned |
+| 005-author-auto-hide-queue | Author-auto-hidden queue group | 007-moderation | 024-moderation | should | complete |
 | 006-moderator-action-audit-log | Moderator action audit log | 007-moderation | 024-moderation | must | planned |
 | 001-media-purge-job | Media purge job (90-day) | 008-jobs-operations | 025-jobs-operations | must | complete |
 | 002-deleted-account-pii-purge | Deleted-account PII purge (30-day) | 008-jobs-operations | 025-jobs-operations | must | complete |

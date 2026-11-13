@@ -1,4 +1,5 @@
 import {
+  authorAutoHideBadge,
   formatAreaLine,
   formatCategoryLabel,
   formatDecisionLabel,
@@ -8,6 +9,7 @@ import {
   formatTimestamp,
   formatTimestampShort,
   isAuthorAutoHide,
+  isInAuthorAutoHideGroup,
   maskPhone,
   maskUploaderIdentity,
 } from '@/lib/format';
@@ -86,6 +88,41 @@ describe('isAuthorAutoHide', () => {
   it('is false for the per-report threshold and for a manual hide', () => {
     expect(isAuthorAutoHide('flag_threshold')).toBe(false);
     expect(isAuthorAutoHide('manual')).toBe(false);
+  });
+});
+
+describe('the author-auto-hide group', () => {
+  it('holds the reports hidden by the author rule', () => {
+    expect(isInAuthorAutoHideGroup('author_auto_hide')).toBe(true);
+    expect(isInAuthorAutoHideGroup('both')).toBe(true);
+  });
+
+  it('excludes the reports hidden by their own flag count', () => {
+    expect(isInAuthorAutoHideGroup('flag_threshold')).toBe(false);
+    expect(isInAuthorAutoHideGroup('manual')).toBe(false);
+  });
+});
+
+describe('the author-auto-hide badge', () => {
+  it('names the author rule on its own', () => {
+    expect(authorAutoHideBadge('author_auto_hide')).toBe('author');
+  });
+
+  it('names both causes when both rules applied', () => {
+    // A report that reached its own 3 flags AND was swept in by the author
+    // rule carries the 'both' badge — naming only one cause would misinform
+    // the moderator about why it is in the queue.
+    expect(authorAutoHideBadge('both')).toBe('both');
+  });
+
+  it('carries no badge for a report hidden by its own threshold', () => {
+    expect(authorAutoHideBadge('flag_threshold')).toBeNull();
+    expect(authorAutoHideBadge('manual')).toBeNull();
+  });
+
+  it('is distinct from the plain hide reason, so the two are separable at a glance', () => {
+    expect(authorAutoHideBadge('author_auto_hide')).not.toBe(authorAutoHideBadge('flag_threshold'));
+    expect(authorAutoHideBadge('both')).not.toBe(authorAutoHideBadge('author_auto_hide'));
   });
 });
 

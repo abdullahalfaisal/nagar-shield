@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **34 of 54 stories still carry `implemented: false`** — the
+built and verified. **28 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -37,10 +37,10 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
-| Database | **27 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **84 unit tests** |
+| Database | **30 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **343 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37) |
+| SQL test suites | **386 assertions pass** — `schema_contract` (18), `business_rules` (35), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -49,9 +49,12 @@ Every command below was run green against the local Supabase stack.
 | Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
 | Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
 | Report category | `tools/probe-report-category.cjs` — **22/22** over the real GoTrue + PostgREST path |
+| Public alert | `tools/probe-public-alert.cjs` — **14/14** over the real GoTrue + PostgREST + Storage path |
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html`. The **location-sharing** screen's CTA now performs a real share. |
+| History + alert detail | `app/(app)/history.tsx` (four tabs, one filter object, one query key), `history-map.tsx` (one shared wrapper), `alert-detail.tsx` (the projection omits `author_id` **entirely**) |
+| Source scans | `noChartCode.test.ts` (no chart — FR-NG-3 / FR-NG-4 / ADR-010), `noBulkActions.test.ts` (no bulk action — FR-MOD-3), `stationMap.test.ts` (one wrapper, one attribution, the 150 cap) — all **read code only**, and all fail the build |
 | Offline queue | `apps/mobile/src/shared/services/` — the sandbox queue, the backoff schedule, the drain, and the drain trigger. **70 new unit tests** across three suites. |
 | Permissions | `apps/mobile/src/shared/services/permissions.ts` + `permissionRecovery.ts` — the three-state read, the entry-point degradation rules, and the just-in-time recovery routing. **88 unit tests** across four suites. |
 | Location sharing | `apps/mobile/src/shared/services/` — the just-in-time fix, the snapshot payload, the OS share sheet, the fan-out, the intent telemetry, and the app-user lookup. **67 new unit tests** across four suites, plus 37 SQL assertions. |
@@ -68,8 +71,8 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 379 tests (268 mobile, 75 shared, 36 admin)
-pnpm db:test          # 343 SQL assertions
+pnpm test             # 467 tests (335 mobile, 84 shared, 48 admin)
+pnpm db:test          # 386 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
@@ -78,6 +81,7 @@ pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
 pnpm category:check   # 22 report-category probes (live GoTrue + PostgREST)
+pnpm alert:check      # 14 public-alert probes (live GoTrue + PostgREST + Storage)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -264,7 +268,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 34 of 54 stories
+## 4. What is NOT DONE — 28 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -310,18 +314,19 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| A1 | `history.tsx` — placeholder route. | [020] story 006 |
-| A2 | `alert-detail.tsx` — placeholder route (public alert detail, distinct from the author's own). | [021] story 009 |
-| A3 | History filters, history map, author-auto-hide. | [020–021] |
+| A1 | ✅ **FIXED** — the History screen is live. `app/(app)/history.tsx` carries the prototype's three segmented tabs — **ধরন** (the rows), **মোট** (the totals) and **বিতরণ** (the per-category counts) — plus the **My Reports** tab that unit `004` added for the author. The prototype's second sentence, *"Detailed map + filters coming soon,"* is **removed**: both ship in Phase 1, so the claim would have been false. The **বিতরণ** tab is a **list of counts** — never a chart, a bar, a percentage or a trend (FR-NG-3 / FR-NG-4 / ADR-010) — and a **source scan** (`src/__tests__/noChartCode.test.ts`) fails the build if a chart library or a chart-shaped identifier appears in the app. The scan reads **code only** — comments and string literals are stripped first — because the rule is *stated in prose* inside the very files it scans; a naive scan would fail on the rule itself. The own-reports branch is **independent of the radius and the window** (FR-HIST-3), and the rows route to the right surface: an own report opens the author's own detail, a neighbour opens the **public** alert detail. | [020] story 006 |
+| A2 | ✅ **FIXED** — the public alert detail is live. `app/(app)/alert-detail.tsx` renders the public projection, and the projection **omits `author_id` entirely** — not nulled, not renamed (FR-DATA-3 / FR-NG-5), so there is nothing for a render to pick up. The client type mirrors that, and `src/shared/api/alertDetail.test.ts` asserts the absence of every author-shaped key (`authorId` / `author_id` / `author` / `reporter` / `reporterId`) and that the serialised body contains no author uuid. The media paths are **author-token** paths, and a media whose URL cannot be signed is **dropped** rather than rendered broken. | [021] story 009 |
+| A3 | ✅ **FIXED** — the filters, the map, and the author auto-hide are live. **The filters**: one filter object, one query key — the list, the totals, the distribution and the map all move together, and a sheet that changes nothing does not re-query. **The map**: one shared wrapper, no fork — the attribution is owned by the wrapper, only `tile.openstreetmap.org` is contacted, and the marker set is capped at 150 keeping the markers **nearest the centre**. **The author auto-hide**: the transition lives in `public.flag_report` — one transaction, so a partial hide is impossible. **A real defect was found and fixed by migration 030**: the function counted `count(*)` over the author's flags, so **five flags on a single report** fired the auto-hide and swept in the author's other reports — exactly what the story forbids ("five flags on one report are one flagged report"). It now counts `count(distinct f.report_id)`, and the response carries **both** counts side by side (`author_flags_24h` and `author_flagged_reports_24h`) so the distinction is visible rather than implied. The old SQL test had encoded the wrong behaviour and was rewritten, and a new Test 10 asserts the negative case directly. The hide is `hidden_pending_review`, not `removed` — it is a moderator's to reverse. **The author still sees their own hidden reports**; the public hide never touches own-report visibility. | [020–021] |
 
 ### 4.7 Moderation — unit `007-moderation`
 
 | # | Gap | Where |
 |---|---|---|
-| M1 | Author-auto-hide queue group. | [024] story 005 |
+| M1 | ✅ **FIXED** — the author-auto-hide queue group is live. `apps/admin/app/queue/page.tsx` gained an **All pending / Author auto-hidden** filter with `aria-pressed`, a derived badge that separates the two causes (`author` / `both`), and the author's 24 h flag count **labelled apart from** the report's own flag count — a context number is not a verdict. The server already carried `hide_reason` and `author_flags_24h`, so **no migration and no new RPC** were needed; the gap was purely in the rendering. The queue offers **no bulk actions** at MVP (FR-MOD-3) — no "restore all", no multi-select, no shared note — and a **source scan** (`apps/admin/lib/noBulkActions.test.ts`) fails the build if one appears. | [024] story 005 |
 
 > The admin console's queue, report detail, restore/remove decision, disable-user
-> and audit log are **all built and working**. Only the auto-hide group is missing.
+> and audit log are **all built and working**, and the auto-hide group now
+> joins them.
 
 ---
 
@@ -402,8 +407,26 @@ Ordered by dependency. Bolt numbers in brackets.
    or a share without a location, and **both complete a share**. The
    absence of background location, streaming, foreground services, and
    receipts is asserted by a **source scan** that fails the build.
-10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
-11. **B4, R5, and the git remote** — release readiness.
+10. ~~**A1 → A2 → A3 → M1** — the alerts and moderation screen surfaces.~~ ✅ **ALL DONE.**
+    ~~**A1** — the History screen.~~ ✅ **DONE.** The three prototype tabs plus
+    My Reports; the distribution is a **list of counts**, protected by a
+    source scan that fails the build on any chart. ~~**A2** — the public alert
+    detail.~~ ✅ **DONE.** The projection omits `author_id` **entirely**, and
+    the client type mirrors that. ~~**A3** — the filters, the map, and the
+    author auto-hide.~~ ✅ **DONE.** One filter object and one query key; one
+    shared map wrapper, no fork; and the auto-hide transition in
+    `public.flag_report` inside **one** transaction. **A real defect was found
+    and fixed by migration 030** — the author tally counted flags, not
+    **distinct flagged reports**, so five flags on one report hid an author's
+    whole recent output. The old SQL test had encoded the wrong behaviour and
+    was rewritten; a new Test 10 asserts the negative case. ~~**M1** — the
+    admin auto-hide group.~~ ✅ **DONE.** A UI gap only — the server already
+    carried the fields — with a `both` badge and the two flag counts labelled
+    apart. **H1 and H2 remain** (see item 11).
+11. **H1 → H2 → B4, R5, and the git remote** — the help-seek surfaces and
+    release readiness. H2 (`station-map.tsx`) needs the shared MapLibre
+    wrapper; the wrapper's cap and attribution are already covered by
+    `stationMap.test.ts`.
 12. Final `pnpm verify` → **one** commit → push.
 
 ---
@@ -422,10 +445,10 @@ session.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 20 stories are `complete`, 34 are `planned`.
+  authoritative source. 26 stories are `complete`, 28 are `planned`.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 20 story files
-  now say `true`; 34 still say `false`. The count is **34 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 26 story files
+  now say `true`; 28 still say `false`. The count is **28 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -450,13 +473,14 @@ apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
                              location-permission
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              location-sharing, contacts, contact-editor,
-                             alerts, alert-detail*, history, report-detail,
-                             more-help*, station-map*
-apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
-                             reportDetail, stations, geocode, flags, errors,
-                             profile, account, locationShares), auth/
-                             (useAuthSession, useAccountStatus,
-                             useBiometricGate, biometricService, authService,
+                             alerts, alert-detail, history, history-map,
+                             report-detail, more-help*, station-map*
+apps/mobile/src/shared/      api/ (supabase, alerts, alertDetail, history,
+                             contacts, reportDetail, stations, geocode, flags,
+                             errors, profile, account, locationShares,
+                             wrongNumber), auth/ (useAuthSession,
+                             useAccountStatus, useBiometricGate,
+                             biometricService, authService,
                              passwordResetService), wizard/
                              (ContactCaptureScreen), services/
                              (captureFlow, submitCapture, uploadQueue,
@@ -464,21 +488,24 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              mediaPipeline, mediaSources, location,
                              dialer, permissions, usePermissions,
                              permissionRecovery, locationFix, osShare,
-                             snapshotPayload, shareLocation, shareTelemetry),
-                             i18n/ (bn.ts, en.ts), theme/, ui/
-                             (incl. StatusBanner, PermissionRow)
+                             snapshotPayload, shareLocation, shareTelemetry,
+                             historyFilters), i18n/ (bn.ts, en.ts), theme/,
+                             ui/ (incl. StatusBanner, PermissionRow,
+                             HistoryFilterSheet, StationMap)
 apps/admin/app/              login, queue, queue/[reportId], users, audit
+apps/admin/lib/              copy.ts, format.ts, api.ts
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         27 forward-only migrations
-supabase/tests/              8 SQL suites (343 assertions)
+supabase/migrations/         30 forward-only migrations
+supabase/tests/              9 SQL suites (386 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
-                             probe-disabled-write, probe-biometric-gate,
-                             probe-alternate-phone, probe-signup-contract,
-                             probe-password-reset, probe-contacts-crud,
-                             probe-report-category
+                             check-i18n-keys, probe-disabled-write,
+                             probe-biometric-gate, probe-alternate-phone,
+                             probe-signup-contract, probe-password-reset,
+                             probe-contacts-crud, probe-report-category,
+                             probe-public-alert, probe-server-side-write
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md

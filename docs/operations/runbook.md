@@ -123,7 +123,7 @@ the staging ones. The command exits non-zero when any assertion fails.
 
 #### The live database probes
 
-Seven of the checks prove behaviour that only exists over the wire, through
+Eight of the checks prove behaviour that only exists over the wire, through
 the door the app actually uses. They need the local stack running
 (`npx supabase start`) and are wired into the `rls-integration` CI job.
 
@@ -135,6 +135,7 @@ pnpm signup:check      # the signup contract
 pnpm reset:check       # the password-reset contract
 pnpm contacts:check    # the emergency-contacts CRUD contract
 pnpm category:check    # the report-category contract
+pnpm alert:check       # the public alert detail — no author anywhere
 ```
 
 `guard:check` proves that a moderator-disabled account is refused every
@@ -265,6 +266,114 @@ user's screen and the database disagreed with nothing to show the
 disagreement. Migration `20261105000024_update_category_forbidden.sql` now
 raises `FORBIDDEN` (42501) for a non-author — and for a report that does not
 exist, so the error cannot be used to enumerate report ids.
+
+`alert:check` is the public-surface probe. It finalizes a capture as one
+citizen and then reads the detail as **another** citizen, and asserts the
+whole privacy contract over the wire: the second citizen may resolve the
+public alert detail; the detail body carries **no `author_id` key** and **no
+author uuid** anywhere in it; the media path carries the **author token**,
+not the author's uuid; the second citizen may mint a signed URL for the
+media and the signed URL returns the bytes; the bucket is **not public**, so
+an unsigned read is refused; and an anonymous visitor is refused the detail
+outright.
+
+Those assertions are the point of the probe. A nulled `author_id` would pass
+"no author uuid in the body" while still naming the field — the projection
+has to **omit** the column, not blank it.
+
+---
+
+## The author auto-hide
+
+The hide is a **side effect of `flag_report`**, not a separate job. One
+transaction carries the rate limit, the flag insert, the 3-flag per-report
+threshold and the 5-distinct-flagged-reports author threshold. A failure at
+any step rolls the whole write back, so a partially applied hide is
+impossible.
+
+```
+one flag write
+   │
+   ├─ rate limit: 10 flags per hour, per user
+   ├─ insert the flag          ── duplicate → CONFLICT (a normal outcome)
+   ├─ ≥ 3 flags on this report → hidden_pending_review
+   └─ ≥ 5 DISTINCT flagged reports by this author in 24 h
+        └─ ALL of that author's reports from the last 24 h → hidden_pending_review
+```
+
+**The tally is over distinct reports, not over flags.** This is the whole
+point of the rule: five flags on one report are **one** flagged report, and
+that report was already handled by the 3-flag threshold. The shipped
+implementation counted flags and would have hidden an author's entire recent
+output for a single noisy report; migration
+`20261105000030_author_hide_distinct_reports.sql` fixed it by counting
+`count(distinct f.report_id)`.
+
+**Two windows, two meanings.** The **tally** counts flags created in the last
+24 h. The **scope** of the hide is the author's reports whose own age falls in
+the last 24 h. A report older than the window still counts toward the tally
+but is not itself hidden by this rule — it goes through the ordinary 3-flag
+path.
+
+**The hide is `hidden_pending_review`, not `removed`.** It is reversible by a
+moderator, exactly like the 3-flag hide. `removed` is a moderator-only
+decision.
+
+**The two causes stay separable.** The server derives `hide_reason` — a
+report that hit its own 3-flag threshold and was then swept in by the author
+rule carries `both`, so the console can tell "this report was flagged by
+people" from "this report was swept in because of its author".
+
+**The author still sees their own hidden reports.** Own-report visibility is
+not affected by the public hide: `alerts_feed` filters to `visible` /
+`restored`, while the author's own History branch is independent of the
+public hide.
+
+**No notification.** There is no FCM fanout, no email and no in-app notice to
+the author at MVP — push is Phase 2. The author discovers the hidden state
+through their own History.
+
+### Reading the flag response
+
+`flag_report` returns both author counts side by side, so the distinction is
+visible rather than implied:
+
+| Field | Meaning |
+|---|---|
+| `flag_count` | The flags on **this** report. |
+| `report_hidden` | The 3-flag state of this report. |
+| `author_flags_24h` | The author's **flag** count in the window — a context number, not a verdict. |
+| `author_flagged_reports_24h` | The author's **distinct flagged reports** in the window — the tally the hide uses. |
+| `author_hidden` | The author-hide state. |
+
+A duplicate flag, the author's own report and the hourly rate limit are all
+**normal outcomes**, returned as typed results (`duplicate`, `own_report`,
+`rate_limited`) rather than transport failures — the client shows the right
+message instead of an error toast.
+
+### The moderation queue
+
+The admin console's queue filters into **All pending** and **Author
+auto-hidden**, and each row carries a badge that separates the two causes
+plus the author's 24 h flag count **labelled apart from** the report's own
+flag count.
+
+**There are no bulk actions at MVP** (FR-MOD-3). No "restore all", no
+"remove all", no multi-select, no shared note — one report, one decision, one
+note. A **source scan** (`apps/admin/lib/noBulkActions.test.ts`) fails the
+build if one appears.
+
+### The two source scans
+
+Both scans read **code only** — comments and string literals are stripped
+before matching. The reason is not pedantry: the rules they protect are
+*stated in prose* inside the very files they scan, so a naive scan either
+fails on the rule itself or forces the rule out of the codebase.
+
+| Scan | Rule |
+|---|---|
+| `apps/mobile/src/__tests__/noChartCode.test.ts` | No chart library, no chart-shaped identifier, no SVG primitive (FR-NG-3 / FR-NG-4 / ADR-010). The History **বিতরণ** tab is a **list of counts** — never a chart, a bar, a percentage or a trend. |
+| `apps/admin/lib/noBulkActions.test.ts` | No bulk action, no multi-select, no shared note (FR-MOD-3). |
 
 ### 4. Staging
 
@@ -423,6 +532,61 @@ from the session at drain time.
   History, the idempotency key was not reused — the retry sent a fresh
   `client_request_id`, so `finalize_capture` saw no existing
   `(author_id, client_request_id)` pair and inserted a second row.
+
+---
+
+## The History surface
+
+History is the local read model: the caller's **own** reports plus the reports
+within the radius of the current fix over the window.
+
+**The four tabs.** ধরন (the rows), মোট (the totals for the current filter
+set), বিতরণ (the per-category counts) and **My Reports** (the author's own
+branch).
+
+**The filters are one object and one query key.** The list, the totals, the
+distribution and the map all move together, and no surface can serve a page
+from a stale filter. A sheet that changes nothing does **not** re-query — the
+result set is identical, and a needless request would only make the list
+flicker.
+
+**The own-reports branch is independent of the radius and the window**
+(FR-HIST-3). It is not a filter of the nearby set; it is the author's own
+reports, and it stays that way.
+
+**The rows route to different surfaces.** A row in **My Reports** opens the
+author's own detail, where the category is editable. A row in ধরন opens the
+**public** alert detail, because the neighbouring reports are the public
+projection and carry no author field at all.
+
+**বিতরণ is a list of counts.** Never a chart, a bar, a percentage or a trend
+— Nagar Shield is for live reports, not aggregator data (FR-NG-3 /
+FR-NG-4 / ADR-010). A source scan fails the build if a chart appears.
+
+**The map.** One shared wrapper, no fork. The attribution is owned by the
+wrapper, only `tile.openstreetmap.org` is contacted, and the marker set is
+capped at **150** — the markers kept are the ones **nearest the centre**, not
+the newest, because the centre is what the user is looking at.
+
+---
+
+## The public alert detail
+
+The public detail is a **projection**, and the projection **omits `author_id`
+entirely** — not nulled, not renamed (FR-DATA-3 / FR-NG-5). A nulled column
+would still be named `author_id`; the point is that the field does not exist
+in the public surface, so there is nothing for a render to pick up.
+
+The client type mirrors the projection, and a unit test asserts the absence
+of every author-shaped key (`authorId` / `author_id` / `author` / `reporter` /
+`reporterId`) and that the serialised body contains no author uuid.
+
+**The media paths are author-token paths.** A media whose URL cannot be
+signed is **dropped** from the list rather than rendered broken, and a detail
+with no media makes no signing call at all.
+
+**A signed URL is not a public URL.** The bucket is not public; an unsigned
+read is refused. The signed URL is minted per reader, per call.
 
 ---
 

@@ -1,4 +1,4 @@
-import { AppError, type PublicVisibility } from '@nagar-shield/shared';
+import { AppError, authorToken, type PublicVisibility } from '@nagar-shield/shared';
 import { supabase } from '@/shared/api/supabase';
 import { parseErrorBody } from '@/shared/api/errors';
 import { buildStoragePath, newClientRequestId, type PreparedMedia } from './mediaPipeline';
@@ -62,6 +62,7 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
     authorId,
     clientRequestId: submission.clientRequestId,
     fileName,
+    authorToken: await authorToken(authorId),
   });
 
   // (1) The bytes go straight to the bucket.

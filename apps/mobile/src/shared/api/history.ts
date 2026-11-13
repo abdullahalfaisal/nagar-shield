@@ -3,7 +3,6 @@ import {
   HISTORY_DEFAULT_RADIUS_KM,
   HISTORY_DEFAULT_WINDOW_HOURS,
   type AreaHierarchy,
-  type Paginated,
   type PublicReport,
   type ReportCategory,
 } from '@nagar-shield/shared';
@@ -35,6 +34,9 @@ export interface HistoryReport extends PublicReport {
   distanceM: number | null;
   /** True when the row is the signed-in user's own report. */
   isOwn: boolean;
+  /** The report's own coordinates — `null` when the row carries no geometry. */
+  lat: number | null;
+  lng: number | null;
 }
 
 interface HistoryRow {
@@ -48,6 +50,8 @@ interface HistoryRow {
   media_count: number;
   distance_m: number | null;
   is_own: boolean;
+  lat: number | null;
+  lng: number | null;
 }
 
 interface HistoryEnvelope {
@@ -55,7 +59,6 @@ interface HistoryEnvelope {
   next_cursor: string | null;
   total_count: number;
 }
-
 function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | null {
   if (!raw) return null;
   return {
@@ -80,10 +83,26 @@ function toHistoryReport(row: HistoryRow): HistoryReport {
     mediaCount: row.media_count,
     distanceM: typeof row.distance_m === 'number' ? row.distance_m : null,
     isOwn: Boolean(row.is_own),
+    lat: typeof row.lat === 'number' ? row.lat : null,
+    lng: typeof row.lng === 'number' ? row.lng : null,
   };
 }
 
-export async function fetchHistory(query: HistoryQuery): Promise<Paginated<HistoryReport>> {
+/**
+ * The History result envelope.
+ *
+ * `totalCount` is the number of rows the query matched — a **per-query
+ * result**, not an aggregate crime statistic. The client renders it as the
+ * **মোট** tab's single number and never as a trend, a rate, or a comparison
+ * (FR-NG-3 / FR-NG-4 / ADR-010).
+ */
+export interface HistoryPage {
+  items: HistoryReport[];
+  nextCursor: string | null;
+  totalCount: number;
+}
+
+export async function fetchHistory(query: HistoryQuery): Promise<HistoryPage> {
   const { data, error } = await supabase.rpc('history_nearby', {
     p_lat: query.lat,
     p_lng: query.lng,
@@ -99,13 +118,17 @@ export async function fetchHistory(query: HistoryQuery): Promise<Paginated<Histo
   const envelope = (data ?? { items: [], next_cursor: null, total_count: 0 }) as unknown as HistoryEnvelope;
   const items = (envelope.items ?? []).map(toHistoryReport);
 
-  return { items, nextCursor: envelope.next_cursor ?? null };
+  return {
+    items,
+    nextCursor: envelope.next_cursor ?? null,
+    totalCount: typeof envelope.total_count === 'number' ? envelope.total_count : items.length,
+  };
 }
 
 export function useHistory(
   query: HistoryQuery,
   options?: { enabled?: boolean },
-): UseQueryResult<Paginated<HistoryReport>, Error> {
+): UseQueryResult<HistoryPage, Error> {
   return useQuery({
     queryKey: ['history', query],
     queryFn: () => fetchHistory(query),

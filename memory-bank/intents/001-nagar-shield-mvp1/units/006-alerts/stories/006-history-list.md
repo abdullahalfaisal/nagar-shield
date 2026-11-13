@@ -2,11 +2,11 @@
 id: 006-history-list
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 006-history-list
@@ -47,6 +47,66 @@ implemented: false
 - **The body copy is localised in `bn` and `en`** and states the real defaults (1 km / 24 h) rather than promising features that are not built.
 - **The History screen owns no write path.** The report-detail entry point (including the author-only category edit) is unit 004's surface; this screen links to it and renders the read model.
 - **Testing.** Jest covers the relative-time formatter and the Bangla / English pair rendering on the History rows. A Supabase-local integration test covers the `history_nearby` radius / window / category filters, the own-reports branch, and the cursor pagination. A Maestro flow covers: open History → the default query is 1 km / 24 h → a filter change alters the result set → the map opens.
+
+## Implementation
+
+**Built 2026-11-13.** The screen is live at `apps/mobile/app/(app)/history.tsx`.
+
+- **The read model.** `apps/mobile/src/shared/api/history.ts` — `fetchHistory` calls
+  `history_nearby` with `{ p_lat, p_lng, p_radius_km, p_window_hours, p_category,
+  p_cursor, p_limit }`, mapping the envelope to `{ items, nextCursor, totalCount }`.
+  `useHistory` wraps it in `useQuery` with a 60 s stale window and the query key
+  `{ lat, lng, radiusKm, windowHours, category }`.
+- **The four tabs.** **ধরন** (the neighbour rows), **মোট** (the totals), **বিতরণ**
+  (the distribution counts), and **My Reports** — the author's own branch, added
+  by unit `004`'s `003-report-detail-and-category-edit`. The own branch is
+  independent of the radius and the window (FR-HIST-3); it is the RPC's `OR
+  author_id = auth.uid()` that makes this true, and the client does not re-filter
+  it.
+- **The distribution is counts in a list.** `countByCategory` derives the counts
+  from the rows the same query already returned, so the list and the count
+  cannot disagree. `CountRow` renders a label and a number — there is no width
+  computed from the count, which is what a bar would need.
+- **A row opens the right surface.** An own row opens the author's report detail
+  (where the category is editable); a neighbour row opens the **public** alert
+  detail, because the neighbouring reports are the public projection and carry
+  no author field at all.
+- **The location pill opens the filter sheet**, and the filter state is part of
+  the query key, so the list, the totals, the distribution, and the map all move
+  together.
+
+### Deviations from the story
+
+- **The prototype's second body sentence is removed**, as AC #8 requires — both
+  the map and the filters ship in Phase 1, so *"Detailed map + filters coming
+  soon."* would be a false claim in the shipped UI. The shipped copy states the
+  real defaults instead.
+- **A fourth tab is present.** The prototype's screen 21 has no "my reports"
+  tab; unit `004`'s `003-report-detail-and-category-edit` AC #1 asks for the
+  author's own report to be reachable from History. The two branches coexist
+  rather than compete, and the story's own Technical Notes already record this.
+- **The `history_nearby` RPC is `bolt-006-alerts-3`'s**, but the migration that
+  carries it is `supabase/migrations/0005_alerts.sql`. The story's dependency
+  list names the migration file, which is the durable reference.
+
+### Verification
+
+- `apps/mobile/src/shared/api/history.test.ts` — 8 Jest tests: the counts sum to
+  the row count; a `null` category is its own bucket, kept separate from
+  `'other'`; every count is an integer ≥ 1; no entry carries a `percentage`, a
+  `share`, a `trend`, a `series`, `points`, `height`, or a `percent`.
+- `apps/mobile/src/__tests__/noChartCode.test.ts` — 9 Jest tests: a **source
+  scan** over `app/` and `src/` that fails the build on any chart code, any
+  charting library in the dependency tree, any SVG chart primitive, any chart
+  route, and any chart-shaped identifier. The scan reads **code only** —
+  comments and string literals are stripped first — because the rule is stated
+  in prose in several places, and a scan that matched those would either fail on
+  the rule itself or force the rule to be hidden from the codebase.
+- `supabase/tests/history.sql` — the SQL-side assertions for the radius, the
+  window, the category filter, the own-reports branch, and the cursor
+  pagination.
+- `pnpm alert:check` — the live probe, which finalises a capture, resolves the
+  public detail as a **different** citizen, and asserts the privacy properties.
 
 ## Dependencies
 

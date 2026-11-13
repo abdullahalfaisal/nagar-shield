@@ -22,6 +22,10 @@ interface StationMapProps {
   children?: ReactNode;
   /** Shows the OSM attribution. Mandatory whenever the map renders. */
   attribution?: string;
+  /** The user's own position — drawn as a distinct "you are here" marker. */
+  userLocation?: { lat: number; lng: number } | null;
+  /** Rendered over the canvas — the empty state, the offline notice. */
+  overlay?: ReactNode;
 }
 
 export interface StationMarker {
@@ -31,6 +35,44 @@ export interface StationMarker {
   title: string;
   subtitle?: string;
   onPress?: () => void;
+}
+
+/**
+ * The documented marker cap.
+ *
+ * A dense filter set (5 km over 30 days) can return hundreds of reports, and
+ * one native marker per report would freeze the map. The cap keeps the render
+ * responsive. It never silently drops a report from the **list** — the list
+ * remains the complete view, and the map is the spatial overview
+ * (`008-history-map`).
+ */
+export const MAP_MARKER_CAP = 150;
+
+/**
+ * Caps the marker set, keeping the ones nearest the centre.
+ *
+ * The cap is applied by **distance from the centre**, not by row order, so the
+ * markers that survive are the ones the user is actually looking at. A
+ * half-sorted list would show the cap's worth of whichever reports happened to
+ * be newest.
+ */
+export function capMarkers(
+  markers: StationMarker[],
+  center: { lat: number; lng: number },
+  cap: number = MAP_MARKER_CAP,
+): StationMarker[] {
+  if (markers.length <= cap) return markers;
+
+  return [...markers]
+    .map((marker) => ({
+      marker,
+      // A cheap planar distance is enough for a *selection* heuristic — the
+      // marker is still placed at its true coordinate.
+      distance: (marker.lat - center.lat) ** 2 + (marker.lng - center.lng) ** 2,
+    }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, cap)
+    .map((entry) => entry.marker);
 }
 
 /**
@@ -46,16 +88,24 @@ export function StationMap({
   markers,
   children,
   attribution = '© OpenStreetMap contributors',
+  userLocation = null,
+  overlay = null,
 }: StationMapProps) {
   const theme = useTheme();
 
   return (
     <View style={styles.root}>
       <View style={[styles.canvas, { backgroundColor: theme.colors.ink[100] }]}>
-        <MapCanvas center={center} zoom={zoom} markers={markers} />
+        <MapCanvas
+          center={center}
+          zoom={zoom}
+          markers={capMarkers(markers, center)}
+          userLocation={userLocation}
+        />
         <View style={styles.attribution}>
           <Text style={styles.attributionText}>{attribution}</Text>
         </View>
+        {overlay ? <View style={styles.overlay}>{overlay}</View> : null}
       </View>
       {children ? <ScrollView style={styles.list}>{children}</ScrollView> : null}
     </View>
@@ -73,10 +123,12 @@ function MapCanvas({
   center,
   zoom,
   markers,
+  userLocation,
 }: {
   center: { lat: number; lng: number };
   zoom: number;
   markers: StationMarker[];
+  userLocation: { lat: number; lng: number } | null;
 }) {
   const theme = useTheme();
   const MapLibre = requireMapLibre();
@@ -112,6 +164,11 @@ function MapCanvas({
           <View style={[styles.pin, { backgroundColor: theme.palette.violet[600] }]} />
         </MapLibre.Marker>
       ))}
+      {userLocation ? (
+        <MapLibre.Marker id="user-location" lngLat={[userLocation.lng, userLocation.lat]}>
+          <View style={[styles.userPin, { backgroundColor: theme.palette.sky[600] }]} />
+        </MapLibre.Marker>
+      ) : null}
     </MapLibre.Map>
   );
 }
@@ -172,6 +229,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  userPin: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
   attribution: {
     position: 'absolute',

@@ -19,6 +19,7 @@
  *   * `enums/`   — the fixed vocabularies the schemas depend on
  *   * `schemas/` — the Zod contracts, shared with the mobile client
  *   * `jobs/`    — the retention rules and the tombstone builder
+ *   * `storage/` — the author token, which the capture write path computes
  *
  * Usage:
  *   node tools/mirror-shared-to-functions.cjs            # write the mirror
@@ -35,7 +36,7 @@ const SOURCE_ROOT = path.join(ROOT, 'packages', 'shared', 'src');
 const TARGET_ROOT = path.join(ROOT, 'supabase', 'functions', '_shared', 'vendor');
 
 /** The modules the Edge Functions consume. */
-const MODULES = ['errors', 'enums', 'schemas', 'jobs'];
+const MODULES = ['errors', 'enums', 'schemas', 'jobs', 'storage'];
 
 const CHECK_ONLY = process.argv.includes('--check');
 

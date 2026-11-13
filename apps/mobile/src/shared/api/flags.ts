@@ -7,11 +7,26 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * The flag write path — the only write unit `006` owns.
  *
  * The server owns the rate limit (10 flags per hour), the 3-flag auto-hide and
- * the 5-flag author auto-hide. The client only maps the outcome to a stable
- * code and shows it; it never counts flags itself.
+ * the 5-distinct-flagged-reports author auto-hide. The client only maps the
+ * outcome to a stable code and shows it; it never counts flags itself.
+ *
+ * The two author counts are kept apart because they mean different things.
+ * `authorFlags24h` is the number of **flags**; `authorFlaggedReports24h` is
+ * the number of **distinct flagged reports**, and it is the latter that decides
+ * the hide. A single heavily-flagged report is one flagged report however many
+ * times it was flagged.
  */
 export type FlagOutcome =
-  | { status: 'ok'; reportHidden: boolean; authorHidden: boolean; flagCount: number }
+  | {
+      status: 'ok';
+      reportHidden: boolean;
+      authorHidden: boolean;
+      flagCount: number;
+      /** The author's flag count in the last 24 h — a context number, not a verdict. */
+      authorFlags24h: number;
+      /** The author's DISTINCT flagged reports in the last 24 h — the tally the hide uses. */
+      authorFlaggedReports24h: number;
+    }
   | { status: 'duplicate' }
   | { status: 'own_report' }
   | { status: 'rate_limited'; retryAfterSec: number };
@@ -21,6 +36,8 @@ interface FlagResponse {
   flag_count?: number;
   report_hidden?: boolean;
   author_hidden?: boolean;
+  author_flags_24h?: number;
+  author_flagged_reports_24h?: number;
   retry_after_sec?: number;
 }
 
@@ -48,6 +65,8 @@ export async function flagReport(reportId: string, reason: FlagReason): Promise<
         reportHidden: Boolean(body.report_hidden),
         authorHidden: Boolean(body.author_hidden),
         flagCount: body.flag_count ?? 0,
+        authorFlags24h: body.author_flags_24h ?? 0,
+        authorFlaggedReports24h: body.author_flagged_reports_24h ?? 0,
       };
     case 'duplicate':
       return { status: 'duplicate' };

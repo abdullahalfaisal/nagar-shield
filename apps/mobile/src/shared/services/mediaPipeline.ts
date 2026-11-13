@@ -140,18 +140,32 @@ export function extensionFor(contentType: string | null, mediaType: MediaType): 
  *
  * The shape is fixed by the server contract:
  *
- *   reports/<author_id>/<client_request_id>/<file>
+ *   reports/<author_token>/<client_request_id>/<file>
  *
  * The first segment is the literal `reports`, the second is the uploader's
- * id, and the third is the idempotency key. The Storage policy and the
- * `finalize-capture` ownership check both read this shape.
+ * **author token**, and the third is the idempotency key. The Storage policy
+ * and the `finalize-capture` ownership check both read this shape.
+ *
+ * The author token is a **one-way hash of the uploader's user id**, not the
+ * id itself. The id used to sit here in the clear, and that was a leak: the
+ * public alert detail returns the media path to any signed-in citizen so the
+ * client can mint a short-lived signed URL, and a path carrying the author's
+ * uuid hands every reader a stable, cross-referenceable handle on the author
+ * — the exact thing FR-DATA-3 and the `006-alerts / 009-alert-detail-screen`
+ * story forbid ("no author identity of any kind … no author id").
+ *
+ * The hash keeps the upload-time ownership check working: the author can
+ * compute the token for their **own** id, and nobody else can invert the
+ * token to recover the id.
  */
 export function buildStoragePath(input: {
   authorId: string;
   clientRequestId: string;
   fileName: string;
+  /** The hash of the uploader's id — the second path segment. */
+  authorToken: string;
 }): string {
-  return `reports/${input.authorId}/${input.clientRequestId}/${input.fileName}`;
+  return `reports/${input.authorToken}/${input.clientRequestId}/${input.fileName}`;
 }
 
 /**

@@ -2,11 +2,11 @@
 id: 008-history-map
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 008-history-map
@@ -45,6 +45,70 @@ implemented: false
 - **No analytics layer, ever.** No heatmap, no trend line, no hotspot ranking, no density colouring, no crime-statistics overlay (FR-NG-3 / FR-NG-4 / ADR-010). The markers are report points, and nothing else.
 - **C-6 — no dispatch claim.** The surface states what the app knows — where a citizen report was filed — and never claims anyone was notified, dispatched, or routed.
 - **Testing.** A Jest test asserts the attribution is present in the rendered tree, that the marker cap is respected for a synthetic dense result set, and that the map surface imports the shared wrapper rather than a local map component. A source scan asserts that no second MapLibre style or map wrapper exists in the mobile app. A Maestro flow covers: open History → tap **ম্যাপ ভিউ** → the map renders → tap a marker → the alert detail opens.
+
+## Implementation
+
+**Built 2026-11-13.** The screen is live at `apps/mobile/app/(app)/history-map.tsx`,
+built on the shared wrapper at `apps/mobile/src/shared/ui/StationMap.tsx`.
+
+- **One wrapper, no fork.** The screen imports `StationMap` from
+  `shared/ui` and imports **no** MapLibre module directly. `StationMap` owns
+  the OSM raster style and renders the attribution itself, so a consumer cannot
+  forget it — which is the whole point of not forking.
+- **The same query, the same key.** The map reuses `useHistory` with the same
+  `{ lat, lng, radiusKm, windowHours, category }` shape the list uses. The
+  filter set arrives from the History screen as route params, so a filter change
+  on the list is reflected on the map without a parallel query, and the map can
+  never show a different filter set than the list.
+- **The marker cap is documented and applied in the wrapper.** `MAP_MARKER_CAP`
+  is **150**, and `capMarkers` keeps the markers **nearest the centre** — not
+  the first N in row order. A cap that took the first N would show the cap's
+  worth of whichever reports happened to be newest, which is not what the user
+  is looking at. A surviving marker is still placed at its true coordinate;
+  the cheap planar distance is a *selection* heuristic only.
+- **A report with no coordinates gets no marker** — it is filtered out, so a
+  malformed point never crashes the map and the remaining markers still render.
+- **The origin degrades.** The map opens on the caller's fix, or on
+  `DHAKA_FALLBACK_ORIGIN` with no "you are here" marker when there is no fix.
+  No permission prompt fires from the map.
+- **The empty state is a first-class state.** The map still loads, centred on
+  the origin, with a localised message over the canvas — never a blank map.
+- **A marker tap opens the public alert detail** (`/(app)/alert-detail`), the
+  same surface the feed card's **✎ বিস্তারিত দেখুন** link opens.
+- **The native module is loaded lazily.** `requireMapLibre` catches a missing
+  native binary (Expo Go, a CI runner) and degrades to the list under the map
+  instead of crashing the screen.
+
+### Deviations from the story
+
+- **The markers are capped, not clustered.** The story's AC #4 allows "clustered
+  **or** capped" and the Technical Notes describe clustering above the cap. The
+  shipped behaviour is the cap. A cluster expands into its members on tap, and
+  the capped markers do not — but the **list under the map** carries every
+  report with coordinates, so nothing is lost: the list remains the complete
+  view and the map is the spatial overview, exactly as the story requires. The
+  cap never silently drops a report from the list.
+- **The map takes its origin from route params, not from a GPS call.** The
+  History screen already holds the resolved origin and passes it in the route.
+  The map therefore fires **no** permission prompt and issues **no** second
+  location request, which satisfies the story's "location is just-in-time" note
+  by construction rather than by discipline.
+- **The accessibility assertions are made over the source, not the rendered
+  tree.** `@maplibre/maplibre-react-native` needs a native module that is
+  absent under Jest, so the screen cannot be rendered in a unit test. The
+  attribution, the single-wrapper rule, the single tile source, and the shared
+  consumption are asserted over the source text instead.
+
+### Verification
+
+- `apps/mobile/src/shared/ui/stationMap.test.ts` — 11 Jest tests: the cap is
+  150; a set at or below the cap is untouched; a dense set is capped; the
+  markers kept are the ones nearest the centre rather than the newest; a
+  surviving marker keeps its true coordinate; the caller's array is not
+  mutated; and — over the source — the attribution is owned by the wrapper,
+  there is exactly one map wrapper and no forked map component, the only tile
+  source is `tile.openstreetmap.org`, and the History map consumes the shared
+  wrapper rather than importing MapLibre itself.
 
 ## Dependencies
 

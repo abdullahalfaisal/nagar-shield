@@ -66,7 +66,7 @@ implemented: true
 - Unit `001-foundation` — the pnpm workspace, the typed Supabase client, the shared Zod contracts, and the CI workflow this job's tests run inside
 - Unit `004-capture` — the `reports` / `report_media` tables, the `storage_path` contract, the **private** `report-media` bucket this job deletes from, and the `geocode_cache` table the sibling cleanup job evicts
 - Unit `002-identity` — `profiles.id` as `reports.author_id`, so the retained report metadata keeps its identity FK
-- `007-storage-upload-and-finalize` — the upload path that creates the `report_media` rows and the `reports/{user_id}/{uuid}.jpg` storage-path policy this job deletes from
+- `007-storage-upload-and-finalize` — the upload path that creates the `report_media` rows and the `reports/{author_token}/{client_request_id}/{file}` storage-path policy this job deletes from
 - `004-exif-strip-and-media-caps` — the per-file byte caps that keep the worklist inside the 1 GB quota between purge runs
 - `bolt-008-jobs-operations-1` — `supabase/migrations/0007_jobs.sql`: the `job_runs` table, the `report_media.purged_at` column, the `reports.deleted_at` column, and the age-scan index
 - `bolt-008-jobs-operations-2` — the shared `job-runner` helper and the `purge-media` Edge Function shell

@@ -2,11 +2,11 @@
 id: 005-author-auto-hide
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: should
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 005-author-auto-hide
@@ -42,6 +42,83 @@ implemented: false
 - **The client invalidates the feed on the response flag.** `report_hidden` / `author_hidden` drive `queryClient.invalidateQueries` so the hidden cards leave the feed without waiting for the next 60 s poll.
 - **The threshold constants are named constants,** not inline literals: `FLAG_HIDE_THRESHOLD = 3`, `AUTHOR_HIDE_FLAG_COUNT = 5`, `AUTHOR_HIDE_WINDOW_HOURS = 24`, `FLAG_RATE_LIMIT_PER_HOUR = 10`. The values are asserted in a shared test so the client copy, the function, and the docs cannot drift.
 - **Testing.** A Supabase-local integration test seeds one author with 5 flagged reports inside 24 h, flags the 5th, and asserts that **all** of the author's reports from the last 24 h are `hidden_pending_review` and that they are absent from `alerts_feed`. A second test asserts that 5 flags on a **single** report do **not** trigger the author auto-hide. A third test asserts the author's own report is still returned by `history_nearby` for that author.
+
+## Implementation
+
+**Built 2026-11-13.** The transition lives in `public.flag_report`
+(`supabase/migrations/20261105000003_functions.sql`), as the story describes:
+one transaction, the rate limit, the flag insert, the 3-flag threshold, and the
+author auto-hide.
+
+- **The response carries the flag state.** `flag_report` returns
+  `{ status, flag_count, report_hidden, author_flags_24h, author_reports_hidden }`
+  — `report_hidden` reflects the 3-flag state and `author_reports_hidden` the
+  author-hide count, so the client invalidates the feed query immediately.
+- **The hide is `hidden_pending_review`, not `removed`.** The update only
+  touches rows that are `visible` or already `flag_threshold`, so a report a
+  moderator already `removed` is never resurrected into the pending state, and
+  a `restored` report is not dragged back either.
+- **The `both` badge is derived on the server.** A report that hit its own
+  3-flag threshold and was then swept in by the author rule carries
+  `hide_reason = 'both'`, so the two causes stay separable in the console.
+- **The window is the flag's age, not the report's age.** The tally counts
+  flags created in the last 24 h; the hide's scope is the author's reports from
+  the last 24 h. A report older than the window still counts toward the tally
+  but is not itself hidden by this rule.
+
+### A real defect, found and fixed: the count was over flags, not over flagged reports
+
+The story is explicit — *"5 flagged reports means 5 distinct reports, not 5
+flags"*, and *"Five flags on one report are one flagged report — and that report
+was already handled by the 3-flag threshold. This distinction is the whole
+point of the rule."*
+
+The implementation counted `count(*)` over the author's flags, so **five flags
+on a single report fired the author auto-hide and swept in the author's other
+reports**. One heavily-flagged report was enough to hide an author's whole
+recent output. Migration `20261105000030_author_hide_distinct_reports.sql`
+replaces the function with one that counts `count(distinct f.report_id)`.
+
+The response keeps `author_flags_24h` — the flag count, which the console shows
+as the author's flag total — and adds `author_flagged_reports_24h`, the
+**distinct report** count that actually decides the hide. The two are reported
+side by side so the distinction is visible rather than implied.
+
+The response also gains `author_hidden`, the field the story names and the
+mobile client already reads. The old `author_reports_hidden` (a count) is kept
+alongside it, so nothing is lost.
+
+The old SQL test had encoded the wrong behaviour: it cast five flags across
+**three** distinct reports and asserted that the hide fired. It now asserts the
+correct rule in two stages — three distinct flagged reports do **not** fire the
+hide, and the fifth distinct one does.
+
+### The client side
+
+`apps/mobile/src/shared/api/flags.ts` maps the outcome to a stable code and
+never counts flags itself. `FlagOutcome` carries `reportHidden` (the 3-flag
+state), `authorHidden` (the author-hide state), `authorFlags24h`, and
+`authorFlaggedReports24h` — the two counts kept apart, because a single
+heavily-flagged report is one flagged report however many times it was
+flagged. A duplicate flag, the author's own report, and the rate limit are all
+**normal outcomes** returned as typed results, not transport failures.
+
+### Verification
+
+- `supabase/tests/business_rules.sql` — Test 2 asserts the author rule fires on
+  the **fifth distinct** flagged report and not before; that **every** report
+  the author filed in the window is hidden, including one with **zero flags of
+  its own**; and that a report that hit both rules carries `hide_reason =
+  'both'`. Test 10 asserts the negative case directly: five flags on **one**
+  report is one flagged report, the author auto-hide does **not** fire, the
+  sibling reports stay `visible`, and the response reports both counts.
+- `apps/mobile/src/shared/api/flags.test.ts` — 10 Jest tests: the RPC is called
+  with the report id and the reason; the 3-flag and author-hide states are
+  carried; the flag count and the distinct-report count stay apart; a
+  duplicate, an own-report, and a rate limit are typed **outcomes** rather
+  than errors; the rate limit carries its retry hint; an unknown status
+  throws rather than pretending it succeeded; and a failed write throws the
+  mapped error.
 
 ## Dependencies
 

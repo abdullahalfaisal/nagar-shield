@@ -2,11 +2,11 @@
 id: 007-history-filters
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 007-history-filters
@@ -46,6 +46,59 @@ implemented: false
 - **The filter summary is visible outside the sheet.** The pill (or a summary line under it) reflects the active filters so the user can see what the list is showing without reopening the sheet.
 - **The 2 s budget survives a filter change.** The filtered query is the same index-backed query with a narrower predicate, so it is no slower than the default view; the skeleton is shown for the filtered load as well.
 - **Testing.** Jest covers the option → parameter mapping (all four radii, all four windows, the 11 categories plus none), the draft / commit / cancel semantics of the sheet, and the reset action. A Supabase-local integration test covers `history_nearby` with each radius, each window, and a category filter, and asserts the result set changes. A Maestro flow covers: open History → open the filter sheet → change the radius → the result set changes → reset → the default result set returns.
+
+## Implementation
+
+**Built 2026-11-13.** The sheet is live at `apps/mobile/src/shared/ui/HistoryFilterSheet.tsx`,
+driven by `apps/mobile/src/shared/services/historyFilters.ts`.
+
+- **One filter object, three consumers.** `HistoryFilters` is `{ radiusKm: number;
+  windowHours: number; category: ReportCategory | null }` — the sheet's draft, the
+  query key, and the RPC arguments all read the same shape. The sheet edits a
+  **draft** and commits it on confirm, so a cancelled sheet changes nothing.
+- **The defaults come from the shared constants.** `DEFAULT_HISTORY_FILTERS` is
+  `{ radiusKm: HISTORY_DEFAULT_RADIUS_KM, windowHours: HISTORY_DEFAULT_WINDOW_HOURS,
+  category: null }` — 1 km and 24 h (FR-HIST-1). `resetHistoryFilters()` returns a
+  **fresh object** each time, so a caller cannot corrupt the default by mutating
+  the result.
+- **The options are fixed.** `HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5]`,
+  `HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720]`, and `HISTORY_CATEGORY_OPTIONS`
+  is the **shared** `REPORT_CATEGORIES` — the same list the author can set from
+  the report detail. One vocabulary; a second list is how two screens start
+  disagreeing about what "accident" means.
+- **A null category is a first-class value.** `historyFiltersEqual` treats
+  `null` and `'other'` as **different** filters, and `historyQueryKey` carries
+  the null through — the RPC receives a null, never the string `"null"`.
+- **The query key carries every filter.** `historyQueryKey(origin, filters)`
+  returns `{ lat, lng, radiusKm, windowHours, category }` — a plain object so
+  React Query compares it structurally. Any filter change, or a change of
+  origin, produces a distinct cache entry.
+- **A no-op confirm does not re-query.** `historyFiltersEqual` gates the commit
+  in the screen, so selecting the radius that is already active closes the
+  sheet without a request.
+
+### Deviations from the story
+
+- **Three label helpers were removed from the filter module.** An earlier
+  `historyFilters.ts` carried `formatRadiusLabel`, `formatWindowLabel`, and
+  `formatFilterSummary`. They were **dead code** — the sheet labels its options
+  inline from the shared `history.metres` / `history.days` / `history.hours`
+  i18n keys — so they were deleted rather than tested. The "filter summary is
+  visible outside the sheet" behaviour the Technical Notes describe is carried
+  by the location pill, which shows the active category alongside the origin
+  coordinates.
+
+### Verification
+
+- `apps/mobile/src/shared/services/historyFilters.test.ts` — 16 Jest tests: the
+  defaults are 1 km / 24 h / null and match the shared constants; `resetHistoryFilters`
+  restores them and returns a fresh object; the option lists are exactly the
+  three fixed sets; `historyFiltersEqual` distinguishes a changed radius, a
+  changed window, a changed category, and `null` from `'other'`; and
+  `historyQueryKey` changes with any filter or with the origin, and is
+  structurally comparable.
+- `supabase/tests/history.sql` — the SQL-side assertions for each radius, each
+  window, and a category filter, and that the result set changes.
 
 ## Dependencies
 

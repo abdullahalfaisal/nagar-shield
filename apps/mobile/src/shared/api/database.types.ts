@@ -509,6 +509,17 @@ export interface Database {
         };
         Returns: Json;
       };
+      /**
+       * The public alert detail for one visibly-moderated report.
+       *
+       * Carries no author id and no author display name unless the report was
+       * filed as `identified` (FR-DATA-3 / FR-NG-5). Returns `null` for a
+       * removed or deleted report.
+       */
+      alert_detail: {
+        Args: { p_report_id: string };
+        Returns: Json;
+      };
       moderation_queue: {
         Args: { p_cursor?: string | null; p_limit?: number };
         Returns: Json;

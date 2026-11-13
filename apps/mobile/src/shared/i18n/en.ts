@@ -314,6 +314,15 @@ export const en: TranslationSchema = {
     uncategorised: 'Not categorised',
     readOnly: 'Read only',
     reportNotFound: 'That report could not be found',
+    // The public alert detail.
+    detailUnavailableTitle: 'This report is no longer available',
+    detailUnavailableBody:
+      'The moderation team removed it, or it was deleted before you opened it.',
+    detailNote:
+      'This is a report filed by a citizen — not a verified incident. The app has not notified any authority.',
+    absoluteTimeLabel: 'Exact time',
+    mediaLabel: 'Report photo',
+    categoryLabel: 'Incident type',
     historyMyReports: 'My reports',
     historyNearby: 'Nearby',
     noOwnReports: 'You have no reports yet',
@@ -326,6 +335,7 @@ export const en: TranslationSchema = {
     distributionTab: 'Distribution',
     scopeNote: 'Reports you file and recent reports within 1 km in the last 24 hours.',
     filtersTitle: 'Filters',
+    filterHelper: 'Change the radius, the time window, or the incident type.',
     radiusLabel: 'Radius',
     windowLabel: 'Time window',
     categoryLabel: 'Category',
@@ -337,6 +347,8 @@ export const en: TranslationSchema = {
     mapTitle: 'Area map',
     mapUnavailable: 'Map tiles are unreachable — showing the list',
     hours: '{{count}} h',
+    days: '{{count}} d',
+    metres: '{{count}} m',
     km: '{{count}} km',
     apply: 'Apply',
     reset: 'Reset',

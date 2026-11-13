@@ -34,7 +34,8 @@
     "reset:check": "node tools/probe-password-reset.cjs",
     "contacts:check": "node tools/probe-contacts-crud.cjs",
     "category:check": "node tools/probe-report-category.cjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm maestro:check && pnpm fn:typecheck",
+    "alert:check": "node tools/probe-public-alert.cjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm alert:check && pnpm maestro:check && pnpm fn:typecheck",
     "mobile": "pnpm --filter @nagar-shield/mobile",
     "admin": "pnpm --filter @nagar-shield/admin",
     "shared": "pnpm --filter @nagar-shield/shared"

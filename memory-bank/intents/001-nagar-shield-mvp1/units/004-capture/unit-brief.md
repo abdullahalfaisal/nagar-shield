@@ -168,7 +168,7 @@ Notes on the schema:
 | `stripExif` | Removes embedded EXIF (GPS in particular) from the captured or imported media and replaces the location with the **app-supplied** coordinates and capture timestamp (FR-CAPTURE-2). Runs on the device before any byte is uploaded | media asset + `{ lat, lng, captured_at }` | sanitised media asset — no embedded EXIF GPS, app-supplied coordinates attached |
 | `compressImage` | Re-encodes a photo down to the 1080p cap (longest edge ≤ 1920) before upload. The re-encode is also the reliable EXIF strip for images | image asset | image asset ≤ 1080p, EXIF-free, JPEG |
 | `transcodeVideo` | Re-encodes a video to the 1080p / **30 s** caps (PRD-X-4) before upload; a longer recording is trimmed at 30 s | video asset | video asset ≤ 1080p and ≤ 30 s |
-| `uploadToStorage` | Direct-to-bucket upload of the sanitised media into the **private** bucket under a signed-path policy (`reports/<author_id>/<client_uuid>/<file>`), with the MIME allow-list and the size cap enforced by the storage policy | sanitised file + destination path | `{ "data": { "storage_path": "…", "byte_size": n } }` |
+| `uploadToStorage` | Direct-to-bucket upload of the sanitised media into the **private** bucket under a signed-path policy (`reports/<author_token>/<client_request_id>/<file>`), with the MIME allow-list and the size cap enforced by the storage policy | sanitised file + destination path | `{ "data": { "storage_path": "…", "byte_size": n } }` |
 | `enqueueUpload` | Writes a pending / failed upload into the device-local queue (app-sandbox JSON, bounded to 20 items) together with its attempt count and the timestamp of the next permitted attempt | queued payload (media path, description, visibility, coordinates, `client_request_id`) | queue entry (persisted) |
 | `drainUploadQueue` | Retries queued uploads with **exponential backoff**. After **3 failed attempts** the item is retained on the device and the UI shows "saved on device"; the drain never blocks the foreground UI | queue | drained items → `finalize_capture` success; retained items → "saved on device" state |
 | `updateCategory` | Author-only category change on an existing report using the fixed 11-value enum, reached from History → Report detail (FR-CAPTURE-5). Media, location, description, and visibility are **not** editable | `{ report_id, category }` | `{ "data": { "report_id": "…", "category": "…" } }` |
@@ -257,7 +257,7 @@ integration tests.
 
 | Integration | Type | Protocol |
 |-------------|------|----------|
-| Mobile → Supabase Storage (private bucket) | API | HTTPS — direct-to-bucket upload under the signed-path policy `reports/<author_id>/<client_uuid>/<file>`; never through the Edge Function (the media never transits the function) |
+| Mobile → Supabase Storage (private bucket) | API | HTTPS — direct-to-bucket upload under the signed-path policy `reports/<author_token>/<client_request_id>/<file>`; never through the Edge Function (the media never transits the function) |
 | Mobile → Edge Function `finalize_capture` | API | HTTPS — `POST /functions/v1/finalize_capture` with the user's JWT; returns the `{ "data": { report_id, area_hierarchy, moderation_status } }` envelope |
 | Mobile → PostgREST `/rest/v1/reports` | API | HTTPS — insert own row (`author_id = auth.uid()`), read own rows for History |
 | Mobile → RPC `update_category` | API | HTTPS — `POST /rest/v1/rpc/update_category`; author-only, enforced by RLS as well |

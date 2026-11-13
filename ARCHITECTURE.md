@@ -691,7 +691,7 @@ RLS examples (conceptual):
 
 ```json
 {
-  "storage_path": "reports/{user_id}/{uuid}.jpg",
+  "storage_path": "reports/{author_token}/{client_request_id}/{file}",
   "media_type": "photo",
   "lat": 23.7808,
   "lng": 90.4074,
@@ -701,6 +701,15 @@ RLS examples (conceptual):
   "category": null
 }
 ```
+
+`{author_token}` is the hex SHA-256 of the uploader's user id — **not** the id
+itself. The public alert detail hands the media path to every signed-in
+reader so the client can mint a short-lived signed URL, so a path carrying the
+author's uuid would hand every reader a stable handle on the author. The
+token lets the author prove a path is theirs — the Storage insert policy
+compares the segment against `digest(auth.uid()::text, 'sha256')` — without the
+id being visible or recoverable. See
+`supabase/migrations/20261105000029_storage_author_token.sql`.
 
 Success:
 

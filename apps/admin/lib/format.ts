@@ -120,6 +120,51 @@ export function isAuthorAutoHide(reason: HideReason): boolean {
   return reason === 'author_auto_hide' || reason === 'both';
 }
 
+/**
+ * The queue's group filter.
+ *
+ * `all` is every pending report — the queue as it was before this group
+ * existed. `author_auto_hide` is the **slice** of that queue where the
+ * report's author was auto-hidden: `hide_reason ∈ { 'author_auto_hide', 'both' }`.
+ *
+ * The group is a **client-side slice over a `SELECT`-only read model**. It
+ * adds no rows to the schema, it invents no second cursor, and it can only
+ * **narrow** what `moderation_queue` returned — it never widens it. A
+ * non-moderator is refused by the RPC before any of this runs.
+ */
+export type QueueGroup = 'all' | 'author_auto_hide';
+
+/**
+ * Whether a queue row belongs to the author-auto-hide group.
+ *
+ * The server's `hide_reason` is authoritative. The client does not recompute
+ * the rule from the row's flag counts — it renders the reason the server sent.
+ * The `author_flags_24h` count is shown **alongside** the badge as context,
+ * never as the thing that decides membership: a report's flags age out of the
+ * 24 h window, and when they do the badge stops claiming the author rule even
+ * though the report is still `hidden_pending_review`.
+ */
+export function isInAuthorAutoHideGroup(hideReason: HideReason): boolean {
+  return isAuthorAutoHide(hideReason);
+}
+
+/**
+ * The badge's variant.
+ *
+ * `author` — the report's author was auto-hidden. `both` — the report reached
+ * its own 3 flags **and** the author's rule applied. The two are rendered
+ * distinctly so a moderator can tell a report that reached the 3-flag
+ * threshold apart from one that was swept up by the author's flag history.
+ * `null` means the report carries no author-rule badge at all.
+ */
+export type AuthorAutoHideBadge = 'author' | 'both' | null;
+
+export function authorAutoHideBadge(hideReason: HideReason): AuthorAutoHideBadge {
+  if (hideReason === 'both') return 'both';
+  if (hideReason === 'author_auto_hide') return 'author';
+  return null;
+}
+
 /** Formats an ISO timestamp for the audit trail and the detail view. */
 export function formatTimestamp(iso: string): string {
   const parsed = new Date(iso);

@@ -2,11 +2,11 @@
 id: 005-author-auto-hide-queue
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: should
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 005-author-auto-hide-queue
@@ -48,6 +48,83 @@ implemented: false
 - **The layout reuses the shared token set.** The badge, the group header, and the count chip are built from the web-safe CSS custom-property subset of `docs/design/design-tokens.md` (`--amber-500` / `--amber-100` for the author badge, `--red-500` / `--red-100` for the threshold badge, `--r-md`, `--shadow-card`). No new hex value, no third-party UI kit, and no separate admin palette.
 - **i18n is a hard requirement.** Bangla primary (native-speaker reviewed) and English secondary, through the shared bundle contract from unit `001`. The console does not start a second i18n system.
 - **Accessibility.** The badge is never conveyed by colour alone — it carries a text label and an accessible description of the reason; every interactive control is ≥ 48 × 48 px with an accessible name, and the token contrast pairs are verified at WCAG AA in both themes.
+
+## Implementation
+
+**Built 2026-11-13.** The group is live at `apps/admin/app/queue/page.tsx`, with
+the derivation helpers in `apps/admin/lib/format.ts` and the copy in
+`apps/admin/lib/copy.ts` (both locales).
+
+- **The server already sent everything the group needs.** The
+  `moderation_queue` RPC returns each row's `hide_reason` and its
+  `author_flags_24h` count — the per-author count of flags in the last 24 h,
+  joined on `reports.author_id`. The admin client already carried both on
+  `QueueItem`; the **rendering** was missing, and that is what this story adds.
+  No migration and no new RPC.
+- **The group is a client-side slice over the same page.** The queue has two
+  groups: **all pending** and **author auto-hidden** — the rows where
+  `hide_reason ∈ { 'author_auto_hide', 'both' }`. The filter narrows the rows
+  already on screen and issues **no second request**, so the group cannot show
+  a different page than the queue, and the pagination stays the queue's.
+- **The badge is derived from the server's `hide_reason`, not recomputed.**
+  `authorAutoHideBadge()` returns `'author'` for `author_auto_hide`, `'both'`
+  for `both`, and `null` for `flag_threshold` / `manual`. The client never
+  derives the rule from the row's own flag counts — it renders the reason the
+  server sent.
+- **The two counts are shown separately and separately labelled.** The report's
+  **own** flag count (`নিজের ফ্ল্যাগ: 1` / *Own flags: 1*) and the **author's**
+  24 h count (`লেখকের ২৪ ঘণ্টার ফ্ল্যাগ: 5` / *Author's flags in 24 h: 5*) come
+  from different joins. A report can show `0` on one and `5` on the other, and
+  that is the normal author-auto-hide shape — collapsing them into one number
+  would make the two indistinguishable.
+- **The badge explains the cause in words.** The author-rule rows carry the
+  bilingual explanation, so the badge is never conveyed by colour alone. The
+  `both` badge names **both** causes rather than only one.
+- **A report with zero flags of its own is not dropped.** It still appears in
+  the group with the badge and the author's 24 h count, and its own flag count
+  renders as `0`.
+- **There is no bulk action, and a source scan keeps it that way.**
+
+### Deviations from the story
+
+- **The story's suggested i18n key names differ from the shipped ones.** The
+  story proposes `moderation.queue.badge.authorAutoHide`,
+  `moderation.queue.badge.flagThreshold`, `moderation.queue.badge.both`,
+  `moderation.queue.authorAutoHide.explanation`,
+  `moderation.queue.authorFlagCount`, and `moderation.queue.ownFlagCount`. The
+  console does not start a second i18n system — the admin app has its own
+  `AdminCopy` interface with Bangla first and English second, so the strings
+  live there as `queueBadgeAuthorAutoHide`, `queueBadgeBoth`,
+  `queueAuthorAutoHideExplanation`, `queueAuthorFlagCount`, and
+  `queueOwnFlagCount`. The **content** is as the story specifies; only the key
+  names differ, because the key namespace was the admin app's own.
+- **The badge for a plain 3-flag hide is the existing hide-reason chip**, not a
+  new one. The story only asks for a *distinct* author badge that a
+  threshold-hidden report never carries; the threshold hide keeps its existing
+  presentation.
+- **Five dead copy keys were removed.** `queueFlagCount`,
+  `queueHideReasonThreshold`, `queueHideReasonAuthor`, `queueHideReasonBoth`,
+  and `queueHideReasonManual` were declared in both bundles and referenced by
+  nothing — the row rendered `formatHideReason(item.hideReason)` instead. The
+  row's own flag count is now the labelled `queueOwnFlagCount`, and the
+  hide-reason text for the threshold case comes from `formatHideReason`. Dead
+  keys were deleted rather than left to rot.
+
+### Verification
+
+- `apps/admin/lib/format.test.ts` — 6 new Jest tests: the group holds
+  `author_auto_hide` and `both` and excludes `flag_threshold` and `manual`;
+  the badge is `'author'` for the author rule, `'both'` for both causes, and
+  `null` for the threshold and the manual hide; and the two badge variants are
+  distinct from each other and from the threshold case.
+- `apps/admin/lib/noBulkActions.test.ts` — 6 Jest tests, including a **source
+  scan** over `app/` and `lib/` that fails the build on any bulk action, any
+  multi-select, any checkbox in a moderation list, any shared note, any
+  `restoreAll` / `removeAll` / `bulkRestore` identifier, and any decision
+  written for a set of report ids. It also asserts the group issues no second
+  request — there are exactly two `fetchModerationQueue` call sites (the page
+  load and "Load more"), neither of which takes the group — and that the
+  decision call does not sit in the queue list at all.
 
 ## Dependencies
 

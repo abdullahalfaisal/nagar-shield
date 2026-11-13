@@ -35,12 +35,16 @@ export interface AdminCopy {
   queueLoadMore: string;
   queueEnd: string;
   queueLoading: string;
-  queueFlagCount: string;
-  queueHideReasonThreshold: string;
-  queueHideReasonAuthor: string;
-  queueHideReasonBoth: string;
-  queueHideReasonManual: string;
   queueUploader: string;
+  queueGroupAll: string;
+  queueGroupAuthorAutoHide: string;
+  queueGroupEmptyTitle: string;
+  queueGroupEmptyBody: string;
+  queueBadgeAuthorAutoHide: string;
+  queueBadgeBoth: string;
+  queueAuthorFlagCount: string;
+  queueOwnFlagCount: string;
+  queueAuthorAutoHideExplanation: string;
 
   detailTitle: string;
   detailMedia: string;
@@ -145,12 +149,17 @@ const bn: AdminCopy = {
   queueLoadMore: 'আরও দেখুন',
   queueEnd: 'সব রিপোর্ট দেখানো হয়েছে',
   queueLoading: 'কিউ লোড হচ্ছে…',
-  queueFlagCount: '{{count}}টি ফ্ল্যাগ',
-  queueHideReasonThreshold: '৩টি ফ্ল্যাগের সীমায় লুকানো',
-  queueHideReasonAuthor: 'লেখকের নিয়মে লুকানো',
-  queueHideReasonBoth: 'ফ্ল্যাগ ও লেখকের নিয়মে লুকানো',
-  queueHideReasonManual: 'মডারেটরের আগে লুকানো',
   queueUploader: 'লেখক',
+  queueGroupAll: 'সব অপেক্ষমাণ',
+  queueGroupAuthorAutoHide: 'লেখকের নিয়মে লুকানো',
+  queueGroupEmptyTitle: 'এই দলে কোনো রিপোর্ট নেই',
+  queueGroupEmptyBody: 'লেখকের নিয়মে লুকানো কোনো রিপোর্ট এই মুহূর্তে নেই।',
+  queueBadgeAuthorAutoHide: 'লেখক-স্বয়ংক্রিয় লুকানো',
+  queueBadgeBoth: 'লেখকের নিয়ম ও ৩ ফ্ল্যাগ',
+  queueAuthorFlagCount: 'লেখকের ২৪ ঘণ্টার ফ্ল্যাগ: {{count}}',
+  queueOwnFlagCount: 'নিজের ফ্ল্যাগ: {{count}}',
+  queueAuthorAutoHideExplanation:
+    'এই রিপোর্টটি নিজের ফ্ল্যাগের সংখ্যার কারণে নয়, বরং লেখকের ২৪ ঘণ্টায় ৫টি বা তার বেশি রিপোর্ট ফ্ল্যাগ হওয়ায় স্বয়ংক্রিয়ভাবে লুকানো হয়েছে।',
 
   detailTitle: 'রিপোর্ট পর্যালোচনা',
   detailMedia: 'মিডিয়া',
@@ -255,12 +264,17 @@ const en: AdminCopy = {
   queueLoadMore: 'Load more',
   queueEnd: 'Every report is shown',
   queueLoading: 'Loading the queue…',
-  queueFlagCount: '{{count}} flags',
-  queueHideReasonThreshold: 'Hidden at the 3-flag threshold',
-  queueHideReasonAuthor: 'Hidden by the author rule',
-  queueHideReasonBoth: 'Hidden by the flag and author rules',
-  queueHideReasonManual: 'Hidden earlier by a moderator',
   queueUploader: 'Uploader',
+  queueGroupAll: 'All pending',
+  queueGroupAuthorAutoHide: 'Author auto-hidden',
+  queueGroupEmptyTitle: 'Nothing in this group',
+  queueGroupEmptyBody: 'No report is currently hidden by the author rule.',
+  queueBadgeAuthorAutoHide: 'Author auto-hidden',
+  queueBadgeBoth: 'Author rule and 3 flags',
+  queueAuthorFlagCount: "Author's flags in 24 h: {{count}}",
+  queueOwnFlagCount: 'Own flags: {{count}}',
+  queueAuthorAutoHideExplanation:
+    'This report was hidden automatically because its author had 5 or more reports flagged in the last 24 hours — not because the report itself reached 3 flags.',
 
   detailTitle: 'Report review',
   detailMedia: 'Media',

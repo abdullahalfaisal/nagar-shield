@@ -2,11 +2,11 @@
 id: 009-alert-detail-screen
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 009-alert-detail-screen
@@ -45,6 +45,87 @@ implemented: false
 - **Accessibility.** The flag action and every other control are ≥ 48 × 48 dp with accessibility labels; the media carries a descriptive label; the screen reader announces the category and the capture time.
 - **i18n is a hard requirement.** Every string — the title, the labels, the time format, the unavailable state, the media placeholder — ships in `bn` (primary, native-speaker reviewed) and `en`.
 - **Testing.** A Jest test asserts the detail renders the media, the description, the area, the category pair, both times, and the flag action, and that no author field exists in the rendered tree. A Supabase-local test asserts the detail read path returns no `author_id`. A Maestro flow covers: open Home → the feed renders → tap **✎ বিস্তারিত দেখুন** → the detail opens → tap the flag action → the sheet opens.
+
+## Implementation
+
+**Built 2026-11-13.** The screen is live at `apps/mobile/app/(app)/alert-detail.tsx`,
+reading through `apps/mobile/src/shared/api/alertDetail.ts`.
+
+- **The public read model is `public.alert_detail`.** `fetchPublicAlertDetail`
+  calls the RPC with `{ p_report_id }` and maps the row to `PublicAlertDetail`.
+  The RPC is a `SECURITY DEFINER` read model that returns **no author id at
+  all** — the column is omitted from the projection, not nulled (FR-DATA-3 /
+  FR-NG-5).
+- **The type carries no author field.** `PublicAlertDetail` has no `authorId`,
+  no `author_id`, no `author`, and no `reporter` — a type that named the field
+  would be a field waiting to be rendered. The only author-derived value is
+  `authorDisplayName`, which is present **only** when the author explicitly
+  chose `public_visibility = 'identified'`.
+- **The coordinates ride along.** `lat` / `lng` come with the detail, so the
+  map needs no second query and the detail cannot show a report in a place its
+  own row does not carry.
+- **A null category stays null.** The neutral **uncategorized** placeholder is
+  the client's job; the read model does not invent a category.
+- **The media list is never null.** An empty result is `[]`, so the renderer
+  never has to distinguish "no media" from "media not loaded".
+- **A media whose URL cannot be signed is dropped.** `signAlertMediaUrls` maps
+  the media to its signed URL and **omits** the failures, so an expired URL
+  degrades to a placeholder for that tile only — the description, area,
+  category, and times still render.
+- **A report that does not resolve reads as `null`.** A removed report, a
+  deleted report, and a report that never existed are all the same from
+  outside: the client renders one "no longer available" state for all three,
+  so the read cannot be used to discover which reports exist but are hidden.
+
+### Deviations from the story
+
+- **The story's Testing note says "a Jest test asserts the detail renders the
+  media, the description, the area, the category pair, both times, and the flag
+  action, and that no author field exists in the rendered tree."** The shipped
+  test asserts the **data contract**, not the rendered tree: the read model
+  carries no author field under any name, the body contains no author uuid
+  anywhere, the display alias appears only for an identified report, the
+  coordinates are carried, a null category stays null, an empty media list is
+  `[]`, a failed read throws, and a media whose URL cannot be signed is
+  dropped. The rendering assertions need a component-test harness the mobile
+  app does not have yet — the existing Jest suites are pure functions over
+  plain objects, and a `react-test-renderer` dependency was not added for one
+  screen. The **live probe** covers the rendering path end to end instead: it
+  signs in as one citizen, finalises a capture, resolves the detail as a
+  **different** citizen, mints a signed URL, and fetches the bytes.
+- **The storage path carries a hash, not the author's uuid.** This was a real
+  defect, found while proving this story: the public alert detail hands the
+  media path to every signed-in reader, so a path carrying the uuid in the
+  clear handed every reader a stable handle on the author — exactly what
+  FR-DATA-3 forbids. The path's second segment is now the hex SHA-256 of the
+  author's id. The author's id is not recoverable from the token, and the
+  upload-time ownership check still works because the author computes the
+  token for their **own** id. See
+  `004-capture / 007-storage-upload-and-finalize` and migration
+  `20261105000029_storage_author_token.sql`.
+- **The public detail is reachable from the History map's marker tap** as well
+  as from the feed card's link — both entry points route to
+  `/(app)/alert-detail`, so there is one surface, not two.
+
+### Verification
+
+- `apps/mobile/src/shared/api/alertDetail.test.ts` — 13 Jest tests: the RPC is
+  called as `('alert_detail', { p_report_id })`; a null response resolves to
+  `null`; the detail carries **no** `authorId` / `author_id` / `author` /
+  `reporter` / `reporterId` key; the serialised body contains no author uuid;
+  the display alias appears for an identified report and not for an anonymous
+  one; the coordinates are carried; a null category stays null; an empty media
+  list is `[]`; a failed read throws; each media path is signed; a media whose
+  URL cannot be signed is dropped; and no media means no signing call at all.
+- `supabase/tests/alert_detail.sql` — 36 SQL assertions: the projection
+  returns no `author_id` key, `anon` is refused the RPC, the public Storage
+  policy admits a neighbour's media and refuses an anonymous one, and
+  `media_is_publicly_visible` is a `SECURITY DEFINER` function.
+- `pnpm alert:check` — the live probe, 14 assertions over the real stack:
+  capture → upload → public detail as a second citizen → signed URL → bytes,
+  plus the privacy properties (no `author_id` key, no author uuid anywhere, the
+  path carries the token, the bucket is not public, an anonymous visitor is
+  refused with a 401).
 
 ## Dependencies
 

@@ -39,7 +39,14 @@ values
   ('11111111-1111-1111-1111-111111111103', 'flagger2'),
   ('11111111-1111-1111-1111-111111111104', 'flagger3'),
   ('11111111-1111-1111-1111-111111111105', 'flagger4'),
-  ('11111111-1111-1111-1111-111111111106', 'flagger5');
+  ('11111111-1111-1111-1111-111111111106', 'flagger5'),
+  -- The second author and five more flaggers, for the distinct-report test.
+  ('33333333-3333-3333-3333-333333333301', 'author2'),
+  ('22222222-2222-2222-2222-222222222201', 'flagger6'),
+  ('22222222-2222-2222-2222-222222222202', 'flagger7'),
+  ('22222222-2222-2222-2222-222222222203', 'flagger8'),
+  ('22222222-2222-2222-2222-222222222204', 'flagger9'),
+  ('22222222-2222-2222-2222-222222222205', 'flagger10');
 
 
 -- `profiles.id` references `auth.users.id`, so the auth rows must exist
@@ -150,10 +157,15 @@ select 'Test 1f: an author cannot flag their own report' as test,
        :'flag_own'::jsonb ->> 'status' = 'own_report' as passed;
 
 -- =============================================================================
--- Test 2 — the author auto-hide at 5 flags / 24 h
+-- Test 2 — the author auto-hide at 5 DISTINCT flagged reports / 24 h
 -- =============================================================================
 
--- Two more reports from the same author, to be hidden by the author rule.
+-- Four more reports from the same author, to be hidden by the author rule.
+--
+-- The threshold counts DISTINCT flagged reports, not flags. The author under
+-- test already has ONE flagged report (report #1, flagged three times in Test
+-- 1 — which is one flagged report, and was already handled by the 3-flag
+-- threshold). These four bring the tally to five distinct flagged reports.
 insert into public.reports (
   id, author_id, client_request_id, lat, lng, captured_at, public_visibility, moderation_status
 )
@@ -161,11 +173,21 @@ values
   ('22222222-2222-2222-2222-222222222202', '11111111-1111-1111-1111-111111111101',
    '33333333-3333-3333-3333-333333333302', 23.80, 90.40, now(), 'anonymous', 'visible'),
   ('22222222-2222-2222-2222-222222222203', '11111111-1111-1111-1111-111111111101',
-   '33333333-3333-3333-3333-333333333303', 23.81, 90.41, now(), 'anonymous', 'visible');
+   '33333333-3333-3333-3333-333333333303', 23.81, 90.41, now(), 'anonymous', 'visible'),
+  ('22222222-2222-2222-2222-222222222204', '11111111-1111-1111-1111-111111111101',
+   '33333333-3333-3333-3333-333333333304', 23.82, 90.42, now(), 'anonymous', 'visible'),
+  ('22222222-2222-2222-2222-222222222205', '11111111-1111-1111-1111-111111111101',
+   '33333333-3333-3333-3333-333333333305', 23.83, 90.43, now(), 'anonymous', 'visible'),
+  -- A sixth report with **zero flags of its own**. The author rule hides
+  -- EVERY one of the author's reports in the window, including the ones that
+  -- were never flagged.
+  ('22222222-2222-2222-2222-222222222206', '11111111-1111-1111-1111-111111111101',
+   '33333333-3333-3333-3333-333333333306', 23.84, 90.44, now(), 'anonymous', 'visible');
 
--- flagger5 flags report #2, then flagger4 flags report #3. Together with the
--- three flags already cast in Test 1, that is the 5th flag against the author
--- inside 24 hours — the auto-hide threshold.
+-- flagger4 flags report #2, then flagger5 flags report #3. Together with the
+-- three flags already cast in Test 1, that is five flags against the author
+-- inside 24 hours — but only THREE distinct flagged reports. The auto-hide
+-- must NOT fire yet.
 select pg_temp.as_user(
   '11111111-1111-1111-1111-111111111105',
   $$select public.flag_report('22222222-2222-2222-2222-222222222202', 'harassment')$$
@@ -176,20 +198,48 @@ select pg_temp.as_user(
   $$select public.flag_report('22222222-2222-2222-2222-222222222203', 'other')$$
 ) as flag5 \gset
 
-select 'Test 2a: the 5th flag triggers the author auto-hide' as test,
+select 'Test 2a: three distinct flagged reports do NOT trigger the author auto-hide' as test,
        :'flag5'::jsonb ->> 'author_flags_24h' = '5'
+       and :'flag5'::jsonb ->> 'author_flagged_reports_24h' = '3'
        and (select count(*) from public.reports
             where author_id = '11111111-1111-1111-1111-111111111101'
-              and moderation_status = 'hidden_pending_review') = 3 as passed;
+              and moderation_status = 'hidden_pending_review') = 1 as passed;
 
-select 'Test 2b: the untouched sibling report is also hidden' as test,
-       (select moderation_status from public.reports where id = '22222222-2222-2222-2222-222222222203') = 'hidden_pending_review' as passed;
+-- The fourth and fifth DISTINCT flagged reports. The tally now reaches five
+-- and the hide fires.
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222201',
+  $$select public.flag_report('22222222-2222-2222-2222-222222222204', 'misinformation')$$
+) as flag6 \gset
 
-select 'Test 2c: the author-auto-hidden report keeps a distinct badge' as test,
-       (select hide_reason from public.reports where id = '22222222-2222-2222-2222-222222222203') = 'author_auto_hide' as passed;
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222202',
+  $$select public.flag_report('22222222-2222-2222-2222-222222222205', 'off_topic')$$
+) as flag7 \gset
 
-select 'Test 2d: a report that hit both rules is badged "both"' as test,
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222203',
+  $$select public.flag_report('22222222-2222-2222-2222-222222222205', 'harassment')$$
+) as flag8 \gset
+
+select 'Test 2b: the 5th DISTINCT flagged report triggers the author auto-hide' as test,
+       :'flag8'::jsonb ->> 'author_flagged_reports_24h' = '5'
+       and :'flag8'::jsonb ->> 'author_hidden' = 'true'
+       and (select count(*) from public.reports
+            where author_id = '11111111-1111-1111-1111-111111111101'
+              and moderation_status = 'hidden_pending_review') = 6 as passed;
+
+select 'Test 2c: the untouched sibling report is also hidden' as test,
+       (select moderation_status from public.reports where id = '22222222-2222-2222-2222-222222222206') = 'hidden_pending_review' as passed;
+
+select 'Test 2d: the author-auto-hidden report keeps a distinct badge' as test,
+       (select hide_reason from public.reports where id = '22222222-2222-2222-2222-222222222206') = 'author_auto_hide' as passed;
+
+select 'Test 2e: a report that hit both rules is badged "both"' as test,
        (select hide_reason from public.reports where id = '22222222-2222-2222-2222-222222222201') = 'both' as passed;
+
+select 'Test 2f: a report with zero flags of its own is hidden and badged' as test,
+       (select hide_reason from public.reports where id = '22222222-2222-2222-2222-222222222204') = 'author_auto_hide' as passed;
 
 -- =============================================================================
 -- Test 3 — the 10-flags-per-hour rate limit
@@ -386,4 +436,68 @@ select 'Test 9c: the media carries a purged_at flag for the 90-day purge' as tes
          select 1 from information_schema.columns
          where table_schema = 'public' and table_name = 'report_media' and column_name = 'purged_at'
        ) as passed;
+
+-- =============================================================================
+-- Test 10 — the author auto-hide counts DISTINCT flagged reports
+--
+-- "5 flagged reports" means 5 distinct reports, not 5 flags. Five flags on
+-- one report are ONE flagged report, and that report was already handled by
+-- the 3-flag threshold. Counting flags instead of reports meant one heavily
+-- flagged report could sweep in an author's whole recent output.
+-- =============================================================================
+
+-- A second author, whose reports carry the five flags. Five flags on ONE of
+-- their reports must NOT trigger the author auto-hide.
+insert into public.reports (
+  id, author_id, client_request_id, lat, lng, captured_at, public_visibility, moderation_status
+)
+values
+  ('44444444-4444-4444-4444-444444444401', '33333333-3333-3333-3333-333333333301',
+   '55555555-5555-5555-5555-555555555501', 23.80, 90.40, now(), 'anonymous', 'visible'),
+  ('44444444-4444-4444-4444-444444444402', '33333333-3333-3333-3333-333333333301',
+   '55555555-5555-5555-5555-555555555502', 23.81, 90.41, now(), 'anonymous', 'visible'),
+  ('44444444-4444-4444-4444-444444444403', '33333333-3333-3333-3333-333333333301',
+   '55555555-5555-5555-5555-555555555503', 23.82, 90.42, now(), 'anonymous', 'visible');
+
+-- Five distinct flaggers on ONE report. That is one flagged report.
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222201',
+  $$select public.flag_report('44444444-4444-4444-4444-444444444401', 'harassment')$$
+) as f1 \gset
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222202',
+  $$select public.flag_report('44444444-4444-4444-4444-444444444401', 'harassment')$$
+) as f2 \gset
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222203',
+  $$select public.flag_report('44444444-4444-4444-4444-444444444401', 'harassment')$$
+) as f3 \gset
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222204',
+  $$select public.flag_report('44444444-4444-4444-4444-444444444401', 'harassment')$$
+) as f4 \gset
+select pg_temp.as_user(
+  '22222222-2222-2222-2222-222222222205',
+  $$select public.flag_report('44444444-4444-4444-4444-444444444401', 'harassment')$$
+) as f5 \gset
+
+select 'Test 10a: five flags on ONE report is one flagged report' as test,
+       :'f5'::jsonb ->> 'author_flagged_reports_24h' = '1' as passed;
+
+select 'Test 10b: five flags on one report do NOT trigger the author auto-hide' as test,
+       (select count(*) from public.reports
+        where author_id = '33333333-3333-3333-3333-333333333301'
+          and moderation_status = 'hidden_pending_review') = 1 as passed;
+
+select 'Test 10c: the untouched sibling reports stay visible' as test,
+       (select moderation_status from public.reports where id = '44444444-4444-4444-4444-444444444402') = 'visible'
+       and (select moderation_status from public.reports where id = '44444444-4444-4444-4444-444444444403') = 'visible' as passed;
+
+select 'Test 10d: the flag count is still reported alongside the distinct count' as test,
+       :'f5'::jsonb ->> 'author_flags_24h' = '5'
+       and :'f5'::jsonb ->> 'author_flagged_reports_24h' = '1' as passed;
+
+select 'Test 10e: the author auto-hide did not report a hide' as test,
+       :'f5'::jsonb ->> 'author_reports_hidden' = '0'
+       and :'f5'::jsonb ->> 'author_hidden' = 'false' as passed;
 rollback;

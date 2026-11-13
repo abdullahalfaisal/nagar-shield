@@ -43,7 +43,7 @@ implemented: true
 - **The overflow drop is visible.** When the 21st item evicts the oldest, the user is warned. Silently deleting a citizen's evidence is unacceptable; the warning says what was dropped and that the app will keep only the most recent 20.
 - **Online vs offline telemetry.** `capture_open_to_submit_ms` is measured from the Capture screen's first render to `finalize_capture` returning a `report_id`, and the median is taken over successful **online** submits only. Queued submits are tracked separately as an offline-rate metric. A queued item's clock starts when it is drained, not when it was enqueued.
 - **The `OFFLINE_QUEUED` code.** The shared error-code table lists `OFFLINE_QUEUED` for exactly this outcome — the client maps it to the "saved on device" message rather than a generic failure.
-- **Storage and the private bucket.** The upload target is the private bucket under the signed-path policy (`reports/{user_id}/{uuid}.jpg`); the client never holds the service-role key. The media bytes never transit the Edge Function.
+- **Storage and the private bucket.** The upload target is the private bucket under the signed-path policy (`reports/{author_token}/{client_request_id}/{file}`); the client never holds the service-role key. The media bytes never transit the Edge Function.
 - **Testing.** Jest covers the exponential-backoff schedule, the 3-attempt cut-off, the 20-item bound, and the `client_request_id` idempotency rule. A Maestro E2E flow covers airplane-mode submit → queued → reconnect → drained → the report appears in History.
 
 ## Dependencies

@@ -24,6 +24,7 @@
 import { checkMediaCaps, finalizeCaptureSchema } from '../_shared/contracts.ts';
 import { resolveArea } from '../_shared/area.ts';
 import { authenticateCaller, CallerError } from '../_shared/auth.ts';
+import { authorToken } from '../_shared/vendor/storage/index.ts';
 import {
   databaseErrorResponse,
   errorResponse,
@@ -85,9 +86,16 @@ Deno.serve(async (request) => {
     }
 
     // The storage path must belong to the caller. The path prefix is the
-    // uploader's user id, which is what makes the ownership check a simple
-    // string comparison instead of a lookup.
-    const expectedPrefix = `${STORAGE_PATH_PREFIX}${caller.id}/`;
+    // uploader's **author token** — the hex SHA-256 of their user id — which
+    // is what makes the ownership check a simple string comparison instead of
+    // a lookup.
+    //
+    // The token is a hash rather than the id in the clear, because the public
+    // alert detail hands the media path to every signed-in reader so the
+    // client can mint a short-lived signed URL. A path carrying the author's
+    // uuid would hand every reader a stable handle on the author, which
+    // FR-DATA-3 and `006-alerts / 009-alert-detail-screen` forbid.
+    const expectedPrefix = `${STORAGE_PATH_PREFIX}${await authorToken(caller.id)}/`;
     if (!input.storage_path.startsWith(expectedPrefix)) {
       logEvent('warn', {
         requestId,
