@@ -3,7 +3,7 @@
 > Read this first in a fresh session. It says what is **done**, what is
 > **broken**, and what to do **next**, in that order.
 >
-> Last updated: 2026-11-13 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
+> Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
 
 ---
@@ -11,8 +11,25 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **24 of 54 stories still carry `implemented: false`** — the
-gaps are concentrated in the mobile app's interactive surfaces.
+built and verified.
+
+**The stories are now counted three ways, not two: 31 `complete`, 22
+`partial`, 1 `planned`.** The middle state is new, and it is the honest one.
+An audit of the 23 stories that carried `implemented: false` found that
+**none** of them were fully unimplemented: the features had shipped and
+worked, and what was missing was the *mechanical guard* each acceptance
+criterion named — the byte-identity test, the offline-render assertion, the
+boundary check, the reserved CI job, the query invalidation.
+
+Recording those as `planned` would have hidden a lot of real work.
+Recording them as `complete` would have been a lie about the criteria. So
+`implemented` has a third value, `partial`, and each such story file carries
+an `## Implementation` section naming its exact gaps down to the file and
+line. **Read a story's `## Implementation` section before working on it** —
+it says which guard is missing, not that the screen is missing.
+
+**Only one story is genuinely unbuilt**: the Personal Emergency picker
+(`002-personal-emergency-picker`) has no route, no component, and no action.
 
 **The repository now exists** (see §5). The working tree is committed and
 pushed-ready, and there is a baseline commit to fall back to.
@@ -45,9 +62,9 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **84 unit tests** |
-| Database | **33 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, and the wrong-number `details` / `pending` vocabulary |
+| Database | **36 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, and the **30-day restore window** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
-| SQL test suites | **411 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (52), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36) |
+| SQL test suites | **457 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (52), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -79,9 +96,10 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 467 tests (335 mobile, 84 shared, 48 admin)
-pnpm db:test          # 411 SQL assertions
+pnpm test             # 517 tests (385 mobile, 84 shared, 48 admin)
+pnpm db:test          # 457 SQL assertions
 pnpm db:smoke         # 11 REST checks
+pnpm story:index:check # the index, the bolts and the story files agree
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
@@ -327,16 +345,109 @@ afterwards.
 **Also:** migrations 031–033 exist in the repo but were not recorded in
 the local `supabase_migrations.schema_migrations` table (the DB container
 had been recreated), so `--env local` failed its migration assertion. They
-are applied and recorded now — the gate reports 34 migrations, matching
+are applied and recorded now — the gate reports **36** migrations, matching
 `supabase/migrations/` exactly.
 
 ---
 
-## 4. What is NOT DONE — 24 of 54 stories
+## 4. What is NOT DONE — 22 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
+> **Read this before the tables below.** The tables record the *defects that
+> were found and fixed*. The stories that are still `partial` are recorded in
+> their own story files, each under an `## Implementation` section that names
+> the exact gap down to the file and line. Those are the honest remaining
+> work; the tables here are the history.
+>
+> **A `partial` story is not a missing screen.** In every case the feature
+> ships and works, and the gap is a *guard* — the test, boundary check,
+> reserved CI job, or invalidation the acceptance criterion names. The one
+> exception is `002-personal-emergency-picker`, which is `planned` because
+> nothing of it exists.
+>
+> The most consequential single fact: **`apps/admin` declares
+> `@tanstack/react-query` and never imports it.** The admin hand-rolls its
+> fetching with `useState` + `useEffect`, so no query is ever invalidated —
+> which is the single reason **all five** `partial` moderation stories fail
+> their "the queries are invalidated" criterion. Fixing it once fixes all
+> five.
+>
+> The three other user-facing defects worth naming here, because they are
+> behaviour rather than a missing guard:
+>
+> | Where | What |
+> |---|---|
+> | `apps/mobile/src/shared/api/alerts.ts:94` | The feed computes `next_cursor` and **discards it** — `useQuery`, not `useInfiniteQuery`, so page 2 is unreachable. |
+> | `apps/mobile/src/shared/api/supabase.ts:21-27` | The Supabase client **throws at module load** instead of showing a localized configuration error. On a device with a missing `app.json` extra the app dies with a raw English stack message. |
+> | `apps/mobile/app/(app)/login.tsx:61-63` | `t(\`errors.${appError.code.toLowerCase()}\`)` renders **`undefined`** — the bundle key is `errors.authRequired`, camelCase. A live user-facing bug. |
+>
+> **By unit**, the shape of the remaining work is uneven:
+>
+> | Unit | complete | partial | planned |
+> |---|---|---|---|
+> | `001-foundation` | 0 | 5 | 0 |
+> | `002-identity` | 5 | 2 | 0 |
+> | `003-help-seek` | 5 | 2 | 1 |
+> | `004-capture` | 3 | 4 | 0 |
+> | `005-location` | 5 | 0 | 0 |
+> | `006-alerts` | 5 | 4 | 0 |
+> | `007-moderation` | 1 | 5 | 0 |
+> | `008-jobs-operations` | 7 | 0 | 0 |
+>
+> `001-foundation` is the unit to pick up if you want **cheap** wins: all five
+> of its stories are `partial`, and their gaps are mostly **missing tests and
+> CI jobs** rather than missing behaviour. `007-moderation` is the unit with
+> the **most** remaining work but the **best** leverage — one TanStack Query
+> wiring closes five stories.
+
+### 4.0 The 23 stories that are not `complete`
+
+Each row's story file carries an `## Implementation` section naming the exact
+gap. **Open the story file, not this table, when you pick one up.**
+
+| Story | Unit | State | The gap, in one line |
+|---|---|---|---|
+| `001-monorepo-workspace` | 001-foundation | partial | no test that the three workspaces share one strict TypeScript base |
+| `002-shared-contracts` | 001-foundation | partial | the boundary test that no Zod schema is duplicated locally — **does not exist** |
+| `003-mobile-design-system` | 001-foundation | partial | no token-parity test against `design-tokens.md`; no i18n key-parity gate; no tap-target test |
+| `004-mobile-app-shell` | 001-foundation | partial | the Supabase client **throws at module load** instead of showing a localized error |
+| `005-admin-skeleton-and-ci` | 001-foundation | partial | no reserved `build` job in `ci.yml`; no bundle-scan **test**; the `@shared/*` alias is unused |
+| `002-dual-identifier-login` | 002-identity | partial | no component test on the login screen; Remember-me's effect on the session is untested |
+| `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
+| `001-home-and-help-alert-grid` | 003-help-seek | partial | the grid is on its own route, not Home; the numbers are hardcoded, not read from the dataset |
+| `002-personal-emergency-picker` | 003-help-seek | **planned** | **nothing exists** — no route, no component, no action |
+| `003-bundled-station-hotline-dataset` | 003-help-seek | partial | the drift check compares row **ids**, not values; no APK size check; no byte-identity test |
+| `001-capture-screen` | 004-capture | partial | the `capture_open_to_submit_ms` telemetry **does not exist** |
+| `002-area-hierarchy-extraction` | 004-capture | partial | `areaHierarchySchema` does not exist; the resolution is cache-first, contradicting the story |
+| `004-exif-strip-and-media-caps` | 004-capture | partial | the video path copies the original bytes — no trim, no metadata strip; the cap is 1080, not 1920 |
+| `007-storage-upload-and-finalize` | 004-capture | partial | no unit test ties the client's storage path to the server's |
+| `001-alerts-feed-list` | 006-alerts | partial | `next_cursor` is computed and **discarded** — page 2 is unreachable |
+| `002-auto-refresh-and-pull-to-refresh` | 006-alerts | partial | neither the interval nor pull-to-refresh is tested |
+| `003-area-filter-chips` | 006-alerts | partial | the row uses a plain `View` and **clips** the chips; needs a horizontal `ScrollView` |
+| `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
+| `001-moderator-login-and-queue` | 007-moderation | partial | no TanStack Query → nothing is invalidated; no live probe for the console |
+| `002-report-review-detail` | 007-moderation | partial | no TanStack Query; no live probe; no test on the decision panel |
+| `003-restore-remove-decision` | 007-moderation | partial | no TanStack Query; the console path has no live probe |
+| `004-disable-a-user` | 007-moderation | partial | no TanStack Query; the error branches at `users/page.tsx:146-159` are untested |
+| `006-moderator-action-audit-log` | 007-moderation | partial | no TanStack Query; the "no report contents" rule is convention, not a test |
+
+**Unit `001-foundation` is all five `partial`.** It has no subsection below
+because it has no "defect that was found and fixed" history — its gaps are
+all *guards never built*: no shared-TypeScript-base test, no Zod-duplication
+boundary test, no token-parity test against `design-tokens.md`, no i18n
+key-parity gate, no tap-target test, no reserved `build` job in `ci.yml`, no
+bundle-scan **test**, and an unused `@shared/*` alias. The features themselves
+are there; the proofs are not. This is the **cheapest** unit to close.
+
 ### 4.1 Identity — unit `002-identity`
+
+> The rows below record the **defects that were found and fixed**. Two of this
+> unit's seven stories are still `partial` — `002-dual-identifier-login` (no
+> component test; Remember-me's effect on the session is untested) and
+> `007-account-deletion-and-recovery` (I3's flow is live, but an expired
+> restore is misreported as `errors.internal` and `recoverableUntil` is
+> fetched but never read). See the §4.0 table.
 
 | # | Gap | Where |
 |---|---|---|
@@ -354,6 +465,12 @@ Ordered by dependency. Bolt numbers in brackets.
 
 ### 4.3 Help-seek — unit `003-help-seek`
 
+> Three of this unit's stories are still `partial`: `001-home-and-help-alert-grid`
+> (the grid is on its own route, not Home; the numbers are hardcoded),
+> `003-bundled-station-hotline-dataset` (the drift check compares row **ids**,
+> not values) and `002-personal-emergency-picker` — the one story in the whole
+> project that is genuinely **unbuilt**. See the §4.0 table.
+
 | # | Gap | Where |
 |---|---|---|
 | H1 | ✅ **FIXED** — the More Help surfaces are live. `src/shared/ui/MoreHelpSheet.tsx` is a **shared** component, so the Home dashed card and the Help Alert screen show the identical six rows in the identical order, and each row opens the surface its category implies: the four hotlines → `/more-help` (the hotline list, read from the **bundle** with `lastVerifiedAt` surfaced through `src/shared/utils/verifiedStamp.ts`), নিকটবর্তী থানা → `/thana-line`, ম্যাপে স্টেশন খুঁজুন → `/station-map`. The row **body** opens the surface; the trailing 48 dp violet icon opens the dialer — one control doing two things would make the rule unobservable. `src/shared/ui/WrongNumberSheet.tsx` is the prototype's `#wrong-number-dialog` (amber `report` icon, five fixed reasons, a 500-character textarea, a 52 dp **রিপোর্ট পাঠান**, a 44 dp **বাতিল**). **A pre-existing defect was fixed**: the inline sheet pushed **both** the thana row and the map row to `/station-map`; the thana row now opens `/thana-line`. | [009] story 005 |
@@ -362,6 +479,15 @@ Ordered by dependency. Bolt numbers in brackets.
 | H4 | ✅ **FIXED** — the wrong-number report flow is live, and **two real database defects were found by probing and fixed by migration**. (1) An **anonymous report was impossible**: `reporter_id` was `not null` and the insert policy was `with check (reporter_id = auth.uid())` — and `auth.uid()` is NULL for an anonymous request, so `NULL = NULL` failed the policy. FR-SEEK-6 says *any user* may report. Migration **031** makes the column nullable and the policy accepts `reporter_id is null or reporter_id = auth.uid()`; the disabled-account guard is **not** weakened (`assert_account_not_disabled()` still runs, and G7/G26 still hold). (2) The **polymorphic integrity trigger did not exist** — the story says `entry_id` "cannot carry a plain FK" and that a CHECK trigger resolves it against the table named by `entry_type`, but there was no trigger, so a report could name a `station` type and carry a **hotline's** slug and land silently. Migration **032** adds the trigger (resolving against the *live* table, so a retired slug is refused). Migration **033** adds the `details` column the story's write path names and renames the status vocabulary to `('pending','reviewed','rejected')`. The reason and the free text are stored as **two fields**, not one concatenated string. The schema also now **uses** `wrongNumberReportSchema`, which was defined and never wired in. | [009] story 008 |
 
 ### 4.4 Capture — unit `004-capture`
+
+> Four of this unit's seven stories are still `partial`: `001-capture-screen`
+> (the `capture_open_to_submit_ms` telemetry does not exist),
+> `002-area-hierarchy-extraction` (`areaHierarchySchema` does not exist; the
+> resolution is cache-first, contradicting the story),
+> `004-exif-strip-and-media-caps` (the video path copies the original bytes —
+> no trim, no metadata strip; the cap is 1080, not 1920) and
+> `007-storage-upload-and-finalize` (no unit test ties the client's storage
+> path to the server's). See the §4.0 table.
 
 | # | Gap | Where |
 |---|---|---|
@@ -378,6 +504,14 @@ Ordered by dependency. Bolt numbers in brackets.
 
 ### 4.6 Alerts — unit `006-alerts`
 
+> Four of this unit's nine stories are still `partial`: `001-alerts-feed-list`
+> (`next_cursor` is computed and **discarded**), `002-auto-refresh-and-pull-to-refresh`
+> (neither the interval nor pull-to-refresh is tested),
+> `003-area-filter-chips` (the row uses a plain `View` and clips the chips)
+> and `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
+> the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant).
+> See the §4.0 table.
+
 | # | Gap | Where |
 |---|---|---|
 | A1 | ✅ **FIXED** — the History screen is live. `app/(app)/history.tsx` carries the prototype's three segmented tabs — **ধরন** (the rows), **মোট** (the totals) and **বিতরণ** (the per-category counts) — plus the **My Reports** tab that unit `004` added for the author. The prototype's second sentence, *"Detailed map + filters coming soon,"* is **removed**: both ship in Phase 1, so the claim would have been false. The **বিতরণ** tab is a **list of counts** — never a chart, a bar, a percentage or a trend (FR-NG-3 / FR-NG-4 / ADR-010) — and a **source scan** (`src/__tests__/noChartCode.test.ts`) fails the build if a chart library or a chart-shaped identifier appears in the app. The scan reads **code only** — comments and string literals are stripped first — because the rule is *stated in prose* inside the very files it scans; a naive scan would fail on the rule itself. The own-reports branch is **independent of the radius and the window** (FR-HIST-3), and the rows route to the right surface: an own report opens the author's own detail, a neighbour opens the **public** alert detail. | [020] story 006 |
@@ -391,8 +525,11 @@ Ordered by dependency. Bolt numbers in brackets.
 | M1 | ✅ **FIXED** — the author-auto-hide queue group is live. `apps/admin/app/queue/page.tsx` gained an **All pending / Author auto-hidden** filter with `aria-pressed`, a derived badge that separates the two causes (`author` / `both`), and the author's 24 h flag count **labelled apart from** the report's own flag count — a context number is not a verdict. The server already carried `hide_reason` and `author_flags_24h`, so **no migration and no new RPC** were needed; the gap was purely in the rendering. The queue offers **no bulk actions** at MVP (FR-MOD-3) — no "restore all", no multi-select, no shared note — and a **source scan** (`apps/admin/lib/noBulkActions.test.ts`) fails the build if one appears. | [024] story 005 |
 
 > The admin console's queue, report detail, restore/remove decision, disable-user
-> and audit log are **all built and working**, and the auto-hide group now
-> joins them.
+> and audit log **all exist and work** — but only the author-auto-hide group
+> (M1) is `complete`. The other five moderation stories are `partial`: the
+> screens are there, and what is missing is the **guard** — chiefly the query
+> invalidation, because `apps/admin` never imports `@tanstack/react-query`.
+> See the §4.0 table for each one's exact gap.
 
 ---
 
@@ -403,7 +540,7 @@ Ordered by dependency. Bolt numbers in brackets.
 | R1 | **No git repository.** | ✅ **DONE** — `git init` on `main`, a baseline commit of the verified tree, `.gitattributes` for LF normalization. **Still no remote**: `git remote add origin <url>` before the first push. |
 | R2 | Maestro flow `maestro/panic-path.yaml` missing. | ✅ **DONE** — see B2 |
 | R3 | Scratch files at the root. | ✅ **DONE** — see B3 |
-| R4 | `eas.json` placeholders. | See B4 |
+| R4 | `eas.json` placeholders. | 🟡 **BLOCKED ON THE MAINTAINER** — see B4. The *detection* is built and proven (the gate fails on an unresolved placeholder); only the five hosted-project values are missing. |
 | R5 | `apps/mobile` and `apps/admin` have `.env.example` but **no `.env`** (gitignored). `supabase/functions/.env.local` exists. | ✅ **DONE** — both `.env` files now exist, created from the examples with the local stack's **anon** key (the service-role key is deliberately absent). They are gitignored (`.gitignore:10`), so they stay local. A fresh clone still needs the same two lines written from `.env.example`. |
 
 ---
@@ -504,9 +641,50 @@ Ordered by dependency. Bolt numbers in brackets.
     database defects were found. ~~**R5**~~ ✅ **DONE** — the local `.env`
     files exist (see §5).
     ~~**The memory-bank bolt records**~~ ✅ **DONE** — see §7.
-12. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
-    placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries
-    the real local stack's URL and anon key. The `preview` and `production`
+12. ~~**S1 — reconcile the story records.**~~ ✅ **DONE.** The stories are now
+    counted **three** ways, not two: `complete`, `partial`, `planned`. The
+    binary `implemented` flag could not carry the truth — an audit found
+    that **none** of the 23 stories marked `false` were unbuilt; the
+    features shipped and worked, and what was missing was the *mechanical
+    guard* each acceptance criterion named (the test, the boundary check,
+    the reserved CI job). A `partial` story now **must** carry an
+    `## Implementation` section naming its exact gaps, and the tooling
+    rejects it if it does not — otherwise `partial` would decay into a
+    softer way of saying "planned". Result: **31 `complete` · 22
+    `partial` · 1 `planned`**, every number derived from the story files
+    by `tools/reconcile-story-index.cjs`, and the index's Status column,
+    the header count, the bolt checkboxes, the bolt `status:` and each
+    story's own `status:` are all **derived, not typed**. A `partial`
+    story's `## Implementation` section says **which guard is missing**,
+    not that the screen is missing.
+13. **Close the `partial` stories, highest leverage first.** The order
+    below is by *number of stories closed per unit of work*:
+    1. **Add TanStack Query to `apps/admin`** and wire the post-decision
+       invalidation for the queue, detail and audit queries. The package is
+       **already a dependency** and is **never imported** — this single
+       change closes the invalidation criterion of **all five** `partial`
+       moderation stories at once (`001`, `002`, `003`, `004`, `006`).
+    2. **`apps/mobile/src/shared/api/alerts.ts:94` — `useQuery` →
+       `useInfiniteQuery`.** The list query receives `next_cursor` and
+       **discards it**, so page 2 is unreachable and the feed silently
+       truncates. This is the most user-visible defect in the audit.
+    3. **`apps/mobile/app/(app)/login.tsx:61-63` — the error key.**
+       The template `t(`errors.${appError.code.toLowerCase()}`)` renders
+       `undefined` because the bundle key is `errors.authRequired`
+       (camelCase). A live bug: the user sees the word "undefined"
+       instead of a message.
+    4. **`apps/mobile/src/shared/api/supabase.ts:21-27`** — a module-level
+       `throw` on a missing URL takes the **whole app** down at import time.
+       It should be a localized configuration-error screen.
+    5. The remaining `partial` stories, one at a time, each against its own
+       `## Implementation` section. The stories of unit `001-foundation`
+       are cheap: their gaps are mostly **missing tests and CI jobs**, not
+       missing features.
+    6. **`002-personal-emergency-picker`** — the only genuinely unbuilt
+       story. It has no route, no component and no action.
+14. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
+    placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries the
+    real local stack's URL and anon key. The `preview` and `production`
     profiles still need five hosted-project values — the staging ref and
     anon key, the production ref and anon key, and the SHA-256 pin set
     (with a backup pin). No Supabase project is linked, so these are a
@@ -517,57 +695,79 @@ Ordered by dependency. Bolt numbers in brackets.
     `preview`, and the certificate-pinning assertion counted
     `<sha256-pin-set>` as one valid pin. See §3 for the full account.
     **The git remote is still unset** — the push needs the remote URL.
-13. Final `pnpm verify` → **one** commit → push.
+15. Final `pnpm verify` → **one** commit → push.
 
 ---
 
-## 7. Memory-bank hygiene — stale records
+## 7. Memory-bank hygiene — the records are now derived
 
-The memory bank did **not** reflect the built code. This confused the next
-session. **The bolt records are now reconciled**; two smaller items remain.
+The memory bank did **not** reflect the built code. That confused the next
+session twice: first because the bolts said `planned` while the code was
+built, then because the story index said `planned` while the code was built.
+The fix was not to hand-edit the records again — it was to make the records
+**derived**, so that they cannot drift from the code they describe.
+
+**The authoritative source is each story file's `implemented` frontmatter.**
+Everything else — the index's Status column, the index's header count, each
+bolt's story checkboxes, each bolt's `status:`, and each story's own
+`status:` — is computed from it by `tools/reconcile-story-index.cjs`.
 
 - ~~`memory-bank/bolts/001`–`024` still say `status: planned` with no stage
-  artifacts, although the code for their stories **is built**.~~ — **FIXED.**
-  An audit of all 27 bolts against the story files' own `implemented` flag
-  found **7 stale records** — `005-identity`, `014-capture`, `015-location`,
-  `016-location`, `017-location`, `020-alerts`, `021-alerts` — whose stories
-  were **all** implemented but whose bolt still said `planned`. Those 7 now
-  say `status: complete`, carry `current_stage: null`, the three
-  `stages_completed` entries and a `completed` date, and their story
-  checkboxes are ticked.
-  The other **17** bolts (`001`–`004`, `006`–`013`, `018`, `019`, `022`–`024`)
-  say `planned` **correctly** — each still has at least one genuinely
-  unimplemented story. A bolt is not `complete` because it looks finished; it
-  is `complete` when every story it lists says `implemented: true`.
-  The stage artifacts point at the **story files**, because that is where the
-  design, the change record and the verification evidence actually live. The
-  `ddd-0*.md` files these bolts ask for were **never written**; writing them
-  retroactively would have been invented evidence, and a fabricated design
-  document is worse than a missing one.
-  **Bolt `009-help-seek` is now `complete`** — all three of its stories
-  (`005`, `006`, `008`) are implemented. **Bolt `010-help-seek` is still
-  `planned`** — its `007-find-a-station-map` landed, but
-  `004-graceful-degradation` (the location-denied and battery-saver
-  guidance) has not.
+  artifacts, although the code for their stories **is built**.~~ — **FIXED,
+  and now enforced.** The bolt's `status:` is `complete` only when **every**
+  story it lists is `complete`; a bolt that delivers a `partial` story is
+  `planned` because the work is not finished, but its checkbox for that
+  story **is** ticked — a `partial` story *is* delivered, it ships and works.
+  The 15 bolts whose checkboxes disagreed with the story files
+  (`001`–`003` foundation, `004`/`006` identity, `007`/`008` help-seek,
+  `011`–`013` capture, `018`/`019` alerts, `022`–`024` moderation) were
+  rewritten, and the tool now fails the build if they drift again.
+  The `ddd-0*.md` design files these bolts ask for were **never written**;
+  writing them retroactively would have been invented evidence, and a
+  fabricated design document is worse than a missing one. The stage artifacts
+  point at the **story files**, because that is where the design, the change
+  record and the verification evidence actually live.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
-  `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
-  now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 30 stories are `complete`, 24 are `planned`. A
-  programmatic cross-check of all 54 story files against the index reports
-  **0 mismatches** — 54 files, 54 rows, no duplicates, no orphans.
+  `007-secrets-and-environments`.~~ — **FIXED, and now enforced.** The Status
+  column and the header count are rewritten from the story files by
+  `node tools/reconcile-story-index.cjs --write`, and
+  `pnpm story:index:check` fails the build on any drift. The counts are
+  **31 `complete` · 22 `partial` · 1 `planned`** — 54 files, 54 rows, no
+  duplicates, no orphans, **0 mismatches**.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 30 story files
-  now say `true`; 24 still say `false`. The count is **24 of 54 stories**,
-  not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
+  unit `008-jobs-operations` say `true`.~~ — **FIXED.** The "62" figure was
+  itself stale (the index carries 54 rows). All **54** story files now carry a
+  state that is true: **31 `implemented: true`**, **22 `implemented: partial`**,
+  **1 `implemented: planned`**. The binary flag was replaced by a three-state
+  one because it could not carry the truth — see §6 item 12.
+- ~~A story's own `status:` could contradict its own `implemented:`.~~ —
+  **FIXED.** `004-graceful-degradation` said `status: ready` with
+  `implemented: true`. The story's `status:` is now derived too, and the
+  tool reports the contradiction.
+- ~~A `partial` story with no record of its gaps is just a softer way of
+  saying "planned".~~ — **FIXED.** Every `partial` story must carry an
+  `## Implementation` section naming the exact gaps, and the tool rejects
+  it if the section is missing. This was proved causally: stripping the
+  section from `003-area-filter-chips` makes the gate exit 1 with
+  *"003-area-filter-chips: is marked \"partial\" but has no
+  \"## Implementation\" section naming the gaps"*; restoring it returns the
+  gate to green.
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
   (`supabase/migrations/20261105000001_initial_schema.sql:75`) and the wizard
   step now writes it.
 
-**Fix:** when a bolt's work is done, update `bolt.md` (`status: complete`,
-`current_stage: null`, the three `stages_completed` entries), flip the story's
-`implemented: true`, and correct the story index. Do it as part of the bolt,
-not in a separate pass.
+**Fix:** the story file's `implemented` frontmatter is the **only** place a
+state is written by hand. Everything else — the index, the header count, the
+bolt checkboxes, the bolt `status:`, the story's `status:` — is derived.
+After changing a story's state, run:
+
+```bash
+node tools/reconcile-story-index.cjs --write   # rewrite the derived records
+pnpm story:index:check                        # prove they agree
+```
+
+Do it as part of the bolt, not in a separate pass.
 
 ---
 
@@ -599,30 +799,40 @@ apps/mobile/src/shared/      api/ (supabase, alerts, alertDetail, history,
                              dialer, permissions, usePermissions,
                              permissionRecovery, locationFix, osShare,
                              snapshotPayload, shareLocation, shareTelemetry,
-                             historyFilters), i18n/ (bn.ts, en.ts), theme/,
-                             ui/ (incl. StatusBanner, PermissionRow,
-                             HistoryFilterSheet, StationMap, MoreHelpSheet,
-                             WrongNumberSheet), utils/ (verifiedStamp)
+                             historyFilters, degradation, refreshGuard,
+                             useDegradedHelp, dialConfirmation), i18n/
+                             (bn.ts, en.ts), theme/, ui/ (incl. StatusBanner,
+                             PermissionRow, HistoryFilterSheet, StationMap,
+                             MoreHelpSheet, WrongNumberSheet, AreaChipRow,
+                             AlertCard), utils/ (verifiedStamp)
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 apps/admin/lib/              copy.ts, format.ts, api.ts
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         33 forward-only migrations
-supabase/tests/              9 SQL suites (411 assertions)
+supabase/migrations/         36 forward-only migrations
+supabase/tests/              10 SQL suites (457 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
-                             check-i18n-keys, probe-disabled-write,
-                             probe-biometric-gate, probe-alternate-phone,
-                             probe-signup-contract, probe-password-reset,
-                             probe-contacts-crud, probe-report-category,
-                             probe-public-alert, probe-server-side-write
+                             check-i18n-keys, reconcile-story-index,
+                             probe-disabled-write, probe-biometric-gate,
+                             probe-alternate-phone, probe-signup-contract,
+                             probe-password-reset, probe-contacts-crud,
+                             probe-report-category, probe-public-alert,
+                             probe-server-side-write, probe-capture-submit,
+                             probe-account-deletion
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md
 memory-bank/                 intents/, bolts/, standards/, story-index.md
 prototype ui.html            the design source of truth
 ```
+
+> **`tools/reconcile-story-index.cjs` is the memory-bank's source of truth.**
+> Run `node tools/reconcile-story-index.cjs --write` after changing a story's
+> `implemented` frontmatter; it rewrites the index's Status column, the
+> header count, the bolt checkboxes, the bolt `status:` and each story's own
+> `status:`. `pnpm story:index:check` proves they agree.
 
 ### Conventions
 
