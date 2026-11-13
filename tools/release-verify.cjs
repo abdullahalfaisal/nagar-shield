@@ -41,6 +41,22 @@ const EXPECTED_HOSTS = {
   production: '.supabase.co',
 };
 
+/**
+ * The EAS profile each environment builds with.
+ *
+ * The staging build is the `preview` profile — the runbook builds it with
+ * `eas build -p android --profile preview` and calls the stage "staging".
+ * Mapping the environment to the profile name here is what keeps
+ * `pnpm release:verify --env staging` pointed at the profile the staging APK
+ * is actually built from; looking for a profile literally named `staging`
+ * made the staging gate unsatisfiable.
+ */
+const PROFILE_NAMES = {
+  local: 'dev',
+  staging: 'preview',
+  production: 'production',
+};
+
 const results = [];
 
 function record(name, passed, detail = '') {
@@ -192,7 +208,7 @@ function assertProfileEnvVars(envName) {
   }
 
   const profiles = eas.build?.profiles ?? eas.build ?? {};
-  const profileName = envName === 'local' ? 'dev' : envName;
+  const profileName = PROFILE_NAMES[envName];
 
   const profile = profiles[profileName];
   if (!profile) {
@@ -224,6 +240,23 @@ function assertProfileEnvVars(envName) {
       'the build env vars match the target environment',
       false,
       `the ${profileName} profile still carries an unresolved placeholder`,
+    );
+    return;
+  }
+
+  // The URL is not the only value that must be resolved. A profile whose URL
+  // is real but whose **anon key** is still a placeholder would build an APK
+  // that authenticates against nothing, and the release gate would pass it
+  // through. Every env value in the profile is checked for a placeholder.
+  const unresolved = Object.entries(env)
+    .filter(([, value]) => String(value).includes('<'))
+    .map(([name]) => name);
+
+  if (unresolved.length > 0) {
+    record(
+      'the build env vars match the target environment',
+      false,
+      `the ${profileName} profile still carries an unresolved placeholder: ${unresolved.join(', ')}`,
     );
     return;
   }
@@ -351,8 +384,36 @@ function assertCertPinning(envName) {
     return;
   }
 
-  const count = String(pins).split(',').filter(Boolean).length;
-  record('the production artifact carries the cert-pinning config', true, `${count} pin(s)`);
+  // An unresolved placeholder is not a pin. `<sha256-pin-set>` split on a
+  // comma yields exactly one "pin", which used to satisfy the count check
+  // and pass a production build that pins nothing.
+  if (String(pins).includes('<')) {
+    record(
+      'the production artifact carries the cert-pinning config',
+      false,
+      'the production profile still carries an unresolved pin-set placeholder',
+    );
+    return;
+  }
+
+  // A single digest with no backup is a permanent lockout risk — the
+  // rotation procedure requires the next certificate's digest to ship
+  // **before** the old one expires.
+  const digests = String(pins)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (digests.length < 2) {
+    record(
+      'the production artifact carries the cert-pinning config',
+      false,
+      `the pin set carries ${digests.length} digest(s) and no backup pin`,
+    );
+    return;
+  }
+
+  record('the production artifact carries the cert-pinning config', true, `${digests.length} pin(s)`);
 }
 
 function main() {

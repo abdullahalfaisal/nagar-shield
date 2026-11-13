@@ -268,11 +268,67 @@ other one-off probes were deleted.
 `extract-design-tokens.cjs`, `dump-screen.cjs`, `dump-lines.cjs` are the
 specsmd toolchain — **kept**.
 
-### 🟡 B4 — `eas.json` still carries placeholders
+### 🟡 B4 — `eas.json` still carries hosted-project placeholders
 
-`<staging-ref>`, `<production-ref>`, `<production-anon-key>`,
-`<sha256-pin-set>`. `pnpm release:verify` correctly **fails** on these, so
-staging and production builds are blocked until real values land.
+**The `dev` profile is resolved.** It now carries the real local stack's
+URL (`http://127.0.0.1:54321`) and the local stack's **anon** key — the
+same publishable key `apps/mobile/.env` holds. The anon key is public by
+construction (RLS-scoped, not secret), and a development-client build
+talks to the local stack, so embedding it is correct.
+
+**The `preview` and `production` profiles still carry five placeholders.**
+These are credentials for a **hosted** Supabase project and cannot be
+derived from the repository — no Supabase project is linked
+(`supabase/.temp/project-ref` does not exist; `supabase projects list`
+reports no access token):
+
+| Placeholder | Profile | What the maintainer supplies |
+|---|---|---|
+| `<staging-ref>` | `preview` | the staging project ref (the slug in `https://<ref>.supabase.co`) |
+| `<staging-anon-key>` | `preview` | the staging publishable anon key |
+| `<production-ref>` | `production` | the production project ref — also the `EXPO_PUBLIC_API_HOST` |
+| `<production-anon-key>` | `production` | the production publishable anon key |
+| `<sha256-pin-set>` | `production` | the API host's SHA-256 SPKI digests, comma-separated, **with a backup pin** |
+
+`pnpm release:verify` correctly **fails** on these, so the staging and
+production builds are blocked until the values land.
+
+**Two defects in the release gate were found and fixed** in
+`tools/release-verify.cjs`:
+
+1. **The staging stage could never pass.** The verifier looked for an EAS
+   profile named `staging`, but the staging APK is built from the
+   **`preview`** profile (`eas build --profile preview`, runbook line 61).
+   `--env staging` therefore always reported *"the staging profile is
+   missing from eas.json"* — a false negative that would have blocked a
+   correctly-built staging release. The environment is now mapped to the
+   profile it is actually built from (`local → dev`, `staging → preview`,
+   `production → production`).
+2. **The certificate-pinning assertion passed on a placeholder.** The pin
+   set was checked by counting comma-separated entries, and
+   `<sha256-pin-set>` splits into exactly **one** — so a production
+   profile that pinned *nothing* satisfied the assertion and the gate
+   reported success. The assertion now rejects an unresolved placeholder
+   and requires **at least two** digests: a single pin with no backup is a
+   permanent lockout risk, because the rotation procedure needs the next
+   certificate's digest to ship *before* the old one expires.
+
+A third gap closed alongside them: the placeholder check only examined
+`EXPO_PUBLIC_SUPABASE_URL`, so a profile with a real URL but a placeholder
+**anon key** would have built an APK that authenticates against nothing
+and passed the gate. Every env value in the profile is now checked.
+
+The gate was proved in **both** directions: with the placeholders in place
+`--env local` passes all five assertions and `--env staging` /
+`--env production` fail; with real-shaped values substituted temporarily
+both hosted stages **pass** all five assertions. The file was restored
+afterwards.
+
+**Also:** migrations 031–033 exist in the repo but were not recorded in
+the local `supabase_migrations.schema_migrations` table (the DB container
+had been recreated), so `--env local` failed its migration assertion. They
+are applied and recorded now — the gate reports 34 migrations, matching
+`supabase/migrations/` exactly.
 
 ---
 
@@ -448,11 +504,19 @@ Ordered by dependency. Bolt numbers in brackets.
     database defects were found. ~~**R5**~~ ✅ **DONE** — the local `.env`
     files exist (see §5).
     ~~**The memory-bank bolt records**~~ ✅ **DONE** — see §7.
-12. **B4, and the git remote.** `eas.json` still carries `<staging-ref>`,
-    `<production-ref>`, `<production-anon-key>` and `<sha256-pin-set>`.
-    `pnpm release:verify` correctly **fails** on these, so the staging and
-    production builds are blocked until real values land — that is a
-    credentials decision, not a code decision.
+12. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
+    placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries
+    the real local stack's URL and anon key. The `preview` and `production`
+    profiles still need five hosted-project values — the staging ref and
+    anon key, the production ref and anon key, and the SHA-256 pin set
+    (with a backup pin). No Supabase project is linked, so these are a
+    **credentials** decision, not a code decision: the maintainer who owns
+    the hosted projects supplies them. **Two defects in the release gate
+    itself were found and fixed** in the process — the staging stage looked
+    for a profile named `staging` when the staging APK is built from
+    `preview`, and the certificate-pinning assertion counted
+    `<sha256-pin-set>` as one valid pin. See §3 for the full account.
+    **The git remote is still unset** — the push needs the remote URL.
 13. Final `pnpm verify` → **one** commit → push.
 
 ---

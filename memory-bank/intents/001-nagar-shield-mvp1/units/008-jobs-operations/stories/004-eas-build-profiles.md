@@ -105,6 +105,85 @@ implemented: true
   - Confirm the launch: `adb shell monkey -p com.nagarshield.app -c android.intent.category.LAUNCHER 1`
   - Scan the artifact: `pnpm secret:scan --app app-release.apk`
 
+## Implementation
+
+### What the profile values resolve to
+
+The `dev` profile carries the **real** local stack's values: the local
+Supabase URL (`http://127.0.0.1:54321`) and the local stack's **anon**
+key — the same publishable key `apps/mobile/.env` holds. The anon key is
+public by construction (it is scoped by RLS, not by secrecy), and the
+`dev` profile is a development-client build that talks to the local stack,
+so embedding it is correct and it carries no secret.
+
+The `preview` and `production` profiles still carry placeholders:
+
+| Placeholder | Profile | What it needs |
+|---|---|---|
+| `<staging-ref>` | `preview` | the staging Supabase project ref — the 20-character slug in `https://<ref>.supabase.co` |
+| `<staging-anon-key>` | `preview` | the staging project's publishable anon key |
+| `<production-ref>` | `production` | the production Supabase project ref (also the `EXPO_PUBLIC_API_HOST`) |
+| `<production-anon-key>` | `production` | the production project's publishable anon key |
+| `<sha256-pin-set>` | `production` | the API host's SHA-256 subject-public-key digests, comma-separated, **with a backup pin** |
+
+These are **credentials for a hosted Supabase project**, not code. There
+is no Supabase project linked (`supabase/.temp/project-ref` does not
+exist and `supabase projects list` reports no access token), so the
+values cannot be derived from the repository — they are supplied by the
+maintainer who owns the hosted projects.
+
+The `eas.json` is **not** where the service-role key lives, and it never
+will be: the service-role key bypasses every RLS policy, and an
+`EXPO_PUBLIC_`-prefixed value is inlined into the JS bundle. It stays in
+the Edge Functions and the GitHub Environment secrets.
+
+### The release gate was wrong in two ways
+
+`pnpm release:verify` is the mechanical gate for this story, and it had
+two defects that made it unsound. Both are fixed in
+`tools/release-verify.cjs`:
+
+1. **The staging stage could never pass.** The verifier looked for an EAS
+   profile literally named `staging`, but the staging APK is built from the
+   **`preview`** profile (`eas build -p android --profile preview`, runbook
+   line 61). `pnpm release:verify --env staging` therefore always reported
+   *"the staging profile is missing from eas.json"* — a false negative that
+   would have blocked a correctly-built staging release. The verifier now
+   maps the environment to the profile name it is actually built from
+   (`local → dev`, `staging → preview`, `production → production`).
+
+2. **The certificate-pinning assertion passed on a placeholder.** The
+   production pin set was checked by counting the comma-separated entries,
+   and `<sha256-pin-set>` splits into exactly **one** entry — so a
+   production profile that pinned *nothing* satisfied the assertion and
+   the release gate reported success. The assertion now rejects an
+   unresolved placeholder outright, and requires **at least two** digests:
+   a single pin with no backup is a permanent lockout risk, because the
+   rotation procedure requires the next certificate's digest to ship
+   *before* the old one expires.
+
+A third gap was closed alongside them: the placeholder check only examined
+`EXPO_PUBLIC_SUPABASE_URL`. A profile with a real URL but a placeholder
+**anon key** would have built an APK that authenticates against nothing
+and passed the gate. Every env value in the profile is now checked.
+
+### Verification
+
+The gate's behaviour was proved in both directions, not just observed:
+
+- With the committed placeholders in place, `--env local` passes all five
+  assertions and `--env staging` / `--env production` fail on the
+  placeholder — the correct outcome, because the hosted credentials are
+  not yet supplied.
+- With real-shaped values substituted temporarily (a plausible project ref,
+  a plausible anon key, a two-digest pin set), `--env staging` and
+  `--env production` **both** pass all five assertions. The file was
+  restored immediately afterwards, and `git diff` confirms only the `dev`
+  anon key differs from the committed file.
+
+`--env local` reports 34 migrations, matching the repo's
+`supabase/migrations/` exactly.
+
 ## Dependencies
 
 ### Requires
