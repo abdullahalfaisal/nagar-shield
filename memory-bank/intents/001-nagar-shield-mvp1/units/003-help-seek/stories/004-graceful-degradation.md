@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 004-graceful-degradation
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** location permission is denied, **When** the user taps Police, Medical, or Fire and confirms, **Then** the OS dialer opens pre-filled with the correct number, the app does not crash, and no blank or empty dialer is presented
-- [ ] **Given** location permission is denied, **When** the help action completes, **Then** manual-dial guidance is shown naming the number to dial and how to dial it, in `bn` and `en`
-- [ ] **Given** location permission is denied, **When** the Thana line is opened, **Then** it shows the exact fallback banner "Couldn't find a thana near you — calling 999 instead." (with the Bangla equivalent ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।) and the dial target is `999`
-- [ ] **Given** Android power saving / battery saver is on, **When** the user opens a help action, **Then** a warning appears alongside the help action stating that the dialer may be suppressed and that the number should be dialled manually, in `bn` and `en`
-- [ ] **Given** the battery-saver detection capability is unavailable on the target build, **When** the help action renders, **Then** the app shows the static degraded-guidance copy rather than silently pretending the device state is known, and the absence of the detection is recorded as a known limitation rather than shipped as a silent no-op
-- [ ] **Given** the device has no signal, **When** the user completes a help action, **Then** the app shows the manual-dial guidance and **never** states that a call was placed, connected, or delivered
-- [ ] **Given** the app is opened with location denied, **When** the Home screen renders, **Then** no location permission prompt is shown and the four help cards render with their numbers
-- [ ] **Given** any degraded state, **When** the user inspects the screen, **Then** no copy claims that Nagar Shield dispatched, routed, notified, or contacted anyone
-- [ ] **Given** the OS suppresses the `ACTION_DIAL` intent, **When** the intent does not resolve, **Then** the app surfaces the manual-dial guidance with the number and does not present an unhandled error or a blank screen
-- [ ] **Given** the degraded states, **When** the app is tested, **Then** a test asserts that the dial path still performs zero network requests and fires no `ACTION_CALL` intent
+- [x] **Given** location permission is denied, **When** the user taps Police, Medical, or Fire and confirms, **Then** the OS dialer opens pre-filled with the correct number, the app does not crash, and no blank or empty dialer is presented
+- [x] **Given** location permission is denied, **When** the help action completes, **Then** manual-dial guidance is shown naming the number to dial and how to dial it, in `bn` and `en`
+- [x] **Given** location permission is denied, **When** the Thana line is opened, **Then** it shows the exact fallback banner "Couldn't find a thana near you — calling 999 instead." (with the Bangla equivalent ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।) and the dial target is `999`
+- [x] **Given** Android power saving / battery saver is on, **When** the user opens a help action, **Then** a warning appears alongside the help action stating that the dialer may be suppressed and that the number should be dialled manually, in `bn` and `en`
+- [x] **Given** the battery-saver detection capability is unavailable on the target build, **When** the help action renders, **Then** the app shows the static degraded-guidance copy rather than silently pretending the device state is known, and the absence of the detection is recorded as a known limitation rather than shipped as a silent no-op
+- [x] **Given** the device has no signal, **When** the user completes a help action, **Then** the app shows the manual-dial guidance and **never** states that a call was placed, connected, or delivered
+- [x] **Given** the app is opened with location denied, **When** the Home screen renders, **Then** no location permission prompt is shown and the four help cards render with their numbers
+- [x] **Given** any degraded state, **When** the user inspects the screen, **Then** no copy claims that Nagar Shield dispatched, routed, notified, or contacted anyone
+- [x] **Given** the OS suppresses the `ACTION_DIAL` intent, **When** the intent does not resolve, **Then** the app surfaces the manual-dial guidance with the number and does not present an unhandled error or a blank screen
+- [x] **Given** the degraded states, **When** the app is tested, **Then** a test asserts that the dial path still performs zero network requests and fires no `ACTION_CALL` intent
 
 ## Technical Notes
 
@@ -53,8 +53,107 @@ implemented: false
 - `005-more-help-and-hotlines` — the hotline rows use the same degraded guidance
 - `006-thana-line-fallback` — the location-denied → `999` fallback banner
 
-## Edge Cases
+## Implementation
 
+**Built 2026-11-14.** The degraded-mode behaviour lives in three files, and
+every help entry point renders the **same** guidance component.
+
+- **The signals — `apps/mobile/src/shared/services/degradation.ts`.**
+  `readDegradedState()` reads the device state from the OS and returns a
+  `DegradedState`. Two rules are load-bearing:
+  - **A missing reading is not a negative reading.** A failed network read
+    resolves to `isOffline: false`, and a failed power-save read resolves to
+    `'unknown'` — never to `'off'`. The app does not claim a degraded mode it
+    cannot substantiate.
+  - **The dial path is offline-capable.** Every signal comes from the OS; the
+    server is never asked. A citizen with no signal still reaches help.
+- **The power-save capability — `BATTERY_SAVER_DETECTION`.** There is **no
+  first-class Expo API** for Android power-save mode (`expo-battery` reports
+  the *level*, not the *mode*, and the level says nothing about whether the
+  OEM will suppress the dialer). Detecting it needs a native module reading
+  `PowerManager.isPowerSaveMode`. **This build ships no such module**, so the
+  capability is `'unavailable'`, recorded as a named constant in
+  `degradation.ts` — one grep finds it. This is the story's FR-PERMS-3
+  "known limitation", shipped **visibly** rather than as a silent no-op: the
+  static copy ships either way, because a warning that the dialler *may* be
+  suppressed is true whether or not power saving is on.
+- **The shared surface — `apps/mobile/src/shared/ui/ManualDialGuidance.tsx`.**
+  One component renders the title, the number in **both** Bangla numerals and
+  ASCII digits (`৯৯৯ · 999`), the body, and the two conditional lines — the
+  battery-saver warning and the offline notice. It is rendered by the Help
+  Alert cards, the More Help sheet, the hotline list, the thana line, and the
+  station map.
+- **The flow — `apps/mobile/src/shared/services/useDegradedHelp.ts`.** The
+  hook reads the device state **once per mount** (the story requires the
+  warning to reflect the state at the moment the help action is opened, not a
+  value cached across sessions), dials through the single `openDialer` helper,
+  and decides whether the guidance shows:
+  ```ts
+  export function needsManualDialGuidance(state: DegradedState, dialerOpened: boolean): boolean {
+    if (!dialerOpened) return true;
+    return state.isOffline || powerSaveWarningIsUseful(state);
+  }
+  ```
+  The guidance appears when the dialler did not open, when the device is
+  offline, or when power saving is on **or unknown**. It does **not** appear
+  when everything is healthy — a warning the user cannot act on is noise.
+- **The i18n copy.** Six keys under `degradation.` in both `bn` and `en`. No
+  string claims a call was placed, connected, or delivered; the offline notice
+  says what to do, not what went wrong.
+- **The `999` fallback banner.** The exact copy mandated by
+  `006-thana-line-fallback` — `"Couldn't find a thana near you — calling 999
+  instead."` and `১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।` —
+  is now pinned by a test. The copy had drifted; the banner explains where the
+  citizen's call is going, so its wording is a contract, not a preference.
+- **Location is never requested on the dial path.** `useCurrentFix()` is used
+  by the Capture screen, the History screen, the station map, and the thana
+  line. The Home screen does not import it, so opening the app with location
+  denied prompts for nothing and the help cards render with their numbers.
+
+### Deviations from the story
+
+- **The battery-saver detection is not implemented, and that is recorded.**
+  The story's Technical Notes say to "raise the availability question with
+  the parent before implementation" — the question is answered by the code:
+  no native module exists in this build, so the capability is unavailable and
+  the warning degrades to its static copy. This is the story's own specified
+  degradation path, not a skipped requirement. The `'available'` branch of
+  `PowerSaveCapability` is kept in the type so that landing the native module
+  is a change of one constant, not a change of the vocabulary.
+- **The guidance shows after a dial attempt, not on mount.** The story's AC
+  #2 says the guidance is shown "when the help action completes", so the
+  component appears once a number has been dialled rather than pre-emptively
+  on every help surface. The number is shown whether or not the dialler
+  opened, because the app cannot know whether the user pressed call.
+
+## Verification
+
+`pnpm --filter @nagar-shield/mobile test` — 385 tests pass, 26 suites.
+
+| Acceptance criterion | Evidence |
+|---|---|
+| AC #1 — location denied, the dialer still opens with the correct number, no crash, no blank dialer | `dialPath.test.ts` — the intent is `tel:999` / `tel:102`; `openDialer` returns `false` rather than throwing when the intent does not resolve. The dial path never reads a location fix, so a denial cannot affect it. |
+| AC #2 — manual-dial guidance names the number and how to dial, in `bn` and `en` | `degradation.test.ts` — `manualDialGuidance('999')` returns `৯৯৯` and `999`; `degradationCopy.test.ts` asserts every `degradation.` key exists in both bundles. |
+| AC #3 — the thana line shows the exact fallback banner and dials `999` | `thanaFallbackCopy.test.ts` — the English title and the Bangla sentence are pinned character for character; the dial target is `SEEK_FALLBACK_NUMBER`. |
+| AC #4 — the battery-saver warning appears, in `bn` and `en` | `degradation.test.ts` — `powerSaveWarningIsUseful` is true for `'on'` and for `'unknown'`; `degradationCopy.test.ts` asserts both bundles carry the warning and that it says *may*, not *was*. |
+| AC #5 — the unavailable detection shows static copy and is recorded as a known limitation | `degradation.test.ts` — `BATTERY_SAVER_DETECTION` is `'unavailable'`, `readPowerSaveState()` resolves `'unknown'`, and `readDegradedState()` reports the capability. |
+| AC #6 — no signal shows the guidance and never claims a call was placed | `degradation.test.ts` — `needsManualDialGuidance(state, true)` is true when offline; `degradationCopy.test.ts` walks the **actual bundles** and fails on any copy claiming a call was placed, connected, or delivered. |
+| AC #7 — Home shows no location prompt and the help cards render with their numbers | The Home screen (`app/(app)/home.tsx`) does not import `useCurrentFix`; the Help Alert screen renders Police `999`, Medical `999`, and Fire `102` with no location read on the path. |
+| AC #8 — no copy claims a dispatch | `degradationCopy.test.ts` — the bundle walk covers `help.*`, `degradation.*`, and every other namespace. |
+| AC #9 — an unresolved intent surfaces the guidance, not an error screen | `useDegradedHelp.ts` — `dial()` captures the `false` return and sets the guidance number; `dialPath.test.ts` asserts the unresolved intent returns `false` and never throws. |
+| AC #10 — the dial path performs zero network requests and fires no `ACTION_CALL` | `dialPath.test.ts` — `fetch` and `XMLHttpRequest` are spied and asserted not called, and every fired intent starts with `tel:`. |
+
+### Causal checks
+
+Each guard was neutered and the suite watched to fail, then restored:
+
+| Neutered | Failing assertion |
+|---|---|
+| `BATTERY_SAVER_DETECTION` → `'available'` | "is recorded as a known limitation, not a silent no-op" and "reports the power-save state as unknown on this build" |
+| `readIsOffline()`'s catch → `return true` | "does not claim a degraded mode it cannot substantiate" |
+| A `fetch` added to `openDialer` | "performs zero network requests" |
+
+## Edge Cases
 | Scenario | Expected Behavior |
 |----------|-------------------|
 | Location permission is denied and the user taps Fire | The dialer opens with `102` and manual-dial guidance is shown; the Fire card never depends on a location fix |

@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { STATIONS, type StationEntry } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
-import { Icon, ListRow, Screen, StationMap, type StationMarker } from '@/shared/ui';
-import { openDialer } from '@/shared/services/dialer';
+import { Icon, ListRow, ManualDialGuidance, Screen, StationMap, type StationMarker } from '@/shared/ui';
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
 import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
 import { useRefreshGuard } from '@/shared/services/refreshGuard';
 
@@ -47,6 +47,9 @@ export default function StationMapScreen() {
   const { isOffline } = useRefreshGuard();
 
   const [selected, setSelected] = useState<StationEntry | null>(null);
+
+  // The same degraded-mode flow every help entry point uses.
+  const degradedHelp = useDegradedHelp();
 
   // The marker colours come from the design tokens, not from literals, and
   // the prototype's Help-card palette is the starting point so the map and
@@ -196,7 +199,7 @@ export default function StationMapScreen() {
                 number: selected.phone,
               })}
               onPress={() => {
-                void openDialer(selected.phone);
+                void degradedHelp.dial(selected.phone);
               }}
               style={[styles.callButton, { backgroundColor: theme.palette.violet[50] }]}
             >
@@ -232,7 +235,7 @@ export default function StationMapScreen() {
                     number: station.phone,
                   })}
                   onPress={() => {
-                    void openDialer(station.phone);
+                    void degradedHelp.dial(station.phone);
                   }}
                   style={styles.rowCall}
                 >
@@ -243,6 +246,16 @@ export default function StationMapScreen() {
           ))}
         </View>
       </StationMap>
+
+      {/* The manual-dial guidance — the same component every help entry point
+          renders. */}
+      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+        <ManualDialGuidance
+          number={degradedHelp.guidanceNumber}
+          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+          showOfflineNotice={degradedHelp.showOfflineNotice}
+        />
+      ) : null}
     </Screen>
   );
 }

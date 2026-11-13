@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { HOTLINES, type HotlineEntry } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
-import { Icon, ListRow, Screen, WrongNumberSheet } from '@/shared/ui';
-import { openDialer } from '@/shared/services/dialer';
+import { Icon, ListRow, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui';
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
 import { formatVerifiedStamp, isVerificationStale } from '@/shared/utils/verifiedStamp';
 
 /**
@@ -35,6 +35,9 @@ export default function MoreHelpScreen() {
   const { t, i18n } = useTranslation();
 
   const [reporting, setReporting] = useState<HotlineEntry | null>(null);
+
+  // The same degraded-mode flow every help entry point uses.
+  const degradedHelp = useDegradedHelp();
 
   // The bundled list is already sorted by `sortOrder` by the shared package;
   // the filter keeps only the **active** entries, so a retired row never
@@ -68,7 +71,7 @@ export default function MoreHelpScreen() {
                   number: hotline.phone,
                 })}
                 onPress={() => {
-                  void openDialer(hotline.phone);
+                  void degradedHelp.dial(hotline.phone);
                 }}
                 trailing={
                   <View style={styles.trailing}>
@@ -100,6 +103,16 @@ export default function MoreHelpScreen() {
           );
         })}
       </View>
+
+      {/* The manual-dial guidance — the same component every help entry point
+          renders. */}
+      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+        <ManualDialGuidance
+          number={degradedHelp.guidanceNumber}
+          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+          showOfflineNotice={degradedHelp.showOfflineNotice}
+        />
+      ) : null}
 
       <WrongNumberSheet
         visible={reporting !== null}

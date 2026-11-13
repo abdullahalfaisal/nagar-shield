@@ -18,6 +18,7 @@ export { InputField } from './InputField';
 export { ListRow, type IconTone } from './ListRow';
 export { ListRowGroup, CountRow, MapViewLink } from './ListRowGroup';
 export { LocationPill } from './LocationPill';
+export { ManualDialGuidance } from './ManualDialGuidance';
 export { MoreHelpSheet } from './MoreHelpSheet';
 export { PermissionRow } from './PermissionRow';
 export { PulseDot } from './PulseDot';

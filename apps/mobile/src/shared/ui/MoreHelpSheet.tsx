@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { MORE_HELP_ROWS } from '@nagar-shield/shared';
 import { useTheme } from '../theme';
 import { Icon } from './Icon';
-import { openDialer } from '../services/dialer';
+import { ManualDialGuidance } from './ManualDialGuidance';
+import { useDegradedHelp } from '../services/useDegradedHelp';
 
 /**
  * The More Help sheet.
@@ -51,12 +52,16 @@ export function MoreHelpSheet({
   const router = useRouter();
   const { t } = useTranslation();
 
+  // The same degraded-mode flow the help cards use. The hotline rows dial
+  // through the same door, so they get the same guidance.
+  const degradedHelp = useDegradedHelp();
+
   if (!visible) return null;
 
   const dial = async (phone: string) => {
     // The dial path is client-only: the OS dialler is pre-filled and the app
     // never places a call (C-1).
-    await openDialer(phone);
+    await degradedHelp.dial(phone);
   };
 
   const openHotlineList = () => {
@@ -139,6 +144,16 @@ export function MoreHelpSheet({
             onPress={openStationMap}
           />
         </ScrollView>
+
+        {/* The manual-dial guidance — the same component the help cards
+            render. One surface, one behaviour. */}
+        {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+          <ManualDialGuidance
+            number={degradedHelp.guidanceNumber}
+            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+            showOfflineNotice={degradedHelp.showOfflineNotice}
+          />
+        ) : null}
 
         <Text
           accessibilityRole="button"

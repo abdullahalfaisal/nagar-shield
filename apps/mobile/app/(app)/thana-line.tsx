@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SEEK_FALLBACK_NUMBER } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
-import { Button, Icon, Screen, WrongNumberSheet } from '@/shared/ui';
+import { Button, Icon, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui';
 import { useNearestThana } from '@/shared/api/stations';
-import { openDialer } from '@/shared/services/dialer';
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
 import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
 
 /**
@@ -42,6 +42,11 @@ export default function ThanaLineScreen() {
   const { data, isLoading, error } = useNearestThana(origin.lat, origin.lng, 10);
 
   const [reporting, setReporting] = useState(false);
+
+  // The degraded-mode flow. The thana line's dial target is decided
+  // server-side, but the dial itself is client-only and degrades the same
+  // way every other help entry point does.
+  const degradedHelp = useDegradedHelp();
 
   // The RPC's answer, rendered as-is. `fallback` true means the rule fired
   // and the target is 999.
@@ -142,7 +147,7 @@ export default function ThanaLineScreen() {
       <Button
         label={`${t('help.callNow')} · ${target}`}
         onPress={() => {
-          void openDialer(target);
+          void degradedHelp.dial(target);
         }}
         style={styles.call}
         accessibilityLabel={
@@ -151,6 +156,18 @@ export default function ThanaLineScreen() {
             : t('help.hotlineCallLabel', { name: SEEK_FALLBACK_NUMBER, number: SEEK_FALLBACK_NUMBER })
         }
       />
+
+      {/* The manual-dial guidance — the same component every help entry point
+          renders. The thana line is no exception: the dial target is on
+          screen, and if the dialler did not open the user still needs the
+          number. */}
+      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+        <ManualDialGuidance
+          number={degradedHelp.guidanceNumber}
+          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+          showOfflineNotice={degradedHelp.showOfflineNotice}
+        />
+      ) : null}
 
       {station ? (
         <Pressable

@@ -169,7 +169,7 @@ export const en: TranslationSchema = {
     thanaDistance: '{{distance}} km away',
     thanaCallLabel: 'Call {{name}} police station',
     thanaFallback: 'If no station is within 10 km, the call routes to 999.',
-    thanaFallbackTitle: 'No station near you — calling 999 instead.',
+    thanaFallbackTitle: "Couldn't find a thana near you — calling 999 instead.",
     thanaManual: 'You can also dial 999 yourself.',
     thanaLocationDenied: 'Showing stations from the centre of Dhaka — location is off.',
     // The wrong-number report sheet.
@@ -565,5 +565,23 @@ export const en: TranslationSchema = {
     noteRequired: 'A note is required for every decision',
     confirmDecision: 'Confirm',
     auditLog: 'Action log',
+  },
+  // The degraded-mode copy. Every string here says only what is true: the app
+  // hands a number to the OS dialler and the user presses call. No string
+  // claims a call was placed, connected, or delivered (constraint C-1).
+  degradation: {
+    manualDialTitle: 'Dial this number yourself',
+    manualDialBody: 'Open your phone dialler and dial the number above.',
+    manualDialLabel: 'Dial this number yourself. Number: {{number}}',
+    // The battery-saver warning is a warning, not a guarantee. It says the
+    // dialler *may* be suppressed — never that it was.
+    batterySaverWarning:
+      'Battery saver is on, or this phone does not let the app check. The dialler may be suppressed — dial the number yourself.',
+    // The offline notice never says a call failed. It says what to do.
+    offlineNotice: 'This phone has no signal. Dial the number yourself.',
+    // The static copy — shown when the app cannot detect the device state.
+    // It is shipped deliberately, not as a silent no-op.
+    detectionUnavailable:
+      'This phone does not tell the app whether battery saver is on. If the dialler does not open, dial the number yourself.',
   },
 };

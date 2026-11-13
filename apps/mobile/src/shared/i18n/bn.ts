@@ -162,7 +162,7 @@ export const bn = {
     thanaDistance: '{{distance}} কিমি দূরে',
     thanaCallLabel: '{{name}} থানায় কল করুন',
     thanaFallback: '১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।',
-    thanaFallbackTitle: 'কাছে কোনো থানা নেই — ৯৯৯ এ কল করা হবে।',
+    thanaFallbackTitle: 'কাছে কোনো থানা পাওয়া গেল না — ৯৯৯ এ কল করা হবে।',
     thanaManual: 'নিজে থেকেও ৯৯৯ নম্বরে কল করতে পারেন।',
     thanaLocationDenied: 'লোকেশন না পেলে ঢাকার কেন্দ্র থেকে দেখানো হচ্ছে।',
     // The wrong-number report sheet.
@@ -556,6 +556,24 @@ export const bn = {
     noteRequired: 'সিদ্ধান্তের নোট আবশ্যক',
     confirmDecision: 'নিশ্চিত করুন',
     auditLog: 'অ্যাকশন লগ',
+  },
+  // The degraded-mode copy. Every string here says only what is true: the app
+  // hands a number to the OS dialler and the user presses call. No string
+  // claims a call was placed, connected, or delivered (constraint C-1).
+  degradation: {
+    manualDialTitle: 'নিজে থেকেও নম্বরে কল করুন',
+    manualDialBody: 'ফোনের ডায়ালার খুলে উপরের নম্বরে কল করুন।',
+    manualDialLabel: 'নিজে থেকেও নম্বরে কল করুন। নম্বর: {{number}}',
+    // The battery-saver warning is a warning, not a guarantee. It says the
+    // dialler *may* be suppressed — never that it was.
+    batterySaverWarning:
+      'ব্যাটারি সেভার চালু, অথবা এই ফোন অ্যাপকে সেটি জানতে দেয় না। ডায়ালার বন্ধ থাকতে পারে — নিজে থেকেও নম্বরে কল করুন।',
+    // The offline notice never says a call failed. It says what to do.
+    offlineNotice: 'এই ফোনে সিগন্যাল নেই। নিজে থেকেও নম্বরে কল করুন।',
+    // The static copy — shown when the app cannot detect the device state.
+    // It is shipped deliberately, not as a silent no-op.
+    detectionUnavailable:
+      'এই ফোন অ্যাপকে জানায় না ব্যাটারি সেভার চালু আছে কি না। ডায়ালার না খুললে নিজে থেকেও নম্বরে কল করুন।',
   },
 };
 

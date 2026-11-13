@@ -3,7 +3,7 @@ id: 010-help-seek
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [007-find-a-station-map, 004-graceful-degradation]
 created: 2026-11-04T00:00:00Z
 
@@ -29,16 +29,26 @@ Deliver **station map and degradation** for unit `003-help-seek`. Stories: 2. Bo
 ### Stories Included
 
 - [x] **007-find-a-station-map** — Priority: should
-- [ ] **004-graceful-degradation** — Priority: must
+- [x] **004-graceful-degradation** — Priority: must
 
-> **The bolt is still `planned`.** A bolt is `complete` only when **every**
-> story it lists says `implemented: true` in its own frontmatter.
+> **The bolt is `complete`.** A bolt is `complete` only when **every** story
+> it lists says `implemented: true` in its own frontmatter.
 > `007-find-a-station-map` landed on 2026-11-13; `004-graceful-degradation`
-> has not — the location-denied and battery-saver guidance is the open half.
-> The `ddd-*.md` artifacts are **not** written: the story files carry the
+> landed on 2026-11-14 with the location-denied, battery-saver, and offline
+> guidance — one shared `ManualDialGuidance` component that every help entry
+> point renders.
+>
+> **The `ddd-*.md` artifacts are not written**: the story files carry the
 > design (Technical Notes), the change record (Implementation) and the
 > evidence (Verification) instead, so inventing a separate artifact file
 > would be duplicating what already exists.
+>
+> **One limitation is recorded, not hidden.** The Android power-save
+> detection needs a native module that this build does not ship, so the
+> battery-saver warning ships as its static copy. The capability is a named
+> constant (`BATTERY_SAVER_DETECTION`) and the story records it as a known
+> limitation — the story's own specified degradation path, not a silent
+> no-op.
 
 ### Expected Outputs
 

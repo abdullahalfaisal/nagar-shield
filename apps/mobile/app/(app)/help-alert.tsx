@@ -6,8 +6,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/shared/theme';
 import { Icon } from '@/shared/ui/Icon';
+import { ManualDialGuidance } from '@/shared/ui/ManualDialGuidance';
 import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet';
-import { openDialer } from '@/shared/services/dialer';
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
 import { useContacts } from '@/shared/api/contacts';
 import { toBengaliDigits } from '@/shared/utils/relativeTime';
 
@@ -38,8 +39,13 @@ export default function HelpAlertScreen() {
   const { data: contacts } = useContacts();
   const contactCount = useMemo(() => contacts?.length ?? 0, [contacts]);
 
+  // The degraded-mode flow. The dial path is client-only — the number is
+  // bundled and the intent goes straight to the OS — so a phone with no
+  // signal, no location, and battery saver on still reaches help.
+  const degradedHelp = useDegradedHelp();
+
   const dial = async (number: string) => {
-    await openDialer(number);
+    await degradedHelp.dial(number);
   };
 
   return (
@@ -113,6 +119,17 @@ export default function HelpAlertScreen() {
           number={`${toBengaliDigits(String(contactCount))} জন`}
           onPress={() => router.push('/(app)/contacts')}
         />
+
+        {/* The manual-dial guidance. It renders after the tiles, so the
+            number on the tile the user tapped and the guidance about it
+            appear together. */}
+        {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+          <ManualDialGuidance
+            number={degradedHelp.guidanceNumber}
+            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+            showOfflineNotice={degradedHelp.showOfflineNotice}
+          />
+        ) : null}
 
         {/* The dashed "More Help" card. */}
         <Pressable
