@@ -255,8 +255,9 @@ jobs:
         run: pnpm shared:check
 
       # The SQL suites — the schema contract, the business rules, the read
-      # models, the write guards, the password-reset contract, and the
-      # contacts contract — against the freshly migrated database.
+      # models, the write guards, the password-reset contract, the contacts
+      # contract, and the report-category contract — against the freshly
+      # migrated database.
       - name: run the SQL test suites
         run: pnpm db:test
 
@@ -414,6 +415,27 @@ jobs:
       # refused by the `contacts_phone_format` CHECK.
       - name: the emergency-contacts CRUD contract
         run: pnpm contacts:check
+
+      # The report-detail category contract, proved through the same door:
+      # GoTrue → PostgREST → the `update_category` RPC → the RLS policies.
+      #
+      # The probe signs in as **two** seeded citizens, because the author
+      # check is only meaningful when there is somebody else to be checked
+      # against.
+      #
+      # The assertion that earns its keep is the negative one: a non-author's
+      # category update is refused with `FORBIDDEN` and the stored category is
+      # unchanged. That refusal is the whole point of the story — the old
+      # function returned a **success envelope** for a write it had not
+      # performed, so the client cached a category the database never stored.
+      #
+      # The probe also proves the two properties the SQL suite cannot: that
+      # the category is the **only** editable field after submit (the
+      # description and the visibility are both refused over the wire), and
+      # that the report is in the author's own History **immediately**, with
+      # no pending-review gate.
+      - name: the report-category contract
+        run: pnpm category:check
 
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the

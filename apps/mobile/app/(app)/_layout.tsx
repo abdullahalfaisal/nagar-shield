@@ -71,9 +71,11 @@ export default function AppLayout() {
       <Stack.Screen name="capture" />
       <Stack.Screen name="location-sharing" />
       <Stack.Screen name="contacts" />
+      <Stack.Screen name="contact-editor" />
       <Stack.Screen name="history" />
       <Stack.Screen name="alerts" />
       <Stack.Screen name="alert-detail" />
+      <Stack.Screen name="report-detail" />
       <Stack.Screen name="help-alert" />
       <Stack.Screen name="more-help" />
       <Stack.Screen name="station-map" />

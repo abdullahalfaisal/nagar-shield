@@ -627,14 +627,71 @@ select 'Test G29: the capture landed a media row' as test,
        (select count(*) from public.report_media
          where storage_path = 'reports/11111111-1111-1111-1111-111111111101/c/d.jpg') = 1 as passed;
 
+-- The report the citizen authored EARLIER in this suite — `…2201` — was
+-- DELETED by Test B, which exercises the `ON DELETE SET NULL` referential
+-- action on the audit trail. So it is gone by the time this test runs.
+--
+-- The old `update_category` was fail-**open**: its `UPDATE` was scoped to the
+-- author's own row, so a missing report matched **zero** rows, the write was a
+-- no-op, and the function still returned a success envelope. This test
+-- therefore used to pass for the wrong reason — it was asserting "the RPC
+-- does not error" against a row that was not there.
+--
+-- Migration 024 makes the author check explicit: a report that is not the
+-- caller's is refused with `FORBIDDEN`, and a report that does not exist is
+-- refused the same way (so the error cannot be used to enumerate report ids).
+-- The old assertion would now fail against the deleted row — correctly, but
+-- for the wrong reason — so this test gets its own report, which really does
+-- exist and really is the citizen's.
+insert into public.reports (
+  id, author_id, client_request_id, lat, lng, captured_at, description,
+  category, public_visibility, moderation_status
+)
+values (
+  '22222222-2222-2222-2222-222222222203',
+  '11111111-1111-1111-1111-111111111101',
+  '33333333-3333-3333-3333-333333333303',
+  23.7461, 90.3774, now(), 'a report whose category may be edited', 'theft',
+  'anonymous', 'visible'
+);
+
 select 'Test G30: an enabled account can still edit its report category' as test,
        pg_temp.as_client(
          '11111111-1111-1111-1111-111111111101',
-         $w$select public.update_category('22222222-2222-2222-2222-222222222201', 'harassment')$w$
+         $w$select public.update_category('22222222-2222-2222-2222-222222222203', 'harassment')$w$
        ) = '' as passed;
 
 select 'Test G31: the category was changed' as test,
-       (select category from public.reports where id = '22222222-2222-2222-2222-222222222201') = 'harassment' as passed;
+       (select category from public.reports where id = '22222222-2222-2222-2222-222222222203') = 'harassment' as passed;
+
+-- --- The author check (migration 024) ---------------------------------------
+--
+-- `004-capture / 003-report-detail-and-category-edit` AC #6 — a signed-in user
+-- who is NOT the author is refused with `FORBIDDEN`, and the stored category
+-- is unchanged.
+--
+-- The non-author here is the moderator `…1102`, who is signed in and enabled.
+-- The refusal must be `FORBIDDEN` and not `NOT_FOUND`, so a caller cannot
+-- probe which report ids exist by the error it gets back.
+
+select 'Test G32: a non-author is refused with FORBIDDEN' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111102',
+         $w$select public.update_category('22222222-2222-2222-2222-222222222203', 'fraud')$w$
+       ) = 'FORBIDDEN' as passed;
+
+select 'Test G33: the refused write left the category alone' as test,
+       (select category from public.reports where id = '22222222-2222-2222-2222-222222222203') = 'harassment' as passed;
+
+-- A report that does not exist is refused the SAME way. If it answered
+-- `NOT_FOUND` instead, the difference in the two errors would tell a caller
+-- whether a report id is real — so the two cases must be indistinguishable.
+
+select 'Test G34: a report that does not exist is refused with FORBIDDEN too' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$select public.update_category('99999999-9999-9999-9999-999999999999', 'fraud')$w$
+       ) = 'FORBIDDEN' as passed;
 
 -- =============================================================================
 -- Test H — the alternate phone format constraint

@@ -123,7 +123,7 @@ the staging ones. The command exits non-zero when any assertion fails.
 
 #### The live database probes
 
-Six of the checks prove behaviour that only exists over the wire, through
+Seven of the checks prove behaviour that only exists over the wire, through
 the door the app actually uses. They need the local stack running
 (`npx supabase start`) and are wired into the `rls-integration` CI job.
 
@@ -134,6 +134,7 @@ pnpm alternate:check   # the alternate phone constraint
 pnpm signup:check      # the signup contract
 pnpm reset:check       # the password-reset contract
 pnpm contacts:check    # the emergency-contacts CRUD contract
+pnpm category:check    # the report-category contract
 ```
 
 `guard:check` proves that a moderator-disabled account is refused every
@@ -237,6 +238,33 @@ status code. And the non-BD phone one is what caught the missing
 020 fixed for `profiles.alternate_phone`: the obvious form of the
 constraint silently accepts every non-BD number, because a CHECK rejects
 only FALSE and `NULL = '…'` is NULL.
+
+`category:check` is the second probe that creates **no** account. It signs
+in as two **seeded** citizens (`citizen@nagar.local` and
+`citizen2@nagar.local`) — the author check is only meaningful when there is
+somebody else to be checked against — and cleans up its own rows
+(`description = 'probe-report'`) on the way out.
+
+`category:check` proves the report-detail category contract over the real
+GoTrue → PostgREST → `update_category` RPC path: a report starts with a
+`NULL` category and that is a valid report, the author sets a category and
+the stored value equals it, changing it replaces the old value with no trace
+of it, all 11 of the fixed values are accepted, a value outside the 11 is
+refused with no row written, and the report is in the author's own History
+**immediately** with `is_own = true` and no pending-review gate. It also
+proves the two things the SQL suite cannot: that the description and the
+visibility are **not** editable after submit (both PATCHes are refused over
+the wire), and that the History projection carries no `author_id`.
+
+The assertion that earns its keep is the **non-author's refusal**. The
+shipped `update_category` was fail-**open**: its `UPDATE` was scoped to the
+author's own row, so a non-author's attempt matched zero rows, the write was
+a no-op, and the function still returned a success envelope claiming the
+category had been set. The client cached that value and showed it, so the
+user's screen and the database disagreed with nothing to show the
+disagreement. Migration `20261105000024_update_category_forbidden.sql` now
+raises `FORBIDDEN` (42501) for a non-author — and for a report that does not
+exist, so the error cannot be used to enumerate report ids.
 
 ### 4. Staging
 

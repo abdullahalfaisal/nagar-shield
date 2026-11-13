@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **42 of 54 stories still carry `implemented: false`** — the
+built and verified. **41 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -38,9 +38,9 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
-| Database | **24 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK |
+| Database | **25 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category` |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **270 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78), `password_reset` (47), `contacts` (47) |
+| SQL test suites | **306 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -48,9 +48,10 @@ Every command below was run green against the local Supabase stack.
 | Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
 | Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
 | Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
+| Report category | `tools/probe-report-category.cjs` — **22/22** over the real GoTrue + PostgREST path |
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
-| Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html` |
+| Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html` |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
@@ -65,7 +66,7 @@ Every command below was run green against the local Supabase stack.
 pnpm typecheck        # 3 workspaces
 pnpm lint
 pnpm test             # 170 tests
-pnpm db:test          # 270 SQL assertions
+pnpm db:test          # 306 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
@@ -73,6 +74,7 @@ pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
 pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
+pnpm category:check   # 22 report-category probes (live GoTrue + PostgREST)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -259,7 +261,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 42 of 54 stories
+## 4. What is NOT DONE — 41 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -290,7 +292,7 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| P1 | **Report detail + category edit.** `update_category` RPC has no caller; `reportDetailTitle` / `editCategory` / `categoryReadOnly` i18n keys are unused. | [013] story 003 |
+| P1 | ✅ **FIXED** — the report detail + category edit is live. `src/shared/api/reportDetail.ts` gained `fetchOwnedReport`, `updateCategory` and `signMediaUrl`; `app/(app)/report-detail.tsx` is the new detail screen (media, description, area, capture time, and the category row), with a bottom sheet holding exactly the 11 Bangla-labelled values and no free-text field; and `app/(app)/history.tsx` gained a **My Reports** tab that reads `history_nearby` and opens the detail screen — the entry point AC #1 asks for. The category is the only editable field: the description and the visibility PATCHes are both refused. **A fail-open defect was found by probing and fixed by migration**: `update_category`'s `UPDATE` was scoped to the author's own row, so a non-author's attempt matched zero rows and the function still returned a success envelope claiming the category had been set (migration 024 now raises `FORBIDDEN`, and a report that does not exist is refused the same way so the error cannot be used to enumerate ids). `pnpm category:check` proves the whole contract over the real PostgREST path (22/22) and `supabase/tests/report_category.sql` adds 32 DB-side assertions. | [013] story 003 |
 | P2 | **Offline queue never drains.** `dueItems` / `markAttemptFailed` / `removeFromQueue` exist but nothing retries — a queued report never sends. | [014] story 005 |
 | P3 | Capture permission degradation (camera denied → degrade). | [014] story 006 |
 
@@ -358,7 +360,13 @@ Ordered by dependency. Bolt numbers in brackets.
    found by the live probe and landed as migrations 022 and 023. The probe
    itself (26/26) is wired into CI. Unit `002-identity` now has five of its
    seven stories complete.
-8. **P1 → P2 → P3** — unit `004-capture`.
+8. **P1 → P2 → P3** — unit `004-capture`. ~~**P1** — report detail + category
+   edit.~~ ✅ **DONE.** The detail screen, the category sheet, the API layer
+   and the **My Reports** History tab are live. One fail-open defect was
+   found by the live probe and fixed by migration 024: `update_category`
+   reported success for a write it had not performed, so the client's cached
+   category and the database's stored one disagreed invisibly. The probe
+   (22/22) is wired into CI. **P2 → P3** remain.
 9. **L1 → L2** — unit `005-location`.
 10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
 11. **B4, R5, and the git remote** — release readiness.
@@ -378,10 +386,10 @@ session.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 12 stories are `complete`, 42 are `planned`.
+  authoritative source. 13 stories are `complete`, 41 are `planned`.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 12 story files
-  now say `true`; 42 still say `false`. The count is **42 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 13 story files
+  now say `true`; 41 still say `false`. The count is **41 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -406,11 +414,11 @@ apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
                              location-permission
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              location-sharing, contacts, contact-editor,
-                             alerts, alert-detail*, history*, more-help*,
-                             station-map*
+                             alerts, alert-detail*, history, report-detail,
+                             more-help*, station-map*
 apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
-                             stations, geocode, flags, errors, profile,
-                             account), auth/ (useAuthSession,
+                             reportDetail, stations, geocode, flags, errors,
+                             profile, account), auth/ (useAuthSession,
                              useAccountStatus, useBiometricGate,
                              biometricService, authService,
                              passwordResetService), wizard/
@@ -420,15 +428,16 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         24 forward-only migrations
-supabase/tests/              6 SQL suites (270 assertions)
+supabase/migrations/         25 forward-only migrations
+supabase/tests/              7 SQL suites (306 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
                              probe-disabled-write, probe-biometric-gate,
                              probe-alternate-phone, probe-signup-contract,
-                             probe-password-reset, probe-contacts-crud
+                             probe-password-reset, probe-contacts-crud,
+                             probe-report-category
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md

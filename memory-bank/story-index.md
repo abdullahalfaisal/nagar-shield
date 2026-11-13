@@ -32,7 +32,7 @@
 | 004-exif-strip-and-media-caps | EXIF strip + media caps | 004-capture | 012-capture | must | planned |
 | 007-storage-upload-and-finalize | Storage upload + finalize_capture | 004-capture | 012-capture | must | planned |
 | 002-area-hierarchy-extraction | Area hierarchy extraction | 004-capture | 013-capture | must | planned |
-| 003-report-detail-and-category-edit | Report detail + author category edit | 004-capture | 013-capture | must | planned |
+| 003-report-detail-and-category-edit | Report detail + author category edit | 004-capture | 013-capture | must | complete |
 | 005-offline-upload-queue | Offline upload queue | 004-capture | 014-capture | must | planned |
 | 006-capture-permission-degradation | Capture permission degradation | 004-capture | 014-capture | must | planned |
 | 001-location-sharing-screen | Location Sharing screen | 005-location | 015-location | must | planned |

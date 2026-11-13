@@ -30,6 +30,7 @@ const SUITES = [
   'write_guards.sql',
   'password_reset.sql',
   'contacts.sql',
+  'report_category.sql',
 ];
 
 /** Counts the `| t` / `| f` assertion rows in a psql transcript. */
