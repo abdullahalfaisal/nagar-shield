@@ -26,6 +26,12 @@ interface StationMapProps {
   userLocation?: { lat: number; lng: number } | null;
   /** Rendered over the canvas — the empty state, the offline notice. */
   overlay?: ReactNode;
+  /**
+   * Where the overlay sits on the canvas. `center` (the default) suits an
+   * empty state; `top` pins a legend to the top-left so it does not cover
+   * the markers.
+   */
+  overlayAlign?: 'center' | 'top';
 }
 
 export interface StationMarker {
@@ -34,6 +40,16 @@ export interface StationMarker {
   lng: number;
   title: string;
   subtitle?: string;
+  /**
+   * The marker's pin colour.
+   *
+   * The Find-a-station surface encodes the station **type** in the pin
+   * colour — police, hospital and fire each get a distinct colour from the
+   * design tokens. The History map leaves this unset and keeps the single
+   * violet pin, because a report's category is already carried by the
+   * marker *title*.
+   */
+  color?: string;
   onPress?: () => void;
 }
 
@@ -90,6 +106,7 @@ export function StationMap({
   attribution = '© OpenStreetMap contributors',
   userLocation = null,
   overlay = null,
+  overlayAlign = 'center',
 }: StationMapProps) {
   const theme = useTheme();
 
@@ -105,7 +122,11 @@ export function StationMap({
         <View style={styles.attribution}>
           <Text style={styles.attributionText}>{attribution}</Text>
         </View>
-        {overlay ? <View style={styles.overlay}>{overlay}</View> : null}
+        {overlay ? (
+          <View style={[styles.overlay, overlayAlign === 'top' ? styles.overlayTop : null]}>
+            {overlay}
+          </View>
+        ) : null}
       </View>
       {children ? <ScrollView style={styles.list}>{children}</ScrollView> : null}
     </View>
@@ -161,7 +182,12 @@ function MapCanvas({
           lngLat={[marker.lng, marker.lat]}
           onPress={marker.onPress}
         >
-          <View style={[styles.pin, { backgroundColor: theme.palette.violet[600] }]} />
+          <View
+            style={[
+              styles.pin,
+              { backgroundColor: marker.color ?? theme.palette.violet[600] },
+            ]}
+          />
         </MapLibre.Marker>
       ))}
       {userLocation ? (
@@ -246,6 +272,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+  },
+  /**
+   * The overlay's own alignment is overridable.
+   *
+   * The default is **centred** — the History map's empty state sits in the
+   * middle of the canvas. The Find-a-station surface pins its legend to the
+   * top-left instead, because a legend in the middle of a map covers the
+   * stations the user is looking for. A consumer that needs the other
+   * alignment passes `overlayAlign="top"`.
+   */
+  overlayTop: {
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   attribution: {
     position: 'absolute',

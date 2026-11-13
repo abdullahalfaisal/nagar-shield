@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/shared/theme';
 import { Icon } from '@/shared/ui/Icon';
+import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet';
 import { openDialer } from '@/shared/services/dialer';
 import { useContacts } from '@/shared/api/contacts';
 import { toBengaliDigits } from '@/shared/utils/relativeTime';
@@ -145,68 +146,11 @@ export default function HelpAlertScreen() {
         </Text>
       </ScrollView>
 
-      {/* The More Help bottom sheet. */}
-      {sheetOpen ? (
-        <View style={styles.sheetScrim}>
-          <Pressable
-            accessibilityLabel={t('common.close')}
-            style={styles.sheetDismissArea}
-            onPress={() => setSheetOpen(false)}
-          />
-          <View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: theme.colors.surface.white,
-                paddingBottom: 20 + insets.bottom,
-              },
-            ]}
-          >
-            <View style={[styles.sheetHandle, { backgroundColor: theme.colors.ink[200] }]} />
-            <Text style={[styles.sheetTitle, { color: theme.colors.ink[950] }]}>
-              {t('help.moreHelpTitle')}
-            </Text>
-
-            <View style={styles.sheetRows}>
-              <SheetRow title={t('help.womenChildren')} number="109" onPress={() => dial('109')} />
-              <SheetRow title={t('help.disaster')} number="333" onPress={() => dial('333')} />
-              <SheetRow title={t('help.ambulance')} number="999" onPress={() => dial('999')} />
-              <SheetRow title={t('help.electricity')} number="16116" onPress={() => dial('16116')} />
-              <SheetRow
-                title={t('help.nearestStation')}
-                subtitle={t('help.nearestStationSub')}
-                note={t('help.stationFallbackNote')}
-                onPress={() => router.push('/(app)/station-map')}
-              />
-              <SheetRow
-                title={t('help.stationMap')}
-                subtitle={t('help.stationMapSub')}
-                icon="map"
-                onPress={() => router.push('/(app)/station-map')}
-              />
-            </View>
-
-            <Text
-              accessibilityRole="button"
-              onPress={() => router.push('/(app)/more-help')}
-              style={[styles.wrongNumber, { color: theme.palette.violet[700] }]}
-            >
-              {t('help.wrongNumber')}
-            </Text>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-              onPress={() => setSheetOpen(false)}
-              style={[styles.sheetClose, { backgroundColor: theme.palette.violet[50] }]}
-            >
-              <Text style={[styles.sheetCloseText, { color: theme.palette.violet[700] }]}>
-                {t('common.close')}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      {/* The More Help bottom sheet. The sheet is a **shared** component, so
+          the Home entry point and this one show the identical rows in the
+          identical order — the story requires both entry points to show the
+          same sheet. */}
+      <MoreHelpSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
     </View>
   );
 }
@@ -297,46 +241,6 @@ function HelpTile({
           </View>
         </View>
       </LinearGradient>
-    </Pressable>
-  );
-}
-
-function SheetRow({
-  title,
-  subtitle,
-  number,
-  note,
-  icon = 'call',
-  onPress,
-}: {
-  title: string;
-  subtitle?: string;
-  number?: string;
-  note?: string;
-  icon?: string;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}${number ? ` ${number}` : ''}`}
-      onPress={onPress}
-      style={[styles.sheetRow, { backgroundColor: theme.colors.ink[50] }]}
-    >
-      <View style={styles.sheetRowText}>
-        <Text style={[styles.sheetRowTitle, { color: theme.colors.ink[950] }]}>{title}</Text>
-        {number ? (
-          <Text style={[styles.sheetRowNumber, { color: theme.colors.ink[500] }]}>{number}</Text>
-        ) : null}
-        {subtitle ? (
-          <Text style={[styles.sheetRowNumber, { color: theme.colors.ink[500] }]}>{subtitle}</Text>
-        ) : null}
-        {note ? (
-          <Text style={[styles.sheetRowNote, { color: theme.colors.ink[400] }]}>{note}</Text>
-        ) : null}
-      </View>
-      <Icon name={icon} size={20} color={theme.palette.violet[700]} />
     </Pressable>
   );
 }
@@ -475,83 +379,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 24,
     paddingTop: 16,
-  },
-  sheetScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheetDismissArea: {
-    flex: 1,
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  sheetRows: {
-    gap: 8,
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    minHeight: 48,
-  },
-  sheetRowText: {
-    flex: 1,
-  },
-  sheetRowTitle: {
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  sheetRowNumber: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  sheetRowNote: {
-    fontSize: 10,
-    fontStyle: 'italic',
-    marginTop: 4,
-    lineHeight: 14,
-  },
-  wrongNumber: {
-    marginTop: 14,
-    paddingHorizontal: 4,
-    fontSize: 11,
-    textAlign: 'right',
-    fontWeight: '600',
-  },
-  sheetClose: {
-    marginTop: 16,
-    width: '100%',
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetCloseText: {
-    fontWeight: '600',
-    fontSize: 15,
   },
 });

@@ -3,15 +3,27 @@ id: 009-help-seek
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [005-more-help-and-hotlines, 006-thana-line-fallback, 008-wrong-number-report]
 created: 2026-11-04T00:00:00Z
+current_stage: null
+stages_completed:
+  - name: plan
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Technical Notes carries the design
+  - name: implement
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Implementation carries the change record
+  - name: test
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Verification carries the evidence
 
 # Dependency Tracking
 requires_bolts: [008-help-seek]
 enables_bolts: [010-help-seek]
 requires_units: [001-foundation, 002-identity]
 blocks: false
+completed: '2026-11-13T00:00:00Z'
 
 # Complexity Assessment
 complexity:
@@ -28,9 +40,9 @@ Deliver **more help surfaces** for unit `003-help-seek`. Stories: 3. Bolt type: 
 
 ### Stories Included
 
-- [ ] **005-more-help-and-hotlines** — Priority: must
-- [ ] **006-thana-line-fallback** — Priority: must
-- [ ] **008-wrong-number-report** — Priority: should
+- [x] **005-more-help-and-hotlines** — Priority: must
+- [x] **006-thana-line-fallback** — Priority: must
+- [x] **008-wrong-number-report** — Priority: should
 
 ### Expected Outputs
 

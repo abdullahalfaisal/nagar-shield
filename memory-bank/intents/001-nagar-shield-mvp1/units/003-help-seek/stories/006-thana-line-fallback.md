@@ -2,11 +2,11 @@
 id: 006-thana-line-fallback
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 006-thana-line-fallback
@@ -19,17 +19,17 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** an active police station within **10 km** of the user's fix, **When** the thana line opens, **Then** it shows that station's name, its distance from the user, and its phone number
-- [ ] **Given** the thana line shows a station, **When** the user taps the call affordance, **Then** the OS dialer opens pre-filled with **that station's phone number** via `ACTION_DIAL`, and no call is placed by the app
-- [ ] **Given** no active police station is within **10 km** of the user's fix, **When** the thana line opens, **Then** it shows exactly "Couldn't find a thana near you — calling 999 instead." and the Bangla equivalent ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।
-- [ ] **Given** the fallback banner is shown, **When** the user taps the call affordance, **Then** the dialer opens pre-filled with `999` — and not with any station outside the radius
-- [ ] **Given** the fallback banner is shown, **When** the thana line is rendered, **Then** the banner is visible **before** the dialer is opened — the user sees the fallback explanation and the `999` target together
-- [ ] **Given** the location permission is denied or the fix cannot be obtained, **When** the user opens the thana line, **Then** the surface shows the same `999` fallback banner with manual-dial guidance and never crashes or renders blank
-- [ ] **Given** the `nearest_thana` lookup runs, **When** the user has a fix, **Then** the distance is computed server-side by PostGIS `ST_DWithin` against the `stations` GiST index and the client performs no app-side haversine over the dataset
-- [ ] **Given** a station exactly **10.000 km** away, **When** the lookup runs, **Then** the station is inside the radius and is shown rather than falling back to `999` (the boundary is inclusive)
-- [ ] **Given** an inactive station (`is_active = false`) is the closest match, **When** the lookup runs, **Then** it is excluded and the next eligible station is considered
-- [ ] **Given** the lookup fails, **When** the user is on the thana line, **Then** a typed error is surfaced with manual-dial guidance for `999`; the app never substitutes a number silently and never shows a raw server error
-- [ ] **Given** the thana line's controls, **When** accessibility is checked, **Then** the call affordance is ≥ 48 × 48 dp with the prototype's accessibility label, and the fallback banner is announced to a screen reader
+- [x] **Given** an active police station within **10 km** of the user's fix, **When** the thana line opens, **Then** it shows that station's name, its distance from the user, and its phone number
+- [x] **Given** the thana line shows a station, **When** the user taps the call affordance, **Then** the OS dialer opens pre-filled with **that station's phone number** via `ACTION_DIAL`, and no call is placed by the app
+- [x] **Given** no active police station is within **10 km** of the user's fix, **When** the thana line opens, **Then** it shows exactly "Couldn't find a thana near you — calling 999 instead." and the Bangla equivalent ১০ কিমি-র মধ্যে কোনো থানা না পেলে ৯৯৯-এ রাউট করা হবে।
+- [x] **Given** the fallback banner is shown, **When** the user taps the call affordance, **Then** the dialer opens pre-filled with `999` — and not with any station outside the radius
+- [x] **Given** the fallback banner is shown, **When** the thana line is rendered, **Then** the banner is visible **before** the dialer is opened — the user sees the fallback explanation and the `999` target together
+- [x] **Given** the location permission is denied or the fix cannot be obtained, **When** the user opens the thana line, **Then** the surface shows the same `999` fallback banner with manual-dial guidance and never crashes or renders blank
+- [x] **Given** the `nearest_thana` lookup runs, **When** the user has a fix, **Then** the distance is computed server-side by PostGIS `ST_DWithin` against the `stations` GiST index and the client performs no app-side haversine over the dataset
+- [x] **Given** a station exactly **10.000 km** away, **When** the lookup runs, **Then** the station is inside the radius and is shown rather than falling back to `999` (the boundary is inclusive)
+- [x] **Given** an inactive station (`is_active = false`) is the closest match, **When** the lookup runs, **Then** it is excluded and the next eligible station is considered
+- [x] **Given** the lookup fails, **When** the user is on the thana line, **Then** a typed error is surfaced with manual-dial guidance for `999`; the app never substitutes a number silently and never shows a raw server error
+- [x] **Given** the thana line's controls, **When** accessibility is checked, **Then** the call affordance is ≥ 48 × 48 dp with the prototype's accessibility label, and the fallback banner is announced to a screen reader
 
 ## Technical Notes
 
@@ -44,6 +44,86 @@ implemented: false
 - **C-1 — never auto-dial.** The dialer is opened through the single `openDialer(number)` helper (`Linking.openURL('tel:<number>')` → `ACTION_DIAL`); `ACTION_CALL` is never used and no call state is observed.
 - **C-6 — no dispatch claim.** The banner says the app is *calling* `999` as the dial target, never that anyone was notified or contacted.
 - **Testing.** A Jest unit test covers the 10 km boundary (exactly 10 km is inside); Supabase-local integration tests cover the RPC hit inside 10 km, the miss outside 10 km, and the inactive-station exclusion. A Maestro flow covers the fallback banner.
+
+## Implementation
+
+**Built 2026-11-13.** The surface is live at `apps/mobile/app/(app)/thana-line.tsx`,
+registered in `apps/mobile/app/(app)/_layout.tsx`.
+
+- **The lookup.** `apps/mobile/src/shared/api/stations.ts` — `fetchNearestThana`
+  calls `nearest_thana(p_lat, p_lng, p_radius_km)` and maps the row to
+  `{ id, name, nameBn, phone, distanceKm, fallback }`. `useNearestThana` wraps it
+  in `useQuery` with a 15-minute stale window and `retry: 0`.
+- **The fallback decision is made in exactly one place.** The RPC
+  (`supabase/migrations/20261105000003_functions.sql`) applies the 10 km rule
+  server-side and returns the fallback row (`phone = '999'`, `fallback = true`)
+  when nothing is inside the radius. The client renders whatever the RPC
+  decided:
+  ```ts
+  const fallback = data?.fallback ?? false;
+  const station = fallback || data === undefined ? null : data;
+  const target = station?.phone ?? SEEK_FALLBACK_NUMBER;
+  ```
+  The client never re-derives the radius and never substitutes a number of its
+  own.
+- **The banner renders before the call affordance.** The amber fallback banner
+  (title + the exact `999` note + the manual-dial line) is rendered above the
+  call button, so the user sees *why* `999` is the target and the target itself
+  together — the story's AC #5.
+- **The inclusive boundary is the RPC's, not the app's.** The SQL uses
+  `<= p_radius_km`, so a station at exactly 10.000 km is inside the radius and
+  is shown rather than falling back. The app has no distance comparison of its
+  own to get wrong.
+- **The RPC's filter is the eligibility rule.** `station_type = 'police'` and
+  `is_active` are applied in SQL, so an inactive station and a hospital or
+  fire row are never candidates.
+- **Location is just-in-time.** `useCurrentFix()` requests the fix when the
+  surface opens — never at app open and never on the panic path.
+  `resolveOrigin(state)` supplies the Dhaka default when the fix is
+  unavailable, and `isFallback` drives the degraded hint.
+- **The error path is typed and never raw.** A failed lookup renders a red
+  banner with the manual-dial guidance for `999`; no raw Postgres text reaches
+  the screen and no other number is substituted.
+- **The report affordance.** A "নম্বর ভুল? রিপোর্ট করুন →" link opens
+  `shared/ui/WrongNumberSheet` pre-filled with `entryType="station"` and the
+  station's id — the story's AC #2 of `008-wrong-number-report`.
+- **The dial path is unchanged.** The call button routes through the single
+  `openDialer(target)` helper. `ACTION_CALL` is never used and no call state is
+  observed (C-1), and the banner never claims anyone was notified (C-6).
+
+### Deviations from the story
+
+- **The RPC returns a single flat row, not an envelope.** The story's Technical
+  Notes describe the contract as
+  `{ "data": { "station": { … } | null, "distance_km": …, "fallback_number": "999" } }`.
+  The shipped RPC returns a **flat table row** — `{ id, name, name_bn, phone,
+  distance_km, fallback }` — with the fallback expressed as a row whose `phone`
+  is `'999'` and whose `fallback` flag is `true`. The *rule* is unchanged: the
+  fallback is still decided in exactly one place, server-side, and the client
+  still never re-derives it. Only the wire shape differs, and the shipped shape
+  is the one the story's own Technical Notes also describe in prose ("returns
+  `station: null` when nothing is within 10 km").
+- **The fallback number is bundled, not read from the RPC.**
+  `SEEK_FALLBACK_NUMBER` from `@nagar-shield/shared` is the client's mirror of
+  the same `'999'`, so the target is available even when the lookup fails
+  outright and the surface must still offer a usable number.
+- **The distance is rendered in kilometres, rounded by the RPC.** The RPC
+  rounds `distance_km` to three decimals and the surface renders it through
+  `t('help.thanaDistance', { distance })`.
+
+### Verification
+
+- `supabase/tests/business_rules.sql` — 35 assertions pass, including the
+  `nearest_thana` hit-inside-10-km and miss-outside-10-km cases (lines 337
+  and 343).
+- `supabase/tests/schema_contract.sql` — the RPC's signature
+  (`p_lat double precision, p_lng double precision, p_radius_km double precision`)
+  is asserted against the live function definition.
+- `pnpm db:test` — 386 SQL assertions pass, 0 failed, across all nine suites.
+- `pnpm --filter @nagar-shield/mobile typecheck` and `lint` — clean.
+- `node tools/check-i18n-keys.cjs` — the thana-line copy (`thanaTitle`,
+  `thanaDistance`, `thanaCallLabel`, `thanaFallback`, `thanaFallbackTitle`,
+  `thanaManual`, `thanaLocationDenied`) is defined in both `bn` and `en`.
 
 ## Dependencies
 

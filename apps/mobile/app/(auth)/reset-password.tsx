@@ -135,7 +135,10 @@ export default function ResetPasswordScreen() {
         return;
       }
 
-      router.replace('/(app)');
+      // The password is changed and the session is adopted. The `(app)`
+      // group has no index route of its own, so the replace names a concrete
+      // screen — Home — rather than the group.
+      router.replace('/(app)/home');
     } catch (error) {
       const appError = error instanceof AppError ? error : null;
 

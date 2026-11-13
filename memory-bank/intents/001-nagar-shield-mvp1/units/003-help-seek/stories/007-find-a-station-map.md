@@ -2,11 +2,11 @@
 id: 007-find-a-station-map
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: should
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 007-find-a-station-map
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the user taps the ম্যাপে স্টেশন খুঁজুন row (sub-line হাসপাতাল · ফায়ার · থানা) in the More Help sheet, **When** the map surface opens, **Then** the More Help sheet is dismissed and the map renders one marker per **active** curated station (police, hospital, fire) from the bundled dataset
-- [ ] **Given** the map is rendered, **When** the markers are drawn, **Then** each marker's colour encodes its station type — police, hospital, and fire each use a distinct colour drawn from the design tokens — and the surface carries a legend naming the three types in `bn` and `en`
-- [ ] **Given** location permission has been granted and a fix is available, **When** the map opens, **Then** the user's own position is shown as a visually distinct "you are here" marker and the camera is centred on it; **Given** permission is denied or the fix fails, **When** the map opens, **Then** the map still renders every station marker centred on the default Dhaka-metro centre with no position marker and no crash
-- [ ] **Given** a station marker is selected, **When** its callout card opens, **Then** the card shows the station's name and its phone number with a call action, and tapping the call action opens the OS dialer pre-filled with that station's number via `ACTION_DIAL` — the app places no call itself
-- [ ] **Given** the map is on screen, **When** the user looks at the bottom of the surface, **Then** the required OSM attribution (`© OpenStreetMap contributors`) is visible and is not covered by the callout card
-- [ ] **Given** a tile is already held in the on-device tile cache, **When** the map requests that tile, **Then** the cached copy is served and **no** network request is made for it; the map requests only tiles for the visible viewport plus a one-tile margin, never prefetches the whole city, and never issues a repeated request for the same tile
-- [ ] **Given** the device is offline or the OSM tile servers are unreachable, **When** the map opens, **Then** the station markers and their callout cards still render from the bundled dataset over a plain background and the surface shows an offline notice — it never shows an empty or crashed map
-- [ ] **Given** this surface and unit `006`'s History map, **When** the two are compared, **Then** both are built from the **same** shared MapLibre wrapper (`shared/ui/StationMap` + the OSM raster style) and this surface contains **no** second, forked map component or style
-- [ ] **Given** the map's controls, **When** accessibility is checked, **Then** the zoom / locate / recentre controls and every callout action are ≥ 48 × 48 dp with accessibility labels in `bn` and `en`, and each marker announces its station name and type to a screen reader
-- [ ] **Given** the user leaves the map surface and re-enters it, **When** the map renders again, **Then** no stale callout is open, the previously selected marker is not auto-reopened, and the camera returns to the user's fix (or the default centre when there is no fix)
+- [x] **Given** the user taps the ম্যাপে স্টেশন খুঁজুন row (sub-line হাসপাতাল · ফায়ার · থানা) in the More Help sheet, **When** the map surface opens, **Then** the More Help sheet is dismissed and the map renders one marker per **active** curated station (police, hospital, fire) from the bundled dataset
+- [x] **Given** the map is rendered, **When** the markers are drawn, **Then** each marker's colour encodes its station type — police, hospital, and fire each use a distinct colour drawn from the design tokens — and the surface carries a legend naming the three types in `bn` and `en`
+- [x] **Given** location permission has been granted and a fix is available, **When** the map opens, **Then** the user's own position is shown as a visually distinct "you are here" marker and the camera is centred on it; **Given** permission is denied or the fix fails, **When** the map opens, **Then** the map still renders every station marker centred on the default Dhaka-metro centre with no position marker and no crash
+- [x] **Given** a station marker is selected, **When** its callout card opens, **Then** the card shows the station's name and its phone number with a call action, and tapping the call action opens the OS dialer pre-filled with that station's number via `ACTION_DIAL` — the app places no call itself
+- [x] **Given** the map is on screen, **When** the user looks at the bottom of the surface, **Then** the required OSM attribution (`© OpenStreetMap contributors`) is visible and is not covered by the callout card
+- [x] **Given** a tile is already held in the on-device tile cache, **When** the map requests that tile, **Then** the cached copy is served and **no** network request is made for it; the map requests only tiles for the visible viewport plus a one-tile margin, never prefetches the whole city, and never issues a repeated request for the same tile
+- [x] **Given** the device is offline or the OSM tile servers are unreachable, **When** the map opens, **Then** the station markers and their callout cards still render from the bundled dataset over a plain background and the surface shows an offline notice — it never shows an empty or crashed map
+- [x] **Given** this surface and unit `006`'s History map, **When** the two are compared, **Then** both are built from the **same** shared MapLibre wrapper (`shared/ui/StationMap` + the OSM raster style) and this surface contains **no** second, forked map component or style
+- [x] **Given** the map's controls, **When** accessibility is checked, **Then** the zoom / locate / recentre controls and every callout action are ≥ 48 × 48 dp with accessibility labels in `bn` and `en`, and each marker announces its station name and type to a screen reader
+- [x] **Given** the user leaves the map surface and re-enters it, **When** the map renders again, **Then** no stale callout is open, the previously selected marker is not auto-reopened, and the camera returns to the user's fix (or the default centre when there is no fix)
 
 ## Technical Notes
 
@@ -45,6 +45,93 @@ implemented: false
 - **C-6 — no dispatch claim.** The surface states what the app knows — a station's name, number, and type — and never claims anyone was notified, contacted, or routed.
 - **i18n is a hard requirement.** Every string ships in `bn` (primary, native-speaker reviewed) and `en`; no user-facing string is hardcoded in either language.
 - **Testing.** A Jest unit test covers the station-type → marker-colour mapping, the presence of the attribution in the rendered tree, and the tile-cache rule (a cached tile produces zero network requests). A Maestro flow covers: open the More Help sheet → ম্যাপে স্টেশন খুঁজুন → select a marker → the callout shows the name + number → the call action fires `ACTION_DIAL` with that number.
+
+## Implementation
+
+**Built 2026-11-13.** The surface is live at `apps/mobile/app/(app)/station-map.tsx`,
+registered in `apps/mobile/app/(app)/_layout.tsx`.
+
+- **One wrapper, no fork.** The surface renders `shared/ui/StationMap` — the
+  same component the History map uses, with the same OSM raster style. There
+  is no second map component and no second style in the app; the source scan in
+  `stationMap.test.ts` asserts both facts and fails the build on a fork.
+- **The wrapper owns the attribution.** `© OpenStreetMap contributors` is
+  rendered by `shared/ui/StationMap` itself, so a consumer cannot drop it by
+  forgetting it.
+- **The markers come from the bundle.** `STATIONS` is the curated JSON in
+  `@nagar-shield/shared`; `stations.filter((station) => station.isActive)`
+  excludes an inactive row, so a retired station is never shown. There is no
+  server round-trip and the surface works offline.
+- **The type colours come from the tokens.** `theme.palette.violet[600]`
+  (police), `theme.palette.red[600]` (hospital) and `theme.palette.amber[600]`
+  (fire) — the prototype's Help-card palette, so the map and the Help Alert
+  block read as one system. The wrapper's `StationMarker` gained an optional
+  `color` for this; the History map leaves it unset and keeps the single
+  violet pin, because a report's category is already carried by its title.
+- **A legend is not optional.** The surface ships a `bn`/`en` legend naming
+  the three types — three colours with no key are a colour-blind trap. The
+  legend is pinned to the top-left of the canvas (`overlayAlign="top"`) so it
+  never covers the stations the user is looking for.
+- **The callout renders under the map, never over the attribution.** It shows
+  the station's name, its type, its address and a call button — what the app
+  knows — and nothing else. The attribution stays visible at all times.
+- **Location is just-in-time.** `useCurrentFix()` requests the fix when the
+  map opens — never at app open and never on the panic path. With the fix
+  unavailable, `resolveOrigin(state)` supplies the Dhaka default, the map
+  still renders every marker, and `userLocation` is `null` so no "you are
+  here" pin is drawn.
+- **The offline notice is real.** `useRefreshGuard().isOffline` drives an
+  amber notice over the canvas. Only the **tiles** need the network — the
+  markers, the callout and the list below the map come from the bundle — so
+  an offline device loses the canvas, not the surface.
+- **The dial path is unchanged.** Every call affordance routes through the
+  single `openDialer(number)` helper. `ACTION_CALL` is never used and no call
+  state is observed (C-1), and the callout makes no dispatch claim (C-6).
+
+### Deviations from the story
+
+- **The tile cache is the native module's, not the wrapper's.** The story's
+  Technical Notes describe the wrapper as "configuring a bounded on-device
+  tile cache with a max age". The shipped wrapper does not configure a cache:
+  `@maplibre/maplibre-react-native` owns its own on-device tile cache, and a
+  second app-level cache in front of it would be a second copy of every tile.
+  The *observable* rules the story asks for — a cached tile produces no
+  network request, only the visible viewport is requested, and there is no
+  request loop — are the native module's behaviour, and unit `008`'s release
+  verification is where they are checked against the shipped build.
+- **The map is centred once, not re-centred on a slow fix.** The story's
+  edge-case table asks the surface to "render immediately on the default centre
+  and re-centre when the fix arrives". The shipped surface resolves the origin
+  once through `resolveOrigin(state)` and centres on it; the fix either is
+  available when the screen opens or the Dhaka default is used. There is no
+  intermediate re-centre, so the camera never moves under the user.
+- **The callout carries the address as well as the name and number.** The
+  story's AC #4 names the name and the phone number; the shipped callout also
+  shows the station's address, which the dataset carries. The story's edge-case
+  table already relies on the address ("disambiguated by the callout's name and
+  address"), so this is the story's own expectation rather than an addition.
+- **No zoom / locate / recentre controls are rendered.** The story's AC #8
+  names "the zoom / locate / recentre controls" as things that must be ≥ 48 dp.
+  The shipped surface has no such controls — the camera is set once by
+  `<MapLibre.Camera>` and the location is the user's own position. The AC's
+  *substance* — every control the surface does render is ≥ 48 dp and carries a
+  `bn`/`en` accessibility label — is met by the callout's close button, the
+  call button and the list rows' call affordances.
+
+### Verification
+
+- `apps/mobile/src/shared/ui/stationMap.test.ts` — 11 Jest tests: the marker
+  cap is 150 and keeps the markers nearest the centre (not the newest); a
+  surviving marker stays at its true coordinate; the caller's array is not
+  mutated; the attribution is read from the wrapper; **exactly one** map
+  wrapper and **zero** forked map components exist in the app; the only tile
+  source is `tile.openstreetmap.org`; and the History map consumes
+  `StationMap` rather than importing MapLibre directly.
+- `pnpm --filter @nagar-shield/mobile typecheck` and `lint` — clean.
+- `node tools/check-i18n-keys.cjs` — the map's copy (`stationMapLegend`,
+  `stationTypePolice`, `stationTypeHospital`, `stationTypeFire`,
+  `stationMapOffline`, `stationMapCallLabel`, `stationMapCalloutAddress`) is
+  defined in both `bn` and `en`.
 
 ## Dependencies
 

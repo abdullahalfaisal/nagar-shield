@@ -216,11 +216,30 @@ export const flagReportSchema = z.object({
   reason: flagReasonSchema,
 });
 
-/** FR-SEEK-6 — a user reporting a wrong number. */
+/**
+ * FR-SEEK-6 — a user reporting a wrong number.
+ *
+ * `entryId` is the **curated slug**, not a uuid. The curated dataset is
+ * refreshed quarterly and the slug is its stable key — `stations.id` and
+ * `hotlines.id` are both `text primary key` for exactly that reason. A uuid
+ * would break the reference on the next refresh.
+ */
 export const wrongNumberReportSchema = z.object({
   entryType: z.enum(['station', 'hotline']),
-  entryId: z.string().uuid(),
+  entryId: z.string().trim().min(1, 'Tell us which entry is wrong').max(120),
   reason: z.string().trim().min(1, 'Tell us what is wrong').max(500),
+  /**
+   * The free-text details. **Optional** — the story's edge case is "the user
+   * submits with an empty details textarea; the report is still accepted —
+   * the details are optional and stored as `null`". An empty string is
+   * normalised away here rather than being written as `''`.
+   */
+  details: z
+    .string()
+    .trim()
+    .max(500, 'That is too long')
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 });
 
 /** FR-LOC-1 — sharing a snapshot with one contact or all primaries. */

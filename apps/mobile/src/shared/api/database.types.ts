@@ -340,23 +340,27 @@ export interface Database {
       wrong_number_reports: {
         Row: {
           id: string;
-          reporter_id: string;
+          /** Nullable — FR-SEEK-6 lets any user report, signed in or not. */
+          reporter_id: string | null;
           entry_type: string;
           entry_id: string;
           reason: string;
+          /** The citizen's free text. Optional — `null` when they wrote none. */
+          details: string | null;
           status: string;
           created_at: string;
         };
         Insert: {
           id?: string;
-          reporter_id: string;
+          reporter_id?: string | null;
           entry_type: string;
           entry_id: string;
           reason: string;
+          details?: string | null;
           status?: string;
           created_at?: string;
         };
-        Update: { status?: string };
+        Update: { status?: string; reporter_id?: string | null; details?: string | null };
         Relationships: GenericRelationship[];
       };
       job_runs: {

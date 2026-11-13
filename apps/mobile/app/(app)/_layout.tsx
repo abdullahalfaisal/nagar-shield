@@ -78,6 +78,7 @@ export default function AppLayout() {
       <Stack.Screen name="report-detail" />
       <Stack.Screen name="help-alert" />
       <Stack.Screen name="more-help" />
+      <Stack.Screen name="thana-line" />
       <Stack.Screen name="station-map" />
     </Stack>
   );

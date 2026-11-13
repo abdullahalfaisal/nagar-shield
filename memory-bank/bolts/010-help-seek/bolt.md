@@ -28,8 +28,17 @@ Deliver **station map and degradation** for unit `003-help-seek`. Stories: 2. Bo
 
 ### Stories Included
 
-- [ ] **007-find-a-station-map** — Priority: should
+- [x] **007-find-a-station-map** — Priority: should
 - [ ] **004-graceful-degradation** — Priority: must
+
+> **The bolt is still `planned`.** A bolt is `complete` only when **every**
+> story it lists says `implemented: true` in its own frontmatter.
+> `007-find-a-station-map` landed on 2026-11-13; `004-graceful-degradation`
+> has not — the location-denied and battery-saver guidance is the open half.
+> The `ddd-*.md` artifacts are **not** written: the story files carry the
+> design (Technical Notes), the change record (Implementation) and the
+> evidence (Verification) instead, so inventing a separate artifact file
+> would be duplicating what already exists.
 
 ### Expected Outputs
 

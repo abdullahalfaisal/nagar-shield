@@ -330,4 +330,65 @@ select 'Contract 6e: every cron expression has five fields' as test,
          where array_length(string_to_array(cron_expression, ' '), 1) <> 5
        ) as passed;
 
+-- -----------------------------------------------------------------------------
+-- The wrong-number report's shape.
+--
+-- `003-help-seek / 008-wrong-number-report`. Three properties the clients and
+-- the curator's read path depend on:
+--
+--   * `reporter_id` is **nullable** — FR-SEEK-6 says "any user", so a
+--     signed-out visitor's report must be accepted.
+--   * `details` exists as its **own nullable column** — the fixed enum reason
+--     and the citizen's free text are two fields, not one string.
+--   * `status` uses the `pending` vocabulary — "not yet triaged" — and the
+--     curator's closing states are `reviewed` and `rejected`.
+-- -----------------------------------------------------------------------------
+
+select 'Contract 7a: the wrong-number reporter is nullable' as test,
+       exists (
+         select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'wrong_number_reports'
+           and column_name = 'reporter_id'
+           and is_nullable = 'YES'
+       ) as passed;
+
+select 'Contract 7b: the wrong-number details are their own nullable column' as test,
+       exists (
+         select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'wrong_number_reports'
+           and column_name = 'details'
+           and is_nullable = 'YES'
+       ) as passed;
+
+select 'Contract 7c: the wrong-number status vocabulary is pending/reviewed/rejected' as test,
+       exists (
+         select 1
+         from pg_constraint c
+         join pg_class t on t.oid = c.conrelid
+         join pg_namespace n on n.oid = t.relnamespace
+         where n.nspname = 'public'
+           and t.relname = 'wrong_number_reports'
+           and c.contype = 'c'
+           and c.conname = 'wrong_number_reports_status_check'
+           and pg_get_constraintdef(c.oid) like '%pending%'
+           and pg_get_constraintdef(c.oid) like '%reviewed%'
+           and pg_get_constraintdef(c.oid) like '%rejected%'
+       ) as passed;
+
+-- The polymorphic entry reference is enforced by a trigger, because
+-- `entry_id` is a plain `text` column that resolves against `stations.id` or
+-- `hotlines.id` depending on `entry_type`.
+select 'Contract 7d: the wrong-number entry integrity trigger exists' as test,
+       exists (
+         select 1 from pg_trigger tg
+         join pg_class c on c.oid = tg.tgrelid
+         join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public'
+           and c.relname = 'wrong_number_reports'
+           and not tg.tgisinternal
+           and tg.tgname = 'wrong_number_reports_entry_integrity'
+       ) as passed;
+
 rollback;

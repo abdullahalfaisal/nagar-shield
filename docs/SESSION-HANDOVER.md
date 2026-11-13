@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **28 of 54 stories still carry `implemented: false`** — the
+built and verified. **24 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -20,6 +20,13 @@ pushed-ready, and there is a baseline commit to fall back to.
 **The security defect is closed.** The disabled-account write bypass (defect
 F) was fixed in migration `20261105000019_disabled_account_write_guard.sql`,
 covered by 31 new SQL assertions and an 8-check live API probe. See §3.
+
+**The help-seek surfaces are live.** The More Help sheet, the hotline list, the
+thana line, the find-a-station map and the wrong-number report flow all ship
+now. Building them surfaced **three real database defects** — an impossible
+anonymous report, a missing polymorphic integrity trigger, and a `status`
+vocabulary that did not match the story — all fixed by forward-only migrations
+031–033. See §4.3.
 
 **One pre-existing quirk worth knowing.** After `pnpm db:reset`, the
 `alerts_feed` read model returns **zero items** — the seeded reports fall
@@ -38,9 +45,9 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **84 unit tests** |
-| Database | **30 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide |
-| RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **386 assertions pass** — `schema_contract` (18), `business_rules` (35), `read_models` (52), `write_guards` (82), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36) |
+| Database | **33 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, and the wrong-number `details` / `pending` vocabulary |
+| RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
+| SQL test suites | **411 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (52), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -53,6 +60,7 @@ Every command below was run green against the local Supabase stack.
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html`. The **location-sharing** screen's CTA now performs a real share. |
+| Help-seek surfaces | the shared `MoreHelpSheet`, the hotline list (`more-help`), the thana line (`thana-line`), the find-a-station map (`station-map`), and the wrong-number report sheet — all four stories of the unit's help surfaces land. |
 | History + alert detail | `app/(app)/history.tsx` (four tabs, one filter object, one query key), `history-map.tsx` (one shared wrapper), `alert-detail.tsx` (the projection omits `author_id` **entirely**) |
 | Source scans | `noChartCode.test.ts` (no chart — FR-NG-3 / FR-NG-4 / ADR-010), `noBulkActions.test.ts` (no bulk action — FR-MOD-3), `stationMap.test.ts` (one wrapper, one attribution, the 150 cap) — all **read code only**, and all fail the build |
 | Offline queue | `apps/mobile/src/shared/services/` — the sandbox queue, the backoff schedule, the drain, and the drain trigger. **70 new unit tests** across three suites. |
@@ -72,7 +80,7 @@ Every command below was run green against the local Supabase stack.
 pnpm typecheck        # 3 workspaces
 pnpm lint
 pnpm test             # 467 tests (335 mobile, 84 shared, 48 admin)
-pnpm db:test          # 386 SQL assertions
+pnpm db:test          # 411 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
@@ -268,7 +276,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 28 of 54 stories
+## 4. What is NOT DONE — 24 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -292,8 +300,10 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| H1 | `more-help.tsx` — placeholder route. | [009] story 005 |
-| H2 | `station-map.tsx` — placeholder route (needs the shared MapLibre wrapper). | [010] story 007 |
+| H1 | ✅ **FIXED** — the More Help surfaces are live. `src/shared/ui/MoreHelpSheet.tsx` is a **shared** component, so the Home dashed card and the Help Alert screen show the identical six rows in the identical order, and each row opens the surface its category implies: the four hotlines → `/more-help` (the hotline list, read from the **bundle** with `lastVerifiedAt` surfaced through `src/shared/utils/verifiedStamp.ts`), নিকটবর্তী থানা → `/thana-line`, ম্যাপে স্টেশন খুঁজুন → `/station-map`. The row **body** opens the surface; the trailing 48 dp violet icon opens the dialer — one control doing two things would make the rule unobservable. `src/shared/ui/WrongNumberSheet.tsx` is the prototype's `#wrong-number-dialog` (amber `report` icon, five fixed reasons, a 500-character textarea, a 52 dp **রিপোর্ট পাঠান**, a 44 dp **বাতিল**). **A pre-existing defect was fixed**: the inline sheet pushed **both** the thana row and the map row to `/station-map`; the thana row now opens `/thana-line`. | [009] story 005 |
+| H2 | ✅ **FIXED** — the Find-a-station map is live on the **shared** wrapper. `app/(app)/station-map.tsx` renders `shared/ui/StationMap` — the same component the History map uses, with the same OSM raster style — so there is no fork and the attribution cannot be dropped. The markers come from the **bundle** (`STATIONS.filter(isActive)`), so the surface works offline. The pin colour encodes the station **type** (police violet / hospital red / fire amber, all from the tokens), and a `bn`/`en` **legend** names the three types — three colours with no key are a colour-blind trap. The callout renders **under** the map, so the attribution stays visible, and shows only what the app knows: name, type, address, call button (C-6). The fix is **just-in-time**; with it denied the map still renders every marker on the Dhaka default with no position pin. **The offline notice is real** — `useRefreshGuard().isOffline` drives it; only the tiles need the network. The wrapper gained an optional per-marker `color` and an `overlayAlign` prop (the legend pins to the top-left so it never covers the stations). | [010] story 007 |
+| H3 | ✅ **FIXED** — the thana line is live. `app/(app)/thana-line.tsx` renders the `nearest_thana` RPC's answer **as-is** — the client never re-derives the 10 km rule and never substitutes a number of its own. The RPC (`20261105000003_functions.sql`) applies `ST_DWithin`-equivalent haversine with `<= p_radius_km`, so the boundary is **inclusive**, and it filters `station_type = 'police' and is_active` in SQL. The amber fallback banner renders **before** the call affordance, so the user sees *why* `999` is the target and the target together. A failed lookup renders a **typed** error with manual-dial guidance — never raw Postgres text. | [009] story 006 |
+| H4 | ✅ **FIXED** — the wrong-number report flow is live, and **two real database defects were found by probing and fixed by migration**. (1) An **anonymous report was impossible**: `reporter_id` was `not null` and the insert policy was `with check (reporter_id = auth.uid())` — and `auth.uid()` is NULL for an anonymous request, so `NULL = NULL` failed the policy. FR-SEEK-6 says *any user* may report. Migration **031** makes the column nullable and the policy accepts `reporter_id is null or reporter_id = auth.uid()`; the disabled-account guard is **not** weakened (`assert_account_not_disabled()` still runs, and G7/G26 still hold). (2) The **polymorphic integrity trigger did not exist** — the story says `entry_id` "cannot carry a plain FK" and that a CHECK trigger resolves it against the table named by `entry_type`, but there was no trigger, so a report could name a `station` type and carry a **hotline's** slug and land silently. Migration **032** adds the trigger (resolving against the *live* table, so a retired slug is refused). Migration **033** adds the `details` column the story's write path names and renames the status vocabulary to `('pending','reviewed','rejected')`. The reason and the free text are stored as **two fields**, not one concatenated string. The schema also now **uses** `wrongNumberReportSchema`, which was defined and never wired in. | [009] story 008 |
 
 ### 4.4 Capture — unit `004-capture`
 
@@ -423,12 +433,27 @@ Ordered by dependency. Bolt numbers in brackets.
     admin auto-hide group.~~ ✅ **DONE.** A UI gap only — the server already
     carried the fields — with a `both` badge and the two flag counts labelled
     apart. **H1 and H2 remain** (see item 11).
-11. **H1 → H2 → B4, and the git remote** — the help-seek surfaces and release
-    readiness. H2 (`station-map.tsx`) needs the shared MapLibre wrapper; the
-    wrapper's cap and attribution are already covered by `stationMap.test.ts`.
-    ~~**R5**~~ ✅ **DONE** — the local `.env` files exist (see §5).
+11. ~~**H1 → H2** — the help-seek surfaces.~~ ✅ **BOTH DONE.** ~~**H1** —
+    the More Help sheet and the hotline list.~~ ✅ **DONE.** The sheet is a
+    **shared** component, so both entry points show the identical six rows in
+    the identical order, and each row opens its own category surface. The row
+    **body** opens the surface; the trailing 48 dp icon opens the dialer.
+    ~~**H2** — the find-a-station map.~~ ✅ **DONE.** One wrapper, no fork — the
+    same `shared/ui/StationMap` the History map uses, so the attribution
+    cannot be dropped from one of them. The markers come from the **bundle**,
+    the pin colour encodes the station **type**, and a `bn`/`en` legend names
+    the three types. The callout renders under the map so the attribution
+    stays visible. **Three more stories came with them**: the thana line
+    (H3) and the wrong-number report flow (H4), which is where the three
+    database defects were found. ~~**R5**~~ ✅ **DONE** — the local `.env`
+    files exist (see §5).
     ~~**The memory-bank bolt records**~~ ✅ **DONE** — see §7.
-12. Final `pnpm verify` → **one** commit → push.
+12. **B4, and the git remote.** `eas.json` still carries `<staging-ref>`,
+    `<production-ref>`, `<production-anon-key>` and `<sha256-pin-set>`.
+    `pnpm release:verify` correctly **fails** on these, so the staging and
+    production builds are blocked until real values land — that is a
+    credentials decision, not a code decision.
+13. Final `pnpm verify` → **one** commit → push.
 
 ---
 
@@ -455,15 +480,20 @@ session. **The bolt records are now reconciled**; two smaller items remain.
   `ddd-0*.md` files these bolts ask for were **never written**; writing them
   retroactively would have been invented evidence, and a fabricated design
   document is worse than a missing one.
+  **Bolt `009-help-seek` is now `complete`** — all three of its stories
+  (`005`, `006`, `008`) are implemented. **Bolt `010-help-seek` is still
+  `planned`** — its `007-find-a-station-map` landed, but
+  `004-graceful-degradation` (the location-denied and battery-saver
+  guidance) has not.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 26 stories are `complete`, 28 are `planned`. A
+  authoritative source. 30 stories are `complete`, 24 are `planned`. A
   programmatic cross-check of all 54 story files against the index reports
-  **0 mismatches**.
+  **0 mismatches** — 54 files, 54 rows, no duplicates, no orphans.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 26 story files
-  now say `true`; 28 still say `false`. The count is **28 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 30 story files
+  now say `true`; 24 still say `false`. The count is **24 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -489,7 +519,8 @@ apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
                              location-sharing, contacts, contact-editor,
                              alerts, alert-detail, history, history-map,
-                             report-detail, more-help*, station-map*
+                             report-detail, more-help, thana-line,
+                             station-map
 apps/mobile/src/shared/      api/ (supabase, alerts, alertDetail, history,
                              contacts, reportDetail, stations, geocode, flags,
                              errors, profile, account, locationShares,
@@ -506,12 +537,13 @@ apps/mobile/src/shared/      api/ (supabase, alerts, alertDetail, history,
                              snapshotPayload, shareLocation, shareTelemetry,
                              historyFilters), i18n/ (bn.ts, en.ts), theme/,
                              ui/ (incl. StatusBanner, PermissionRow,
-                             HistoryFilterSheet, StationMap)
+                             HistoryFilterSheet, StationMap, MoreHelpSheet,
+                             WrongNumberSheet), utils/ (verifiedStamp)
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 apps/admin/lib/              copy.ts, format.ts, api.ts
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         30 forward-only migrations
-supabase/tests/              9 SQL suites (386 assertions)
+supabase/migrations/         33 forward-only migrations
+supabase/tests/              9 SQL suites (411 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
@@ -527,8 +559,6 @@ docs/operations/             runbook.md, secrets.md
 memory-bank/                 intents/, bolts/, standards/, story-index.md
 prototype ui.html            the design source of truth
 ```
-
-`*` = placeholder route.
 
 ### Conventions
 

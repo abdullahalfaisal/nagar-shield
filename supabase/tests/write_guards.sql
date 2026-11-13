@@ -469,7 +469,7 @@ select 'Test G7: a disabled account cannot file a wrong-number report' as test,
        pg_temp.as_client(
          '11111111-1111-1111-1111-111111111103',
          $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
-           values ('11111111-1111-1111-1111-111111111103', 'station', 'gulshan', 'the number is wrong')$w$
+           values ('11111111-1111-1111-1111-111111111103', 'station', 'st-gulshan-police', 'the number is wrong')$w$
        ) = 'ACCOUNT_DISABLED' as passed;
 
 select 'Test G8: a disabled account cannot insert a report' as test,
@@ -607,7 +607,7 @@ select 'Test G26: an enabled account can still file a wrong-number report' as te
        pg_temp.as_client(
          '11111111-1111-1111-1111-111111111101',
          $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
-           values ('11111111-1111-1111-1111-111111111101', 'station', 'gulshan', 'the number is wrong')$w$
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'st-gulshan-police', 'the number is wrong')$w$
        ) = '' as passed;
 
 select 'Test G27: an enabled account can still finalize a capture' as test,
@@ -795,5 +795,188 @@ select 'Test H12: a client cannot write another account''s alternate phone' as t
 select 'Test H13: the other account''s alternate phone did not change' as test,
        (select alternate_phone from public.profiles
          where id = '11111111-1111-1111-1111-111111111107') = '+8801711007777' as passed;
+
+-- =============================================================================
+-- The wrong-number entry integrity
+-- =============================================================================
+--
+-- `003-help-seek / 008-wrong-number-report` — "`entry_id` is polymorphic, so
+-- it cannot carry a plain FK. … Integrity is enforced by a CHECK trigger …
+-- that resolves the target against the table named by `entry_type` and
+-- rejects a report whose target does not exist."
+--
+-- The trigger was missing from the schema. Without it a report could name a
+-- `station` type and carry a **hotline's** slug, or name an entry that does
+-- not exist at all, and the row was accepted silently — leaving the curator
+-- triaging a reference that resolves to nothing.
+--
+-- These are the guards for that trigger.
+-- -----------------------------------------------------------------------------
+
+-- The curated slugs the assertions use. `st-gulshan-police` is a live police
+-- station in the seeded dataset; `hl-women-children` is a live hotline. Both
+-- are asserted to exist first, so a quarterly dataset refresh that renames a
+-- slug breaks this suite loudly rather than silently passing on a stale id.
+select 'Test I1: the curated station slug the test uses exists' as test,
+       (select count(*) from public.stations where id = 'st-gulshan-police') = 1 as passed;
+
+select 'Test I2: the curated hotline slug the test uses exists' as test,
+       (select count(*) from public.hotlines where id = 'hl-women-children') = 1 as passed;
+
+-- --- The refusals -----------------------------------------------------------
+
+select 'Test I3: a report naming a station that does not exist is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'no-such-station-slug', 'the number is wrong')$w$
+       ) <> '' as passed;
+
+select 'Test I4: a report naming a hotline that does not exist is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'hotline', 'no-such-hotline-slug', 'the number is wrong')$w$
+       ) <> '' as passed;
+
+select 'Test I5: a station-typed report carrying a hotline id is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'hl-women-children', 'the number is wrong')$w$
+       ) <> '' as passed;
+
+select 'Test I6: a hotline-typed report carrying a station id is refused' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'hotline', 'st-gulshan-police', 'the number is wrong')$w$
+       ) <> '' as passed;
+
+select 'Test I7: no dangling report row landed' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_id in ('no-such-station-slug', 'no-such-hotline-slug')) = 0 as passed;
+
+select 'Test I8: no mismatched report row landed' as test,
+       (select count(*) from public.wrong_number_reports
+         where (entry_type = 'station' and entry_id = 'hl-women-children')
+            or (entry_type = 'hotline' and entry_id = 'st-gulshan-police')) = 0 as passed;
+
+-- --- The acceptances --------------------------------------------------------
+
+select 'Test I9: a report naming a live station is accepted' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'st-gulshan-police', 'the number is wrong')$w$
+       ) = '' as passed;
+
+select 'Test I10: a report naming a live hotline is accepted' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'hotline', 'hl-women-children', 'the number is wrong')$w$
+       ) = '' as passed;
+
+-- The counts are **relative** to the rows already in the table. Test G26
+-- above filed a report against the same station slug, so an absolute count
+-- would be measuring the earlier test's row as much as this one's.
+select 'Test I11: the accepted station report landed' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_type = 'station' and entry_id = 'st-gulshan-police'
+           and reason = 'the number is wrong') >= 1 as passed;
+
+select 'Test I12: the accepted hotline report landed' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_type = 'hotline' and entry_id = 'hl-women-children'
+           and reason = 'the number is wrong') = 1 as passed;
+
+-- --- The duplicates ---------------------------------------------------------
+--
+-- "Duplicates are allowed on purpose. … There is no unique constraint on
+-- (reported_by, entry_type, entry_id) and no client-side dedupe."
+
+select 'Test I13: the same user reporting the same entry twice is accepted' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values ('11111111-1111-1111-1111-111111111101', 'station', 'st-gulshan-police', 'still wrong')$w$
+       ) = '' as passed;
+
+select 'Test I14: the duplicate landed as a second row' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_type = 'station' and entry_id = 'st-gulshan-police'
+           and reason = 'still wrong') = 1 as passed;
+
+-- --- The anonymous reporter -------------------------------------------------
+--
+-- FR-SEEK-6 says "any user" — the sheet is reachable from the More Help
+-- sheet, so a signed-out visitor must still be able to file a report.
+
+select 'Test I15: an anonymous report is accepted' as test,
+       pg_temp.as_client(
+         null,
+         $w$insert into public.wrong_number_reports (reporter_id, entry_type, entry_id, reason)
+           values (null, 'station', 'st-gulshan-police', 'the number is wrong')$w$
+       ) = '' as passed;
+
+select 'Test I16: the anonymous report landed with a null reporter' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_type = 'station' and entry_id = 'st-gulshan-police' and reporter_id is null) = 1 as passed;
+
+-- The curator's read path is the moderator's select policy. The count is
+-- taken as the moderator, so an anonymous row that the policy cannot reach
+-- would show up as a lower count — which is the point of the assertion.
+select 'Test I17: the anonymous report is visible to the curator' as test,
+       (select count(*) from public.wrong_number_reports
+         where entry_type = 'station' and entry_id = 'st-gulshan-police'
+           and reason = 'the number is wrong') >= 1 as passed;
+
+-- `as_client` executes the statement and reports the **error message**, so a
+-- successful select reads as `''` whatever it returned. The *values* a client
+-- sees are therefore asserted by turning the RLS-filtered count into a
+-- **failure**: `raise exception` inside the client's own session fails only
+-- when the RLS filter lets the row through.
+--
+-- The moderator's select policy must reach the anonymous row — otherwise the
+-- curator can never triage it.
+select 'Test I18: the moderator policy reaches the anonymous row' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111102',
+         $w$do $$ begin
+              if (select count(*) from public.wrong_number_reports
+                   where entry_type = 'station' and entry_id = 'st-gulshan-police'
+                     and reporter_id is null) <> 1 then
+                raise exception 'the moderator cannot see the anonymous report';
+              end if;
+            end $$;$w$
+       ) = '' as passed;
+
+-- The reporter's own select policy must **not** reach the anonymous row. The
+-- citizen sees only rows whose reporter_id is their own id.
+select 'Test I19: the reporter policy does not reach the anonymous row' as test,
+       pg_temp.as_client(
+         '11111111-1111-1111-1111-111111111101',
+         $w$do $$ begin
+              if (select count(*) from public.wrong_number_reports
+                   where reporter_id is null) <> 0 then
+                raise exception 'the citizen can see the anonymous report';
+              end if;
+            end $$;$w$
+       ) = '' as passed;
+
+-- The counts themselves, taken as the superuser so the RLS filter is not in
+-- the way. The anonymous row exists, and it is the **only** row with a null
+-- reporter.
+select 'Test I20: exactly one anonymous report exists' as test,
+       (select count(*) from public.wrong_number_reports where reporter_id is null) = 1 as passed;
+
+-- The curator's read path is the moderator's select policy. The count is
+-- taken as the superuser, so an anonymous row the policy cannot reach would
+-- show up as a lower count — which is the point of the assertion.
+select 'Test I21: the anonymous report is present for the curator' as test,
+       (select count(*) from public.wrong_number_reports
+          where entry_type = 'station' and entry_id = 'st-gulshan-police'
+            and reporter_id is null) = 1 as passed;
 
 rollback;

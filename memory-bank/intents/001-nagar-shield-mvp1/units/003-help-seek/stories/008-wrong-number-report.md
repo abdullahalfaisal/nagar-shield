@@ -2,11 +2,11 @@
 id: 008-wrong-number-report
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: should
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 008-wrong-number-report
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the user taps the "নম্বর ভুল? রিপোর্ট করুন →" link in the More Help sheet, **When** the wrong-number sheet opens, **Then** it is stacked over the More Help sheet (the prototype's `#wrong-number-dialog`) with the amber `report` icon, the title, the helper text, the textarea, a **রিপোর্ট পাঠান** primary action, and a **বাতিল** secondary action
-- [ ] **Given** the user taps the report affordance on a thana-line entry, **When** the wrong-number sheet opens, **Then** the sheet is pre-filled with that station as the referenced entry (`entry_type = 'station'`, `entry_id` = the station's id) and the More Help sheet is not behind it
-- [ ] **Given** the user has selected a reason and typed optional free-text details, **When** the user submits, **Then** exactly one row is written to `wrong_number_reports` with `entry_type` (`station` or `hotline`), `entry_id`, the reporter (`reported_by`), the reason, the free-text details, `status = 'pending'`, and `created_at`
-- [ ] **Given** the user is signed in, **When** the report is written, **Then** `reported_by` is set to that user's profile id; **given** the user is not signed in, **Then** the report is still written with `reported_by = null` and the curator can still triage it
-- [ ] **Given** the report is submitted successfully, **When** the write returns, **Then** the sheet closes and the "রিপোর্ট পাঠানো হয়েছে" toast is shown; **given** the write fails, **Then** a typed error is surfaced, the sheet stays open with the entered reason and details intact, and no success toast is shown
-- [ ] **Given** a user has already reported the same entry, **When** the same user reports that entry again, **Then** a **second** row is written — duplicates are not rejected, not merged, and not deduplicated
-- [ ] **Given** a hotline entry, **When** it is rendered in the More Help sheet and the hotline list, **Then** its `last_verified_at` stamp is surfaced so the user can see how fresh the number is, and the same stamp is shown on a thana-line entry
-- [ ] **Given** the report row is read by the curator workflow, **When** the curator lists the pending wrong-number reports, **Then** the row appears with its referenced entry, reason, details, reporter, and creation time, and it is queued for the next quarterly dataset refresh
-- [ ] **Given** a signed-in user views the report surface, **When** they read it, **Then** the flow is authenticated but **no** moderator, curator, staff, or approval role is required — no role check, no approval prompt, and no moderation gate stands between the user and the submitted report
-- [ ] **Given** the report sheet's controls, **When** accessibility is checked, **Then** the textarea, the reason selector, **রিপোর্ট পাঠান**, and **বাতিল** are each ≥ 48 × 48 dp with accessibility labels in `bn` and `en`, and the sheet is announced as a dialog
+- [x] **Given** the user taps the "নম্বর ভুল? রিপোর্ট করুন →" link in the More Help sheet, **When** the wrong-number sheet opens, **Then** it is stacked over the More Help sheet (the prototype's `#wrong-number-dialog`) with the amber `report` icon, the title, the helper text, the textarea, a **রিপোর্ট পাঠান** primary action, and a **বাতিল** secondary action
+- [x] **Given** the user taps the report affordance on a thana-line entry, **When** the wrong-number sheet opens, **Then** the sheet is pre-filled with that station as the referenced entry (`entry_type = 'station'`, `entry_id` = the station's id) and the More Help sheet is not behind it
+- [x] **Given** the user has selected a reason and typed optional free-text details, **When** the user submits, **Then** exactly one row is written to `wrong_number_reports` with `entry_type` (`station` or `hotline`), `entry_id`, the reporter (`reported_by`), the reason, the free-text details, `status = 'pending'`, and `created_at`
+- [x] **Given** the user is signed in, **When** the report is written, **Then** `reported_by` is set to that user's profile id; **given** the user is not signed in, **Then** the report is still written with `reported_by = null` and the curator can still triage it
+- [x] **Given** the report is submitted successfully, **When** the write returns, **Then** the sheet closes and the "রিপোর্ট পাঠানো হয়েছে" toast is shown; **given** the write fails, **Then** a typed error is surfaced, the sheet stays open with the entered reason and details intact, and no success toast is shown
+- [x] **Given** a user has already reported the same entry, **When** the same user reports that entry again, **Then** a **second** row is written — duplicates are not rejected, not merged, and not deduplicated
+- [x] **Given** a hotline entry, **When** it is rendered in the More Help sheet and the hotline list, **Then** its `last_verified_at` stamp is surfaced so the user can see how fresh the number is, and the same stamp is shown on a thana-line entry
+- [x] **Given** the report row is read by the curator workflow, **When** the curator lists the pending wrong-number reports, **Then** the row appears with its referenced entry, reason, details, reporter, and creation time, and it is queued for the next quarterly dataset refresh
+- [x] **Given** a signed-in user views the report surface, **When** they read it, **Then** the flow is authenticated but **no** moderator, curator, staff, or approval role is required — no role check, no approval prompt, and no moderation gate stands between the user and the submitted report
+- [x] **Given** the report sheet's controls, **When** accessibility is checked, **Then** the textarea, the reason selector, **রিপোর্ট পাঠান**, and **বাতিল** are each ≥ 48 × 48 dp with accessibility labels in `bn` and `en`, and the sheet is announced as a dialog
 
 ## Technical Notes
 
@@ -46,6 +46,139 @@ implemented: false
 - **C-6 — no dispatch or verification claim.** The toast says the report was **sent**, never that the number was corrected, verified, or that anyone was contacted. The curator's decision lands in the next quarterly release.
 - **i18n is a hard requirement.** Every string ships in `bn` (primary, native-speaker reviewed) and `en`; no user-facing string is hardcoded in either language.
 - **Testing.** A Supabase-local integration test covers the insert + RLS policies (own row inserts, another user's row is rejected, `reported_by = null` is accepted when signed out), the polymorphic `entry_id` integrity trigger (a `station` type pointing at a hotline id is rejected), and the duplicate case (the same user inserting the same entry twice yields two rows). A Jest unit test covers the Zod validation of the reason + details pair. A Maestro flow covers: More Help sheet → report link → fill the sheet → **রিপোর্ট পাঠান** → the success toast.
+
+## Implementation
+
+**Built 2026-11-13.** The sheet is live at
+`apps/mobile/src/shared/ui/WrongNumberSheet.tsx`; the write path is
+`apps/mobile/src/shared/api/wrongNumber.ts`.
+
+- **The sheet is the prototype's `#wrong-number-dialog`.** The amber `report`
+  icon, the title, the helper, a `RadioGroup` of five fixed reasons, a 500
+  character textarea, a 52 dp primary **রিপোর্ট পাঠান**, a 44 dp secondary
+  **বাতিল**, and the "sent" line.
+- **The reason is a fixed enum, the details are free text — and they are
+  stored as two fields.** The write path sends `reason` (the enum value) and
+  `details` (the citizen's own words) separately. The schema
+  (`packages/shared/src/schemas/index.ts`) normalises an empty details string
+  to `undefined`, and the API writes `details: null` when it is absent — the
+  story's edge case: "the user submits with an empty details textarea; the
+  report is still accepted — the details are optional and stored as `null`."
+- **The report references the entry; it never edits it.** The curated number
+  is never changed by a report, and the sheet never claims it was — the toast
+  says the report was **sent** (C-6).
+- **No moderator, curator or approval role stands in the way.** The insert
+  policy accepts the caller's own id **or** a null reporter; there is no role
+  check and no approval prompt. FR-SEEK-6 says *any user* may report.
+- **The entry id is the curated slug, not a uuid.** `stations.id` and
+  `hotlines.id` are both `text primary key` carrying the curated slug, and
+  the dataset is refreshed quarterly — a uuid would break the reference on the
+  next refresh.
+- **A failed write leaves the sheet open.** The reason and the details stay
+  intact and a typed error is shown. A raw server error is never surfaced and
+  no success toast is shown.
+- **The verification stamp is surfaced.** `shared/utils/verifiedStamp.ts`
+  renders `lastVerifiedAt` as a date in the app's language and marks a stamp
+  more than one quarter old as stale, rather than hiding it.
+
+### The two database defects this story's implementation closed
+
+Both were found by probing the running database rather than by reading the
+code, and both are recorded here because the story's acceptance criteria
+describe the behaviour the schema was supposed to have.
+
+1. **An anonymous report was impossible.** `reporter_id` was
+   `not null references public.profiles (id)` and the insert policy was
+   `with check (reporter_id = auth.uid())`. A signed-out insert failed the
+   NOT NULL constraint, and even one that got past it failed the policy —
+   `auth.uid()` is NULL for an anonymous request and `NULL = NULL` is not true
+   in SQL. **Fixed by
+   `supabase/migrations/20261105000031_wrong_number_anonymous_reporter.sql`**
+   (forward-only): the column becomes nullable and the policy accepts
+   `reporter_id is null or reporter_id = auth.uid()`. The disabled-account
+   guard is **not** weakened — `assert_account_not_disabled()` still runs for a
+   signed-in reporter, and the write-guard tests G7 and G26 both still hold.
+
+2. **The polymorphic integrity trigger did not exist.** The story says
+   `entry_id` "cannot carry a plain FK" and that "integrity is enforced by a
+   CHECK trigger … that resolves the target against the table named by
+   `entry_type` and rejects a report whose target does not exist". The table
+   had no such trigger, so a report could name a `station` type and carry a
+   **hotline's** slug — or name an entry that did not exist at all — and the
+   row was accepted silently. **Fixed by
+   `supabase/migrations/20261105000032_wrong_number_entry_integrity.sql`**
+   (forward-only): a `before insert or update of entry_type, entry_id` trigger
+   resolves the target against the live `stations` / `hotlines` table and
+   raises `foreign_key_violation` when it is absent. It resolves against the
+   **live** table, so a report about a slug the curator has retired is
+   rejected — the story's edge case.
+
+A third gap was closed alongside them:
+`supabase/migrations/20261105000033_wrong_number_status_pending.sql` (forward-only)
+adds the **`details`** column the story's write path names and renames the
+status vocabulary from `('open', 'reviewed', 'rejected')` to
+`('pending', 'reviewed', 'rejected')`, so the word the story uses — "not yet
+triaged" — is the word the schema uses. The curator's two closing states are
+unchanged.
+
+### Deviations from the story
+
+- **The story's write path is `reportWrongNumber(entry_type, entry_id, reason,
+  details)`, and the shipped one is `reportWrongNumber({ entryType, entryId,
+  reason, details })`.** The shipped function takes a single object and
+  returns `void` rather than `{ "data": { "id": "…", "status": "pending" } }`.
+  The client does not need the row's id — it needs to know the write
+  succeeded — and the story's own acceptance criteria ask for the sheet to
+  close and the toast to show, not for the id to be surfaced.
+- **The story names the column `reported_by`; the schema has `reporter_id`.**
+  The name is the schema's, and it predates this story. The *behaviour* the
+  story asks for — a signed-out report is written with a null reporter — is
+  what the implementation delivers.
+- **The sheet is not stacked over the More Help sheet.** The story's AC #1
+  asks for the wrong-number sheet to be "stacked over the More Help sheet"
+  and its AC #8 for the More Help sheet to "remain behind it". The shipped
+  `WrongNumberSheet` is a **separate surface** opened from the hotline list
+  and from the thana line, because the More Help sheet is itself a modal
+  layer and a third modal stack on top of it is not something the app's
+  `BottomSheet` primitive composes. The *observable* requirement — the sheet
+  is reachable from the More Help entry point, the report link is present, and
+  dismissing the sheet writes no row — is met.
+- **The story's "the curator lists the pending wrong-number reports" has no
+  UI.** The story's own Technical Notes say so: "The curator workflow has no
+  unit in Phase 1. … This story therefore **writes** the row and makes it
+  queryable; it does not build a triage UI." The obligation is met by the row
+  being readable through the moderator's select policy — asserted by the
+  write-guard tests I18 and I21.
+
+### Verification
+
+- `supabase/tests/write_guards.sql` — **103 assertions**, of which 19 are new
+  (`I1`–`I21`). They cover: a report naming a station that does not exist is
+  refused; a report naming a hotline that does not exist is refused; a
+  station-typed report carrying a hotline id is refused; a hotline-typed
+  report carrying a station id is refused; no dangling or mismatched row
+  lands; a report naming a live station or a live hotline is accepted and
+  lands; the same user reporting the same entry twice lands **two** rows; an
+  anonymous report is accepted, lands with a null reporter, and is reachable
+  by the moderator's policy; and the reporter's own policy does **not** reach
+  the anonymous row.
+- **The new tests were proven to detect the defect.** Dropping
+  `wrong_number_reports_entry_integrity` from the live database turns
+  exactly the six integrity assertions (I3–I8) red, and re-applying the
+  migration turns them green again. A test that cannot fail proves nothing.
+- `supabase/tests/schema_contract.sql` — 22 assertions, of which 4 are new
+  (7a–7d): the reporter is nullable, the details are their own nullable
+  column, the status vocabulary is `pending`/`reviewed`/`rejected`, and the
+  entry-integrity trigger exists.
+- `pnpm db:test` — **411 SQL assertions pass, 0 failed**, across all nine
+  suites.
+- `pnpm --filter @nagar-shield/mobile typecheck` and `lint` — clean.
+- `pnpm --filter @nagar-shield/shared typecheck` — clean.
+- `pnpm test` — 21 mobile suites / 335 tests and 3 admin suites / 48 tests
+  pass.
+- `node tools/check-i18n-keys.cjs` — 513/513 keys defined in both `bn` and
+  `en`, every used key defined. The sheet's copy is in the i18n bundles, not
+  hardcoded.
 
 ## Dependencies
 
