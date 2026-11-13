@@ -2,11 +2,11 @@
 id: 006-capture-permission-degradation
 unit: 004-capture
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 006-capture-permission-degradation
@@ -19,16 +19,16 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** a fresh install, **When** the app is launched for the first time, **Then** **no** camera, microphone, media-library, or location permission prompt appears — no prompt fires at first launch (FR-PERMS-1)
-- [ ] **Given** the user taps the video capture card, **When** the permission is not yet determined, **Then** the camera and microphone prompts fire at that moment, immediately before the recorder opens, and the record starts only if both are granted
-- [ ] **Given** the user taps the photo card's camera path, **When** the camera permission is not yet determined, **Then** the camera prompt fires at that moment; **Given** the user taps the gallery path, **Then** the media-library prompt fires at that moment — neither is requested at screen mount
-- [ ] **Given** the camera permission is **denied**, **When** the Capture screen renders, **Then** the camera and microphone entry points are **hidden entirely** — the video capture card is not rendered and the camera half of the photo card is not offered (FR-PERMS-2)
-- [ ] **Given** the camera permission is denied, **When** the Capture screen renders, **Then** the **gallery** path and the **file upload** path are still present and still work
-- [ ] **Given** the location permission is denied, **When** the Capture screen renders, **Then** the location card shows a **manual-entry fallback** instead of an auto-detected address, and the user can enter an area or a place by hand
-- [ ] **Given** any permission is denied, **When** the user submits, **Then** the submit **still succeeds**, the app **never crashes**, and the submit is **never blocked** by the missing permission
-- [ ] **Given** a denied permission, **When** the user opens Settings, **Then** a re-request affordance is available that either re-triggers the system prompt (when the OS still allows it) or deep-links to the app's OS permission settings, and it states plainly which permission is missing and what it would unlock
-- [ ] **Given** the user revokes a permission while the app is running, **When** the Capture screen is next opened, **Then** the screen reflects the new state — the entry points are hidden or the fallback is shown — without a crash and without a stale permission state
-- [ ] **Given** a denied permission, **When** the user inspects the screen, **Then** **no** copy claims the app has verified the location, the identity, or anything else about the citizen — and no copy claims anyone was notified (C-6)
+- [x] **Given** a fresh install, **When** the app is launched for the first time, **Then** **no** camera, microphone, media-library, or location permission prompt appears — no prompt fires at first launch (FR-PERMS-1)
+- [x] **Given** the user taps the video capture card, **When** the permission is not yet determined, **Then** the camera and microphone prompts fire at that moment, immediately before the recorder opens, and the record starts only if both are granted
+- [x] **Given** the user taps the photo card's camera path, **When** the camera permission is not yet determined, **Then** the camera prompt fires at that moment; **Given** the user taps the gallery path, **Then** the media-library prompt fires at that moment — neither is requested at screen mount
+- [x] **Given** the camera permission is **denied**, **When** the Capture screen renders, **Then** the camera and microphone entry points are **hidden entirely** — the video capture card is not rendered and the camera half of the photo card is not offered (FR-PERMS-2)
+- [x] **Given** the camera permission is denied, **When** the Capture screen renders, **Then** the **gallery** path and the **file upload** path are still present and still work
+- [x] **Given** the location permission is denied, **When** the Capture screen renders, **Then** the location card shows a **manual-entry fallback** instead of an auto-detected address, and the user can enter an area or a place by hand
+- [x] **Given** any permission is denied, **When** the user submits, **Then** the submit **still succeeds**, the app **never crashes**, and the submit is **never blocked** by the missing permission
+- [x] **Given** a denied permission, **When** the user opens Settings, **Then** a re-request affordance is available that either re-triggers the system prompt (when the OS still allows it) or deep-links to the app's OS permission settings, and it states plainly which permission is missing and what it would unlock
+- [x] **Given** the user revokes a permission while the app is running, **When** the Capture screen is next opened, **Then** the screen reflects the new state — the entry points are hidden or the fallback is shown — without a crash and without a stale permission state
+- [x] **Given** a denied permission, **When** the user inspects the screen, **Then** **no** copy claims the app has verified the location, the identity, or anything else about the citizen — and no copy claims anyone was notified (C-6)
 
 ## Technical Notes
 
@@ -83,3 +83,105 @@ implemented: false
 - Any permission for contacts, notifications, or background location at MVP
 - Any claim that a denied permission is recoverable by a background retry — the user must act
 - Runtime permission handling for a future iOS build — Phase 1 targets Android
+
+## Implementation Notes
+
+**The state machine has three states, not two.** `granted` / `denied` /
+`undetermined`. The distinction that matters to the user is only *"will the
+prompt still come?"* — a `blocked` permission and a `denied` one are the same
+thing to a citizen, so both map to `denied`
+(`apps/mobile/src/shared/services/permissions.ts`).
+
+### Two defects the tests found, and the fixes
+
+**1. An undetermined permission was hiding its own entry point.** The first
+version of `entryPointAvailability()` gated on `=== 'granted'`, so an
+undetermined permission removed the card. That made the just-in-time prompt
+**unreachable**: the card was never rendered, so it could never be tapped, so
+the dialog would never appear. The citizen would be left with a feature that
+silently did not exist and a permission that was never asked for.
+
+The rule is now **only `denied` hides**. `undetermined` still shows its entry
+point, and the prompt fires on the tap. This is the AC-2 and AC-3 contract
+stated exactly: *the prompt fires when the entry point is tapped*, which is
+only possible if the entry point is there.
+
+**2. `composeDescription()` dropped the last word of every description.** The
+word-boundary truncation was applied even when the description already fit,
+so `'a report Area: Mirpur'` came out as `'a Area: Mirpur'`. The cut now runs
+only when truncation is actually needed. The truncation itself cuts on a
+**word boundary**, so a report never ends in a half-written word.
+
+### The manual area rides in the description
+
+The server has **no separate field** for a manually-entered area. The
+`reports` table carries `lat` / `lng` / `description` / `area_hierarchy`, and
+`finalize-capture` resolves the hierarchy from the coordinates. Adding a
+dedicated field would have meant a migration, a new Edge Function parameter,
+a new Zod contract, and a new read model — a server change this story does
+not own.
+
+So the manual entry rides in the **description**, under an `Area: ` prefix
+that marks it as the citizen's own words rather than a resolved address. The
+server-resolved `area_hierarchy` stays authoritative, exactly as the edge-case
+table requires. The citizen's words remain visible to the moderation console
+and to whoever reads the report.
+
+Two rules protect the 140-character cap
+(`composeDescription()` in `captureFlow.ts`):
+
+| Situation | Outcome |
+|---|---|
+| Both fit | `"<description> Area: <hint>"` |
+| The description is too long | The description is cut on a **word boundary** to make room; the hint is kept |
+| The hint alone will not fit beside any description | The hint is dropped — `null` |
+| Either is blank | The other is returned alone, or `null` |
+
+### The recovery path routes on the state
+
+`recoveryAction(state)` returns `'prompt'` for `undetermined` and
+`'settings'` for `denied`. The Settings button's **label always matches the
+action it performs** — "Ask again" re-triggers the system prompt, "Open
+system settings" opens the OS page. A button labelled "Ask again" that opens
+a settings page teaches citizens not to believe the app.
+
+`recoverPermission()` reports the branch it took. The `settings` branch
+reports `granted: false` even if the permission happened to have been granted
+in the meantime: **the app did not grant it and has not verified it.** The
+row re-reads the live state instead, which reports what the OS says rather
+than what the app hopes.
+
+### The read never prompts, and never assumes
+
+`readPermissions()` calls only the `get*PermissionsAsync` APIs — never a
+`request*` one. A failed query resolves to `'denied'`, the most restricted
+reading. A failed query read as "granted" would render an entry point the
+user cannot use, and the tap would fail with no explanation.
+
+### The state is re-read on every foreground
+
+`usePermissions()` reads on mount and re-reads on the `AppState` `'active'`
+transition. A permission revoked in the OS settings while the app was
+backgrounded is reflected the next time the screen renders — no restart, no
+stale flag.
+
+### Verification
+
+| What | How |
+|---|---|
+| The state mapping, the restricted fallback, the entry-point rules | `permissions.test.ts` — 26 tests |
+| The recovery routing, the label/action match, the no-throw guarantee | `permissionRecovery.test.ts` — 16 tests |
+| The just-in-time prompts, the microphone gate on video, the no-permission file path | `mediaSources.test.ts` — 17 tests |
+| The area-hint composition and the 140-char budget | `captureFlow.test.ts` — 29 tests |
+
+### What this story does **not** own
+
+- The **server-side** area degradation — `002-area-hierarchy-extraction`. The
+  client sends `lat: 0, lng: 0` when there is no fix; the server degrades to
+  `'Dhaka'` / unknown thana.
+- The **permission grants themselves**. The app never grants a permission on
+  the citizen's behalf — the user flips the switch in the OS settings page.
+- The **notification** permission. It is not requested anywhere at MVP.
+- A **prompt storm** guard. The `entryPointAvailability()` rule means each
+  permission is requested at most once per entry point per flow, but there is
+  no explicit in-flight lock on the request itself.

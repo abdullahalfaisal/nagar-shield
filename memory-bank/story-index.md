@@ -34,7 +34,7 @@
 | 002-area-hierarchy-extraction | Area hierarchy extraction | 004-capture | 013-capture | must | planned |
 | 003-report-detail-and-category-edit | Report detail + author category edit | 004-capture | 013-capture | must | complete |
 | 005-offline-upload-queue | Offline upload queue | 004-capture | 014-capture | must | complete |
-| 006-capture-permission-degradation | Capture permission degradation | 004-capture | 014-capture | must | planned |
+| 006-capture-permission-degradation | Capture permission degradation | 004-capture | 014-capture | must | complete |
 | 001-location-sharing-screen | Location Sharing screen | 005-location | 015-location | must | planned |
 | 002-os-share-sheet-fallback | OS share-sheet fallback | 005-location | 016-location | must | planned |
 | 003-share-with-all-primary-contacts | Share with all primary contacts | 005-location | 016-location | must | planned |

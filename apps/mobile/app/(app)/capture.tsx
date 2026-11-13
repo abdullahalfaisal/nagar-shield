@@ -15,6 +15,7 @@ import {
 } from '@/shared/services/mediaSources';
 import { preparePickedMedia, useCaptureSubmit, type MediaKind } from '@/shared/services/captureFlow';
 import { useQueueDrain } from '@/shared/services/useQueueDrain';
+import { usePermissions } from '@/shared/services/usePermissions';
 import type { PreparedMedia } from '@/shared/services/mediaPipeline';
 import { toBengaliDigits } from '@/shared/utils/relativeTime';
 
@@ -63,6 +64,7 @@ export default function CaptureScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [overflowed, setOverflowed] = useState(false);
+  const [manualArea, setManualArea] = useState('');
 
   const { state: fixState } = useCurrentFix();
   const { data: geocode } = useReverseGeocode(
@@ -76,6 +78,11 @@ export default function CaptureScreen() {
   // The drain is mounted on this screen so the queue actually empties. It
   // runs off the render path — the capture screen is never blocked by it.
   const { pending, savedOnDevice } = useQueueDrain();
+
+  // The live permission state. It is read — never prompted for — and it is
+  // re-read on every foreground, so a permission revoked while the app was
+  // backgrounded is reflected the next time the screen renders.
+  const { permissions, availability } = usePermissions();
 
   const counter = useMemo(() => `${description.length} / ${CAPTURE_DESCRIPTION_MAX_LENGTH}`, [
     description.length,
@@ -142,6 +149,9 @@ export default function CaptureScreen() {
         lat: fixState.status === 'ready' ? fixState.fix.lat : 0,
         lng: fixState.status === 'ready' ? fixState.fix.lng : 0,
         capturedAt: new Date().toISOString(),
+        // The manually-entered area travels with the report as a **hint**.
+        // The server-resolved hierarchy stays authoritative.
+        areaHint: manualArea.trim().length > 0 ? manualArea.trim() : null,
       },
     });
 
@@ -157,10 +167,45 @@ export default function CaptureScreen() {
     if (outcome.status === 'sent' || outcome.status === 'queued') {
       setSent(true);
     }
-  }, [anonymous, description, fixState, media, submit]);
+  }, [anonymous, description, fixState, manualArea, media, submit]);
 
   const addressLine = geocode ? formatAddressLine(geocode) : '';
   const hasFix = fixState.status === 'ready';
+
+  // The manual-entry fallback shows when the location permission is not
+  // granted — including while it is still undetermined, because the prompt
+  // has not fired yet and the citizen should not be left waiting on a fix
+  // they may never get.
+  const showManualLocation =
+    permissions !== null && permissions.location !== 'granted' && !hasFix;
+
+  /**
+   * Commits the manually-entered area.
+   *
+   * The entry is a **hint**, not a claim: the app does not resolve it and it
+   * does not verify the citizen's place. It is carried with the report so the
+   * server-resolved hierarchy stays authoritative and the citizen's own words
+   * are still visible to whoever reads the report.
+   */
+  const onCommitManualArea = useCallback(() => {
+    setManualArea((current) => current.trim());
+    setNotice(null);
+  }, []);
+
+  /**
+   * Whether the camera row may be offered for a given kind.
+   *
+   * A video capture needs the microphone as well as the camera, so the
+   * camera row is hidden for a video when the mic is blocked.
+   */
+  const canUseCameraFor = useCallback(
+    (kind: MediaKind): boolean => {
+      if (!availability.canTakePhoto) return false;
+      if (kind === 'video') return availability.canRecordVideo;
+      return true;
+    },
+    [availability.canRecordVideo, availability.canTakePhoto],
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.white }]}>
@@ -244,21 +289,40 @@ export default function CaptureScreen() {
           />
         ) : null}
 
-        {/* Upload cards */}
-        <UploadCard
-          icon="videocam"
-          title={t('capture.takeVideo')}
-          sub={t('capture.maxVideo')}
-          selected={mediaKind === 'video'}
-          onPress={() => openPicker('video')}
-        />
-        <UploadCard
-          icon="photo_camera"
-          title={t('capture.takePhoto')}
-          sub={t('capture.photoSub')}
-          selected={mediaKind === 'photo'}
-          onPress={() => openPicker('photo')}
-        />
+        {/*
+          The upload cards. A denied permission removes the entry point
+          entirely — **hidden, not disabled**. A disabled control the user
+          cannot use is a dead end; a hidden one is honest. The screen must
+          not reserve a blank card where the prototype has an upload card.
+        */}
+        {availability.canRecordVideo ? (
+          <UploadCard
+            icon="videocam"
+            title={t('capture.takeVideo')}
+            sub={t('capture.maxVideo')}
+            selected={mediaKind === 'video'}
+            onPress={() => openPicker('video')}
+          />
+        ) : null}
+
+        {/*
+          The photo card survives a denied camera — the gallery half of it
+          does not need the camera permission.
+        */}
+        {availability.canTakePhoto || availability.canPickFromGallery ? (
+          <UploadCard
+            icon="photo_camera"
+            title={t('capture.takePhoto')}
+            sub={
+              availability.canTakePhoto
+                ? t('capture.photoSub')
+                : t('capture.gallerySub')
+            }
+            selected={mediaKind === 'photo'}
+            onPress={() => openPicker('photo')}
+          />
+        ) : null}
+
         <UploadCard
           icon="attach_file"
           title={t('capture.chooseFile')}
@@ -304,7 +368,12 @@ export default function CaptureScreen() {
           <Text style={[styles.counter, { color: theme.colors.ink[500] }]}>{counter}</Text>
         </View>
 
-        {/* `.location-card` */}
+        {/*
+          The location card. With the permission denied it degrades to a
+          **manual-entry fallback** — never a fake address, and never the
+          prototype's hardcoded বসুন্ধরা R/A. The manual entry is a *hint*:
+          the server-resolved hierarchy stays authoritative.
+        */}
         <View
           style={[
             styles.locationCard,
@@ -317,15 +386,55 @@ export default function CaptureScreen() {
           <Icon name="location_on" size={22} color={theme.palette.violet[700]} filled />
           <View style={styles.locationInfo}>
             <Text style={[styles.locationTitle, { color: theme.colors.ink[950] }]}>
-              {hasFix ? addressLine || t('capture.locationPending') : t('capture.locationUnavailable')}
+              {manualArea
+                ? t('capture.locationManualSaved')
+                : hasFix
+                  ? addressLine || t('capture.locationPending')
+                  : t('capture.locationUnavailable')}
             </Text>
             <Text style={[styles.locationSub, { color: theme.colors.ink[500] }]}>
-              {hasFix && fixState.fix.accuracyM !== null
-                ? t('capture.locationAccuracy', { accuracy: toBengaliDigits(String(Math.round(fixState.fix.accuracyM))) })
-                : t('capture.locationUnavailableSub')}
+              {manualArea
+                ? t('capture.locationManualHint')
+                : hasFix && fixState.fix.accuracyM !== null
+                  ? t('capture.locationAccuracy', { accuracy: toBengaliDigits(String(Math.round(fixState.fix.accuracyM))) })
+                  : t('capture.locationUnavailableSub')}
             </Text>
           </View>
         </View>
+
+        {showManualLocation ? (
+          <View style={styles.manualBlock}>
+            <Text style={[styles.manualLabel, { color: theme.colors.ink[950] }]}>
+              {t('capture.locationManualTitle')}
+            </Text>
+            <TextInput
+              value={manualArea}
+              onChangeText={setManualArea}
+              placeholder={t('capture.locationManualPlaceholder')}
+              placeholderTextColor={theme.colors.ink[400]}
+              accessibilityLabel={t('capture.locationManualTitle')}
+              onSubmitEditing={onCommitManualArea}
+              style={[
+                styles.manualInput,
+                {
+                  backgroundColor: theme.colors.surface.white,
+                  borderColor: theme.colors.ink[200],
+                  color: theme.colors.ink[950],
+                },
+              ]}
+            />
+            <Text style={[styles.manualHint, { color: theme.colors.ink[500] }]}>
+              {t('capture.locationManualHint')}
+            </Text>
+            <Button
+              label={t('capture.locationManualSubmit')}
+              variant="secondary"
+              size="md"
+              disabled={manualArea.trim().length === 0}
+              onPress={onCommitManualArea}
+            />
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* The media-source sheet. */}
@@ -335,7 +444,12 @@ export default function CaptureScreen() {
         onClose={() => setPickerOpen(false)}
       >
         <View style={styles.pickerRows}>
-          {pickerKind !== 'file' ? (
+          {/*
+            The camera row is offered only when the camera is permitted. A
+            video capture additionally needs the microphone, so the camera
+            row is hidden for a video too when the mic is blocked.
+          */}
+          {pickerKind !== 'file' && canUseCameraFor(pickerKind) ? (
             <PickerRow
               icon="photo_camera"
               label={t('capture.cameraOption')}
@@ -407,6 +521,7 @@ function PickerRow({
 /** Maps a media failure to a localized message. */
 function mapMediaError(error: unknown, t: (key: string) => string): string {
   const code = (error as { code?: string } | null)?.code;
+  const permission = (error as { details?: { permission?: string } } | null)?.details?.permission;
 
   switch (code) {
     case 'MEDIA_TOO_LARGE':
@@ -414,6 +529,11 @@ function mapMediaError(error: unknown, t: (key: string) => string): string {
     case 'UNSUPPORTED_MEDIA':
       return t('capture.unsupportedFile');
     case 'FORBIDDEN':
+      // The permission that was refused is named, so the citizen knows
+      // which one to turn back on — the microphone and the camera are
+      // different switches.
+      if (permission === 'microphone') return t('capture.micOnlyDenied');
+      if (permission === 'mediaLibrary') return t('capture.galleryDenied');
       return t('capture.cameraDenied');
     default:
       return t('capture.uploadFailed');
@@ -607,6 +727,27 @@ const styles = StyleSheet.create({
   locationSub: {
     fontSize: 11,
     marginTop: 1,
+  },
+  manualBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  manualLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  manualInput: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    fontSize: 14,
+  },
+  manualHint: {
+    fontSize: 11,
+    marginTop: 6,
+    marginBottom: 10,
   },
   pickerRows: {
     gap: 8,

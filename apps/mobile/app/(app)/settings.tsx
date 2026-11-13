@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme, useThemeControls } from '@/shared/theme';
-import { Button, Icon, ListRow, Screen, Toggle } from '@/shared/ui';
+import { Button, Icon, ListRow, PermissionRow, Screen, Toggle } from '@/shared/ui';
 import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { setLocale } from '@/shared/i18n';
 import { logOut } from '@/shared/auth/authService';
@@ -11,6 +11,12 @@ import { softDeleteAccount } from '@/shared/api/account';
 import { loadProfile, updateProfile } from '@/shared/api/profile';
 import { isBiometricAvailable } from '@/shared/auth/biometricService';
 import { useAuthSession } from '@/shared/auth/useAuthSession';
+import { usePermissions } from '@/shared/services/usePermissions';
+import {
+  RECOVERABLE_PERMISSIONS,
+  type PermissionName,
+  type PermissionSnapshot,
+} from '@/shared/services/permissions';
 
 /**
  * Screen 16 — Settings.
@@ -30,6 +36,11 @@ export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const { toggleTheme, setTheme } = useThemeControls();
   const { session } = useAuthSession();
+
+  // The live permission state. It is read — never prompted for — and it is
+  // re-read on every foreground, so a permission revoked while the app was
+  // backgrounded is reflected here too.
+  const { permissions, refresh } = usePermissions();
 
   const [biometric, setBiometric] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -204,6 +215,46 @@ export default function SettingsScreen() {
         />
       </Section>
 
+      {/* Permissions — the re-request surface. */}
+      <Section title={t('permissions.title')}>
+        <View style={styles.permissionsIntro}>
+          <Text style={[styles.permissionsSubtitle, { color: theme.colors.ink[500] }]}>
+            {permissions && everyGranted(permissions)
+              ? t('permissions.allGranted')
+              : t('permissions.subtitle')}
+          </Text>
+        </View>
+
+        {permissions === null ? null : (
+          <>
+            {RECOVERABLE_PERMISSIONS.map((name) => (
+              <View
+                key={name}
+                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.ink[100] }}
+              >
+                <PermissionRow
+                  name={name}
+                  state={permissions[name]}
+                  unlocks={unlocksFor(name, t)}
+                  onChanged={refresh}
+                />
+              </View>
+            ))}
+
+            {/*
+              A report can always be filed without any of these. Saying so
+              keeps the permissions from reading like a toll gate at the
+              door of the app.
+            */}
+            <View style={styles.permissionsFooter}>
+              <Text style={[styles.permissionsFooterText, { color: theme.colors.ink[500] }]}>
+                {t('permissions.noneNeeded')}
+              </Text>
+            </View>
+          </>
+        )}
+      </Section>
+
       {/* About */}
       <Section title={t('settings.aboutHeader')}>
         <ListRow
@@ -308,6 +359,25 @@ export default function SettingsScreen() {
   );
 }
 
+/** Whether every permission the app reads has been granted. */
+function everyGranted(permissions: PermissionSnapshot): boolean {
+  return RECOVERABLE_PERMISSIONS.every((name) => permissions[name] === 'granted');
+}
+
+/** What a permission would unlock, in the user's language. */
+function unlocksFor(name: PermissionName, t: (key: string) => string): string {
+  switch (name) {
+    case 'camera':
+      return t('permissions.cameraUnlocks');
+    case 'microphone':
+      return t('permissions.microphoneUnlocks');
+    case 'mediaLibrary':
+      return t('permissions.mediaLibraryUnlocks');
+    case 'location':
+      return t('permissions.locationUnlocks');
+  }
+}
+
 /** A `.list-section` card with an uppercase header. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const theme = useTheme();
@@ -404,6 +474,23 @@ const styles = StyleSheet.create({
   },
   deleteActions: {
     gap: 8,
+  },
+  permissionsIntro: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  permissionsSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  permissionsFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  permissionsFooterText: {
+    fontSize: 11,
+    lineHeight: 16,
   },
   logoutRow: {
     marginHorizontal: 20,

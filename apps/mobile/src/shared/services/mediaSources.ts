@@ -1,3 +1,4 @@
+import * as Camera from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { AppError, MEDIA_MAX_VIDEO_SECONDS } from '@nagar-shield/shared';
@@ -91,14 +92,26 @@ export async function capturePhoto(): Promise<PickedAsset | null> {
 /**
  * Records a video with the camera.
  *
+ * A video capture needs **two** permissions: the camera and the microphone.
+ * A silent video is not the evidence a citizen is trying to file, so the
+ * microphone is requested alongside the camera, just-in-time, and the
+ * recording starts only if both are granted.
+ *
  * The 30 s cap is enforced by the **camera itself** through
  * `videoMaxDuration`, so the user is stopped at the cap rather than after it.
  */
 export async function captureVideo(): Promise<PickedAsset | null> {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  const [camera, microphone] = await Promise.all([
+    ImagePicker.requestCameraPermissionsAsync(),
+    Camera.Camera.requestMicrophonePermissionsAsync(),
+  ]);
 
-  if (permission.status !== 'granted') {
+  if (camera.status !== 'granted') {
     throw new AppError('FORBIDDEN', { permission: 'camera' });
+  }
+
+  if (microphone.status !== 'granted') {
+    throw new AppError('FORBIDDEN', { permission: 'microphone' });
   }
 
   const result = await ImagePicker.launchCameraAsync({

@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **40 of 54 stories still carry `implemented: false`** — the
+built and verified. **39 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -53,6 +53,7 @@ Every command below was run green against the local Supabase stack.
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html` |
 | Offline queue | `apps/mobile/src/shared/services/` — the sandbox queue, the backoff schedule, the drain, and the drain trigger. **70 new unit tests** across three suites. |
+| Permissions | `apps/mobile/src/shared/services/permissions.ts` + `permissionRecovery.ts` — the three-state read, the entry-point degradation rules, and the just-in-time recovery routing. **88 unit tests** across four suites. |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
@@ -66,7 +67,7 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 240 tests
+pnpm test             # 312 tests (201 mobile, 75 shared, 36 admin)
 pnpm db:test          # 306 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
@@ -262,7 +263,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 40 of 54 stories
+## 4. What is NOT DONE — 39 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -295,7 +296,7 @@ Ordered by dependency. Bolt numbers in brackets.
 |---|---|---|
 | P1 | ✅ **FIXED** — the report detail + category edit is live. `src/shared/api/reportDetail.ts` gained `fetchOwnedReport`, `updateCategory` and `signMediaUrl`; `app/(app)/report-detail.tsx` is the new detail screen (media, description, area, capture time, and the category row), with a bottom sheet holding exactly the 11 Bangla-labelled values and no free-text field; and `app/(app)/history.tsx` gained a **My Reports** tab that reads `history_nearby` and opens the detail screen — the entry point AC #1 asks for. The category is the only editable field: the description and the visibility PATCHes are both refused. **A fail-open defect was found by probing and fixed by migration**: `update_category`'s `UPDATE` was scoped to the author's own row, so a non-author's attempt matched zero rows and the function still returned a success envelope claiming the category had been set (migration 024 now raises `FORBIDDEN`, and a report that does not exist is refused the same way so the error cannot be used to enumerate ids). `pnpm category:check` proves the whole contract over the real PostgREST path (22/22) and `supabase/tests/report_category.sql` adds 32 DB-side assertions. | [013] story 003 |
 | P2 | ✅ **FIXED** — the offline queue drains. `src/shared/services/queueDrain.ts` is the drain (`isRetryable`, `drainItem`, `drainQueue`) and `src/shared/services/useQueueDrain.ts` is the trigger — an `expo-network` state listener plus an `AppState` transition to `active`, both off the render path and both guarded by an in-flight **ref** so a burst of connectivity events cannot fire a burst of uploads. The Capture screen mounts the hook and surfaces the **"saved on device"** state through a new `StatusBanner`; the overflow warning is an alert, because the screen navigates away the moment a capture is queued and an inline banner would be dismissed unread. The drain runs **sequentially** and the backoff is 30 s / 2 min / 8 min, capped at 3 attempts. **Three defects were found and fixed while building it.** (1) The queue minted a **fresh** `client_request_id` instead of reusing the failed attempt's — which would have let a submit whose response was lost in transit land twice, creating a duplicate report. (2) The attempt counter moved **twice** per attempt, burning two of the three attempts on one failure. (3) The 20-item overflow was **never reported**: `enqueueUpload` truncated the queue on write, so the read-back that looked for the overflow saw an already-truncated queue and the dropped report was lost silently — the eviction is now detected before the write. Two edge cases from the story's table are also honoured: a **wrong device clock** cannot strand a report (`BACKOFF_CEILING_MS` releases an item whose timestamp is unreachable), and **signing out discards the queue** with a warning, because a queued item is scoped to its session. 70 new unit tests. | [014] story 005 |
-| P3 | Capture permission degradation (camera denied → degrade). | [014] story 006 |
+| P3 | ✅ **FIXED** — the Capture screen degrades instead of breaking. `src/shared/services/permissions.ts` is the typed wrapper: a **three-state** read (`granted` / `denied` / `undetermined`), the `get*PermissionsAsync` APIs only — **reading never prompts** — and a failed query resolves to `denied`, the most restricted reading, because reading "I could not check" as "it is allowed" would render a control that fails on tap. `entryPointAvailability()` is the whole degradation rule as a **pure function**: the video card needs the camera **and** the mic (a silent video is not the evidence being filed), the camera path needs the camera, the gallery path needs the media library, and the file path needs nothing. `usePermissions.ts` re-reads on every foreground, so a revocation made in the OS settings while the app was backgrounded is reflected with no restart and no stale flag. `src/shared/services/permissionRecovery.ts` routes the recovery: `undetermined` → re-trigger the system prompt, `denied` → deep-link to the OS settings page via `expo-linking`, and **the Settings button's label always matches the action it performs**. The Settings screen gained a Permissions section (`src/shared/ui/PermissionRow.tsx`) that names each permission, says what it would unlock, and shows the state. `captureVideo` now requests the **microphone** alongside the camera. The location card degrades to a **manual-entry fallback**, and the manual area rides in the report's description under an `Area: ` prefix — the server has no separate field for it, and the server-resolved `area_hierarchy` stays authoritative. **Two defects were found by the tests and fixed.** (1) The first version of `entryPointAvailability()` gated on `=== 'granted'`, so an **undetermined** permission hid its own entry point — which made the just-in-time prompt *unreachable*, because the card could never be rendered and so could never be tapped. Only `denied` hides now. (2) `composeDescription()` ran its word-boundary cut even when the description already fit, dropping the last word of every description (`'a report Area: Mirpur'` → `'a Area: Mirpur'`). 88 new unit tests. | [014] story 006 |
 
 ### 4.5 Location — unit `005-location`
 
@@ -361,20 +362,27 @@ Ordered by dependency. Bolt numbers in brackets.
    found by the live probe and landed as migrations 022 and 023. The probe
    itself (26/26) is wired into CI. Unit `002-identity` now has five of its
    seven stories complete.
-8. **P1 → P2 → P3** — unit `004-capture`. ~~**P1** — report detail + category
-   edit.~~ ✅ **DONE.** The detail screen, the category sheet, the API layer
-   and the **My Reports** History tab are live. One fail-open defect was
-   found by the live probe and fixed by migration 024: `update_category`
-   reported success for a write it had not performed, so the client's cached
-   category and the database's stored one disagreed invisibly. The probe
-   (22/22) is wired into CI. ~~**P2** — offline upload queue.~~ ✅ **DONE.**
-   The drain, the drain trigger, the "saved on device" state and the overflow
-   warning are live; 70 new unit tests. **Three defects** were found while
-   building it — a **fresh** idempotency key on the queued item (which would
-   have created duplicate reports), an attempt counter that moved **twice** per
-   attempt, and an overflow that was **never reported** because the truncation
-   happened before the check. All three are fixed and covered by tests.
-   **P3** remains.
+8. ~~**P1 → P2 → P3** — unit `004-capture`.~~ ✅ **ALL THREE DONE.** ~~**P1** —
+   report detail + category edit.~~ ✅ **DONE.** The detail screen, the
+   category sheet, the API layer and the **My Reports** History tab are live.
+   One fail-open defect was found by the live probe and fixed by migration
+   024: `update_category` reported success for a write it had not performed,
+   so the client's cached category and the database's stored one disagreed
+   invisibly. The probe (22/22) is wired into CI. ~~**P2** — offline upload
+   queue.~~ ✅ **DONE.** The drain, the drain trigger, the "saved on device"
+   state and the overflow warning are live; 70 new unit tests. **Three
+   defects** were found while building it — a **fresh** idempotency key on the
+   queued item (which would have created duplicate reports), an attempt
+   counter that moved **twice** per attempt, and an overflow that was **never
+   reported** because the truncation happened before the check. All three are
+   fixed and covered by tests. ~~**P3** — capture permission degradation.~~
+   ✅ **DONE.** The typed permission wrapper, the pure degradation rules, the
+   just-in-time prompts, the Settings recovery surface, and the location
+   manual-entry fallback are live; 88 new unit tests. **Two defects** were
+   found by the tests — an **undetermined** permission hiding its own entry
+   point (which made the just-in-time prompt unreachable, because the card
+   could never be tapped), and a description composer that dropped the last
+   word of every description. Both are fixed and covered by tests.
 9. **L1 → L2** — unit `005-location`.
 10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
 11. **B4, R5, and the git remote** — release readiness.
@@ -394,10 +402,10 @@ session.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 14 stories are `complete`, 40 are `planned`.
+  authoritative source. 15 stories are `complete`, 39 are `planned`.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 14 story files
-  now say `true`; 40 still say `false`. The count is **40 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 15 story files
+  now say `true`; 39 still say `false`. The count is **39 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -434,8 +442,9 @@ apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              (captureFlow, submitCapture, uploadQueue,
                              queueDrain, useQueueDrain, prepareMedia,
                              mediaPipeline, mediaSources, location,
-                             dialer), i18n/ (bn.ts, en.ts), theme/, ui/
-                             (incl. StatusBanner)
+                             dialer, permissions, usePermissions,
+                             permissionRecovery), i18n/ (bn.ts, en.ts), theme/, ui/
+                             (incl. StatusBanner, PermissionRow)
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
 supabase/migrations/         25 forward-only migrations

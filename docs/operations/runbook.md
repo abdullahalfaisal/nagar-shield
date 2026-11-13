@@ -426,6 +426,49 @@ from the session at drain time.
 
 ---
 
+## The device permissions
+
+The Capture screen adapts to what the phone will let it do. It never prompts
+at launch and never blocks a submit on a missing permission.
+
+| Permission | Needed for | If it is denied |
+|---|---|---|
+| **Camera** | the photo card's camera path, and the video card | the video card and the camera path are **hidden**; the gallery and file paths survive |
+| **Microphone** | the video card | the video card is **hidden** — a silent video is not the evidence being filed; the photo card survives |
+| **Photos and videos** | the photo card's gallery path | the gallery path is hidden; the camera and file paths survive |
+| **Location** | the auto-detected address | the location card shows a **manual-entry fallback**; the submit still succeeds |
+
+**Operational notes.**
+
+- **No prompt at first launch.** The prompts fire at the moment the entry
+  point is tapped — just-in-time. The screen reads the permission state on
+  every render and on every foreground, and **reading never prompts**.
+- **Only a `denied` permission hides an entry point.** An `undetermined`
+  permission still shows its card, because the prompt fires on the tap.
+  Hiding it would make the prompt unreachable.
+- **A failed permission query is treated as `denied`.** The app must never
+  read "I could not check" as "it is allowed" — the entry point would be
+  offered, the tap would fail, and the user would see a broken control.
+- **The Settings button's label always matches its action.** "Ask again"
+  re-triggers the system prompt; "Open system settings" opens the OS page.
+  On Android, a permission denied with "don't ask again" will not prompt
+  again, so the settings page is the only route back — and the copy says so.
+- **The app never grants a permission.** The user flips the switch in the OS
+  settings page. The app re-reads the live state on the next foreground, so
+  the entry points reappear without a restart.
+- **The manual area is a hint, not a location.** It rides in the report's
+  description under an `Area: ` prefix. The server-resolved
+  `area_hierarchy` stays authoritative.
+
+**Diagnosing a "the camera is off but the card is still there" report.**
+Check the permission state the app read, not the OS state. The card is hidden
+only when the app *reads* the permission as `denied`. A stale read is
+impossible by construction — the state is re-read on every foreground — so a
+card that is still there means the OS still reports the permission as usable
+(typically `undetermined`).
+
+---
+
 ## The environment progression
 
 | Surface | Local | Staging | Production |

@@ -1,5 +1,10 @@
-import { AppError } from '@nagar-shield/shared';
-import { isTransportFailure, preparePickedMedia, submitDraft } from './captureFlow';
+import { AppError, CAPTURE_DESCRIPTION_MAX_LENGTH } from '@nagar-shield/shared';
+import {
+  composeDescription,
+  isTransportFailure,
+  preparePickedMedia,
+  submitDraft,
+} from './captureFlow';
 
 /**
  * The capture flow's contract.
@@ -311,5 +316,122 @@ describe('preparePickedMedia', () => {
 
     await expect(preparePickedMedia('file', asset)).resolves.toBe(media);
     expect(mockedFile).toHaveBeenCalled();
+  });
+});
+
+// --- The manual area hint -----------------------------------------------------
+
+/**
+ * The manual area is a **hint**, not the report's location.
+ *
+ * The server has no separate field for it, and the story's rule is that the
+ * server-resolved `area_hierarchy` stays authoritative. So the hint rides in
+ * the description, under an `Area: ` prefix that marks it as the citizen's
+ * own words rather than a resolved address.
+ *
+ * Two rules protect the description:
+ *
+ *   1. the citizen's own words come **first** — the hint is dropped rather
+ *      than the description being discarded, because the description is the
+ *      report's substance;
+ *   2. nothing is ever silently truncated mid-word.
+ */
+describe('composeDescription', () => {
+  it('returns the description unchanged when there is no area hint', () => {
+    expect(composeDescription('a report', null)).toBe('a report');
+  });
+
+  it('returns null when there is nothing to say', () => {
+    expect(composeDescription(null, null)).toBeNull();
+    expect(composeDescription('', '')).toBeNull();
+    expect(composeDescription('   ', '  ')).toBeNull();
+  });
+
+  it('appends the area hint under a prefix', () => {
+    expect(composeDescription('a report', 'Mirpur')).toBe('a report Area: Mirpur');
+  });
+
+  it('carries the hint on its own when there is no description', () => {
+    expect(composeDescription(null, 'Mirpur')).toBe('Area: Mirpur');
+  });
+
+  it('trims the description and the hint', () => {
+    expect(composeDescription('  a report  ', '  Mirpur  ')).toBe('a report Area: Mirpur');
+  });
+
+  it('never exceeds the 140-character cap', () => {
+    const long = 'x'.repeat(CAPTURE_DESCRIPTION_MAX_LENGTH);
+    const composed = composeDescription(long, 'Mirpur');
+
+    expect(composed).not.toBeNull();
+    expect(composed!.length).toBeLessThanOrEqual(CAPTURE_DESCRIPTION_MAX_LENGTH);
+  });
+
+  it('gives way to make room for the hint when the description is too long', () => {
+    const long = 'x'.repeat(CAPTURE_DESCRIPTION_MAX_LENGTH);
+    const composed = composeDescription(long, 'Mirpur');
+
+    // The hint is the thing the citizen cannot supply any other way, so it
+    // is carried and the description is cut to make room for it.
+    expect(composed).toBe(`${'x'.repeat(CAPTURE_DESCRIPTION_MAX_LENGTH - 'Area: Mirpur'.length - 1)} Area: Mirpur`);
+  });
+
+  it('keeps every word of a description that fits', () => {
+    const composed = composeDescription('the quick brown fox jumps', 'Mirpur');
+
+    expect(composed).toBe('the quick brown fox jumps Area: Mirpur');
+  });
+
+  it('truncates on a word boundary to make room for the hint', () => {
+    // Long enough that the hint cannot fit beside it.
+    const words = 'alpha bravo charlie delta echo foxtrot golf hotel india juliet'.repeat(4).split(' ');
+    const composed = composeDescription(words.join(' '), 'Mirpur');
+
+    expect(composed!.length).toBeLessThanOrEqual(CAPTURE_DESCRIPTION_MAX_LENGTH);
+    expect(composed).toContain('Area: Mirpur');
+    // The cut lands on a word boundary — the description does not end in a
+    // fragment.
+    const body = composed!.replace(' Area: Mirpur', '');
+    expect(body.split(' ').every((word) => words.includes(word))).toBe(true);
+  });
+
+  it('returns null when the hint alone does not fit', () => {
+    const hugeHint = 'y'.repeat(CAPTURE_DESCRIPTION_MAX_LENGTH);
+
+    expect(composeDescription(null, hugeHint)).toBeNull();
+  });
+});
+
+// --- The area hint on the wire ------------------------------------------------
+
+describe('submitDraft with an area hint', () => {
+  it('carries the composed description into the submit', async () => {
+    await submitDraft({ media, draft: { ...draft, areaHint: 'Mirpur' } });
+
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'a report Area: Mirpur' }),
+    );
+  });
+
+  // The online path and the queued path must carry exactly the same text.
+  it('carries the same composed description into the queue', async () => {
+    mockedSubmit.mockRejectedValue(new AppError('INTERNAL'));
+
+    await submitDraft({ media, draft: { ...draft, areaHint: 'Mirpur' } });
+
+    expect(mockedEnqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'a report Area: Mirpur' }),
+    );
+  });
+
+  it('sends no description when there is no hint and no description', async () => {
+    await submitDraft({
+      media,
+      draft: { ...draft, description: null, areaHint: null },
+    });
+
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ description: null }),
+    );
   });
 });

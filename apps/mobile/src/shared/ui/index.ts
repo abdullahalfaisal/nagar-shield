@@ -17,6 +17,7 @@ export { InputField } from './InputField';
 export { ListRow, type IconTone } from './ListRow';
 export { ListRowGroup, CountRow, MapViewLink } from './ListRowGroup';
 export { LocationPill } from './LocationPill';
+export { PermissionRow } from './PermissionRow';
 export { PulseDot } from './PulseDot';
 export { RadioGroup, RadioRow, ChoiceChip, CheckRow, type RadioReason } from './RadioGroup';
 export { Screen } from './Screen';
