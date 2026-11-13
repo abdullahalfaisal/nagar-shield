@@ -3,15 +3,27 @@ id: 014-capture
 unit: 004-capture
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [005-offline-upload-queue, 006-capture-permission-degradation]
 created: 2026-11-04T00:00:00Z
+current_stage: null
+stages_completed:
+  - name: plan
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Technical Notes carries the design
+  - name: implement
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Implementation carries the change record
+  - name: test
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Verification carries the evidence
 
 # Dependency Tracking
 requires_bolts: [013-capture]
 enables_bolts: [015-location, 018-alerts, 022-moderation, 025-jobs-operations]
 requires_units: [001-foundation, 002-identity]
 blocks: false
+completed: '2026-11-13T00:00:00Z'
 
 # Complexity Assessment
 complexity:
@@ -28,8 +40,8 @@ Deliver **offline queue** for unit `004-capture`. Stories: 2. Bolt type: `ddd-co
 
 ### Stories Included
 
-- [ ] **005-offline-upload-queue** — Priority: must
-- [ ] **006-capture-permission-degradation** — Priority: must
+- [x] **005-offline-upload-queue** — Priority: must
+- [x] **006-capture-permission-degradation** — Priority: must
 
 ### Expected Outputs
 

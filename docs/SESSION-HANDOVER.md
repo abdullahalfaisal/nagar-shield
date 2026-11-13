@@ -338,7 +338,7 @@ Ordered by dependency. Bolt numbers in brackets.
 | R2 | Maestro flow `maestro/panic-path.yaml` missing. | ✅ **DONE** — see B2 |
 | R3 | Scratch files at the root. | ✅ **DONE** — see B3 |
 | R4 | `eas.json` placeholders. | See B4 |
-| R5 | `apps/mobile` and `apps/admin` have `.env.example` but **no `.env`** (gitignored). `supabase/functions/.env.local` exists. | A fresh clone needs the local env files created from the examples. |
+| R5 | `apps/mobile` and `apps/admin` have `.env.example` but **no `.env`** (gitignored). `supabase/functions/.env.local` exists. | ✅ **DONE** — both `.env` files now exist, created from the examples with the local stack's **anon** key (the service-role key is deliberately absent). They are gitignored (`.gitignore:10`), so they stay local. A fresh clone still needs the same two lines written from `.env.example`. |
 
 ---
 
@@ -423,29 +423,44 @@ Ordered by dependency. Bolt numbers in brackets.
     admin auto-hide group.~~ ✅ **DONE.** A UI gap only — the server already
     carried the fields — with a `both` badge and the two flag counts labelled
     apart. **H1 and H2 remain** (see item 11).
-11. **H1 → H2 → B4, R5, and the git remote** — the help-seek surfaces and
-    release readiness. H2 (`station-map.tsx`) needs the shared MapLibre
-    wrapper; the wrapper's cap and attribution are already covered by
-    `stationMap.test.ts`.
+11. **H1 → H2 → B4, and the git remote** — the help-seek surfaces and release
+    readiness. H2 (`station-map.tsx`) needs the shared MapLibre wrapper; the
+    wrapper's cap and attribution are already covered by `stationMap.test.ts`.
+    ~~**R5**~~ ✅ **DONE** — the local `.env` files exist (see §5).
+    ~~**The memory-bank bolt records**~~ ✅ **DONE** — see §7.
 12. Final `pnpm verify` → **one** commit → push.
 
 ---
 
 ## 7. Memory-bank hygiene — stale records
 
-The memory bank does **not** reflect the built code. This confuses the next
-session.
+The memory bank did **not** reflect the built code. This confused the next
+session. **The bolt records are now reconciled**; two smaller items remain.
 
-- `memory-bank/bolts/001`–`024` still say `status: planned` with no stage
-  artifacts, although the code for their stories **is built**. Only bolts
-  `025`–`027` have `implementation-plan.md` / `implementation-walkthrough.md` /
-  `test-walkthrough.md` and `status: complete`. Bolts `015`–`017`
-  (unit `005-location`) are the newest — their stories are complete but the
-  bolt records are still `planned`.
+- ~~`memory-bank/bolts/001`–`024` still say `status: planned` with no stage
+  artifacts, although the code for their stories **is built**.~~ — **FIXED.**
+  An audit of all 27 bolts against the story files' own `implemented` flag
+  found **7 stale records** — `005-identity`, `014-capture`, `015-location`,
+  `016-location`, `017-location`, `020-alerts`, `021-alerts` — whose stories
+  were **all** implemented but whose bolt still said `planned`. Those 7 now
+  say `status: complete`, carry `current_stage: null`, the three
+  `stages_completed` entries and a `completed` date, and their story
+  checkboxes are ticked.
+  The other **17** bolts (`001`–`004`, `006`–`013`, `018`, `019`, `022`–`024`)
+  say `planned` **correctly** — each still has at least one genuinely
+  unimplemented story. A bolt is not `complete` because it looks finished; it
+  is `complete` when every story it lists says `implemented: true`.
+  The stage artifacts point at the **story files**, because that is where the
+  design, the change record and the verification evidence actually live. The
+  `ddd-0*.md` files these bolts ask for were **never written**; writing them
+  retroactively would have been invented evidence, and a fabricated design
+  document is worse than a missing one.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 26 stories are `complete`, 28 are `planned`.
+  authoritative source. 26 stories are `complete`, 28 are `planned`. A
+  programmatic cross-check of all 54 story files against the index reports
+  **0 mismatches**.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
   unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 26 story files
   now say `true`; 28 still say `false`. The count is **28 of 54 stories**,

@@ -3,15 +3,27 @@ id: 020-alerts
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [006-history-list, 007-history-filters]
 created: 2026-11-04T00:00:00Z
+current_stage: null
+stages_completed:
+  - name: plan
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Technical Notes carries the design
+  - name: implement
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Implementation carries the change record
+  - name: test
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Verification carries the evidence
 
 # Dependency Tracking
 requires_bolts: [019-alerts]
 enables_bolts: [021-alerts]
 requires_units: [001-foundation, 002-identity, 004-capture]
 blocks: false
+completed: '2026-11-13T00:00:00Z'
 
 # Complexity Assessment
 complexity:
@@ -28,8 +40,8 @@ Deliver **history** for unit `006-alerts`. Stories: 2. Bolt type: `ddd-construct
 
 ### Stories Included
 
-- [ ] **006-history-list** — Priority: must
-- [ ] **007-history-filters** — Priority: must
+- [x] **006-history-list** — Priority: must
+- [x] **007-history-filters** — Priority: must
 
 ### Expected Outputs
 

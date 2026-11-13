@@ -3,15 +3,27 @@ id: 015-location
 unit: 005-location
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [001-location-sharing-screen]
 created: 2026-11-04T00:00:00Z
+current_stage: null
+stages_completed:
+  - name: plan
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Technical Notes carries the design
+  - name: implement
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Implementation carries the change record
+  - name: test
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Verification carries the evidence
 
 # Dependency Tracking
 requires_bolts: [003-foundation, 006-identity, 014-capture]
 enables_bolts: [016-location]
 requires_units: [001-foundation, 002-identity, 004-capture]
 blocks: false
+completed: '2026-11-13T00:00:00Z'
 
 # Complexity Assessment
 complexity:
@@ -28,7 +40,7 @@ Deliver **share screen** for unit `005-location`. Stories: 1. Bolt type: `ddd-co
 
 ### Stories Included
 
-- [ ] **001-location-sharing-screen** — Priority: must
+- [x] **001-location-sharing-screen** — Priority: must
 
 ### Expected Outputs
 

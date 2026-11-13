@@ -3,15 +3,27 @@ id: 005-identity
 unit: 002-identity
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [003-email-otp-password-reset, 004-biometric-reauth-gate]
 created: 2026-11-04T00:00:00Z
+current_stage: null
+stages_completed:
+  - name: plan
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Technical Notes carries the design
+  - name: implement
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Implementation carries the change record
+  - name: test
+    completed: '2026-11-13T00:00:00Z'
+    artifact: the story files themselves — Verification carries the evidence
 
 # Dependency Tracking
 requires_bolts: [004-identity]
 enables_bolts: [006-identity]
 requires_units: [001-foundation]
 blocks: false
+completed: '2026-11-13T00:00:00Z'
 
 # Complexity Assessment
 complexity:
@@ -28,8 +40,8 @@ Deliver **reset and biometrics** for unit `002-identity`. Stories: 2. Bolt type:
 
 ### Stories Included
 
-- [ ] **003-email-otp-password-reset** — Priority: must
-- [ ] **004-biometric-reauth-gate** — Priority: must
+- [x] **003-email-otp-password-reset** — Priority: must
+- [x] **004-biometric-reauth-gate** — Priority: must
 
 ### Expected Outputs
 
