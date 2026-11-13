@@ -54,7 +54,10 @@ export function errorResponse(
 /** The pre-flight answer for a browser-facing function. */
 export function preflightResponse(cors = true): Response {
   const headers = cors ? { ...CORS_HEADERS } : {};
-  return new Response('ok', { status: 204, headers });
+  // A 204 must NOT carry a body. Deno enforces this — `new Response('ok',
+  // { status: 204 })` throws "Response with null body status cannot have
+  // body" — so the throw surfaced as a 500 on every CORS preflight.
+  return new Response(null, { status: 204, headers });
 }
 
 /**
