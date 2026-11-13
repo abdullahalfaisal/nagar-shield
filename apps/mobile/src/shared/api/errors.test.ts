@@ -51,6 +51,14 @@ describe('fromSupabaseError', () => {
     expect(error.code).toBe('VALIDATION_FAILED');
   });
 
+  it('maps a semantic server rejection (22023) to VALIDATION_FAILED', () => {
+    // `raise exception '<CODE>' using errcode = '22023'` is how the server
+    // functions reject a request on its own terms — a missing note, a
+    // self-disable, a restore whose window has closed.
+    const error = fromSupabaseError({ code: '22023', message: 'VALIDATION_FAILED' });
+    expect(error.code).toBe('VALIDATION_FAILED');
+  });
+
   it('maps an RLS denial without a code to FORBIDDEN', () => {
     const error = fromSupabaseError({ message: 'new row violates row-level security policy' });
     expect(error.code).toBe('FORBIDDEN');

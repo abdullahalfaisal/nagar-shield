@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { AppError, authorToken, type PublicVisibility } from '@nagar-shield/shared';
 import { supabase } from '@/shared/api/supabase';
 import { parseErrorBody } from '@/shared/api/errors';
@@ -36,6 +37,32 @@ export interface CaptureResult {
     neighborhood: string | null;
   } | null;
   moderationStatus: string;
+}
+
+/**
+ * The wire shape of the `finalize-capture` response.
+ *
+ * The Edge Function answers in **snake_case** — `report_id`,
+ * `area_hierarchy`, `moderation_status` — because that is what the Postgres
+ * row and the RPC return. The app's own type is camelCase, so the mapping
+ * happens here, at the boundary, and nowhere else.
+ *
+ * This boundary is where a silent failure once lived: the client read
+ * `data.reportId` from a body that carries `report_id`, so `data.reportId`
+ * was always `undefined` and **every successful capture was misread as a
+ * failure** and handed to the offline queue. The app then showed "saved on
+ * device" for a report that had in fact been filed, and the queue drained it
+ * again as a duplicate.
+ */
+interface CaptureResponseBody {
+  report_id?: string;
+  area_hierarchy?: {
+    division: string | null;
+    city: string | null;
+    thana: string | null;
+    neighborhood: string | null;
+  } | null;
+  moderation_status?: string;
 }
 
 /** The private bucket the report media lives in. */
@@ -108,13 +135,17 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
     throw parseErrorBody(body);
   }
 
-  const data = (body as { data?: CaptureResult } | null)?.data;
+  const data = (body as { data?: CaptureResponseBody } | null)?.data;
 
-  if (!data?.reportId) {
+  if (!data?.report_id) {
     throw new AppError('INTERNAL');
   }
 
-  return data;
+  return {
+    reportId: data.report_id,
+    areaHierarchy: data.area_hierarchy ?? null,
+    moderationStatus: data.moderation_status ?? 'visible',
+  };
 }
 
 /**
@@ -123,9 +154,14 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
  * The bytes are read on the device and handed to the Supabase client as an
  * `ArrayBuffer`, so the upload never goes through a `file://` URL that the
  * native HTTP stack cannot read.
+ *
+ * The `File` import is **static**. It used to be a dynamic `await import()`,
+ * which the CommonJS test transform cannot execute — so this module could not
+ * be unit-tested at all, and the response-contract defect below went
+ * unnoticed. Every other module that touches `expo-file-system` imports it
+ * statically for the same reason.
  */
 async function readFileBytes(uri: string): Promise<ArrayBuffer> {
-  const { File } = await import('expo-file-system');
   const file = new File(uri);
   return file.arrayBuffer();
 }

@@ -41,6 +41,16 @@ export function fromSupabaseError(error: unknown): AppError {
       return new AppError('AUTH_REQUIRED');
     case '23502': // not_null_violation
       return new AppError('VALIDATION_FAILED');
+    case '22023': // invalid_parameter_value
+      // The `raise exception '<CODE>' using errcode = '22023'` form that the
+      // server functions use for a **semantic** rejection: a missing note,
+      // a self-disable, an invalid decision, or a restore whose 30-day
+      // window has closed.
+      //
+      // Without this case the code fell through to `INTERNAL`, so the app
+      // reported "something went wrong" for what are ordinary, expected
+      // outcomes with their own copy in the i18n bundles.
+      return new AppError('VALIDATION_FAILED');
     default:
       break;
   }
