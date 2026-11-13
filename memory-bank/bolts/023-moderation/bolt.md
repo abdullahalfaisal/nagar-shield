@@ -28,8 +28,8 @@ Deliver **decisions** for unit `007-moderation`. Stories: 2. Bolt type: `ddd-con
 
 ### Stories Included
 
-- [ ] **003-restore-remove-decision** — Priority: must
-- [ ] **004-disable-a-user** — Priority: must
+- [x]**003-restore-remove-decision** — Priority: must
+- [x]**004-disable-a-user** — Priority: must
 
 ### Expected Outputs
 

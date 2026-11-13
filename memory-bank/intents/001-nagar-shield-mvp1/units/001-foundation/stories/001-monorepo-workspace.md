@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 001-monorepo-workspace
@@ -77,3 +77,26 @@ implemented: false
 - Any domain behaviour (auth, help, capture, alerts, moderation) — units 002–007
 - EAS build profiles, `eas.json`, and release pipelines — unit 008
 - Turbo/Nx task orchestration, Docker/compose stacks, and npm registry publishing of the shared package
+
+## Implementation
+
+**The pnpm workspace, the TypeScript configuration, and the lint/type/test wiring all ship and work. The story is not `complete` because several of its acceptance criteria name a guard that was never built.**
+
+### What ships
+
+- The workspace is declared in the root `package.json` (`"workspaces": ["apps/mobile", "apps/admin", "packages/shared"]`) with `packageManager: "pnpm@9.15.0"` and `engines.node: ">=18"`. `pnpm -r typecheck`, `pnpm -r lint`, and `pnpm -r --if-present test` all fan out across the three workspaces.
+- The root `package.json` carries the full gate chain in `verify`: typecheck, lint, test, `data:check`, `shared:check`, `story:index:check`, `db:test`, `db:smoke`, `alert:check`, `maestro:check`, `fn:typecheck`.
+- `pnpm-lock.yaml` is committed, and every CI job installs with `pnpm install --frozen-lockfile`.
+- ESLint flat config runs across all three workspaces; `pnpm lint` is clean.
+
+### The gaps
+
+- **No root-level `tsconfig.base.json` contract test.** The shared TypeScript configuration is applied by each workspace's own `tsconfig.json`, and `pnpm typecheck` passes — but there is no test that asserts the three workspaces still extend the same base with the same strictness flags. A workspace could quietly relax `strict` and the gate would still be green.
+- **The lockfile is not checked for drift against the workspace manifests outside CI.** `--frozen-lockfile` fails the CI job, but a local `pnpm install` can silently update `pnpm-lock.yaml`, and nothing in the local gate catches a committed lockfile that has drifted from a manifest.
+- **The story's acceptance criteria are about the *configuration* being right; several of them are satisfied by reading the files rather than by an assertion that would fail if the configuration regressed.** Nothing enforces `strict: true` across the workspaces, the `node` engine floor, or the `packageManager` pin.
+
+### What closing this needs
+
+1. A test that reads all three `tsconfig.json` files and asserts they share one base with `strict: true` — the guard that would catch a workspace quietly opting out of strictness.
+2. A check that the committed `pnpm-lock.yaml` is in sync with the manifests, runnable locally as well as in CI.
+3. An assertion on the `engines.node` floor and the `packageManager` pin, so a Node or pnpm version bump is a deliberate edit rather than an accident.

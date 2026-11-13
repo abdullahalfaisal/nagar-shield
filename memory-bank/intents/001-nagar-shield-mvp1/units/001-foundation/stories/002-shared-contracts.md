@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 002-shared-contracts
@@ -86,3 +86,56 @@ implemented: false
 - Supabase generated database types (`supabase gen types`) — produced with the migrations in later units
 - API versioning, pagination cursors, and the RPC input/output shapes beyond the five named schemas
 - OpenAPI / REST documentation generation
+
+## Implementation
+
+**The shared contracts package ships and is consumed by both apps. The story is not `complete` because the boundary guard it names was never built.**
+
+### What ships
+
+- `packages/shared/src/` holds `schemas/`, `enums/`, `errors/`, `types/`, `storage/`, `jobs/`, `testing/`, and `data/`, exported through `packages/shared/src/index.ts`.
+- Six jest suites cover it: `data.test.ts`, `enums.test.ts`, `errors.test.ts`, `jobs.test.ts`, `schemas.test.ts`, `storage.test.ts`.
+- Both apps import the contracts rather than copying them. `apps/admin/lib/api.ts:1` imports `AppError` and `ApiErrorCode` from `@nagar-shield/shared`; `apps/admin/lib/format.ts:10-11` and `apps/admin/app/queue/[reportId]/page.tsx:5` do the same. `grep -rn "zod|z\.object|z\.enum" apps/admin` returns **zero hits** — no Zod schema is defined inside the admin.
+- `apps/admin/next.config.mjs:18` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+
+### The gaps
+
+- **The boundary test does not exist.** The story requires a test that *asserts* `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema. There is no such test anywhere in the repo, and `tools/release-verify.cjs` has no equivalent check. The *property* holds today — but only because nobody has looked. A contributor adding a local `z.object({...})` to the admin would not be caught by any gate.
+- **The mobile side is not covered by the same property.** The grep above is evidence, not a guard, and it only covered the admin.
+
+### What closing this needs
+
+1. A boundary test that walks `apps/admin` and `apps/mobile` and fails when a Zod schema or a shared enum is redefined locally — the guard this story exists to create.
+Zod schema is defined inside the admin.
+- `apps/admin/next.config.mjs:18` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+
+### The gaps
+
+- **The boundary test does not exist.** The story requires a test that *asserts* `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema. There is no such test anywhere in the repo, and `tools/release-verify.cjs` has no equivalent check. The *property* holds today — but only because nobody has looked. A contributor adding a local `z.object({...})` to the admin would not be caught by any gate.
+- **The mobile side is not covered by the same property.** The grep above is evidence, not a guard, and it only covered the admin.
+
+### What closing this needs
+
+1. A boundary test that walks `apps/admin` and `apps/mobile` and fails when a Zod schema or a shared enum is redefined locally — the guard this story exists to create.
+Zod schema is defined inside the admin.
+- `apps/admin/next.config.mjs:18` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+
+### The gaps
+
+- **The boundary test does not exist.** The story requires a test that *asserts* `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema. There is no such test anywhere in the repo, and `tools/release-verify.cjs` has no equivalent check. The *property* holds today — but only because nobody has looked. A contributor adding a local `z.object({...})` to the admin would not be caught by any gate.
+- **The mobile side is not covered by the same property.** The grep above is evidence, not a guard, and it only covered the admin.
+
+### What closing this needs
+
+1. A boundary test that walks `apps/admin` and `apps/mobile` and fails when a Zod schema or a shared enum is redefined locally — the guard this story exists to create.
+Zod schema is defined inside the admin.
+- `apps/admin/next.config.mjs:18` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+
+### The gaps
+
+- **The boundary test does not exist.** The story requires a test that *asserts* `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema. There is no such test anywhere in the repo, and `tools/release-verify.cjs` has no equivalent check. The *property* holds today — but only because nobody has looked. A contributor adding a local `z.object({...})` to the admin would not be caught by any gate.
+- **The mobile side is not covered by the same property.** The grep above is evidence, not a guard, and it only covered the admin.
+
+### What closing this needs
+
+1. A boundary test that walks `apps/admin` and `apps/mobile` and fails when a Zod schema or a shared enum is redefined locally — the guard this story exists to create.

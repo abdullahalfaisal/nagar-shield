@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 004-mobile-app-shell
@@ -89,3 +89,40 @@ implemented: false
 - EAS build profiles, `eas.json`, and release pipelines — unit 008
 - Supabase migrations, RLS, Edge Functions, and the generated `Database` type — later units
 - Push notifications, FCM, analytics, and crash reporting
+
+## Implementation
+
+**The router groups, the i18n runtime, the Supabase client, and the theme provider all ship. The story is not `complete` because the startup guards it names were never built — and one of them is a live defect.**
+
+### What ships
+
+- The router groups exist: `apps/mobile/app/(auth)/` holds `welcome`, `login`, `register`, `phone`, `alternate-phone`, `contact-1..3`, `verify-otp`, `forgot-password`, `reset-password`, `biometric-gate`, `location-permission`, `account-deleted`, `account-disabled`; `apps/mobile/app/(app)/` holds `home`, `alerts`, `alert-detail`, `capture`, `contacts`, `contact-editor`, `history`, `history-map`, `help-alert`, `more-help`, `station-map`, `thana-line`, `report-detail`, `location-sharing`, `more`, `settings`. Both have a `_layout.tsx`.
+- The i18n runtime resolves `en` and `bn` from `apps/mobile/src/shared/i18n/index.ts`.
+- The theme provider and the Supabase client are wired into the tree.
+
+### The gaps
+
+- **The Supabase client throws at module load instead of showing a localized configuration error.** `apps/mobile/src/shared/api/supabase.ts:21-27`:
+
+  ```ts
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Fail loudly at startup rather than at the first network call.
+    throw new Error(
+      'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
+    );
+  }
+  ```
+
+  The story's contract is a *screen*, not a crash. On a device with a missing or malformed `app.json` extra, the app dies with a raw English stack message instead of the localized configuration error the story names. This is a **live user-facing defect**, not a missing test.
+
+- **Session tokens fall back to AsyncStorage.** `apps/mobile/src/shared/api/supabase.ts:32-54` falls back to AsyncStorage when a value exceeds SecureStore's 2048-byte limit. The story treats SecureStore as the session store; the fallback means a refresh token can land in unencrypted storage on Android with no test pinning the behaviour or the size threshold.
+
+- **No i18n key-parity gate.** See story `003-mobile-design-system` — nothing asserts `en` and `bn` carry the same keys, so the shell's copy can drift between the two languages without any gate noticing.
+
+- **No boot test.** Nothing asserts that the app's entry point renders the router groups without throwing, which is why the module-load throw above was able to ship.
+
+### What closing this needs
+
+1. The Supabase client to return a *localized configuration error state* instead of throwing at module scope — a boot screen that explains the misconfiguration in the user's language.
+2. A boot test that mounts the app root and asserts it renders.
+3. A decision on the AsyncStorage fallback, recorded either way: either the refresh token is sized to fit SecureStore, or the fallback is documented and tested.

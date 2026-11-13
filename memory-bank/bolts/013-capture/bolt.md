@@ -28,8 +28,8 @@ Deliver **geocode and report** for unit `004-capture`. Stories: 2. Bolt type: `d
 
 ### Stories Included
 
-- [ ] **002-area-hierarchy-extraction** — Priority: must
-- [ ] **003-report-detail-and-category-edit** — Priority: must
+- [x]**002-area-hierarchy-extraction** — Priority: must
+- [x]**003-report-detail-and-category-edit** — Priority: must
 
 ### Expected Outputs
 

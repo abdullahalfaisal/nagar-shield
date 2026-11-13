@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 002-report-review-detail
@@ -86,3 +86,28 @@ implemented: false
 - A citizen-facing flag composer, appeals, un-remove, or bulk decisions
 - Aggregate crime statistics, charts, heatmaps, or hotspot rankings — excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - A moderator tier, scoped permissions, or an undo / overturn workflow — FR-MOD-4 keeps one role with full access at MVP
+
+## Implementation
+
+**The report detail screen ships with a working decision panel. The story is not `complete` because the query invalidation the story names is missing — the admin has no TanStack Query — and there is no live probe for the console.**
+
+### What ships
+
+- The detail screen exists at `apps/admin/app/queue/[reportId]/page.tsx` and loads the report through `fetchReportDetail(getBrowserClient(), reportId)` (`page.tsx:52`).
+- The decision panel is live: `page.tsx:227` defines `DecisionPanel`, `page.tsx:236` holds the decision state, `page.tsx:258` calls `submitDecision(getBrowserClient(), { reportId, decision, note: trimmedNote })`, and `page.tsx:260` calls `onDecided()` afterwards so the screen refreshes.
+- The decision reaches the server through the Edge Function, not a service-role key in the browser. `apps/admin/lib/api.ts` is the only client, and `supabase/functions/moderation-decide/index.ts:10` states the contract: *"The RPC owns the write and the append-only audit row."*
+- The report's own action history renders: `page.tsx:202` shows `formatDecisionLabel(action.decision)` per prior action.
+
+### The gaps
+
+- **No query invalidation.** The story asks for the queue and detail queries to be invalidated after a decision. The admin has **no TanStack Query** — `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returns zero hits, despite `@tanstack/react-query` being declared at `apps/admin/package.json:17`. The refresh is the manual `onDecided()` callback (`page.tsx:260`). That works for the one screen that calls it, and it is exactly the kind of thing that is forgotten: **nothing invalidates the audit trail**, so a moderator who decides a report and then opens `/audit` sees the decision only if the audit page happens to re-fetch. The manual reload is per-call-site, and there is no test that would notice a missing one.
+
+- **No live probe for the console.** The moderation function is covered by `tools/smoke-functions.cjs`, but nothing proves the console reaches it and that the audit row appears in the trail the console shows.
+
+- **No test on the decision panel.** Nothing asserts that a decision cannot be submitted without a note, that the note is trimmed, or that the error branches render the right message.
+
+### What closing this needs
+
+1. The admin on TanStack Query, with the decision mutation invalidating the queue, the detail, and the audit queries by key — one invalidation covering all three, which is what a manual callback cannot guarantee.
+2. A live probe: sign in as a moderator, open a report, decide it, and assert the audit trail contains the decision.
+3. A test on the note-required rule and the error branches.

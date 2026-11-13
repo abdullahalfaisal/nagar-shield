@@ -2,7 +2,7 @@
 id: 004-graceful-degradation
 unit: 003-help-seek
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null

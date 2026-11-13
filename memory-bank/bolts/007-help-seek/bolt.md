@@ -28,7 +28,7 @@ Deliver **help alert grid** for unit `003-help-seek`. Stories: 2. Bolt type: `dd
 
 ### Stories Included
 
-- [ ] **001-home-and-help-alert-grid** — Priority: must
+- [x]**001-home-and-help-alert-grid** — Priority: must
 - [ ] **002-personal-emergency-picker** — Priority: must
 
 ### Expected Outputs

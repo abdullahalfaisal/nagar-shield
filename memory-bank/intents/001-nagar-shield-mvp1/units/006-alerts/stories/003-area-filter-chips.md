@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 003-area-filter-chips
@@ -82,3 +82,34 @@ implemented: false
 - The History screen's own location pill and filter sheet — `006-history-list` and `007-history-filters`
 - A map-based area picker, a polygon draw, or a bounding-box filter — the filter is a chip row
 - Saving a user's favourite area or persisting the last selection across launches — Phase 1 keeps **All BD** as the default on every launch
+
+## Implementation
+
+**The filter chips ship and select correctly. The story is not `complete` because the row clips — a plain `View` is used where a horizontal `ScrollView` is needed, and there is no test.**
+
+### What ships
+
+- `apps/mobile/src/shared/ui/AreaChipRow.tsx` renders the chips, tracks the active one via `activeId`, and reports a selection through `onSelect`. Each chip carries `accessibilityRole="button"` and `accessibilityState={{ selected: active }}`, so a screen reader announces which filter is on.
+- The chips are driven by the feed's area query: `alerts.tsx:45` passes `chip.value ?? {}` as the filter.
+
+### The gaps
+
+- **The row clips.** `AreaChipRow.tsx:25` uses a plain `View`:
+
+  ```tsx
+  <View style={styles.row}>
+    {chips.map((chip) => { ... })}
+  </View>
+  ```
+
+  A horizontal chip row with more chips than fit the screen width overflows in a `View` and is cut off at the edge, with no way to reach the chips beyond it. The story describes a scrollable filter row; the shipped component cannot scroll, so on a narrow phone with a dozen areas the last few filters are unreachable.
+
+- **No test covers the row.** Nothing asserts the chips render, that the active chip is marked selected, or that the row scrolls. A regression that drops the last chip would not fail any gate.
+
+- **The chip row is used by the alerts feed with a real area list,** so the clipping is not theoretical — the number of Dhaka areas exceeds what fits on a small screen.
+
+### What closing this needs
+
+1. `AreaChipRow.tsx:25` changed from `View` to a horizontal `ScrollView`, so every filter is reachable.
+2. A test asserting the row renders every chip and that the active one carries the selected state.
+3. A test asserting the horizontal scroll is enabled, so the fix cannot silently regress back to a `View`.

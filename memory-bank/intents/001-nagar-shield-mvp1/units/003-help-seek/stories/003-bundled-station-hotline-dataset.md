@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 003-bundled-station-hotline-dataset
@@ -83,3 +83,104 @@ implemented: false
 - The wrong-number report write path and curator triage UI — `008-wrong-number-report` and unit 007
 - Editing the curated dataset by users at runtime — reports are collected, not applied
 - Live fetching of hotline or station data from any third-party API
+
+## Implementation
+
+**The curated dataset ships, the Postgres mirror is generated from it, and the offline dial path makes zero network requests. The story is not `complete` because eight of its ten acceptance criteria name an assertion that was never built.**
+
+### What ships
+
+- The repo JSON is the single source of truth: `packages/shared/src/data/stations.json` and `hotlines.json`. The mobile app imports the same payload through the `@nagar-shield/shared` workspace link (`apps/mobile/node_modules/@nagar-shield/shared` is a symlink to `packages/shared`), so Metro bundles the very same files — there is no copy step that *could* drift.
+- The emergency numbers and the hotline list render offline: `apps/mobile/app/(app)/more-help.tsx:45` reads `HOTLINES` from the bundle and `app/(app)/station-map.tsx:72` reads `STATIONS`. Neither path uses `useQuery` or the Supabase client.
+- The dial path is genuinely zero-network: `apps/mobile/src/shared/services/dialer.ts:14-24` is `Linking.canOpenURL` → `openURL('tel:…')`, and `apps/mobile/src/shared/services/dialPath.test.ts:77-85` asserts `expect(fetchSpy).not.toHaveBeenCalled()` while `dialPath.test.ts:66-75` asserts no `ACTION_CALL` intent is fired.
+- The mirror regenerates rather than patches: `tools/mirror-reference-data.cjs` emits `insert … on conflict (id) do update set … is_active = excluded.is_active` (lines 215-223, 232-240) and contains **no `delete` statement**. `is_active boolean not null default true` carries the comment *"Retired entries are flagged, never deleted"* (`supabase/migrations/20261105000001_initial_schema.sql:318,336`), and the app filters retired rows (`packages/shared/src/data/index.ts:67`).
+- `pnpm data:check` passes today: `✓ Dataset size 14.0 KB`, `✓ supabase/seed.sql matches the JSON`, `✓ The Postgres mirror matches the JSON`. It runs in CI at `.github/workflows/ci.yml:259-260`.
+- Public anon-key reads return only active rows: `supabase/migrations/20261105000002_rls_policies.sql:295-305` creates `using (is_active)` policies for both tables, verified live against the running stack.
+- Every hotline carries all seven fields — `name`, `nameBn`, `phone`, `category`, `description`, `sortOrder`, `lastVerifiedAt` — enforced by `hotlineEntrySchema` (`packages/shared/src/data/index.ts:30-40`) and surfaced at `apps/mobile/app/(app)/more-help.tsx:84-86` via `formatVerifiedStamp` / `isVerificationStale`.
+
+### The gaps, criterion by criterion
+
+**AC1 — no byte-identity test.** The bundle copy is the repo copy (the symlink makes this true), so the *outcome* holds. The criterion's mechanism — a copy that *could* drift, with a test that proves it has not — does not exist. Nothing would fail if a second copy of the JSON were ever added.
+
+**AC2 — the zero-request assertion covers the dial path, not the hotline list.** `dialPath.test.ts` proves the dialler makes no request. No test renders the hotline list or the station list and asserts that no request is made.
+
+**AC3 — the help cards hardcode the numbers instead of reading them from the bundle.** The criterion says *"the number is read from the bundled dataset"*. `apps/mobile/app/(app)/help-alert.tsx:95-96, 103-104, 111-112` hardcode `number="999"`, `dial('999')`, and `dial('102')`. The bundle's own `EMERGENCY_NUMBERS` (`packages/shared/src/data/index.ts:85-89`) is **imported nowhere in `apps/mobile`** — the only importer is `packages/shared/src/data/data.test.ts`. The values agree today, but they are not read from the dataset, so a change to the JSON would not reach the dial path.
+
+**AC4 — the drift check compares row IDs, not values.** `tools/mirror-reference-data.cjs:294-330` selects `name|phone|lat|lng|is_active` from the live tables and then compares **only the id set** — `expectedStationIds.has(id)` / `expectedHotlineIds.has(id)`. A mirrored row with a **wrong phone number** passes the check. The criterion says *"a test asserts the mirror matches the bundle for the same release"*; the current check asserts the mirror has the same *rows*, not the same *values*. The script is also a bare `.cjs` with no jest coverage.
+
+**AC5 — the retirement path is never exercised.** The mirror's regeneration semantics and the `is_active = false` flag are both implemented, but no JSON entry currently has `isActive: false`, so the path never runs. Worse: if a curator **removes** an entry from the JSON, `checkDrift` reports *"row X exists in the database but not in the JSON"* as drift and the script **has no deactivation step** — the retired row stays `is_active = true` in Postgres. The criterion says *"retired entries are marked `is_active = false` rather than deleted"*; that only happens if the curator marks the entry inactive in the JSON rather than removing it.
+
+**AC6 — the size check measures the source JSON, not the APK.** `tools/mirror-reference-data.cjs:113-124` enforces `MAX_BUNDLE_BYTES = 100 * 1024` on the two JSON files (14.0 KB actual), which is a reasonable proxy, but the criterion says *"the dataset adds less than 100 KB to the **APK** size"*. `.github/workflows/build.yml` builds the APK and scans it for secrets but **never measures its size**.
+
+**AC7 — MET.** The dataset is a compile-time import with no override mechanism, and the wrong-number path writes to a separate `wrong_number_reports` table rather than mutating curated rows.
+
+**AC8 — the app-build-time validator names an array index, not the entry id.** Two validation paths exist. `tools/mirror-reference-data.cjs:42-110` (`validateDataset`) names the file, the entry id, and the field — ``${where}: entry "${entry.id}" is missing required field "${field}"}`` — and also validates coordinate bounds (lines 66-76); it runs in `--check` (CI) and `--write-seed`. But the path that actually gates the **app** build is the Zod parse at module load, `packages/shared/src/data/index.ts:61-62`, whose error reads `path: "stations.0.phone"` — an **array index, not the entry id** — with no file name. The descriptive message exists in the CI tool; the app build fails with the useless message.
+
+**AC9 — MET.** RLS `using (is_active)` for both tables, verified live; and no service-role material anywhere in `apps/mobile`, `apps/admin`, or `packages/shared`, enforced by `tools/secret-scan.cjs` and `tools/release-verify.cjs:87-113`.
+
+**AC10 — MET.** All seven fields present, schema-enforced, and surfaced in the UI.
+
+### What closing this needs
+
+1. `checkDrift` compared **values**, not just row ids — so a mirrored row with the wrong phone number fails.
+2. The help cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared` instead of hardcoding `999` and `102`.
+3. The Zod error to name the **entry id** and the file, so a bad dataset fails the app build with an actionable message.
+4. A build-time size check on the actual APK, not the source JSON.
+5. A retirement test — a fixture with `isActive: false` proving the mirror sets `is_active = false` rather than deleting the row — and a deactivation step for entries removed from the JSON.
+6. An offline-render test for the hotline list that asserts zero requests, matching the one that already exists for the dial path.
+Zod parse at module load, `packages/shared/src/data/index.ts:61-62`, whose error reads `path: "stations.0.phone"` — an **array index, not the entry id** — with no file name. The descriptive message exists in the CI tool; the app build fails with the useless message.
+
+**AC9 — MET.** RLS `using (is_active)` for both tables, verified live; and no service-role material anywhere in `apps/mobile`, `apps/admin`, or `packages/shared`, enforced by `tools/secret-scan.cjs` and `tools/release-verify.cjs:87-113`.
+
+**AC10 — MET.** All seven fields present, schema-enforced, and surfaced in the UI.
+
+### What closing this needs
+
+1. `checkDrift` compared **values**, not just row ids — so a mirrored row with the wrong phone number fails.
+2. The help cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared` instead of hardcoding `999` and `102`.
+3. The Zod error to name the **entry id** and the file, so a bad dataset fails the app build with an actionable message.
+4. A build-time size check on the actual APK, not the source JSON.
+5. A retirement test — a fixture with `isActive: false` proving the mirror sets `is_active = false` rather than deleting the row — and a deactivation step for entries removed from the JSON.
+6. An offline-render test for the hotline list that asserts zero requests, matching the one that already exists for the dial path.
+Zod parse at module load, `packages/shared/src/data/index.ts:61-62`, whose error reads `path: "stations.0.phone"` — an **array index, not the entry id** — with no file name. The descriptive message exists in the CI tool; the app build fails with the useless message.
+
+**AC9 — MET.** RLS `using (is_active)` for both tables, verified live; and no service-role material anywhere in `apps/mobile`, `apps/admin`, or `packages/shared`, enforced by `tools/secret-scan.cjs` and `tools/release-verify.cjs:87-113`.
+
+**AC10 — MET.** All seven fields present, schema-enforced, and surfaced in the UI.
+
+### What closing this needs
+
+1. `checkDrift` compared **values**, not just row ids — so a mirrored row with the wrong phone number fails.
+2. The help cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared` instead of hardcoding `999` and `102`.
+3. The Zod error to name the **entry id** and the file, so a bad dataset fails the app build with an actionable message.
+4. A build-time size check on the actual APK, not the source JSON.
+5. A retirement test — a fixture with `isActive: false` proving the mirror sets `is_active = false` rather than deleting the row — and a deactivation step for entries removed from the JSON.
+6. An offline-render test for the hotline list that asserts zero requests, matching the one that already exists for the dial path.
+Zod parse at module load, `packages/shared/src/data/index.ts:61-62`, whose error reads `path: "stations.0.phone"` — an **array index, not the entry id** — with no file name. The descriptive message exists in the CI tool; the app build fails with the useless message.
+
+**AC9 — MET.** RLS `using (is_active)` for both tables, verified live; and no service-role material anywhere in `apps/mobile`, `apps/admin`, or `packages/shared`, enforced by `tools/secret-scan.cjs` and `tools/release-verify.cjs:87-113`.
+
+**AC10 — MET.** All seven fields present, schema-enforced, and surfaced in the UI.
+
+### What closing this needs
+
+1. `checkDrift` compared **values**, not just row ids — so a mirrored row with the wrong phone number fails.
+2. The help cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared` instead of hardcoding `999` and `102`.
+3. The Zod error to name the **entry id** and the file, so a bad dataset fails the app build with an actionable message.
+4. A build-time size check on the actual APK, not the source JSON.
+5. A retirement test — a fixture with `isActive: false` proving the mirror sets `is_active = false` rather than deleting the row — and a deactivation step for entries removed from the JSON.
+6. An offline-render test for the hotline list that asserts zero requests, matching the one that already exists for the dial path.
+Zod parse at module load, `packages/shared/src/data/index.ts:61-62`, whose error reads `path: "stations.0.phone"` — an **array index, not the entry id** — with no file name. The descriptive message exists in the CI tool; the app build fails with the useless message.
+
+**AC9 — MET.** RLS `using (is_active)` for both tables, verified live; and no service-role material anywhere in `apps/mobile`, `apps/admin`, or `packages/shared`, enforced by `tools/secret-scan.cjs` and `tools/release-verify.cjs:87-113`.
+
+**AC10 — MET.** All seven fields present, schema-enforced, and surfaced in the UI.
+
+### What closing this needs
+
+1. `checkDrift` compared **values**, not just row ids — so a mirrored row with the wrong phone number fails.
+2. The help cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared` instead of hardcoding `999` and `102`.
+3. The Zod error to name the **entry id** and the file, so a bad dataset fails the app build with an actionable message.
+4. A build-time size check on the actual APK, not the source JSON.
+5. A retirement test — a fixture with `isActive: false` proving the mirror sets `is_active = false` rather than deleting the row — and a deactivation step for entries removed from the JSON.
+6. An offline-render test for the hotline list that asserts zero requests, matching the one that already exists for the dial path.

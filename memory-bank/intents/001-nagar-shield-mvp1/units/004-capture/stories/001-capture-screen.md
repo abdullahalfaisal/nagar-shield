@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 001-capture-screen
@@ -86,3 +86,28 @@ implemented: false
 - The History read model, the History screen, and the report-detail surface — unit `006-alerts` and `003-report-detail-and-category-edit`
 - Any AI media classification, blurring, or face detection — out of MVP scope
 - Any copy claiming that police, authorities, or anyone else were notified — forbidden by C-6
+
+## Implementation
+
+**The capture screen ships and works, with the permission degradation and the manual-entry fallback. The story is not `complete` because the telemetry it names does not exist.**
+
+### What ships
+
+- The capture screen exists at `apps/mobile/app/(app)/capture.tsx`, with the upload cards, the location card, and the permission handling.
+- Permissions are **read, never prompted for** (`capture.tsx:82-85`): the live permission state is read and re-read on every foreground, so a permission revoked while the app was backgrounded is noticed. The comment states the rule explicitly.
+- The manual-entry fallback appears when location is not granted: `capture.tsx:175-180` shows it when `permissions.location !== 'granted' && !hasFix`.
+- Each denied permission gets its own message: `capture.tsx:524-536` reads `error.details.permission` and selects `capture.micOnlyDenied` or `capture.galleryDenied` — the citizen is told *which* permission was refused, not given a generic failure.
+- The capture flow is covered: `apps/mobile/src/shared/services/captureFlow.test.ts` and `apps/mobile/src/shared/services/submitCapture.test.ts`.
+- The upload path is proven live: `tools/probe-capture-submit.cjs` reports **25/25** assertions.
+
+### The gaps
+
+- **The telemetry does not exist.** The story names a `capture_open_to_submit_ms` event. `grep -rn "capture_open_to_submit_ms|captureOpenToSubmit" apps packages supabase` returns **nothing**. The only telemetry in the mobile app is `apps/mobile/src/shared/services/shareTelemetry.ts` (for location sharing) and the dead `dialConfirmation.ts`. So the story's central measurement — how long a citizen takes from opening capture to submitting — is not captured at all.
+- **No test on the capture screen's own composition.** `captureFlow.test.ts` and `submitCapture.test.ts` cover the flow service and the submit service; nothing renders the screen and asserts the fallback appears when permission is denied, or that the right card is shown for a microphone denial.
+- **The dead `dialConfirmation.ts` telemetry surface is never called.** `apps/mobile/src/shared/services/dialConfirmation.ts` exports `useDialConfirmation`, `recordDialTelemetry`, `medianDialMs`, and `markAppOpen` — `grep` shows **zero callers**. The confirmation sheet it was written for is not wired into any screen.
+
+### What closing this needs
+
+1. A `capture_open_to_submit_ms` telemetry event, emitted once per submission, with the open timestamp captured when the capture screen mounts.
+2. A screen-level test for the permission-degradation branches: no location permission → manual entry visible; microphone refused → `capture.micOnlyDenied`; gallery refused → `capture.galleryDenied`.
+3. Either the dial-confirmation sheet wired into the help surfaces — which would make the telemetry live — or the module deleted.

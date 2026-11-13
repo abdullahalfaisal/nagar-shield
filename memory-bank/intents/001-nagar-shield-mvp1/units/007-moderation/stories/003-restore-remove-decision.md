@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 003-restore-remove-decision
@@ -92,3 +92,28 @@ implemented: false
 - Editing the report's content, category, or description
 - Any aggregate crime statistics or moderation dashboard — excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - A second moderator tier, scoped permissions, or a read-only moderator — FR-MOD-4 keeps one role with full access at MVP
+
+## Implementation
+
+**The restore and remove decisions work, and the double-decision refusal was fixed in this project's earlier work. The story is not `complete` because the admin has no TanStack Query — so no query is invalidated — and the console path has no live probe.**
+
+### What ships
+
+- The decisions are real and go through the sanctioned path: `apps/admin/app/queue/[reportId]/page.tsx:258` calls `submitDecision`, which posts to the `moderation_decide` Edge Function, which calls the RPC that owns the write.
+- **The double-decision refusal was fixed and is proven.** Migration `supabase/migrations/20261105000034_moderation_decision_conflicts.sql` makes the guard a **conditional update** — `UPDATE … WHERE moderation_status = 'hidden_pending_review'` — so a second decision on an already-decided report matches zero rows and the RPC raises `CONFLICT`. `tools/smoke-functions.cjs` asserts both halves of that contract: *"a second decision on the same report is refused with CONFLICT"* (HTTP 409 with `error.code === 'CONFLICT'`) and *"the refused second decision wrote no second audit row"*. The smoke run reports **36/36**.
+- The audit row is written by the same RPC, so the decision and its trail entry are one transaction: `supabase/migrations/20261105000003_functions.sql:572` and `:622` insert into `public.moderation_actions`.
+- The audit trail is **append-only**: `supabase/migrations/20261105000008_moderation_integrity.sql:17` defines `public.moderation_actions_append_only()`, and migration `016` re-establishes it. A decision cannot be edited or removed.
+
+### The gaps
+
+- **No query invalidation.** The story names the invalidation explicitly. The admin declares `@tanstack/react-query` at `apps/admin/package.json:17` but **never imports it** — `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returns zero hits. The queue is reloaded by the hand-written `onDecided()` callback. So a moderator who decides the last item in the queue can be left looking at a stale queue, and the audit trail is never invalidated at all.
+
+- **The console path has no live probe.** The *function* is proven by `tools/smoke-functions.cjs`. The console that calls it — the button, the note, the error rendering — is proven by nothing. The smoke run reaches the function over HTTP; it does not click the button.
+
+- **The refusal is not asserted at the UI level.** The smoke run proves the server answers `CONFLICT`. Nothing proves the console *shows* that refusal as a conflict rather than as a generic error.
+
+### What closing this needs
+
+1. The admin on TanStack Query, with the decision mutation invalidating the queue, the detail, and the audit keys — the mechanism the story names.
+2. A live probe that drives the console and asserts the double-decision refusal surfaces as a conflict message.
+3. A UI test asserting the `CONFLICT` branch renders the conflict copy.

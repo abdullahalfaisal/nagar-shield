@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 004-flag-an-alert
@@ -88,3 +88,28 @@ implemented: false
 - Flagging your own report, flagging a comment, or flagging a category — only a public alert can be flagged
 - Any notification to the flagged report's author — the author is not notified by push at MVP
 - Any copy claiming a moderator or authority has been notified, dispatched, or alerted — forbidden by C-6
+
+## Implementation
+
+**The flag path works end to end and is proven live. The story is not `complete` because the error contract is wrong — the server returns different codes than the story mandates, and the retry delay is a constant rather than a computed one.**
+
+### What ships
+
+- The citizen can flag an alert, and the write path is proven against the running stack: `tools/probe-public-alert.cjs` reports **14/14** assertions.
+- The write is refused for the right reasons. The SQL in `supabase/migrations/20261105000030_author_hide_distinct_reports.sql` enforces the distinct-reporter rule: a report can only be auto-hidden after a threshold of *distinct* citizens flag it, and one citizen cannot flag the same report twice to reach the threshold.
+- The client handles the refusal: `apps/mobile/src/shared/api/flags.ts:32` models `{ status: 'rate_limited'; retryAfterSec: number }` and `flags.ts:76` reads `body.retry_after_sec`.
+- The flag sheet is a real UI primitive: `apps/mobile/src/shared/ui/FlagSheet.tsx`.
+
+### The gaps
+
+- **The error codes do not match the story's contract.** The story mandates `CONFLICT` and `FLAG_RATE_LIMIT`. The shipped code returns `status: 'duplicate'` and `status: 'rate_limited'` — `apps/mobile/src/shared/api/flags.ts:32` types the rate-limited case as the bare string `'rate_limited'`, and the duplicate case likewise. Neither is the `ApiErrorCode` the shared package defines, so the mobile client cannot raise these as the shared `AppError` codes the rest of the app uses. The contract between the server and the shared error enum is broken in a way no test catches.
+
+- **`retry_after_sec` is a hardcoded constant, not a computed one.** `supabase/migrations/20261105000030_author_hide_distinct_reports.sql:69` writes the literal `3600`, and `apps/mobile/src/shared/api/flags.ts:76` falls back to `?? 3600`. The story says the retry delay is **computed from the oldest in-window flag** — so that a client that just tripped the limit is told how long until its own flag expires. The shipped value is a constant that is right only in the common case, and wrong whenever the oldest in-window flag is younger than an hour.
+
+- **No test asserts the contract.** The probe proves the write works and is refused; nothing asserts *which* code comes back or that the retry delay reflects the actual window.
+
+### What closing this needs
+
+1. The server to return the shared `ApiErrorCode` values — `CONFLICT` and `FLAG_RATE_LIMIT` — and the client to model them as `AppError` codes rather than bare status strings.
+2. `retry_after_sec` computed from the oldest in-window flag rather than written as `3600`.
+3. A test asserting both the code and the computed delay — the guard that keeps the server and the shared error enum in step.

@@ -28,8 +28,8 @@ Deliver **audit and auto hide** for unit `007-moderation`. Stories: 2. Bolt type
 
 ### Stories Included
 
-- [ ] **005-author-auto-hide-queue** — Priority: should
-- [ ] **006-moderator-action-audit-log** — Priority: must
+- [x]**005-author-auto-hide-queue** — Priority: should
+- [x]**006-moderator-action-audit-log** — Priority: must
 
 ### Expected Outputs
 

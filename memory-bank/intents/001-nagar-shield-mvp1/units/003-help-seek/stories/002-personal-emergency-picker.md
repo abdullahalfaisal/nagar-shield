@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: planned
 ---
 
 # Story: 002-personal-emergency-picker
@@ -78,3 +78,30 @@ implemented: false
 - The Help Alert grid, the confirmation sheet, and the Home layout — `001-home-and-help-alert-grid`
 - Location Sharing to a contact — unit 005
 - Any "contact notified" tracking, call receipts, or delivery confirmation — not an MVP capability
+
+## Implementation
+
+**This story is not built. The Personal Emergency picker does not exist.**
+
+### What ships
+
+Only the copy. The bundles carry the strings — `apps/mobile/src/shared/i18n/en.ts:153-154` defines `personalTitle: 'Personal emergency contact'` and `personalSubtitle: 'We will call your primary contact.'`, and line 481 carries `intro: 'Personal Emergency dials your'`.
+
+### What does not ship
+
+- **There is no Personal Emergency route.** `apps/mobile/app/(app)/` holds `home`, `alerts`, `alert-detail`, `capture`, `contacts`, `contact-editor`, `history`, `history-map`, `help-alert`, `more-help`, `station-map`, `thana-line`, `report-detail`, `location-sharing`, `more`, and `settings`. There is no `personal-emergency.tsx`, and `find apps/mobile/app -iname "*personal*" -o -iname "*picker*"` returns nothing.
+- The only mention of the picker in the codebase is a comment: `apps/mobile/src/shared/ui/ManualDialGuidance.tsx:12` names it as one of the surfaces that renders the degraded-mode guidance — a comment written for a screen that does not exist.
+- No picker component, no contact-selection list, no "dial my primary contact" action.
+
+### The gap
+
+The story is the citizen-facing counterpart to the primary-contact data that *does* exist (the `emergency_contacts` table and its CRUD, which story `006-emergency-contacts-crud` shipped). The data is there; the picker that turns it into a help action is not.
+
+### What closing this needs
+
+1. The picker route and screen: list the citizen's emergency contacts, let them choose one, and dial it through the same zero-network `openDialer` helper the other help surfaces use.
+2. A primary-contact marker and an ordering, so the picker can present "your primary" first.
+3. The dial action wired through `openDialer`, with the number read from the contact record.
+4. A test asserting the picker dials the selected contact and makes no network request — matching `dialPath.test.ts`.
+
+**Because nothing of the feature ships, this story stays `planned`.** It is not `partial`: `partial` would mean the picker exists and works but a guard is missing.

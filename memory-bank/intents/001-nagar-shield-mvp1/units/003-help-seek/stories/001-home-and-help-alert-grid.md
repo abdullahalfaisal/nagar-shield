@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 001-home-and-help-alert-grid
@@ -87,3 +87,29 @@ implemented: false
 - The Capture and Location Sharing quick-action tiles — units 004 and 005
 - The `emergency_contacts` schema, RLS, and CRUD API — unit 002
 - Any server involvement in the dial path (ADR-003): the panic path makes zero network calls
+
+## Implementation
+
+**The four help cards render and dial correctly, and the dial path is proven zero-network. The story is not `complete` because the grid lives on the wrong screen, the slot order contradicts the story, and the numbers are hardcoded rather than read from the bundled dataset.**
+
+### What ships
+
+- The four help cards exist and dial: `apps/mobile/app/(app)/help-alert.tsx:95-96, 103-104, 111-112` render the police, medical, and fire cards and call `dial('999')` / `dial('102')`.
+- The dial path is proven: `apps/mobile/src/shared/services/dialPath.test.ts:77-85` asserts no `fetch` is made, and `dialPath.test.ts:66-75` asserts no `ACTION_CALL` intent is fired — only `tel:`.
+- The Home screen renders its own six quick-action cards and an alerts section (`apps/mobile/app/(app)/home.tsx`), and navigates to the help screen at `home.tsx:99` (`router.push('/(app)/help-alert')`).
+
+### The gaps
+
+- **The grid is on its own route, not on Home.** The story's title and intent are *"Help Alert grid"* on the Home surface; the shipped code puts the cards on `/(app)/help-alert` and Home links to it. The comment at `home.tsx:26` says *"Unit `003-help-seek` owns the layout composition and the Help Alert block"*, so the split was a deliberate decision — but it means the criterion as written is not met, and the citizen reaches the help cards through an extra tap that the story does not describe.
+
+- **Home's own slot order contradicts the story.** `home.tsx:21` says *"the six quick-action cards"* and `:24` says *"the Alerts feed cards"*. The story specifies the composition and its order; the shipped Home puts its quick-action grid where the story expects the Help Alert block.
+
+- **The numbers are hardcoded, not read from the bundled dataset.** `help-alert.tsx:95-96, 103-104, 111-112` hardcode `999` and `102`. The bundle's `EMERGENCY_NUMBERS` (`packages/shared/src/data/index.ts:85-89`) is imported nowhere in `apps/mobile`. The values agree today, but the dataset is not the source for the dial path.
+
+- **No test on the grid itself.** Nothing asserts that Home or the help screen renders four cards, or that the right number is on the right card. The dial path's zero-network test proves the *dialler*, not the *grid*.
+
+### What closing this needs
+
+1. The Help Alert grid composed onto Home in the order the story specifies, with the separate route either removed or kept as an alias.
+2. The cards to read `EMERGENCY_NUMBERS` from `@nagar-shield/shared`.
+3. A test asserting the grid renders the expected cards with the expected numbers — the same shape as the `degradationCopy.test.ts` audit, so a new card claiming a wrong number fails the build.

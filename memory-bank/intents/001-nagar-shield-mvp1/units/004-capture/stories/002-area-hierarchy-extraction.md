@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 002-area-hierarchy-extraction
@@ -90,3 +90,48 @@ implemented: false
 - Any map tile rendering, geofencing, or distance alert — no dispatch or geofence features at MVP
 - Any use of the geocoder for the location-sharing or Help Alert paths
 - Raw GPS logging or exposing raw coordinates in an API response
+
+## Implementation
+
+**The area-hierarchy shape and the server-side resolution ship. The story is not `complete` because the shared schema was never written and the resolution order contradicts the story.**
+
+### What ships
+
+- The hierarchy shape is typed in `packages/shared/src/types/index.ts` and referenced from `packages/shared/src/testing/index.ts`.
+- The server resolves an area hierarchy. `supabase/migrations/20261105000003_functions.sql` defines the resolution with a curated `public.area_lookup` table of Dhaka-local centroids and a `ST_DWithin` match capped at **7 km**.
+- The cap is deliberate and documented in the SQL: *"A thana is roughly 5–7 km across, so 7 km is the widest match that is still truthful."* The comment continues: *"Without the cap the nearest centroid always wins, so a coordinate 200 km away would be labelled 'Dhanmondi' — a fabricated address, which is exactly what the degraded path exists to avoid."*
+- The response shape is `{ area_hierarchy, source }` with a `geocode_source` enum distinguishing the cache hit from the local match.
+
+### The gaps
+
+- **`areaHierarchySchema` does not exist.** `grep -rn "areaHierarchySchema" packages/shared apps/mobile apps/admin` returns **nothing**. The story names it as the shared contract for the hierarchy; the type exists but the validating schema — the thing that would reject a malformed hierarchy at the boundary — was never written. The server's JSON is trusted as-is.
+
+- **The resolution order contradicts the story.** The story specifies the `area_lookup`-first order; the shipped code is **cache-first**. `supabase/migrations/20261105000003_functions.sql:332-368`:
+
+  ```sql
+  -- 1. Exact cache hit.
+  select * into v_row
+  from public.geocode_cache
+  where key = v_key
+  limit 1;
+
+  if found then
+    return jsonb_build_object(
+      'area_hierarchy', v_row.area_hierarchy,
+      'source', v_row.source
+    );
+  end if;
+
+  -- 2. The curated Dhaka-local table — the PRIMARY source.
+  ```
+
+  The comment calls `area_lookup` *"the PRIMARY source"*, but the cache is consulted **first** and returns immediately. So the effective precedence is the reverse of the comment's own claim. This is not merely a wording mismatch: a **stale cache entry wins over the curated table**, which is the opposite of what the story wants and of what the code's own comment promises.
+
+- **No test pins the precedence.** Nothing asserts which source wins when both a cache entry and a curated row exist for the same coordinate, so the order can drift silently in either direction.
+
+### What closing this needs
+
+1. `areaHierarchySchema` in `packages/shared`, with the server's response validated against it at the client boundary.
+2. The resolution order made to match the story — `area_lookup` first, cache only as a fallback — or the story amended to say cache-first. Right now the code, the comment, and the story are three different positions.
+3. A test that fixes the precedence: with both a cache entry and a curated row for one coordinate, the curated row wins.
+4. A cache-invalidation rule, if the cache stays first — otherwise a corrected area never reaches a citizen.

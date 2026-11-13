@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 005-admin-skeleton-and-ci
@@ -85,3 +85,69 @@ implemented: false
 - The Supabase local stack, integration tests against a live database, and the RLS negative tests — later units
 - Admin analytics, charts, or crime-statistics dashboards — explicitly excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - Production deployment configuration, preview environments, and domain setup
+
+## Implementation
+
+**The admin console and the CI pipeline both ship and work. The story is not `complete` because four of its nine acceptance criteria name a guard that was never built, and one names a job that does not exist.**
+
+### What ships
+
+- All five routes exist and return HTTP 200: `apps/admin/app/login/page.tsx`, `app/queue/page.tsx`, `app/queue/[reportId]/page.tsx`, `app/users/page.tsx`, `app/audit/page.tsx`, all behind `apps/admin/app/admin-shell.tsx`. `next build` compiles cleanly and the routes serve 200 on a running server.
+- The CI workflow `.github/workflows/ci.yml` declares the five jobs the story names — `lint` (line 59), `typecheck` (line 79), `shared-test` (line 124), `unit-test-mobile` (line 149), `unit-test-admin` (line 170) — with `needs: [shared-test]` on both test jobs (lines 153 and 174), `pnpm install --frozen-lockfile` in every job, and workflow-level `NODE_VERSION: '22.19.0'` / `PNPM_VERSION: '9.15.0'` consumed by both the install step and the test steps. It triggers on `pull_request` and on `push` to `main` (lines 30–33). A failing lint, typecheck, or test exits non-zero.
+- Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are referenced by the admin (`apps/admin/lib/supabase/client.ts:23-24`). `tools/secret-scan.cjs` forbids `SUPABASE_SERVICE_ROLE_KEY`, `sb_secret_`, and service-role JWTs, and `tools/release-verify.cjs:92` runs it over `apps/admin`.
+
+### The gaps, criterion by criterion
+
+**AC2 — the routes are not placeholders.** The story says *"The route stubs are placeholders only… no queue data, no decision actions… unit 007 owns those."* Unit 007 shipped instead and replaced the stubs with live moderation screens (`apps/admin/app/queue/page.tsx:66` calls `fetchModerationQueue`; `app/queue/[reportId]/page.tsx:227` renders a live `DecisionPanel`). The story's acceptance criterion and the shipped code disagree about what this unit was. The **behaviour** is strictly better than the story asked for; the **stub shape** was never built, so nothing was ever built against the placeholder contract.
+
+**AC3 — three CSS custom properties are invented outside the token contract.** `apps/admin/app/globals.css:89-91` declares `--tap-target: 48px`, `--rail-width: 232px`, and `--page-max: 1440px` under a comment that says *"the console's own layout constants (not design tokens)"*. The criterion says *"no value is invented outside that contract."* The other custom properties (`--r-sm`, `--r-md`, `--shadow-card`, `--surface-lavender`, `--ink-950`) do match `docs/design/design-tokens.md`. Two raw `#ffffff` literals also sit at lines 362 and 383 where `var(--surface-white)` would do.
+
+**AC4 — the bundle scan is a CI script, not a test.** `tools/secret-scan.cjs` is real and does what the criterion wants, and `.github/workflows/ci.yml:496-538` runs it over the built admin bundle. But the criterion requires *"a bundle-scan **test** fails the build if one appears"*, and `apps/admin` has only three test files — `lib/api.test.ts`, `lib/format.test.ts`, `lib/noBulkActions.test.ts`. There is no bundle-scan test in the admin suite. Separately, the scan currently **false-positives on the real bundle**: `node tools/secret-scan.cjs apps/admin/.next` reports two `sb_secret_` findings from the Supabase SDK's own `startsWith("sb_secret_")` detector code in `.next/static/chunks/400-*.js` — not an embedded key, but the CI `secret-scan` job would fail on every build until the scanner stops matching the SDK's own detector.
+
+**AC8 — no build/release job is reserved in `ci.yml`.** The criterion says *"a separate job is reserved for the build/release pipeline that unit 008 will fill in"*, and the Technical Notes are explicit: *"this story leaves a named placeholder job so the pipeline shape is already visible."* `ci.yml` declares `lint`, `typecheck`, `shared-test`, `unit-test-mobile`, `unit-test-admin`, `unit-test-functions`, `migration-dry-run`, `maestro-flow`, `rls-integration`, `secret-scan` — **no `build` or `release` job**. Line 36 states *"There is no deploy job here — the production release is a human-driven runbook step."* The build pipeline exists only as the separate file `.github/workflows/build.yml` (`preview-apk` + `apk-smoke`), which is unit 008's deliverable, not a reserved placeholder.
+
+**AC9 — the `@shared/*` alias is declared but unused, and the boundary test is missing.** `apps/admin/tsconfig.json:36-38` and `apps/admin/jest.config.js:21` define the alias, but **no admin source file imports it**. Every real import uses the package name — `apps/admin/lib/api.ts:1`, `app/login/page.tsx:5`, `lib/format.ts:10-11`, `app/queue/[reportId]/page.tsx:5` all import from `@nagar-shield/shared`. The *substance* of the criterion holds: `grep -rn "zod|z\.object|z\.enum" apps/admin` returns zero hits, so no Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
+
+### What closing this needs
+
+1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
+2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
+3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
+4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
+5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
+Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
+
+### What closing this needs
+
+1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
+2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
+3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
+4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
+5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
+Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
+
+### What closing this needs
+
+1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
+2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
+3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
+4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
+5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
+Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
+
+### What closing this needs
+
+1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
+2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
+3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
+4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
+5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
+Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
+
+### What closing this needs
+
+1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
+2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
+3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
+4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
+5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.

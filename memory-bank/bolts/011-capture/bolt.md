@@ -28,7 +28,7 @@ Deliver **capture screen** for unit `004-capture`. Stories: 1. Bolt type: `ddd-c
 
 ### Stories Included
 
-- [ ] **001-capture-screen** — Priority: must
+- [x]**001-capture-screen** — Priority: must
 
 ### Expected Outputs
 

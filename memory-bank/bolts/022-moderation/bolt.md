@@ -28,8 +28,8 @@ Deliver **queue** for unit `007-moderation`. Stories: 2. Bolt type: `ddd-constru
 
 ### Stories Included
 
-- [ ] **001-moderator-login-and-queue** — Priority: must
-- [ ] **002-report-review-detail** — Priority: must
+- [x]**001-moderator-login-and-queue** — Priority: must
+- [x]**002-report-review-detail** — Priority: must
 
 ### Expected Outputs
 

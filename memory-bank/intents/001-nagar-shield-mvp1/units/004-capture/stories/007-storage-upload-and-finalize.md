@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 007-storage-upload-and-finalize
@@ -104,3 +104,26 @@ implemented: false
 - Push notifications on a new report (Phase 2)
 - Any server-side media processing, thumbnailing, or transcoding
 - Exposing `author_id` in any public response — the public projection omits it entirely
+
+## Implementation
+
+**The storage upload, the author-token path, the finalize step, and the idempotency all ship and are proven against the live stack. The story is not `complete` because the client's idempotency key and the server's storage path are not tied together by a test.**
+
+### What ships
+
+- The upload path exists end to end and is proven live: `tools/probe-capture-submit.cjs` reports **25/25** assertions against the running stack, and `apps/mobile/src/shared/services/submitCapture.test.ts` covers the client side.
+- The `finalize-capture` Edge Function exists at `supabase/functions/finalize-capture/index.ts` and re-validates the media caps independently of the client.
+- The **author token** keeps the citizen's uuid out of the storage path. The path is `reports/<sha256(author_id)>/<client_request_id>.jpg` — the hex SHA-256 of the author's user id as the second segment, so a media path never carries the author's uuid (FR-DATA-3). The client mirrors the server's token derivation in `packages/shared/src/storage/index.ts`.
+- The **client request id** gives idempotency: a repeated submit with the same id does not create a second report.
+- The capture response contract was corrected — the server returns `report_id` and the client reads it correctly (that defect was fixed in this project's earlier work).
+
+### The gaps
+
+- **No test asserts that the client's `client_request_id` is the one that reaches the storage path.** The author token and the request id are separate contracts; the probe covers them together against the live stack, but no unit test ties the client's derivation to the server's path construction. A change to either side's hashing would be caught only by the probe, which needs the running stack.
+- **No unit test on the `finalize-capture` function itself.** Its behaviour is exercised through the probe and the smoke run, not by a jest suite that runs in CI without Docker.
+- **The media-cap re-validation has no unit coverage** — see story `004-exif-strip-and-media-caps` for the video path specifically.
+
+### What closing this needs
+
+1. A unit test asserting the client's storage path and the server's expected path are the same string, for a fixed author id and request id — the check that keeps the two derivations in step without needing the live stack.
+2. A jest suite for `finalize-capture` covering its refusals, runnable in CI.

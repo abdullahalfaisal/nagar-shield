@@ -28,8 +28,8 @@ Deliver **media pipeline** for unit `004-capture`. Stories: 2. Bolt type: `ddd-c
 
 ### Stories Included
 
-- [ ] **004-exif-strip-and-media-caps** — Priority: must
-- [ ] **007-storage-upload-and-finalize** — Priority: must
+- [x]**004-exif-strip-and-media-caps** — Priority: must
+- [x]**007-storage-upload-and-finalize** — Priority: must
 
 ### Expected Outputs
 

@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 002-dual-identifier-login
@@ -82,3 +82,26 @@ implemented: false
 - Social login of any kind — FR-AUTH-6
 - Phone-number change, email change, and the identity-change row in Settings — surfaced by the Settings account section, not part of this sign-in story
 - The moderator console and the `disable_user` Edge Function — unit 007
+
+## Implementation
+
+**The dual-identifier login and the Remember-me switch both ship and are proven against the live stack. The story is not `complete` because the UI-level guards it names were never built.**
+
+### What ships
+
+- The login screen accepts either identifier: `apps/mobile/app/(auth)/login.tsx:44` calls `logIn({ identifier, password, rememberMe })`, and the field accepts an email or a phone number.
+- Remember-me is a real switch on the screen: `login.tsx:32` holds the `rememberMe` state, `login.tsx:132-139` renders the switch with `accessibilityLabel={t('auth.rememberMe')}`, and the value is passed into the session write.
+- The live probe proves it against the running stack: `tools/probe-alternate-phone.cjs` signs in with the alternate identifier and reports **9/9** assertions.
+- The sign-out / forgot-password / OTP flows share the same `(auth)` group and the same session service.
+
+### The gaps
+
+- **No component test on the login screen.** The probe proves the *server* accepts the alternate identifier; nothing proves the screen sends it. A regression that made the input strip `+` or a leading zero would pass every probe and fail every user.
+- **No test that the Remember-me switch actually changes the session write.** The switch is wired (`login.tsx:44`) and the `rememberMe` value is passed, but no assertion covers the branch — so flipping the default, or ignoring the flag in the session service, would go unnoticed.
+- **No i18n key-parity gate** covers `auth.rememberMe` in the Bangla bundle.
+
+### What closing this needs
+
+1. A component test that types an alternate identifier into the login screen and asserts the sign-in call carries it unchanged.
+2. A test asserting the `rememberMe` flag reaches the session write and changes its behaviour.
+3. The i18n key-parity gate from story `003-mobile-design-system`.

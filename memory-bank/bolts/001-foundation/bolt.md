@@ -28,8 +28,8 @@ Deliver **workspace and contracts** for unit `001-foundation`. Stories: 2. Bolt 
 
 ### Stories Included
 
-- [ ] **001-monorepo-workspace** — Priority: must
-- [ ] **002-shared-contracts** — Priority: must
+- [x]**001-monorepo-workspace** — Priority: must
+- [x]**002-shared-contracts** — Priority: must
 
 ### Expected Outputs
 

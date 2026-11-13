@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 001-alerts-feed-list
@@ -91,3 +91,30 @@ implemented: false
 - Any push notification on a new report — Phase 2; Phase 1 refreshes by polling and pull-to-refresh only
 - Charts, heatmaps, trend lines, hotspot rankings, and any crime-statistics output — excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - The Home layout composition, the search bar, and the Help Alert block — unit `003`
+
+## Implementation
+
+**The alerts feed ships, renders, and refreshes. The story is not `complete` because pagination is unreachable — the server returns a cursor the client never follows.**
+
+### What ships
+
+- The feed screen exists at `apps/mobile/app/(app)/alerts.tsx` and reads through `useAlerts` (`alerts.tsx:45`).
+- The API layer is real: `apps/mobile/src/shared/api/alerts.ts` defines the envelope with `next_cursor` (`alerts.ts:43`), maps it to `nextCursor` (`alerts.ts:87`), and runs a `useQuery` with `refetchInterval: ALERTS_REFRESH_INTERVAL_MS` and `refetchIntervalInBackground: false` (`alerts.ts:94-100`).
+- The alerts table is served by a cursor-paginated RPC, and the public read path is proven live: `tools/probe-public-alert.cjs` reports **14/14** assertions.
+- An alert detail screen exists at `apps/mobile/app/(app)/alert-detail.tsx`.
+
+### The gaps
+
+- **Page 2 is unreachable.** `alerts.ts:94` uses `useQuery`, not `useInfiniteQuery`. The hook computes `nextCursor` (`alerts.ts:87`) and returns it — and then **nothing consumes it**. The feed therefore always shows the first page and the cursor the server hands back is discarded. A citizen with more alerts than fit in one page simply never sees the rest, and the UI has no "load more" affordance because there is no second page to load.
+
+  This is the same class of defect the moderation stories hit: the pagination contract is implemented on the server and the client stops one step short of using it.
+
+- **No test on the feed's pagination.** Nothing asserts that a `next_cursor` in the response leads to a second request.
+
+- **The alert card renders a placeholder for an uncategorized alert.** `apps/mobile/src/shared/ui/AlertCard.tsx:42-44` renders the string `'—'` rather than the localized "uncategorized" copy. The bundle has the right copy; the card does not use it.
+
+### What closing this needs
+
+1. `useAlerts` to use `useInfiniteQuery` and pass `nextCursor` as the cursor for the next page, with a "load more" affordance on the feed.
+2. A test asserting that a feed response carrying `next_cursor` triggers a second request with that cursor — the guard that makes page 2 reachable rather than merely possible.
+3. `AlertCard.tsx` to render the localized uncategorized label instead of `'—''.

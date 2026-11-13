@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 001-moderator-login-and-queue
@@ -90,3 +90,29 @@ implemented: false
 - A second moderator tier, scoped permissions, a read-only moderator, or an appeal / overturn workflow — FR-MOD-4 keeps one role with full access at MVP
 - Push notifications for "a report is waiting" — no FCM fanout in Phase 1
 - The Curator workflow, OTP reset flow in the console, and account self-service from the console
+
+## Implementation
+
+**The moderator sign-in and the queue both ship, with the role gate enforced on the server. The story is not `complete` because the admin has no TanStack Query, no live probe, and no cache invalidation.**
+
+### What ships
+
+- The sign-in is email + password only, as the story specifies: `apps/admin/app/login/page.tsx:38-40` calls `client.auth.signInWithPassword({ email: email.trim(), password })`. The comment at `login.tsx:12` states the scope: *"Email + password only — no phone resolution, no biometric, no OTP reset."*
+- The **role is read after the sign-in** and a non-moderator is refused: `login.tsx:56-62` selects `role` from `profiles` and, when the role is not `moderator`, routes away with the access-only state rather than pretending the sign-in failed. The comment at `login.tsx:17-18` says the server refuses every call regardless — the client gate is a courtesy, not the boundary.
+- The queue is real and cursor-paginated: `apps/admin/app/queue/page.tsx:59-64` holds the items, cursor, and loading state; `queue/page.tsx:71` calls `fetchModerationQueue(getBrowserClient(), { limit: PAGE_SIZE })`.
+- The moderation read models are server-side and moderator-only. `supabase/migrations/20261105000013_moderation_console_read_models.sql` defines the three cursor-paginated feeds and revokes execute from `public` and `anon`, granting it only to `authenticated`; each function checks `public.is_moderator()` and raises `FORBIDDEN` otherwise.
+- The admin's own boundary test exists: `apps/admin/lib/noBulkActions.test.ts` asserts the console offers no bulk-action affordance — the FR-NG-3 guard.
+
+### The gaps
+
+- **The admin has no TanStack Query, so no query is ever invalidated.** `apps/admin/package.json:17` declares `"@tanstack/react-query": "^5.62.11"`, but `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returns **zero hits** — the dependency is declared and never imported. The admin hand-rolls its fetching with `useState` + `useEffect` + `useCallback`. The consequence is concrete: when a moderator decides a report, the queue, the report detail, and the audit trail are three separate hand-written reload functions, each of which has to be remembered at every call site. Nothing invalidates by key, so a forgotten reload leaves a stale queue on screen. This is the root cause behind the three "queries are invalidated" criteria in stories `003`, `004`, and `006` — **all three fail for this one reason.**
+
+- **There is no live probe for the admin console.** `tools/` holds ten probes, none for the moderator console: no `probe-moderation-console.cjs`, no `probe-moderator-login.cjs`. Every other critical write path in the project is proven against the running stack; the moderator console is not. The moderation *functions* are covered by `tools/smoke-functions.cjs` (36/36), but the console that calls them is proven by nothing.
+
+- **No test on the login screen.** The role check at `login.tsx:56-62` is load-bearing — it is what stops a citizen with a valid account from seeing a moderator console — and nothing asserts it.
+
+### What closing this needs
+
+1. TanStack Query wired into the admin: a `QueryClientProvider`, `useQuery` for the three feeds, and `useMutation` for the decisions. The declared dependency is already there; the provider and the hooks are not.
+2. A live probe for the console: sign in as a moderator, load the queue, decide a report, and assert the audit row and the queue state — the same shape as the ten existing probes.
+3. A test asserting a citizen account is refused the console.

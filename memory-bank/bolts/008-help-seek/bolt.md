@@ -28,7 +28,7 @@ Deliver **curated dataset** for unit `003-help-seek`. Stories: 1. Bolt type: `dd
 
 ### Stories Included
 
-- [ ] **003-bundled-station-hotline-dataset** — Priority: must
+- [x]**003-bundled-station-hotline-dataset** — Priority: must
 
 ### Expected Outputs
 

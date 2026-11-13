@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 002-auto-refresh-and-pull-to-refresh
@@ -84,3 +84,25 @@ implemented: false
 - Android battery saver / Doze detection and the power-save warning — unit `003`
 - Persisting the battery level, the network state, or the last poll timestamp
 - The History screen's own refresh strategy — the History query uses the same 60 s stale window but is owned by `006-history-list` and `007-history-filters`
+
+## Implementation
+
+**Auto-refresh and pull-to-refresh both ship. The story is not `complete` because the refresh is not testable as written and the background behaviour is unverified.**
+
+### What ships
+
+- Auto-refresh is real: `apps/mobile/src/shared/api/alerts.ts:99-100` sets `refetchInterval: ALERTS_REFRESH_INTERVAL_MS` and `refetchIntervalInBackground: false`.
+- Pull-to-refresh is real: `apps/mobile/app/(app)/alerts.tsx:2` imports `RefreshControl`, and `alerts.tsx:73-75` wires it to `onRefresh={() => void refetch()}`, driven by `isRefetching` from the hook (`alerts.tsx:45`).
+- The refresh interval is a named constant rather than a literal.
+
+### The gaps
+
+- **No test covers either behaviour.** There is no jest test asserting that the feed refetches on the interval, nor that pull-to-refresh triggers `refetch`. The behaviour is real but unguarded — a change to the interval, or a `RefreshControl` whose `onRefresh` is wired to the wrong function, would ship silently.
+- **`refetchIntervalInBackground: false` is a deliberate choice with no recorded reason.** It is correct for a citizen's battery, but nothing in the code or the story records that the interval is intentionally suspended when the app is backgrounded — so a future change to `true` would look like a harmless edit.
+- **The interval constant has no test.** `ALERTS_REFRESH_INTERVAL_MS` is asserted nowhere; its value is a product decision with no guard.
+
+### What closing this needs
+
+1. A test asserting the feed sets a `refetchInterval`, with the interval pinned to the product's chosen value.
+2. A test asserting pull-to-refresh calls `refetch`.
+3. A comment, or a story amendment, recording why the refresh pauses in the background.

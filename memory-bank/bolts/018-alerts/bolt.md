@@ -28,8 +28,8 @@ Deliver **feed** for unit `006-alerts`. Stories: 2. Bolt type: `ddd-construction
 
 ### Stories Included
 
-- [ ] **001-alerts-feed-list** — Priority: must
-- [ ] **003-area-filter-chips** — Priority: must
+- [x]**001-alerts-feed-list** — Priority: must
+- [x]**003-area-filter-chips** — Priority: must
 
 ### Expected Outputs
 

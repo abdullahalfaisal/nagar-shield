@@ -6,7 +6,7 @@ status: ready
 priority: should
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 007-account-deletion-and-recovery
@@ -82,3 +82,40 @@ implemented: false
 - Data export / portability before deletion — not an MVP capability
 - Social login of any kind — FR-AUTH-6
 - SMS OTP delivery and the SMS opt-in flow — feature-flagged off (`EXPO_PUBLIC_SMS_OTP_ENABLED=false`), W-2
+
+## Implementation
+
+**The delete, the 30-day restore window, and the purge path all ship and are proven against the live stack. The story is not `complete` because the window-closed refusal is misreported on screen and the recoverable date is fetched but never read.**
+
+### What ships
+
+- The delete path works and is proven live: `tools/probe-account-deletion.cjs` reports **18/18** assertions against the running stack.
+- The restore window is enforced by the database, not by the app. Migration `034` turns `restore_account` into a **conditional update bounded by `recoverable_until`**, so a restore attempted after the 30-day window is refused by Postgres rather than by a client-side date comparison that could be bypassed.
+- The soft-deleted guard is in place: writes from a soft-deleted account are refused.
+- `apps/mobile/app/(auth)/account-deleted.tsx` renders the deleted state and offers Restore and Sign out.
+- The API returns the recoverable date: `apps/mobile/src/shared/api/account.ts:48-49` maps `recoverable_until` to `recoverableUntil`, and `apps/mobile/src/shared/api/account.test.ts:43,49,57` asserts the mapping.
+
+### The gaps
+
+- **An expired restore is misreported as an internal error.** `apps/mobile/app/(auth)/account-deleted.tsx:36-48`:
+
+  ```ts
+  } catch {
+    // The RPC raises CONFLICT when there is nothing to restore — the
+    // window has closed and the purge job has taken the row.
+    setError(t('errors.internal'));
+    setBusy(false);
+  }
+  ```
+
+  The comment correctly identifies the cause — the RPC raises `CONFLICT` when the window has closed — and then reports it as `errors.internal`. The citizen is told the app broke, when the truthful answer is that the 30 days are up and the account is permanently gone. The `CONFLICT` code is available and unused here.
+
+- **`recoverableUntil` is fetched but never read.** `apps/mobile/src/shared/api/account.ts:48-49` parses it and the API test asserts the mapping, but no screen consumes it. The deleted screen could say *"you can restore until 14 December"* — the fact is in the response and simply not shown. The UI therefore cannot distinguish "still restorable" from "the window has closed" before the user presses the button and gets an error.
+
+- **The screen has no guard against pressing Restore after the window closed.** The button is enabled regardless.
+
+### What closing this needs
+
+1. The catch block to branch on the error code: `CONFLICT` renders a *"the restore window has closed"* message in the user's language, anything else renders `errors.internal`.
+2. The screen to read `recoverableUntil` and state the deadline, and to disable the Restore button once it has passed.
+3. A test for the expired-restore path that asserts the message, not just that an error appears.

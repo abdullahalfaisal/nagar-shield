@@ -28,9 +28,9 @@ Deliver **contacts and account** for unit `002-identity`. Stories: 3. Bolt type:
 
 ### Stories Included
 
-- [ ] **006-emergency-contacts-crud** — Priority: must
-- [ ] **005-remote-account-disable** — Priority: must
-- [ ] **007-account-deletion-and-recovery** — Priority: should
+- [x]**006-emergency-contacts-crud** — Priority: must
+- [x]**005-remote-account-disable** — Priority: must
+- [x]**007-account-deletion-and-recovery** — Priority: should
 
 ### Expected Outputs
 

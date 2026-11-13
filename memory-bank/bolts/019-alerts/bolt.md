@@ -28,9 +28,9 @@ Deliver **refresh and flagging** for unit `006-alerts`. Stories: 3. Bolt type: `
 
 ### Stories Included
 
-- [ ] **002-auto-refresh-and-pull-to-refresh** — Priority: must
-- [ ] **004-flag-an-alert** — Priority: must
-- [ ] **005-author-auto-hide** — Priority: should
+- [x]**002-auto-refresh-and-pull-to-refresh** — Priority: must
+- [x]**004-flag-an-alert** — Priority: must
+- [x]**005-author-auto-hide** — Priority: should
 
 ### Expected Outputs
 

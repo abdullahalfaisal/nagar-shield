@@ -28,8 +28,8 @@ Deliver **app shell and admin** for unit `001-foundation`. Stories: 2. Bolt type
 
 ### Stories Included
 
-- [ ] **004-mobile-app-shell** — Priority: must
-- [ ] **005-admin-skeleton-and-ci** — Priority: must
+- [x]**004-mobile-app-shell** — Priority: must
+- [x]**005-admin-skeleton-and-ci** — Priority: must
 
 ### Expected Outputs
 

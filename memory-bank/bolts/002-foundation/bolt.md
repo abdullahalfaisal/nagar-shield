@@ -28,7 +28,7 @@ Deliver **design system** for unit `001-foundation`. Stories: 1. Bolt type: `sim
 
 ### Stories Included
 
-- [ ] **003-mobile-design-system** — Priority: must
+- [x]**003-mobile-design-system** — Priority: must
 
 ### Expected Outputs
 

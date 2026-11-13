@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 004-exif-strip-and-media-caps
@@ -94,3 +94,46 @@ implemented: false
 - The Edge Function, the Storage bucket, and the signed-path policy — `007-storage-upload-and-finalize`
 - Modifying, deleting, or re-saving the user's original file in their gallery
 - Any exif metadata other than GPS being deliberately preserved — the re-encode drops the original EXIF block as a whole
+
+## Implementation
+
+**The image path works: EXIF is stripped and the size caps are enforced. The story is not `complete` because the video path is not implemented and the dimension cap is the wrong value.**
+
+### What ships
+
+- **Images:** `apps/mobile/src/shared/services/prepareMedia.ts` re-encodes images, which is what actually removes the EXIF metadata — the comment at line 19 names *"the reliable EXIF strip"*.
+- The video cap is enforced on the client: `prepareMedia.ts:108-110` throws `MEDIA_TOO_LARGE` with `{ maxSeconds: 30 }` when the picked video is over 30 s.
+- The file size cap is enforced after the copy: `prepareMedia.ts:122-124` throws `MEDIA_TOO_LARGE` when the copied file exceeds the cap.
+- The type allowlist is enforced: `prepareMedia.ts:104-106` throws `UNSUPPORTED_MEDIA` for a disallowed mime type.
+- The server re-validates independently: `supabase/functions/finalize-capture/index.ts:9` documents that it re-validates `MEDIA_TOO_LARGE` / `UNSUPPORTED_MEDIA`, and `supabase/functions/_shared/contracts.ts:90` carries the code in its response contract.
+
+### The gaps
+
+- **The video path does no video work.** `prepareMedia.ts:103-136` — `prepareVideo` — checks the type, checks the duration, computes a resize target, and then:
+
+  ```ts
+  const file = new File(ensureDraftDirectory(), `video-${Date.now()}.${extensionFor(asset.mimeType, 'video')}`);
+  const source = new File(asset.uri);
+  await source.copy(file, { overwrite: true });
+  ```
+
+  It **copies the original bytes**. There is no trim, no transcode, and no location-metadata strip on the video path. The function's own doc comment (`prepareMedia.ts:98-101`) says *"A video longer than the 30 s cap is **trimmed** before the upload. The transcode itself needs the native video pipeline; when it is unavailable the original is kept and the server rejects it with `MEDIA_TOO_LARGE`"*. The **over-cap** case is genuinely handled — the client refuses it. But the **trim** the comment describes is never performed: a video between the cap and the limit is copied unchanged, and no trimming to 30 s happens. So the video's location metadata is never stripped either, which is the one thing the story is named for.
+
+- **`MEDIA_DEFAULT_DIMENSION` is 1080, not the specified 1920.** `prepareMedia.ts:177`:
+
+  ```ts
+  const MEDIA_DEFAULT_DIMENSION = 1080;
+  ```
+
+  This is the fallback for a picked asset that reports no width or height, and it feeds `resizeTarget(width, height)` at `prepareMedia.ts:112-114`. So an asset with no reported dimensions is scaled to 1080, not 1920.
+
+- **The server-side `UNSUPPORTED_MEDIA` is not reachable from the video path.** The client rejects the disallowed type before the upload, so the server's re-validation for a *video* never sees one. The code exists and is correct; it simply has no path to it for this media type.
+
+- **No test covers the video path.** There is no assertion that a video is trimmed, that its metadata is stripped, or that the dimension cap is applied.
+
+### What closing this needs
+
+1. A real trim on the video path — the native pipeline the comment says is unavailable needs to be either shipped or the story amended to say the client refuses over-cap video rather than trimming it.
+2. Location-metadata stripping for video, matching what the image path achieves by re-encoding.
+3. `MEDIA_DEFAULT_DIMENSION` raised to the specified 1920.
+4. A test on the video path asserting the output is trimmed to the cap and carries no location metadata.

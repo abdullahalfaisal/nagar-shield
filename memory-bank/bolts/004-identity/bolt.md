@@ -28,8 +28,8 @@ Deliver **profile and auth core** for unit `002-identity`. Stories: 2. Bolt type
 
 ### Stories Included
 
-- [ ] **001-signup-with-email-and-phone** — Priority: must
-- [ ] **002-dual-identifier-login** — Priority: must
+- [x]**001-signup-with-email-and-phone** — Priority: must
+- [x]**002-dual-identifier-login** — Priority: must
 
 ### Expected Outputs
 

@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 004-disable-a-user
@@ -85,3 +85,29 @@ implemented: false
 - A user directory browser, a bulk user list, user exports, and CSV reporting
 - Aggregate crime statistics, charts, heatmaps, and hotspot rankings — excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - Sending the citizen a notification about the disable — no push, email, or in-app notice at MVP
+
+## Implementation
+
+**The disable-user flow ships, with the role check, the `NOT_FOUND`/`CONFLICT` distinctions, and the write guard all in place. The story is not `complete` because the admin has no TanStack Query — so no query is invalidated — and the console path has no live probe.**
+
+### What ships
+
+- The users screen exists at `apps/admin/app/users/page.tsx` and the disable call goes through the sanctioned path: `users/page.tsx:142` calls `disableAccount(getBrowserClient(), { userId: account.id, note: trimmedNote })`, which posts to the `disable_user` Edge Function (`apps/admin/lib/api.ts:431`).
+- **The refusals are distinguished on screen.** `users/page.tsx:146-159` branches on the error code: `VALIDATION_FAILED` → `copy.decisionNoteRequired`, `FORBIDDEN` → `copy.usersDisableForbidden`, `CONFLICT` → `copy.errorConflict`, `AUTH_DISABLED` → `copy.errorForbidden`, `AUTH_REQUIRED` → `copy.errorAuthRequired`, and everything else → `copy.errorGeneric`. This is the sharpest error handling in the admin.
+- The **role check** was fixed in this project's earlier work: the function refuses a non-moderator, and `NOT_FOUND` and `CONFLICT` are distinguished from a generic failure.
+- **A disabled account is guarded from writing.** Migration `supabase/migrations/20261105000019_disabled_account_write_guard.sql` blocks the writes, and `20261105000016_purge_integrity.sql` keeps the trail honest.
+- The bulk-action guard exists: `apps/admin/lib/noBulkActions.test.ts` asserts the console offers no bulk disable — the FR-NG-3 boundary.
+
+### The gaps
+
+- **No query invalidation.** The story names it; the admin declares `@tanstack/react-query` but never imports it, so the users list is refreshed by the hand-written `onDisabled()` callback (`users/page.tsx:144`). A moderator who disables a user and returns to the queue is not guaranteed to see the consequence reflected.
+
+- **No live probe for the console.** The `disable_user` function is proven by `tools/smoke-functions.cjs`; the console that calls it is not.
+
+- **No test on the disable screen's branches.** The error handling at `users/page.tsx:146-159` is careful and completely untested — the copy constants could be swapped, or a branch dropped, and nothing would notice.
+
+### What closing this needs
+
+1. The admin on TanStack Query, with the disable mutation invalidating the users and audit queries.
+2. A live probe that drives the console and asserts the disabled account is gone from the list and the audit trail records the action.
+3. A test per error branch at `users/page.tsx:146-159`.

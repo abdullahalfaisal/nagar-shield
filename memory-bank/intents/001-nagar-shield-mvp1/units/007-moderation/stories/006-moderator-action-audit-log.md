@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 006-moderator-action-audit-log
@@ -100,3 +100,31 @@ implemented: false
 - Any aggregate crime statistics, charts, decision-rate trends, per-moderator leaderboards, and "total decisions" counters — excluded by FR-NG-3 / FR-NG-4 / ADR-010
 - Surfacing the uploader's unmasked identity in the trail — the identity stays in the review detail's server payload; the trail carries ids
 - Push notifications for a new audit row — no FCM fanout in Phase 1
+
+## Implementation
+
+**The audit trail ships, is cursor-paginated, is moderator-only, and is append-only. The story is not `complete` because the admin has no TanStack Query — so no query is invalidated — and the console path has no live probe.**
+
+### What ships
+
+- The trail is written by the RPC in the same transaction as the decision: `supabase/migrations/20261105000003_functions.sql:572` and `:622` insert into `public.moderation_actions`.
+- The trail is **append-only**: `supabase/migrations/20261105000008_moderation_integrity.sql:17` defines `public.moderation_actions_append_only()`, and migration `016` re-establishes it. A decision row cannot be updated or deleted.
+- The read model is **cursor-paginated** with the same composite cursor format as the other feeds: `supabase/migrations/20261105000013_moderation_console_read_models.sql:221` defines `public.moderation_audit_feed(p_cursor, p_limit, p_decision)`, ordered by `(created_at DESC, id DESC)`.
+- The feed is **moderator-only**: the function raises `FORBIDDEN` unless `public.is_moderator()`, execute is revoked from `public` and `anon` and granted only to `authenticated` (lines 304-306), and the decision filter is constrained to the three real decisions (`restore`, `remove`, `disable_user`).
+- **The trail carries no report contents.** The comment at `20261105000013_moderation_console_read_models.sql:216-219` is explicit: *"It carries **no** coordinates, **no** description, and **no** media — the trail points at a report, it never duplicates the report's contents."*
+- The console screen exists: `apps/admin/app/audit/page.tsx:43` and `:71` call `fetchAuditTrail(getBrowserClient(), { ... })` (`apps/admin/lib/api.ts:345`).
+
+### The gaps
+
+- **No query invalidation.** The story names it. The admin declares `@tanstack/react-query` at `apps/admin/package.json:17` and **never imports it**. The audit page therefore fetches on mount and on its own "load more" click, and — critically — **a decision made in another screen does not invalidate the trail**. A moderator who decides a report and then opens `/audit` may be looking at a feed that was fetched before the decision.
+
+- **No live probe for the console.** The trail is exercised by the SQL assertions and the smoke run at the *function* level; the console screen that renders it is proven by nothing.
+
+- **The "no contents" guarantee is enforced by convention, not by a test.** The SQL comment states the rule and the query selects only the metadata columns, but nothing asserts that a future column addition would not widen the payload. A test asserting the audit payload has exactly the specified keys would hold the line.
+
+### What closing this needs
+
+1. The admin on TanStack Query, with the decision mutation invalidating the audit query key — the mechanism the story names.
+2. A live probe that drives a decision and asserts the new row appears in the trail the console renders.
+3. A test asserting the audit payload contains exactly the specified keys and no report contents.
+4. A test asserting the trail is append-only at the database level — that an update or delete against `moderation_actions` is refused.

@@ -6,7 +6,7 @@ status: ready
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: false
+implemented: partial
 ---
 
 # Story: 003-mobile-design-system
@@ -88,3 +88,30 @@ implemented: false
 - Screens from `docs/design/screen-spec.md` beyond the showcase route — units 003, 004, and 006
 - Icons beyond `@expo/vector-icons` Material Symbols, illustration assets, and animation libraries other than Reanimated
 - iOS-specific rendering — the target platform is Android
+
+## Implementation
+
+**The theme tokens, the UI primitives, and the Bangla/English copy all ship. The story is not `complete` because the cross-checks it names were never built.**
+
+### What ships
+
+- The token set lives in `apps/mobile/src/shared/theme/tokens.ts`, with `ThemeProvider.tsx`, `ThemeContext.ts`, and `fonts.ts` beside it. `docs/design/design-tokens.md` is the written contract.
+- `tools/extract-design-tokens.cjs` extracts the token values from the markdown document.
+- The primitive library is real and used: `apps/mobile/src/shared/ui/` carries `Button`, `Card`, `InputField`, `ListRow`, `ListRowGroup`, `Screen`, `AppBar`, `StatusBanner`, `EmptyState`, `SectionTitle`, `Toggle`, `RadioGroup`, `SegmentedTabs`, `BottomSheet`, `AlertCard`, `Icon`, `PulseDot`, `PermissionRow`, `LocationPill`, `ContactAvatar`, `WizardScreen`, and the degraded-mode surfaces added with story `004-graceful-degradation` (`ManualDialGuidance.tsx`). `apps/mobile/src/shared/ui/index.ts` is the barrel.
+- The copy ships in both scripts: `apps/mobile/src/shared/i18n/en.ts` and `bn.ts`.
+
+### The gaps
+
+- **No test parses `docs/design/design-tokens.md` and asserts the mobile theme matches it.** The story says *"The token values are cross-checked by the same kind of test used on the mobile side: a test parses `docs/design/design-tokens.md` and asserts the admin CSS custom properties match. The document is the contract for both surfaces."* The only thing that references the document is `tools/extract-design-tokens.cjs` — an extraction tool that is **not wired into CI** (`grep -n "extract-design-tokens" .github/workflows/ci.yml package.json` returns nothing). Nothing fails when the tokens and the document disagree.
+- **No tap-target size test.** The story names a tap-target minimum; no test measures the rendered hit area of the primitives, and the admin's own `--tap-target: 48px` is an invented value (see story `005-admin-skeleton-and-ci`).
+- **No design-system showcase route.** The story asks for a screen that exercises every primitive; no such route exists under `apps/mobile/app/`.
+- **No i18n key-parity gate.** `apps/mobile/src/shared/i18n/` contains `en.ts`, `bn.ts`, `index.ts`, `degradationCopy.test.ts`, and `thanaFallbackCopy.test.ts` — the two test files each audit one namespace, but **nothing checks that `en` and `bn` have the same keys**. A key added to one bundle and forgotten in the other ships silently, and the Bangla screen renders `undefined` for it.
+- **No hardcoded-string scan.** Nothing in `tools/` or the CI workflow asserts that user-facing copy comes from the bundles rather than a literal in a component.
+
+### What closing this needs
+
+1. A token-parity test that parses `docs/design/design-tokens.md` and asserts `apps/mobile/src/shared/theme/tokens.ts` matches it — and the same assertion for the admin's CSS custom properties.
+2. An i18n key-parity test asserting `en` and `bn` carry the same key set, wired into CI.
+3. A tap-target test over the primitives.
+4. A showcase route that renders every primitive, so a regression in one is visible.
+5. A scan for hardcoded user-facing strings in the components.
