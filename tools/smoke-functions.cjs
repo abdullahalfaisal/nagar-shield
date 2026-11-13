@@ -16,7 +16,7 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 
 const API_URL = 'http://127.0.0.1:54321';
 const CONTAINER = 'supabase_db_nagar-shield';
@@ -24,6 +24,21 @@ const CONTAINER = 'supabase_db_nagar-shield';
 const DEV_PASSWORD = 'nagar-local-dev';
 const MODERATOR_EMAIL = 'mod@nagar.local';
 const CITIZEN_EMAIL = 'citizen@nagar.local';
+const CITIZEN2_EMAIL = 'citizen2@nagar.local';
+const CITIZEN_ID = '11111111-1111-1111-1111-1111111111a1';
+const MODERATOR_ID = '11111111-1111-1111-1111-1111111111a2';
+
+/**
+ * The author token — the hex SHA-256 of the author's user id.
+ *
+ * This mirrors `authorToken()` in `packages/shared/src/storage/index.ts` and
+ * `supabase/functions/_shared/vendor/storage/index.ts`. The media path must
+ * carry the token rather than the raw uuid so that a media path never leaks
+ * the author's uuid (FR-DATA-3).
+ */
+function authorToken(userId) {
+  return createHash('sha256').update(userId, 'utf8').digest('hex');
+}
 
 const results = [];
 
@@ -82,6 +97,54 @@ async function callFunction(name, body, bearer) {
     parsed = { raw: text };
   }
   return { status: response.status, body: parsed, text };
+}
+
+/** A PostgREST call of a database function, as the signed-in user. */
+async function callRpc(name, body, bearer) {
+  const response = await fetch(`${API_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: {
+      apikey: localEnv().anonKey,
+      Authorization: `Bearer ${bearer}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const text = await response.text();
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = { raw: text };
+  }
+  return { status: response.status, body: parsed, text };
+}
+
+/**
+ * Creates a throwaway citizen, so a test can act as a third distinct
+ * flagger.
+ *
+ * The phone must be a **valid** BD number — the `handle_new_user` trigger
+ * requires one, and the `profiles.phone` CHECK would reject a malformed one.
+ */
+async function createThrowawayCitizen(email) {
+  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+  const response = await fetch(`${API_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      apikey: localEnv().serviceRoleKey,
+      Authorization: `Bearer ${localEnv().serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password: DEV_PASSWORD,
+      email_confirm: true,
+      user_metadata: { phone: `+88019${subscriber}` },
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  return body.id ?? null;
 }
 
 async function main() {
@@ -259,7 +322,13 @@ async function main() {
   const clientRequestId = randomUUID();
   const payload = {
     client_request_id: clientRequestId,
-    storage_path: `reports/11111111-1111-1111-1111-1111111111a1/${clientRequestId}.jpg`,
+    // The path's second segment is the **author token** — the hex SHA-256 of
+    // the author's user id — not the raw uuid (migration
+    // `20261105000029_storage_author_token.sql`). The raw uuid no longer
+    // matches, so `finalize-capture` refuses it with FORBIDDEN, and every
+    // assertion below it fails for a reason that has nothing to do with what
+    // it is testing.
+    storage_path: `reports/${authorToken(CITIZEN_ID)}/${clientRequestId}.jpg`,
     media_type: 'photo',
     byte_size: 2048,
     duration_seconds: null,
@@ -315,7 +384,7 @@ async function main() {
     {
       ...payload,
       client_request_id: '77777777-7777-4777-8777-777777777702',
-      storage_path: 'reports/11111111-1111-1111-1111-1111111111a3/foreign.jpg',
+      storage_path: `reports/${authorToken('11111111-1111-1111-1111-1111111111a3')}/foreign.jpg`,
     },
     citizenToken ?? '',
   );
@@ -372,6 +441,45 @@ async function main() {
   const targetReport = first.body?.data?.report_id ?? '';
 
   if (targetReport) {
+    // A moderator only ever sees the `hidden_pending_review` queue, and
+    // `moderation_decide` only decides a queued report — a decision on a
+    // `visible` report is refused with `CONFLICT` (story
+    // `003-restore-remove-decision`: "the `CONFLICT` guard is a conditional
+    // update (`UPDATE … WHERE moderation_status = 'hidden_pending_review')`").
+    //
+    // So the fixture has to move the report into the queue the way the
+    // product does: **3 distinct flags** on one report trips the per-report
+    // threshold. The flags go through the real `flag_report` RPC as real
+    // signed-in citizens — the transition is the product's own, not a
+    // hand-written UPDATE that would bypass the rule it is meant to test.
+    const flaggerEmails = [CITIZEN2_EMAIL, MODERATOR_EMAIL, `smoke-flagger-${randomUUID()}@test.local`];
+    await createThrowawayCitizen(flaggerEmails[2]);
+
+    let flagged = 0;
+    for (const email of flaggerEmails) {
+      const token = await signIn(email, DEV_PASSWORD);
+      if (!token) continue;
+      // The flag's identity comes from the JWT, not from the caller — that is
+      // the anti-impersonation rule, and it is why the three flags must be
+      // three real sessions.
+      const flag = await callRpc(
+        'flag_report',
+        { p_report_id: targetReport, p_reason: 'other' },
+        token,
+      );
+      if (flag.status === 200) flagged += 1;
+    }
+    record('three distinct citizens flagged the report', flagged === 3, `${flagged} flag(s)`);
+
+    const queuedStatus = queryScalar(
+      `select moderation_status from public.reports where id = '${targetReport}';`,
+    );
+    record(
+      'the flagged report is in the moderator queue',
+      queuedStatus === 'hidden_pending_review',
+      queuedStatus,
+    );
+
     const decide = await callFunction(
       'moderation-decide',
       { report_id: targetReport, decision: 'remove', note: 'edge function smoke test' },
@@ -397,6 +505,30 @@ async function main() {
       `select moderation_status from public.reports where id = '${targetReport}';`,
     );
     record('the report is now removed', status === 'removed', status);
+
+    // The second decision on the same report must be refused — and it must
+    // write no second audit row. This is the "exactly one row per decision"
+    // guarantee, asserted over the door the moderator actually uses.
+    const secondDecide = await callFunction(
+      'moderation-decide',
+      { report_id: targetReport, decision: 'remove', note: 'edge function smoke test' },
+      moderatorToken ?? '',
+    );
+    record(
+      'a second decision on the same report is refused with CONFLICT',
+      secondDecide.status === 409 && secondDecide.body?.error?.code === 'CONFLICT',
+      `HTTP ${secondDecide.status} ${secondDecide.body?.error?.code ?? ''}`,
+    );
+
+    const auditRowsAfter = queryScalar(
+      `select count(*) from public.moderation_actions
+       where report_id = '${targetReport}' and note = 'edge function smoke test';`,
+    );
+    record(
+      'the refused second decision wrote no second audit row',
+      auditRowsAfter === '1',
+      auditRowsAfter,
+    );
   } else {
     record('a moderator can call moderation-decide', false, 'no visible report to act on');
   }

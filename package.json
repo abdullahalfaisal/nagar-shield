@@ -35,6 +35,8 @@
     "contacts:check": "node tools/probe-contacts-crud.cjs",
     "category:check": "node tools/probe-report-category.cjs",
     "alert:check": "node tools/probe-public-alert.cjs",
+    "capture:check": "node tools/probe-capture-submit.cjs",
+    "deletion:check": "node tools/probe-account-deletion.cjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm data:check && pnpm shared:check && pnpm db:test && pnpm db:smoke && pnpm alert:check && pnpm maestro:check && pnpm fn:typecheck",
     "mobile": "pnpm --filter @nagar-shield/mobile",
     "admin": "pnpm --filter @nagar-shield/admin",

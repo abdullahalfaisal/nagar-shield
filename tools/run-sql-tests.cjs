@@ -33,6 +33,7 @@ const SUITES = [
   'report_category.sql',
   'location_shares.sql',
   'alert_detail.sql',
+  'moderation_conflicts.sql',
 ];
 
 /** Counts the `| t` / `| f` assertion rows in a psql transcript. */

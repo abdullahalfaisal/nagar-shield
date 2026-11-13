@@ -215,7 +215,17 @@ async function main() {
     isRefused(
       await post(
         'wrong_number_reports',
-        { reporter_id: userId, entry_type: 'station', entry_id: 'gulshan', reason: 'wrong number' },
+        {
+          reporter_id: userId,
+          entry_type: 'station',
+          // The station's **real** id. The polymorphic integrity trigger
+          // (migration 032) resolves `entry_id` against the live table and
+          // refuses an unknown target — so a stale fixture would be refused
+          // for the *wrong* reason, and the assertion would no longer be
+          // about the disabled account at all.
+          entry_id: 'st-gulshan-police',
+          reason: 'wrong number',
+        },
         token,
       ),
     ),

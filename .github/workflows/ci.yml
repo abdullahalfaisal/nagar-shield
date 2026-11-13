@@ -443,6 +443,37 @@ jobs:
       - name: the Edge Function auth gates
         run: pnpm fn:smoke
 
+      # The capture submit path, proved end to end: the bytes go straight to
+      # the private bucket, the metadata goes to `finalize-capture`, and the
+      # response's `report_id` is the id of the row that actually exists.
+      #
+      # This probe exists because of a defect that shipped in the client: it
+      # read a camelCase `reportId` from a body that carries `report_id`, so
+      # **every** successful capture was misread as a transport failure and
+      # handed to the offline queue. Nothing had ever exercised this path end
+      # to end, which is why it survived.
+      #
+      # The assertion that earns its keep is the idempotency one: the same
+      # `client_request_id` submitted twice must return the **original**
+      # report id, and exactly one report row must exist. A retry that landed
+      # twice would file the citizen's evidence twice.
+      - name: the capture submit contract
+        run: pnpm capture:check
+
+      # The account-deletion contract: the 30-day window, and the writes a
+      # soft-deleted account may not make.
+      #
+      # The SQL suite proves the database side. This proves the **client's**
+      # side — that the citizen's own session sees the refusals the recovery
+      # screen renders, over the door the app uses.
+      #
+      # The assertion that earns its keep is the expired window: the
+      # deletion is back-dated past 30 days, the way the passage of time
+      # would, and the restore must be refused by the **database**. A client
+      # timer would be defeated by a device with a wrong clock.
+      - name: the account-deletion contract
+        run: pnpm deletion:check
+
   # ---------------------------------------------------------------------------
   # The secret scan — the mechanical proof that the service-role key is never
   # in a bundle. It runs last because it inspects the **built** output.
