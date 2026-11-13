@@ -123,7 +123,7 @@ the staging ones. The command exits non-zero when any assertion fails.
 
 #### The live database probes
 
-Five of the checks prove behaviour that only exists over the wire, through
+Six of the checks prove behaviour that only exists over the wire, through
 the door the app actually uses. They need the local stack running
 (`npx supabase start`) and are wired into the `rls-integration` CI job.
 
@@ -133,6 +133,7 @@ pnpm biometric:check   # the biometric failure accounting
 pnpm alternate:check   # the alternate phone constraint
 pnpm signup:check      # the signup contract
 pnpm reset:check       # the password-reset contract
+pnpm contacts:check    # the emergency-contacts CRUD contract
 ```
 
 `guard:check` proves that a moderator-disabled account is refused every
@@ -208,6 +209,34 @@ both the Auth users **and** the orphaned profile rows, because migration
 `reset:check` uses `reset-probe@nagar.local` and leaves it behind on
 purpose — it changes the account's password each run, so deleting it would
 break the next run's sign-in assertion.
+
+`contacts:check` is the odd one out: it creates **no** account. It signs in
+as two **seeded** citizens (`citizen@nagar.local` and
+`citizen2@nagar.local`) because the owner-scoping criteria are only
+meaningful when there is somebody else to scope against, and it cleans up
+its own rows (`name = like 'probe-*'`) on the way out.
+
+`contacts:check` proves the emergency-contacts CRUD over the real
+GoTrue → PostgREST → RLS path: a contact can be created and the owner comes
+from the session, the timestamps come from the database, a forged `user_id`
+is refused, reading another user's contact by id or by `user_id` returns an
+**empty set**, patching or deleting another user's row affects **no rows**,
+the order is `is_primary` then `sort_order` and is identical on a second
+read, a sixth contact beyond the wizard three is accepted (no cap), a
+non-BD phone is refused with no row written, deleting the only primary
+leaves zero primaries with the rest of the list intact, a duplicate phone
+is accepted, and an empty name is refused.
+
+Two of those assertions earn their keep. The RLS negative ones are the
+point of the probe — a write that RLS filters out is **not** an error in
+PostgREST: an UPDATE answers `200` with an empty representation and a
+DELETE answers `204` with no body. The assertions therefore test the
+**effect** (no rows affected, the other user's row unchanged), never the
+status code. And the non-BD phone one is what caught the missing
+`contacts_phone_format` CHECK — the same three-valued trap that migration
+020 fixed for `profiles.alternate_phone`: the obvious form of the
+constraint silently accepts every non-BD number, because a CHECK rejects
+only FALSE and `NULL = '…'` is NULL.
 
 ### 4. Staging
 

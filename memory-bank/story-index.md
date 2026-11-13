@@ -17,7 +17,7 @@
 | 002-dual-identifier-login | Dual-identifier login + Remember me | 002-identity | 004-identity | must | planned |
 | 003-email-otp-password-reset | Email-OTP password reset | 002-identity | 005-identity | must | complete |
 | 004-biometric-reauth-gate | Biometric re-auth gate | 002-identity | 005-identity | must | complete |
-| 006-emergency-contacts-crud | Emergency contacts CRUD | 002-identity | 006-identity | must | planned |
+| 006-emergency-contacts-crud | Emergency contacts CRUD | 002-identity | 006-identity | must | complete |
 | 005-remote-account-disable | Remote account disable | 002-identity | 006-identity | must | complete |
 | 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | planned |
 | 001-home-and-help-alert-grid | Home surface + Help Alert panic grid | 003-help-seek | 007-help-seek | must | planned |

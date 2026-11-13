@@ -16,6 +16,11 @@ export default function AuthLayout() {
       <Stack.Screen name="verify-otp" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
+      {/* The three onboarding contact steps — S-04a / S-04b / S-04c. */}
+      <Stack.Screen name="contact-1" />
+      <Stack.Screen name="contact-2" />
+      <Stack.Screen name="contact-3" />
+      <Stack.Screen name="location-permission" />
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="account-disabled" options={{ animation: 'fade' }} />

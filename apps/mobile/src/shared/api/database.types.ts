@@ -2,7 +2,7 @@
  * Supabase database types — hand-maintained against the live canonical schema.
  *
  * Source of truth: `supabase/migrations/20261105000001_initial_schema.sql` …
- * `20261105000008_moderation_integrity.sql`.
+ * `20261105000023_contacts_phone_constraint.sql`.
  * Regenerate and diff with:
  *   npx supabase gen types typescript --local --schema public
  *
@@ -83,7 +83,13 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          user_id: string;
+          /**
+           * Optional on insert: the column carries a database default of
+           * `auth.uid()` (migration 022), so the owner is set by the database
+           * and the client never names one. It stays required on `Row` — the
+           * value is always present once the row exists.
+           */
+          user_id?: string;
           name: string;
           phone: string;
           is_primary?: boolean;

@@ -11,7 +11,7 @@
 ## 1. Where the project stands
 
 The backend, the Edge Functions, the admin console and the mobile UI shell are
-built and verified. **43 of 54 stories still carry `implemented: false`** — the
+built and verified. **42 of 54 stories still carry `implemented: false`** — the
 gaps are concentrated in the mobile app's interactive surfaces.
 
 **The repository now exists** (see §5). The working tree is committed and
@@ -38,15 +38,16 @@ Every command below was run green against the local Supabase stack.
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **75 unit tests** |
-| Database | **22 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP |
+| Database | **24 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) |
-| SQL test suites | **223 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78), `password_reset` (47) |
+| SQL test suites | **270 assertions pass** — `schema_contract` (18), `business_rules` (28), `read_models` (52), `write_guards` (78), `password_reset` (47), `contacts` (47) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
 | Alternate phone | `tools/probe-alternate-phone.cjs` — **9/9** over the real PostgREST path |
 | Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
 | Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
+| Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
 | Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts — 1:1 ported from `prototype ui.html` |
@@ -64,13 +65,14 @@ Every command below was run green against the local Supabase stack.
 pnpm typecheck        # 3 workspaces
 pnpm lint
 pnpm test             # 170 tests
-pnpm db:test          # 223 SQL assertions
+pnpm db:test          # 270 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
 pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
+pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
 pnpm fn:smoke         # 32 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
@@ -257,7 +259,7 @@ staging and production builds are blocked until real values land.
 
 ---
 
-## 4. What is NOT DONE — 43 of 54 stories
+## 4. What is NOT DONE — 42 of 54 stories
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -275,7 +277,7 @@ Ordered by dependency. Bolt numbers in brackets.
 
 | # | Gap | Where |
 |---|---|---|
-| C1 | **Contacts CRUD.** `contacts.tsx` FAB has no `onPress`; `src/shared/api/contacts.ts` is read-only (no insert/update/delete). | [006] story 006 |
+| C1 | ✅ **FIXED** — the contacts CRUD is live. `src/shared/api/contacts.ts` gained `createContact`, `updateContact`, `deleteContact`, `makePrimary`, `clearPrimary` and `reorderContacts`; `app/(app)/contact-editor.tsx` is one screen behind add **and** edit; the FAB on `contacts.tsx` opens it; and the wizard's S-04a/b/c capture screens (`app/(auth)/contact-1.tsx` … `contact-3.tsx`, backed by the shared `src/shared/wizard/ContactCaptureScreen.tsx`) now save real contacts, followed by the S-05 location step. **Two database defects were found by probing and fixed by migration**: `contacts.user_id` had no default (the owner was the client's to name — migration 022 gives it `auth.uid()`), and `contacts.phone` had no CHECK constraint at all (migration 023, written against the three-valued trap). `pnpm contacts:check` proves the whole CRUD over the real PostgREST path (26/26) and `supabase/tests/contacts.sql` adds 47 DB-side assertions. | [006] story 006 |
 
 ### 4.3 Help-seek — unit `003-help-seek`
 
@@ -349,9 +351,13 @@ Ordered by dependency. Bolt numbers in brackets.
    description because GoTrue's `verify` endpoint silently ignores a 6-digit
    code — that defect would have shipped a fail-open reset. `pnpm reset:check`
    proves the whole path (30/30).
-7. **C1** — contacts CRUD, the rest of unit `002-identity`. I4 is done: the
-   alternate-phone step is reachable, the column is written, and the format
-   CHECK exists.
+7. ~~**C1** — contacts CRUD, the rest of unit `002-identity`.~~ ✅ **DONE.**
+   The CRUD API layer, the editor, the FAB, and the wizard's three capture
+   steps are live. Two database defects the story assumed were already there
+   — the `contacts.user_id` default and the `contacts.phone` CHECK — were
+   found by the live probe and landed as migrations 022 and 023. The probe
+   itself (26/26) is wired into CI. Unit `002-identity` now has five of its
+   seven stories complete.
 8. **P1 → P2 → P3** — unit `004-capture`.
 9. **L1 → L2** — unit `005-location`.
 10. **A1 → A2 → A3 → H1 → H2 → M1** — the remaining screen surfaces.
@@ -372,10 +378,10 @@ session.
 - ~~`memory-bank/story-index.md` lists every story as `planned` except
   `007-secrets-and-environments`.~~ — **FIXED.** The index's Status column is
   now synced from the story files' `implemented` frontmatter, which is the
-  authoritative source. 11 stories are `complete`, 43 are `planned`.
+  authoritative source. 12 stories are `complete`, 42 are `planned`.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
-  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 11 story files
-  now say `true`; 43 still say `false`. The count is **43 of 54 stories**,
+  unit `008-jobs-operations` say `true`.~~ — **PARTLY FIXED.** 12 story files
+  now say `true`; 42 still say `false`. The count is **42 of 54 stories**,
   not 55 of 62 — the "62" figure was itself stale (the index carries 54 rows).
 - `memory-bank/intents/001-nagar-shield-mvp1/inception-log.md` **Q-1 is stale** —
   it asks whether `profiles.alternate_phone` should exist. The column exists
@@ -395,30 +401,34 @@ not in a separate pass.
 apps/mobile/app/(auth)/      welcome, phone, alternate-phone, login,
                              register, forgot-password, verify-otp,
                              reset-password, account-disabled,
-                             account-deleted, biometric-gate
+                             account-deleted, biometric-gate,
+                             contact-1, contact-2, contact-3,
+                             location-permission
 apps/mobile/app/(app)/       home, more, settings, capture, help-alert,
-                             location-sharing, contacts, alerts,
-                             alert-detail*, history*, more-help*, station-map*
+                             location-sharing, contacts, contact-editor,
+                             alerts, alert-detail*, history*, more-help*,
+                             station-map*
 apps/mobile/src/shared/      api/ (supabase, alerts, history, contacts,
                              stations, geocode, flags, errors, profile,
                              account), auth/ (useAuthSession,
                              useAccountStatus, useBiometricGate,
                              biometricService, authService,
-                             passwordResetService), services/
+                             passwordResetService), wizard/
+                             (ContactCaptureScreen), services/
                              (captureFlow, submitCapture, uploadQueue,
                              prepareMedia, location, dialer), i18n/ (bn.ts,
                              en.ts), theme/, ui/
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         22 forward-only migrations
-supabase/tests/              5 SQL suites (223 assertions)
+supabase/migrations/         24 forward-only migrations
+supabase/tests/              6 SQL suites (270 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
                              purge-media-dry-run, check-maestro-flow,
                              probe-disabled-write, probe-biometric-gate,
                              probe-alternate-phone, probe-signup-contract,
-                             probe-password-reset
+                             probe-password-reset, probe-contacts-crud
 maestro/panic-path.yaml      the nightly emulator flow (help → dialer → capture)
 docs/design/                 design-tokens.md, screen-spec.md
 docs/operations/             runbook.md, secrets.md

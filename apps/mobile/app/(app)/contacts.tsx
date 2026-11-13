@@ -1,11 +1,17 @@
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import type { EmergencyContact } from '@nagar-shield/shared';
+import { AppError, type EmergencyContact } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
 import { ContactAvatar, EmptyState, Icon, PrimaryStar, RelationshipPill, Screen } from '@/shared/ui';
-import { useContacts } from '@/shared/api/contacts';
+import {
+  deleteContact,
+  makePrimary,
+  useContacts,
+  useInvalidateContacts,
+} from '@/shared/api/contacts';
+import { fromSupabaseError } from '@/shared/api/errors';
 
 /**
  * Screen 20 — Emergency Contacts.
@@ -20,17 +26,37 @@ import { useContacts } from '@/shared/api/contacts';
  * says only that the primary contacts are dialled first — the layout is
  * unchanged.
  *
- * The prototype's `★` is a clickable toggle; here it is **read-only**, because
- * changing the primary flag belongs to the contact CRUD flow and the star on
- * this screen is a status marker.
+ * The CRUD surface
+ * ----------------
+ * The list is the read model; the writes go through
+ * `src/shared/api/contacts.ts`, which is owner-scoped by RLS. Three actions
+ * are reachable from a row:
+ *
+ *   * the **★** toggles the primary flag — exactly one primary is kept, and
+ *     the write is atomic, so the list never shows two;
+ *   * the row opens the **editor**, where the name, phone and group are
+ *     changed;
+ *   * the row's delete action removes it.
+ *
+ * Deleting the only primary is **allowed**. The list is left valid with zero
+ * primaries and the app prompts for one — it never blocks a delete because of
+ * the primary flag, and it never auto-promotes a contact on the user's
+ * behalf without an explicit choice.
+ *
+ * **There is no cap** on how many contacts a user may save (A-4). The
+ * prototype's "5 saved" copy is static prototype content and is never
+ * rendered as a live count.
  */
 export default function ContactsScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { t } = useTranslation();
+  const invalidate = useInvalidateContacts();
 
   const { data, isLoading } = useContacts();
   const contacts = useMemo(() => data ?? [], [data]);
+
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const order: Array<EmergencyContact['groupName']> = ['family', 'friend', 'colleague', 'other'];
@@ -41,6 +67,67 @@ export default function ContactsScreen() {
       }))
       .filter((entry) => entry.items.length > 0);
   }, [contacts]);
+
+  /**
+   * Promotes a contact to the primary one.
+   *
+   * Exactly one primary is kept per action, and the write is atomic — the
+   * other primaries are cleared in the same pass as the new one is set. A
+   * half-applied change would leave two primaries in the list.
+   */
+  const onTogglePrimary = useCallback(
+    async (contact: EmergencyContact) => {
+      if (contact.isPrimary) return;
+
+      setBusyId(contact.id);
+      try {
+        await makePrimary(contact.id);
+        await invalidate();
+      } catch (error) {
+        const appError = error instanceof AppError ? error : fromSupabaseError(error);
+        Alert.alert(t('common.error'), t(`errors.${appError.code.toLowerCase()}`));
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [invalidate, t],
+  );
+
+  /**
+   * Removes a contact.
+   *
+   * The confirmation names the contact, so the user knows which row they are
+   * about to delete. A deleted primary leaves the list with zero primaries —
+   * the prompt for a new one appears on the list itself, not here.
+   */
+  const onDelete = useCallback(
+    (contact: EmergencyContact) => {
+      Alert.alert(t('contacts.deleteTitle'), t('contacts.deleteBody', { name: contact.name }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('contacts.deleteCta'),
+          style: 'destructive',
+          onPress: async () => {
+            setBusyId(contact.id);
+            try {
+              await deleteContact(contact.id);
+              await invalidate();
+            } catch (error) {
+              const appError = error instanceof AppError ? error : fromSupabaseError(error);
+              Alert.alert(t('common.error'), t(`errors.${appError.code.toLowerCase()}`));
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ]);
+    },
+    [invalidate, t],
+  );
+
+  // A contact may be primary, and the prompt appears only when the list is
+  // loaded and has no primary at all — the state the story calls out.
+  const hasPrimary = contacts.some((contact) => contact.isPrimary);
 
   return (
     <Screen
@@ -64,22 +151,46 @@ export default function ContactsScreen() {
           description={t('contacts.emptySub')}
         />
       ) : (
-        groups.map(({ group, items }) => (
-          <View key={group}>
-            <Text style={[styles.groupTitle, { color: theme.colors.ink[500] }]}>
-              {groupLabel(group, t)} ({toBengaliDigits(String(items.length))})
-            </Text>
-            {items.map((contact) => (
-              <ContactRow key={contact.id} contact={contact} primaryLabel={t('contacts.primary')} />
-            ))}
-          </View>
-        ))
+        <>
+          {!hasPrimary ? (
+            <View style={[styles.notice, { backgroundColor: theme.palette.amber[50] }]}>
+              <Icon name="star" size={18} color={theme.palette.amber[600]} />
+              <Text style={[styles.noticeText, { color: theme.palette.amber[600] }]}>
+                {t('contacts.noPrimaryNotice')}
+              </Text>
+            </View>
+          ) : null}
+
+          {groups.map(({ group, items }) => (
+            <View key={group}>
+              <Text style={[styles.groupTitle, { color: theme.colors.ink[500] }]}>
+                {groupLabel(group, t)} ({toBengaliDigits(String(items.length))})
+              </Text>
+              {items.map((contact) => (
+                <ContactRow
+                  key={contact.id}
+                  contact={contact}
+                  primaryLabel={t('contacts.primary')}
+                  editLabel={t('contacts.editCta')}
+                  deleteLabel={t('contacts.deleteCta')}
+                  busy={busyId === contact.id}
+                  onPress={() =>
+                    router.push({ pathname: '/(app)/contact-editor', params: { id: contact.id } })
+                  }
+                  onTogglePrimary={() => onTogglePrimary(contact)}
+                  onDelete={() => onDelete(contact)}
+                />
+              ))}
+            </View>
+          ))}
+        </>
       )}
 
       {/* `.fab` — the add-contact button. */}
-      <View
+      <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('contacts.add')}
+        onPress={() => router.push('/(app)/contact-editor')}
         style={[
           styles.fab,
           {
@@ -93,7 +204,7 @@ export default function ContactsScreen() {
         ]}
       >
         <Icon name="add" size={28} color="#FFFFFF" filled />
-      </View>
+      </Pressable>
     </Screen>
   );
 }
@@ -101,9 +212,21 @@ export default function ContactsScreen() {
 function ContactRow({
   contact,
   primaryLabel,
+  editLabel,
+  deleteLabel,
+  busy,
+  onPress,
+  onTogglePrimary,
+  onDelete,
 }: {
   contact: EmergencyContact;
   primaryLabel: string;
+  editLabel: string;
+  deleteLabel: string;
+  busy: boolean;
+  onPress: () => void;
+  onTogglePrimary: () => void;
+  onDelete: () => void;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -118,21 +241,44 @@ function ContactRow({
         },
       ]}
     >
-      <ContactAvatar name={contact.name} group={contact.groupName} />
-      <View style={styles.contactInfo}>
-        <View style={styles.nameRow}>
-          <Text style={[styles.contactName, { color: theme.colors.ink[950] }]}>
-            {contact.name}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={editLabel}
+        onPress={onPress}
+        style={styles.rowMain}
+      >
+        <ContactAvatar name={contact.name} group={contact.groupName} />
+        <View style={styles.contactInfo}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.contactName, { color: theme.colors.ink[950] }]}>
+              {contact.name}
+            </Text>
+            <PrimaryStar
+              isPrimary={contact.isPrimary}
+              onPress={onTogglePrimary}
+              accessibilityLabel={primaryLabel}
+            />
+          </View>
+          <Text style={[styles.contactPhone, { color: theme.colors.ink[500] }]}>
+            {formatPhone(contact.phone)}
           </Text>
-          <PrimaryStar isPrimary={contact.isPrimary} accessibilityLabel={primaryLabel} />
+          <RelationshipPill group={contact.groupName} label={groupLabel(contact.groupName, t)} />
         </View>
-        <Text style={[styles.contactPhone, { color: theme.colors.ink[500] }]}>
-          {formatPhone(contact.phone)}
-        </Text>
-        <RelationshipPill group={contact.groupName} label={groupLabel(contact.groupName, t)} />
-      </View>
-      <View style={[styles.contactAction, { backgroundColor: theme.palette.green[100] }]}>
-        <Icon name="call" size={20} color={theme.palette.green[600]} filled />
+      </Pressable>
+
+      <View style={styles.rowActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel}
+          onPress={onDelete}
+          disabled={busy}
+          style={styles.rowAction}
+        >
+          <Icon name="delete" size={20} color={theme.colors.ink[400]} />
+        </Pressable>
+        <View style={[styles.contactAction, { backgroundColor: theme.palette.green[100] }]}>
+          <Icon name="call" size={20} color={theme.palette.green[600]} filled />
+        </View>
       </View>
     </View>
   );
@@ -193,6 +339,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rowAction: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   contactInfo: {
     flex: 1,
   },
@@ -214,6 +377,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
   },
   loading: {
     textAlign: 'center',

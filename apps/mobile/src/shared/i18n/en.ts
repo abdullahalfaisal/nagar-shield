@@ -23,6 +23,7 @@ export const en: TranslationSchema = {
     minutesAgo: '{{count}} min ago',
     hoursAgo: '{{count}} h ago',
     daysAgo: '{{count}} d ago',
+    error: 'Something went wrong',
   },
   errors: {
     validationFailed: 'Some details were not valid. Please try again.',
@@ -373,9 +374,69 @@ export const en: TranslationSchema = {
     groupColleague: 'Colleague',
     groupOther: 'Other',
     primaryLabel: 'Primary',
+    primaryHelper: 'This number is dialled first in an emergency.',
     makePrimary: 'Make primary',
     empty: 'No contacts yet',
     emptySub: 'Add someone we can call in an emergency.',
+    addTitle: 'Add a contact',
+    editTitle: 'Edit contact',
+    saveCta: 'Save',
+    editCta: 'Edit',
+    deleteTitle: 'Delete this contact?',
+    deleteBody: '{{name}} will be removed. This cannot be undone.',
+    deleteCta: 'Delete',
+    noPrimaryNotice: 'No primary contact yet. Mark one as primary.',
+    phonePlaceholder: '01712345678',
+    phoneHelper: 'The number is stored automatically.',
+    callCta: 'Call',
+  },
+  wizardContacts: {
+    /**
+     * The three wizard capture steps — S-04a, S-04b and S-04c.
+     *
+     * The prototype's copy is ported, but the static example names
+     * ("Rahim Ahmed", "Sumaiya Khan") are **not**: they are prototype
+     * fixtures, and a live screen must show the contacts the user actually
+     * saved. The slot list is filled from the database.
+     */
+    step1Eyebrow: 'Setup · 4 steps',
+    step1Title: 'Add your first emergency contact',
+    step1Highlight: 'first emergency contact',
+    step1Subtitle:
+      'Someone who will pick up if you call for help. Add three in total — family, close friends, anyone you trust.',
+    step2Eyebrow: 'Setup · 4 steps',
+    step2Title: 'Add a second contact',
+    step2Highlight: 'second contact',
+    step2Subtitle:
+      'One more. Three is the minimum — but you can add as many as you want after setup.',
+    step3Eyebrow: 'Setup · 4 steps',
+    step3Title: 'One more contact',
+    step3Highlight: 'contact',
+    step3Subtitle:
+      'After this, location permission is the last step before Nagar Shield opens up.',
+    nameLabel: 'Contact name',
+    phoneLabel: 'Their mobile (01XXXXXXXXX)',
+    slotTitle: 'Contact {{number}}',
+    notAddedYet: 'Not added yet',
+    addOneMore: 'Add one more to finish',
+    saveCta: 'Save & continue',
+    continueToLocation: 'Continue to location',
+    allSavedTitle: 'All three saved.',
+    allSavedBody:
+      'You can edit or add more contacts any time from Settings → Safety Profile.',
+    savedBadge: 'Saved',
+  },
+  wizardLocation: {
+    eyebrow: 'Almost done',
+    title: 'Allow',
+    highlight: 'location',
+    subtitle:
+      'Location is what makes Capture auto-stamp the area and Location Sharing work. We only use it while a share or report is active — never in the background. You can skip this step and grant permission later from Settings.',
+    allowCta: 'Allow precise location',
+    skipCta: 'Continue without location',
+    reassureTitle: 'What we do with location:',
+    reassureBody:
+      'we use it only while you are sharing your live location or filing a Capture. We never collect it in the background, never sell it, and never share it without your action.',
   },
   moderation: {
     title: 'Moderation console',

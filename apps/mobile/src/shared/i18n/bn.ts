@@ -17,6 +17,7 @@ export const bn = {
     minutesAgo: '{{count}} মিনিট আগে',
     hoursAgo: '{{count}} ঘণ্টা আগে',
     daysAgo: '{{count}} দিন আগে',
+    error: 'সমস্যা হয়েছে',
   },
   errors: {
     validationFailed: 'তথ্য সঠিক নয়। আবার চেষ্টা করুন।',
@@ -365,9 +366,69 @@ export const bn = {
     groupColleague: 'সহকর্মী',
     groupOther: 'অন্যান্য',
     primaryLabel: 'প্রাথমিক',
+    primaryHelper: 'জরুরি অবস্থায় এই নম্বরে প্রথমে কল করা হবে।',
     makePrimary: 'প্রাথমিক করুন',
     empty: 'কোনো যোগাযোগ নেই',
     emptySub: 'জরুরি অবস্থায় কল করার জন্য কাউকে যোগ করুন।',
+    addTitle: 'যোগাযোগ যোগ করুন',
+    editTitle: 'যোগাযোগ সম্পাদনা',
+    saveCta: 'সংরক্ষণ করুন',
+    editCta: 'সম্পাদনা',
+    deleteTitle: 'যোগাযোগ মুছে ফেলবেন?',
+    deleteBody: '{{name}} মুছে ফেলা হবে। এটি ফেরানো যাবে না।',
+    deleteCta: 'মুছে ফেলুন',
+    noPrimaryNotice: 'কোনো প্রাথমিক যোগাযোগ নেই। একজনকে প্রাথমিক হিসেবে চিহ্নিত করুন।',
+    phonePlaceholder: '01712345678',
+    phoneHelper: 'নম্বরটি স্বয়ংক্রিয়ভাবে সংরক্ষণ হবে।',
+    callCta: 'কল করুন',
+  },
+  wizardContacts: {
+    /**
+     * The three wizard capture steps — S-04a, S-04b and S-04c.
+     *
+     * The prototype's copy is ported, but the static example names
+     * ("Rahim Ahmed", "Sumaiya Khan") are **not**: they are prototype
+     * fixtures, and a live screen must show the contacts the user actually
+     * saved. The slot list is filled from the database.
+     */
+    step1Eyebrow: 'সেটআপ · ৪ ধাপ',
+    step1Title: 'আপনার প্রথম জরুরি যোগাযোগ যোগ করুন',
+    step1Highlight: 'প্রথম জরুরি যোগাযোগ',
+    step1Subtitle:
+      'সাহায্যের জন্য কল করলে যে ধরে নেবে। মোট তিনজন যোগ করুন — পরিবার, ঘনিষ্ঠ বন্ধু, যে কাউকে আপনি বিশ্বাস করেন।',
+    step2Eyebrow: 'সেটআপ · ৪ ধাপ',
+    step2Title: 'আরেকজন যোগাযোগ যোগ করুন',
+    step2Highlight: 'দ্বিতীয় যোগাযোগ',
+    step2Subtitle:
+      'আরেকজন। তিনজন সর্বনিম্ন — তবে সেটআপ শেষ হওয়ার পর যত খুশি যোগ করতে পারেন।',
+    step3Eyebrow: 'সেটআপ · ৪ ধাপ',
+    step3Title: 'আরেকজন যোগাযোগ',
+    step3Highlight: 'যোগাযোগ',
+    step3Subtitle:
+      'এরপর লোকেশনের অনুমতি — এটিই নগর শিল্ড খোলার আগের শেষ ধাপ।',
+    nameLabel: 'যোগাযোগের নাম',
+    phoneLabel: 'তার মোবাইল (০১XXXXXXXXX)',
+    slotTitle: 'যোগাযোগ {{number}}',
+    notAddedYet: 'এখনো যোগ করা হয়নি',
+    addOneMore: 'শেষ করতে আরেকজন যোগ করুন',
+    saveCta: 'সংরক্ষণ করে এগোন',
+    continueToLocation: 'লোকেশনে যান',
+    allSavedTitle: 'তিনজনই সংরক্ষিত হয়েছে।',
+    allSavedBody:
+      'যেকোনো সময় সেটিংস → নিরাপত্তা প্রোফাইল থেকে সম্পাদনা করতে বা আরও যোগাযোগ যোগ করতে পারেন।',
+    savedBadge: 'সংরক্ষিত',
+  },
+  wizardLocation: {
+    eyebrow: 'প্রায় শেষ',
+    title: 'অনুমতি দিন',
+    highlight: 'লোকেশন',
+    subtitle:
+      'লোকেশন ছাড়া ক্যাপচারে এলাকা স্বয়ংক্রিয়ভাবে যুক্ত হয় না এবং লোকেশন শেয়ারিং কাজ করে না। আমরা শুধু তখনই ব্যবহার করি যখন কোনো শেয়ার বা রিপোর্ট চলছে — পেছনে কখনো নয়। এই ধাপ বাদ দিতে পারেন, পরে সেটিংস থেকে অনুমতি দিতে পারবেন।',
+    allowCta: 'সুনির্দিষ্ট লোকেশন অনুমতি দিন',
+    skipCta: 'লোকেশন ছাড়া এগোন',
+    reassureTitle: 'লোকেশন দিয়ে আমরা যা করি:',
+    reassureBody:
+      'শুধু তখনই ব্যবহার করি যখন আপনি লাইভ লোকেশন শেয়ার করছেন বা ক্যাপচার করছেন। পেছনে কখনো সংগ্রহ করি না, কখনো বিক্রি করি না, এবং আপনার সম্মতি ছাড়া কখনো শেয়ার করি না।',
   },
   moderation: {
     title: 'মডারেশন কনসোল',

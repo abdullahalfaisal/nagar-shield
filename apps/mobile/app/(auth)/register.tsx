@@ -88,7 +88,12 @@ export default function RegisterScreen() {
         }
       }
 
-      router.replace('/(app)/home');
+      // The account exists and is signed in. The next stop is the **contact
+      // capture** step (S-04a) — the wizard's first of three emergency
+      // contacts. The account is not "complete" until the safety profile
+      // has been set up, so the wizard is entered here rather than the home
+      // screen.
+      router.replace('/(auth)/contact-1');
     } catch (error) {
       const appError = error instanceof AppError ? error : fromSupabaseError(error);
 

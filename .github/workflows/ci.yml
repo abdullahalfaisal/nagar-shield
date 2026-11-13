@@ -254,8 +254,9 @@ jobs:
       - name: the Edge Functions mirror has not drifted
         run: pnpm shared:check
 
-      # The SQL suites — the schema contract, the business rules, and the
-      # read models — against the freshly migrated database.
+      # The SQL suites — the schema contract, the business rules, the read
+      # models, the write guards, the password-reset contract, and the
+      # contacts contract — against the freshly migrated database.
       - name: run the SQL test suites
         run: pnpm db:test
 
@@ -397,6 +398,22 @@ jobs:
       # than a client timer.
       - name: the password-reset contract
         run: pnpm reset:check
+
+      # The emergency-contacts CRUD, proved through the door the app uses:
+      # GoTrue → PostgREST → the owner-scoped RLS policies.
+      #
+      # The probe signs in as **two** seeded citizens, because the
+      # owner-scoping criteria are only meaningful when there is somebody else
+      # to scope against. The assertions that earn their keep are the RLS
+      # negative ones — reading another user's contact by id returns an empty
+      # set, not the row, and a write against it affects no rows.
+      #
+      # It also proves the two database guarantees the client cannot: that the
+      # owner column defaults to `auth.uid()` (so the client never names an
+      # owner, and a forged one is refused), and that a non-BD phone number is
+      # refused by the `contacts_phone_format` CHECK.
+      - name: the emergency-contacts CRUD contract
+        run: pnpm contacts:check
 
       # The Edge Function smoke tests cover the auth gates on the jobs and the
       # client-facing functions, including the "no client may call the
