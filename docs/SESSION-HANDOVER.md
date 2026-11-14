@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 626 unit tests · 462 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 841 unit tests · 462 SQL assertions · 37/37 console probes
 
 ---
 
@@ -14,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 36 `complete`, 17
+**The stories are now counted three ways, not two: 40 `complete`, 13
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -60,6 +60,15 @@ an unmodified tree (`git stash` + `db:reset`). The smoke test only asserts
 the response *shape*, so it passes silently. If the Alerts screen ever
 appears empty in a dev session, this is why.
 
+**The mobile app shell now proves it boots.** The boot test renders the
+provider stack in jsdom and reads the root layout's structure from source;
+the AsyncStorage fallback that could put a **refresh token in unencrypted
+storage** is gone, because the 2048-byte limit that motivated it is
+**Apple's Keychain limit, not Expo's** and Android has none. A device that
+cannot write to the Keystore now degrades to **memory-only** with a localized
+notice, which is what the story's edge-case table always asked for. See §3
+M2.
+
 ---
 
 ## 2. What is DONE and verified
@@ -69,7 +78,7 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **84 unit tests** |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **192 unit tests** |
 | Database | **36 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, and the **30-day restore window** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
 | SQL test suites | **462 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (57), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
@@ -88,7 +97,7 @@ Every command below was run green against the local Supabase stack.
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html`. The **location-sharing** screen's CTA now performs a real share. |
 | Help-seek surfaces | the shared `MoreHelpSheet`, the hotline list (`more-help`), the thana line (`thana-line`), the find-a-station map (`station-map`), and the wrong-number report sheet — all four stories of the unit's help surfaces land. |
 | History + alert detail | `app/(app)/history.tsx` (four tabs, one filter object, one query key), `history-map.tsx` (one shared wrapper), `alert-detail.tsx` (the projection omits `author_id` **entirely**) |
-| Source scans | `noChartCode.test.ts` (no chart — FR-NG-3 / FR-NG-4 / ADR-010), `noBulkActions.test.ts` (no bulk action — FR-MOD-3), `stationMap.test.ts` (one wrapper, one attribution, the 150 cap) — all **read code only**, and all fail the build |
+| Source scans | `noChartCode.test.ts` (no chart — FR-NG-3 / FR-NG-4 / ADR-010), `noBulkActions.test.ts` (no bulk action — FR-MOD-3), `stationMap.test.ts` (one wrapper, one attribution, the 150 cap), `themeCoverage.test.ts` (every screen reads the theme, directly or through a component) — all **read code only**, and all fail the build |
 | Offline queue | `apps/mobile/src/shared/services/` — the sandbox queue, the backoff schedule, the drain, and the drain trigger. **70 new unit tests** across three suites. |
 | Permissions | `apps/mobile/src/shared/services/permissions.ts` + `permissionRecovery.ts` — the three-state read, the entry-point degradation rules, and the just-in-time recovery routing. **88 unit tests** across four suites. |
 | Location sharing | `apps/mobile/src/shared/services/` — the just-in-time fix, the snapshot payload, the OS share sheet, the fan-out, the intent telemetry, and the app-user lookup. **67 new unit tests** across four suites, plus 37 SQL assertions. |
@@ -98,6 +107,9 @@ Every command below was run green against the local Supabase stack.
 | Error copy | `errorCopy()` — one place that consults the shared `API_ERROR_I18N_KEYS` map, with an `errors.internal` fallback for an unknown code. **7 unit tests**, against the **real** bundles. |
 | Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
 | Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
+| App shell | `boot.dom.test.tsx` — **29 tests**: the provider stack is **rendered** in jsdom and the root layout's structure is **read from source** (the provider order, the unconfigured branch, every `<Redirect>` target resolving to a real file). See §3 M2. |
+| Session storage | `session-storage.ts` — the session goes to `expo-secure-store` and **nowhere else**; the 2048-byte figure is Apple's Keychain limit, not Expo's, and Android has none (a measured session is ~1550 bytes). A device that cannot write degrades to **memory-only**, with a localized notice. **27 tests**, including one that reads the installed `auth-js` source to assert the `supabase-js` rethrow contract. |
+| Theme coverage | `themeCoverage.test.ts` — **5 tests**: every route screen reaches the theme, directly or **transitively** through a component it renders. |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
 | Nightly build | `.github/workflows/build.yml` — preview APK + emulator smoke (`maestro/panic-path.yaml`) |
 | EAS profiles | `eas.json` — dev / preview / production, APK, cert-pinning, SMS flag off |
@@ -109,7 +121,7 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 626 tests (420 mobile, 84 shared, 122 admin)
+pnpm test             # 841 tests (527 mobile, 192 shared, 122 admin)
 pnpm db:test          # 462 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
@@ -410,6 +422,10 @@ five stories it had been blind to:
 story files' own `status:`, and the check now passes at
 **36 `complete` · 17 `partial` · 1 `planned`**.
 
+> **The counts in this subsection are historical.** They describe the state
+> when the vocabulary bug was found and fixed. The live counts are in §1
+> and are derived by `node tools/reconcile-story-index.cjs`.
+
 The new hard error was proved by **causal check**: writing
 `implemented: shipped` into a story file makes the tool fail with
 
@@ -571,7 +587,122 @@ project back the Node globals it lacks.
 
 ---
 
-## 4. What is NOT DONE — 17 `partial`, 1 `planned`
+### ✅ M2 — The mobile shell boots, proves it boots, and stops leaking tokens — FIXED
+
+**Story:** `001-foundation / 004-mobile-app-shell` — now `complete`.
+
+#### 1. The AsyncStorage fallback is gone, and a token was never at risk
+
+`apps/mobile/src/shared/api/supabase.ts` fell back to AsyncStorage when a
+value exceeded SecureStore's 2048-byte limit. The fallback meant a **refresh
+token could land in unencrypted storage on Android**.
+
+**The limit was never the binding constraint.** The 2048-byte figure is
+**Apple's Keychain limit, not Expo's** — it appears nowhere in
+`expo-secure-store@58.0.2`, not in the TypeScript, not in the Android module
+(`SecureStoreModule.kt`), not in the iOS module (`SecureStoreModule.swift`).
+Android writes an encrypted blob into `SharedPreferences` and has **no size
+limit**, and the story is Android-only.
+
+**And a real session fits.** Measured against the installed client: a minimal
+session is **1169 bytes**, the app's real session with its `user_metadata` is
+**1550 bytes**, an oversized one **1978 bytes**. All fit in 2048. The refresh
+token alone is 43–86 bytes — the old comment's claim that *"the session
+refresh token can exceed that"* is false.
+
+**The fallback is removed.** A device that cannot write to the Keystore now
+degrades to **memory-only** — exactly the edge case the story's table
+specifies — with a localized notice (`SessionPersistenceNotice`, mounted
+above the navigator so it shows on every screen, with copy in both bundles).
+
+**The store never throws at `supabase-js`,** and that matters more than the
+size question. Verified against the installed source, not assumed:
+`signInWithPassword` rethrows a non-`AuthError` out of the method,
+`_saveSession` has **no** catch, and `setItemAsync` calls `storage.setItem`
+with **no** catch. A storage adapter that throws turns a **successful sign-in**
+into an error shown to the user. So the new store **records** the failure and
+resolves, and `apps/mobile/src/shared/api/session-storage.test.ts` asserts the
+rethrow contract by **reading the installed `auth-js` source** — so a future
+`supabase-js` change that breaks the contract fails the build.
+
+#### 2. The boot test — `apps/mobile/src/__tests__/boot.dom.test.tsx` (29 tests)
+
+`@testing-library/react-native` is **not installed**, so a React Native tree
+cannot be rendered. The claim is therefore split into the two halves that can
+each be tested by the tool that can test them: the provider stack is
+**rendered** in jsdom (a descendant hook reads the theme and the locale, for
+real), and the root layout's **structure** is read from source (the provider
+order, and the unconfigured branch).
+
+**Four causal checks, each of which failed when the break was put back:**
+
+| The break | The guard that failed |
+|---|---|
+| Swap the two branches' provider order | 2 tests |
+| Delete the unconfigured branch | 4 tests |
+| Drop the theme's **write** | 1 test |
+| Drop the theme's **read** | 1 test |
+
+The order assertion was **vacuous** on its first attempt — it scanned the
+whole file with `indexOf` and so found the *unconfigured* branch, and passed
+with the two branches' orders swapped. The fix was to locate the branch by
+the one thing only the main branch contains (`<ThemedStack`).
+
+#### 3. A theme-coverage scan — `apps/mobile/src/__tests__/themeCoverage.test.ts` (5 tests)
+
+The criterion *"every screen renders in the chosen theme"* had **no guard**.
+A screen that hardcodes its background does not read the theme, so the user
+who picked the dark theme gets a light screen and nothing complains.
+
+The scan resolves the **transitive** closure over the import graph, because a
+screen qualifies if it **or a component it renders** calls `useTheme` —
+`app/(auth)/contact-1.tsx` renders `ContactCaptureScreen`, which reads the
+theme. A scan that only looked at the route file would flag it, and the
+"fix" would be to add a pointless `useTheme` call.
+
+**Causal check:** removing `useTheme` from `apps/mobile/src/shared/ui/SplashView.tsx`
+— a shared component two levels below a route — failed the scan and named
+`app/index.tsx`. The transitive resolution is real, not a one-level lookup.
+
+#### 4. A SQL suite that broke by one row per run — FIXED
+
+`supabase/tests/alert_detail.sql` failed Test 7.4 (*"the radius filter still
+excludes a far-away neighbour report"*) — **not** because the radius filter
+broke.
+
+`history_nearby` pages with `limit p_limit + 1` and orders by
+`captured_at desc`. The console probe creates a report on every run and never
+deletes it, at (23.7461, 90.3774) — about 8 km from this suite's origin, and
+therefore *inside* its 10 km radius. Each run left one more row there, every
+row newer than the suite's own three-hour-old fixture. Once the accumulated
+rows reached the page limit, the fixture was pushed out of the page.
+
+**The failure grew by one row per `pnpm verify`** — the worst way for a test
+to break: it passes on a clean machine and fails on a working one.
+
+**The fix** is the one `read_models.sql` already used: `delete from public.reports;`
+at the top of the suite, inside its own transaction, so the developer's rows
+are untouched once the suite ends. **Causal check:** with the delete
+commented out, Test 7.4 failed again; restored, 462 assertions pass.
+
+#### What the story file now says
+
+`004-mobile-app-shell` is `complete`, and its `## Implementation` section
+records what ships, the four causal checks, **and the three places where the
+story and the code disagree** — recorded rather than silently "fixed":
+
+- **There is no `(onboarding)` group.** The criterion names three groups; the
+  app has two. The onboarding steps (`contact-1..3`) live inside `(auth)`.
+- **There is no `I18nProvider` or `SupabaseProvider` component.** The story's
+  provider order names components that do not exist. The i18n runtime and the
+  Supabase client are **module singletons**; the theme is the only React
+  provider in the tree.
+- **The Home route is `(app)/home.tsx`, not `(app)/index.tsx`** — and it is
+  no longer a shell: unit 003 built the real Home screen.
+
+---
+
+## 4. What is NOT DONE — 13 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -635,21 +766,17 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
-> `001-foundation` is the unit to pick up if you want **cheap** wins: all five
-> of its stories are `partial`, and their gaps are mostly **missing tests and
-> CI jobs** rather than missing behaviour.
+> `001-foundation` is the unit to pick up if you want **cheap** wins: **four of
+> its five stories are now `complete`**, and the fifth's gaps are mostly
+> **missing CI jobs and a scan test** rather than missing behaviour.
 
-### 4.0 The 17 stories that are not `complete`
+### 4.0 The 13 stories that are not `complete`
 
 Each row's story file carries an `## Implementation` section naming the exact
 gap. **Open the story file, not this table, when you pick one up.**
 
 | Story | Unit | State | The gap, in one line |
 |---|---|---|---|
-| `001-monorepo-workspace` | 001-foundation | partial | no test that the three workspaces share one strict TypeScript base |
-| `002-shared-contracts` | 001-foundation | partial | the boundary test that no Zod schema is duplicated locally — **does not exist** |
-| `003-mobile-design-system` | 001-foundation | partial | no token-parity test against `design-tokens.md`; no i18n key-parity gate; no tap-target test |
-| `004-mobile-app-shell` | 001-foundation | partial | the Supabase client **throws at module load** instead of showing a localized error — ✅ **FIXED in §3 M1**; the remaining gap is the **test** |
 | `005-admin-skeleton-and-ci` | 001-foundation | partial | no reserved `build` job in `ci.yml`; no bundle-scan **test**; the `@shared/*` alias is unused |
 | `002-dual-identifier-login` | 002-identity | partial | no component test on the login screen; Remember-me's effect on the session is untested |
 | `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
@@ -665,19 +792,21 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `003-area-filter-chips` | 006-alerts | partial | the row uses a plain `View` and **clips** the chips; needs a horizontal `ScrollView` |
 | `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
 
-**Unit `001-foundation` is all five `partial`.** It has no subsection below
+**Unit `001-foundation` is down to one `partial`.** It has no subsection below
 because it has no "defect that was found and fixed" history — its gaps are
-all *guards never built*: no shared-TypeScript-base test, no Zod-duplication
-boundary test, no token-parity test against `design-tokens.md`, no i18n
-key-parity gate, no tap-target test, no reserved `build` job in `ci.yml`, no
-bundle-scan **test**, and an unused `@shared/*` alias. The features themselves
-are there; the proofs are not. This is the **cheapest** unit to close.
+all *guards never built*. Four of its five stories are now `complete`:
 
-**One of the five has moved since this was written.** `004-mobile-app-shell`
-named the Supabase client's module-load `throw` as its gap; that is now
-**fixed** (§3 M1) and the story's remaining gap is the **test** — the story
-file still records the old gap, and §4.0's row above is the corrected one.
-The four others are untouched.
+| Story | Closed by |
+|---|---|
+| `001-monorepo-workspace` | a test that the three workspaces share one strict TypeScript base |
+| `002-shared-contracts` | the boundary test that no Zod schema is duplicated locally |
+| `003-mobile-design-system` | the token-parity test against `design-tokens.md`, the i18n key-parity gate, the tap-target test |
+| `004-mobile-app-shell` | §3 M2 — the boot test, the session-store decision, the theme-coverage scan |
+
+**`005-admin-skeleton-and-ci` is the last one.** Its gaps are a reserved
+`build` job in `ci.yml`, a bundle-scan **test** (the scan exists, the *test*
+around it does not), and an unused `@shared/*` alias. The features are there;
+the proofs and the CI job are not. This is the **cheapest** unit to close.
 
 ### 4.1 Identity — unit `002-identity`
 
@@ -906,7 +1035,8 @@ The four others are untouched.
     the header count, the bolt checkboxes, the bolt `status:` and each
     story's own `status:` are all **derived, not typed**. A `partial`
     story's `## Implementation` section says **which guard is missing**,
-    not that the screen is missing.
+    not that the screen is missing. Result (at the time of the fix): **36
+    `complete` · 17 `partial` · 1 `planned`** — see §1 for the live counts.
 13. ~~**S2 — wire the moderator console onto TanStack Query.**~~ ✅ **DONE.**
     `apps/admin` declared `@tanstack/react-query` and **never imported it**;
     the console hand-rolled its fetching with `useState` + `useEffect` and
@@ -920,7 +1050,8 @@ The four others are untouched.
     the login screen, the signed media URL that **no console code ever
     requested**, and the FR-AUTH-7 message literal, which appeared nowhere
     in the repository. Unit `007-moderation` is now **6/6 `complete`**.
-    Result: **36 `complete` · 17 `partial` · 1 `planned`**.
+    Result (at the time of the fix): **36 `complete` · 17 `partial` · 1
+    `planned`** — see §1 for the live counts.
 14. ~~**S3 — write a live probe for the moderator console.**~~ ✅ **DONE.**
     `tools/probe-moderation-console.cjs` — **37/37**, wired into `pnpm verify`
     (`console:check`) and into the CI `rls-integration` job. It calls the
@@ -950,11 +1081,22 @@ The four others are untouched.
        configuration-error screen.
 16. **Close the remaining `partial` stories, highest leverage first.** The
     order below is by *number of stories closed per unit of work*:
-    1. The remaining `partial` stories, one at a time, each against its own
-       `## Implementation` section. The stories of unit `001-foundation`
-       are cheap: their gaps are mostly **missing tests and CI jobs**, not
-       missing features.
-    2. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
+    1. ~~**`004-mobile-app-shell`**~~ ✅ **DONE** — see §3 M2. The boot test
+       (29 tests), the session-store decision (27 tests) and the
+       theme-coverage scan (5 tests). The story's `## Implementation` section
+       now records what ships **and** the three places where the story and
+       the code disagree (no `(onboarding)` group; no `I18nProvider` or
+       `SupabaseProvider` component; the Home route is `home.tsx`, not
+       `index.tsx`).
+    2. **`005-admin-skeleton-and-ci`** — the **last** `001-foundation`
+       story, and the cheapest. Its gaps are a reserved `build` job in
+       `ci.yml`, a bundle-scan **test** (the scan exists; the *test* around
+       it does not), and an unused `@shared/*` alias.
+    3. The remaining `partial` stories, one at a time, each against its own
+       `## Implementation` section. The next-cheapest units are
+       `002-identity` (two stories, both missing component tests) and
+       `006-alerts` (four stories, three of them missing tests).
+    4. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
        stories. It has no route, no component and no action.
 17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
     placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries the
@@ -1016,7 +1158,7 @@ unrecognised value is a **hard error** naming the value and the file. See
   column and the header count are rewritten from the story files by
   `node tools/reconcile-story-index.cjs --write`, and
   `pnpm story:index:check` fails the build on any drift. The counts are
-  **36 `complete` · 17 `partial` · 1 `planned`** — 54 files, 54 rows, no
+  **40 `complete` · 13 `partial` · 1 `planned`** — 54 files, 54 rows, no
   duplicates, no orphans, **0 mismatches**.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
   unit `008-jobs-operations` say `true`.~~ — **FIXED.** The "62" figure was

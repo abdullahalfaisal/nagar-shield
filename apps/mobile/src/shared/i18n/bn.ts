@@ -409,6 +409,16 @@ export const bn = {
       'এই বিল্ডে সার্ভারের সেটিংস নেই, তাই সেবার সাথে যোগাযোগ করা যাচ্ছে না। অ্যাপটি আপডেট করুন।',
     detail: 'এটি বারবার দেখা গেলে অ্যাপটি পুনরায় ইনস্টল বা আপডেট করতে হবে।',
   },
+  sessionPersistence: {
+    // The device could not store the session securely. The app still works
+    // for this launch, but the user will have to sign in again next time.
+    // The copy says what happened and what it means — and it does not blame
+    // the person holding the phone.
+    title: 'সেশন সংরক্ষণ করা যায়নি',
+    message:
+      'এই ডিভাইসে নিরাপদে সেশন রাখা যাচ্ছে না। অ্যাপটি এই সময়ে চলবে, তবে পরবর্তীবার সাইন ইন করতে হবে।',
+    detail: 'আপনার পাসওয়ার্ড কোথাও সংরক্ষিত হয়নি — শুধু এই ডিভাইসেই সেটি ব্যবহার করা হয়েছে।',
+  },
   disabled: {
     title: 'অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে',
     // FR-AUTH-7 names this exact string. It is a **fixed** message — it never

@@ -48,6 +48,34 @@ begin;
 -- Fixtures
 -- -----------------------------------------------------------------------------
 
+-- The History assertions below are about a **radius**, not about a count —
+-- but they still depend on the table being empty, and that dependency is
+-- easy to miss.
+--
+-- `history_nearby` pages with `limit p_limit + 1` and orders by
+-- `captured_at desc, id desc`. The probe for the moderator console creates a
+-- report on every run and never deletes it, at (23.7461, 90.3774) — about
+-- 8 km from the origin this suite uses, and therefore *inside* its 10 km
+-- radius. Each probe run leaves one more row there, every row newer than
+-- this suite's own three-hour-old fixture.
+--
+-- So once the accumulated rows reach the page limit, the fixture is pushed
+-- out of the page and the radius assertion fails — **not** because the
+-- radius filter broke, but because the page filled up. The failure grows by
+-- one row per `pnpm verify`, which is the worst way for a test to break: it
+-- passes on a clean machine and fails on a working one.
+--
+-- The delete is inside the suite's own transaction, so it is rolled back
+-- with everything else — the developer's rows are untouched once the suite
+-- ends. It is safe to clear the table here: the suite creates its own five
+-- reports immediately below, and the only rows that reference a report
+-- (`report_media`, `flags`) cascade, while `moderation_actions` nulls its
+-- `report_id` — the referential action the append-only trigger deliberately
+-- allows (see `write_guards.sql`, Test B4, and `read_models.sql`, which
+-- clears the table for the same reason).
+
+delete from public.reports;
+
 -- Two citizens. The uuid space is deliberately distinct from the seed's and
 -- from the other suites', so this suite never collides with them.
 --

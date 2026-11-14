@@ -418,6 +418,16 @@ export const en: TranslationSchema = {
       'This build is missing its server settings, so it cannot reach the service. Please update the app.',
     detail: 'If you keep seeing this, the app needs to be reinstalled or updated.',
   },
+  sessionPersistence: {
+    // The device could not store the session securely. The app still works
+    // for this launch, but the user will have to sign in again next time.
+    // The copy says what happened and what it means — and it does not blame
+    // the person holding the phone.
+    title: 'Session could not be saved',
+    message:
+      'This device cannot store your session securely. The app will work for now, but you will need to sign in again next time.',
+    detail: 'Your password was not saved anywhere — it was only used on this device.',
+  },
   disabled: {
     title: 'Account disabled',
     // FR-AUTH-7 names this exact string. It is a **fixed** message — it never

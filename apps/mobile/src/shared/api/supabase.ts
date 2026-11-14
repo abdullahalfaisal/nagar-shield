@@ -1,8 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import * as SecureStore from 'expo-secure-store'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import Constants from 'expo-constants'
 import type { Database } from './database.types'
+import { secureStore } from './session-storage'
 
 /**
  * The Supabase URL and anon key are public by design — they ship in the
@@ -34,35 +33,21 @@ const supabaseAnonKey =
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 /**
- * SecureStore cannot hold values larger than 2048 bytes, and the session
- * refresh token can exceed that. Larger payloads fall back to AsyncStorage,
- * which is still app-sandboxed on Android.
+ * The session store.
+ *
+ * The tokens live in `expo-secure-store` and **nowhere else**. The module
+ * that owns that decision — and the reasoning behind it — is
+ * `./session-storage.ts`; the one-paragraph version is:
+ *
+ * > The old adapter fell back to `AsyncStorage` when a value exceeded
+ * > SecureStore's 2048-byte limit, so a refresh token could land in
+ * > unencrypted storage. That limit is Apple's Keychain limit, not Expo's:
+ * > Android's `expo-secure-store` writes an encrypted blob into
+ * > `SharedPreferences` and has no size limit. This app is Android-only, and
+ * > a real session measures ~1550 bytes anyway. The fallback is gone; a
+ * > device that cannot write to the Keystore degrades to memory-only, which
+ * > is what the story's edge case already specifies.
  */
-const secureStore = {
-  getItem: async (key: string): Promise<string | null> => {
-    try {
-      return await SecureStore.getItemAsync(key)
-    } catch {
-      return AsyncStorage.getItem(key)
-    }
-  },
-  setItem: async (key: string, value: string): Promise<void> => {
-    try {
-      await SecureStore.setItemAsync(key, value, {
-        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      })
-    } catch {
-      await AsyncStorage.setItem(key, value)
-    }
-  },
-  removeItem: async (key: string): Promise<void> => {
-    try {
-      await SecureStore.deleteItemAsync(key)
-    } catch {
-      await AsyncStorage.removeItem(key)
-    }
-  },
-}
 
 /**
  * The Supabase client.
@@ -120,4 +105,4 @@ export const supabase: SupabaseClient<Database> = isSupabaseConfigured
     })
   : unconfiguredClient()
 
-export { secureStore }
+export { secureStore } from './session-storage'

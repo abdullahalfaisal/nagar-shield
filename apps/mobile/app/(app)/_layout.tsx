@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { AppState } from 'react-native'
+import { AppState, View } from 'react-native'
 import { Stack } from 'expo-router'
 import { useAuthSession } from '@/shared/auth/useAuthSession'
 import { useAccountStatus } from '@/shared/auth/useAccountStatus'
@@ -10,6 +10,7 @@ import {
 } from '@/shared/auth/useBiometricGate'
 import { Redirect } from 'expo-router'
 import { SplashView } from '@/shared/ui/SplashView'
+import { SessionPersistenceNotice } from '@/shared/ui/SessionPersistenceNotice'
 
 /**
  * The signed-in app group. A signed-out user is bounced back to the auth flow.
@@ -68,23 +69,32 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-      <Stack.Screen name="home" options={{ animation: 'fade' }} />
-      <Stack.Screen name="more" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="capture" />
-      <Stack.Screen name="location-sharing" />
-      <Stack.Screen name="contacts" />
-      <Stack.Screen name="contact-editor" />
-      <Stack.Screen name="history" />
-      <Stack.Screen name="history-map" />
-      <Stack.Screen name="alerts" />
-      <Stack.Screen name="alert-detail" />
-      <Stack.Screen name="report-detail" />
-      <Stack.Screen name="help-alert" />
-      <Stack.Screen name="more-help" />
-      <Stack.Screen name="thana-line" />
-      <Stack.Screen name="station-map" />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      {/*
+        The session-persistence notice. It sits above the navigator so it is
+        visible on every screen in the group — the problem it reports (the
+        device cannot store the session) is not a property of any one
+        screen.
+      */}
+      <SessionPersistenceNotice />
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Screen name="home" options={{ animation: 'fade' }} />
+        <Stack.Screen name="more" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="capture" />
+        <Stack.Screen name="location-sharing" />
+        <Stack.Screen name="contacts" />
+        <Stack.Screen name="contact-editor" />
+        <Stack.Screen name="history" />
+        <Stack.Screen name="history-map" />
+        <Stack.Screen name="alerts" />
+        <Stack.Screen name="alert-detail" />
+        <Stack.Screen name="report-detail" />
+        <Stack.Screen name="help-alert" />
+        <Stack.Screen name="more-help" />
+        <Stack.Screen name="thana-line" />
+        <Stack.Screen name="station-map" />
+      </Stack>
+    </View>
   )
 }
