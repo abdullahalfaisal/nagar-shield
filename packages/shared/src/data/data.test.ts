@@ -8,7 +8,9 @@ import {
   distanceKm,
   findHotline,
   findStation,
+  hotlineEntrySchema,
   stationsWithin,
+  stationEntrySchema,
 } from '../data';
 
 /**
@@ -16,6 +18,100 @@ import {
  * the Postgres mirror. These tests guard the product facts that must never
  * drift, and the geometry the 10 km fallback depends on.
  */
+
+describe('the station entry schema', () => {
+  const valid = {
+    id: 'st-dhanmondi-police',
+    stationType: 'police',
+    name: 'Dhanmondi Police Station',
+    nameBn: 'ধানমন্ডি থানা',
+    phone: '0229120000',
+    lat: 23.7461,
+    lng: 90.3774,
+    address: 'Dhanmondi, Dhaka',
+    isActive: true,
+  };
+
+  it('accepts a well-formed entry', () => {
+    expect(stationEntrySchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('accepts a null Bangla name and a null address', () => {
+    const parsed = stationEntrySchema.safeParse({ ...valid, nameBn: null, address: null });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects an empty id', () => {
+    expect(stationEntrySchema.safeParse({ ...valid, id: '' }).success).toBe(false);
+  });
+
+  it('rejects an unknown station type', () => {
+    expect(stationEntrySchema.safeParse({ ...valid, stationType: 'boat' }).success).toBe(false);
+  });
+
+  it('rejects a non-numeric coordinate', () => {
+    expect(stationEntrySchema.safeParse({ ...valid, lat: '23.7461' }).success).toBe(false);
+  });
+
+  it('rejects a missing active flag', () => {
+    const { isActive, ...withoutFlag } = valid;
+    expect(isActive).toBe(true);
+    expect(stationEntrySchema.safeParse(withoutFlag).success).toBe(false);
+  });
+
+  it('accepts every station in the shipped dataset', () => {
+    for (const station of STATIONS) {
+      expect(stationEntrySchema.safeParse(station).success).toBe(true);
+    }
+  });
+});
+
+describe('the hotline entry schema', () => {
+  const valid = {
+    id: 'hl-women-children',
+    name: 'Women & Children Helpline',
+    nameBn: 'নারী ও শিশু হেল্পলাইন',
+    phone: '109',
+    category: 'women_children',
+    description: '24/7 support for women and children',
+    sortOrder: 0,
+    isActive: true,
+    lastVerifiedAt: '2026-09-30',
+  };
+
+  it('accepts a well-formed entry', () => {
+    expect(hotlineEntrySchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('accepts a null Bangla name and a null description', () => {
+    const parsed = hotlineEntrySchema.safeParse({ ...valid, nameBn: null, description: null });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects an empty hotline id', () => {
+    expect(hotlineEntrySchema.safeParse({ ...valid, id: '' }).success).toBe(false);
+  });
+
+  it('rejects an empty phone number', () => {
+    expect(hotlineEntrySchema.safeParse({ ...valid, phone: '' }).success).toBe(false);
+  });
+
+  it('rejects a non-numeric sort order', () => {
+    expect(hotlineEntrySchema.safeParse({ ...valid, sortOrder: 'first' }).success).toBe(false);
+  });
+
+  it('rejects a missing verification date', () => {
+    const { lastVerifiedAt, ...withoutDate } = valid;
+    expect(lastVerifiedAt).toBe('2026-09-30');
+    expect(hotlineEntrySchema.safeParse(withoutDate).success).toBe(false);
+  });
+
+  it('accepts every hotline in the shipped dataset', () => {
+    for (const hotline of HOTLINES) {
+      expect(hotlineEntrySchema.safeParse(hotline).success).toBe(true);
+    }
+  });
+});
 
 describe('curated reference data', () => {
   it('carries a version stamp', () => {

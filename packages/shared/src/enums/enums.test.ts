@@ -13,6 +13,7 @@ import {
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
   REPORT_CATEGORY_LABELS,
+  parseReportCategory,
 } from '../enums';
 
 describe('report category enum', () => {
@@ -98,5 +99,30 @@ describe('defaults', () => {
 
   it('defaults to the dark theme, matching the prototype', () => {
     expect(DEFAULT_THEME).toBe('dark');
+  });
+});
+
+describe('parseReportCategory', () => {
+  it('parses every one of the 11 values', () => {
+    for (const category of REPORT_CATEGORIES) {
+      expect(parseReportCategory(category)).toBe(category);
+    }
+  });
+
+  it('rejects a value outside the 11', () => {
+    expect(() => parseReportCategory('arson')).toThrow(/Not a report category/);
+  });
+
+  it('rejects a value of the wrong type rather than coercing it', () => {
+    expect(() => parseReportCategory(7)).toThrow(/Not a report category/);
+    expect(() => parseReportCategory(null)).toThrow(/Not a report category/);
+    expect(() => parseReportCategory(undefined)).toThrow(/Not a report category/);
+  });
+
+  it('does not trim or fold case — the value must be exact', () => {
+    // A silently trimmed or case-folded category would put a report in a
+    // bucket the user did not choose, with no trace.
+    expect(() => parseReportCategory('theft ')).toThrow(/Not a report category/);
+    expect(() => parseReportCategory('THEFT')).toThrow(/Not a report category/);
   });
 });

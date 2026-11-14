@@ -79,13 +79,21 @@ Success — Edge Functions and RPCs return a uniform envelope:
 | `CONFLICT` | 409 | Duplicate flag, unique violation |
 | `FLAG_RATE_LIMIT` | 429 | >10 flags/hour |
 | `CAPTURE_RATE_LIMIT` | 429 | Per-user daily capture cap |
+| `OTP_RATE_LIMIT` | 429 | The password-reset challenge is in its 30-minute cooldown |
 | `MEDIA_TOO_LARGE` | 413 | Exceeds the 1080p / 30 s / size cap |
 | `UNSUPPORTED_MEDIA` | 415 | MIME not allowed |
 | `GEOCODE_UNAVAILABLE` | 200 | Non-fatal — Capture succeeded, area degraded to `Dhaka` / unknown thana |
+| `OFFLINE_QUEUED` | 202 | Non-fatal — the report was queued on the device and will be sent when the network returns |
 | `INTERNAL` | 500 | Unexpected |
 
 Clients map `code` → Bangla/English string via i18n. Raw Postgres error text
 never reaches a user.
+
+**This table is the contract.** `packages/shared/src/errors/index.ts` holds
+the union, and `packages/shared/src/errors/errors.test.ts` pins it against
+this file: a code added to the union without a row here fails the build, and
+a row here without a code in the union fails it too. The story's rule holds —
+the code is never added ad hoc without updating this document.
 
 ## Pagination Strategy
 

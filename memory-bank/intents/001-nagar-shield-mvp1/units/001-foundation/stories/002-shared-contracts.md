@@ -2,11 +2,11 @@
 id: 002-shared-contracts
 unit: 001-foundation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 002-shared-contracts
@@ -89,20 +89,125 @@ implemented: partial
 
 ## Implementation
 
-**The shared contracts package ships and is consumed by both apps. The story is not `complete` because the boundary guard it names was never built.**
+**The shared contracts package ships and is consumed by both apps. Every criterion in this story now has a guard that is proved to fail when the thing it guards is broken.**
 
 ### What ships
 
 - `packages/shared/src/` holds `schemas/`, `enums/`, `errors/`, `types/`, `storage/`, `jobs/`, `testing/`, and `data/`, exported through `packages/shared/src/index.ts`.
-- Six jest suites cover it: `data.test.ts`, `enums.test.ts`, `errors.test.ts`, `jobs.test.ts`, `schemas.test.ts`, `storage.test.ts`.
-- Both apps import the contracts rather than copying them. `apps/admin/lib/api.ts:1` imports `AppError` and `ApiErrorCode` from `@nagar-shield/shared`; `apps/admin/lib/format.ts:10-11` and `apps/admin/app/queue/[reportId]/page.tsx:5` do the same. `grep -rn "zod|z\.object|z\.enum" apps/admin` returns **zero hits** — no Zod schema is defined inside the admin.
-- `apps/admin/next.config.mjs:18` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+- **Eleven** jest suites cover it: `boundary.test.ts`, `ci-order.test.ts`, `coverage.test.ts`, `data.test.ts`, `enums.test.ts`, `errors.test.ts`, `exported-types.test.ts`, `jobs.test.ts`, `schemas.test.ts`, `storage.test.ts`, `testing/testing.test.ts` — **158 tests**.
+- Both apps import the contracts rather than copying them. `apps/admin/lib/api.ts:1` imports `AppError` and `ApiErrorCode` from `@nagar-shield/shared`; `apps/admin/lib/format.ts` and `apps/admin/app/queue/[reportId]/page.tsx` do the same.
+- `apps/admin/next.config.mjs` sets `transpilePackages: ['@nagar-shield/shared']`, so the workspace package is bundled rather than re-implemented.
+- `tools/mirror-shared-to-functions.cjs --check` proves the Edge Functions carry the same nine files, so the third consumer of the contract cannot drift either.
 
-### The gaps
+### The guards
 
-- **The boundary test does not exist.** The story requires a test that *asserts* `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema. There is no such test anywhere in the repo, and `tools/release-verify.cjs` has no equivalent check. The *property* holds today — but only because nobody has looked. A contributor adding a local `z.object({...})` to the admin would not be caught by any gate.
-- **The mobile side is not covered by the same property.** The grep above is evidence, not a guard, and it only covered the admin.
+**1. The boundary test — `packages/shared/src/boundary.test.ts`.**
 
-### What closing this needs
+It walks `apps/admin` and `apps/mobile` and fails when either app redefines a shared schema, a shared enum, a shared business-rule constant, or builds a Zod schema of its own. The failure names the offending file and the offending name.
 
-1. A boundary test that walks `apps/admin` and `apps/mobile` and fails when a Zod schema or a shared enum is redefined locally — the guard this story exists to create.
+Three details make it a guard rather than a grep:
+
+- **It reads code, not prose.** The rule is *stated* in the very files it scans, so comments and string literals are stripped before the scan. A naive grep for `z.object` would match the comment explaining the rule.
+- **The Zod import is read from the original source, the construction from the stripped source.** A module specifier is not prose, so it is safe to read — but it *is* a string literal, and the stripper blanks string literals, so the import would be invisible in the stripped text. Splitting the read is what makes the check work at all; the first version read both from the stripped text and **never fired**.
+- **The shared-name list cannot go stale.** A test asserts the list names **every** exported constant in the package. When the list was first written it was missing eight, and the test said so — which is the point. A hand-written vocabulary that silently rots is a guard that quietly stops guarding.
+
+It lives in `packages/shared` rather than in either app: the property is about **both** apps at once, and a test only one app's suite runs would leave the other unguarded.
+
+**2. The error-code table is pinned to the standard.**
+
+AC #7 requires the `ApiErrorCode` union to contain every code in `memory-bank/standards/api-conventions.md` § Error codes **and no code outside it**. `packages/shared/src/errors/errors.test.ts` now reads that file and checks both directions, plus the HTTP status of every code.
+
+**This found a real drift.** The union carried `OTP_RATE_LIMIT` and `OFFLINE_QUEUED` — both genuinely thrown by the shipped code — but the standard's table did not list them. The standard was out of date, not the code, so the two rows were **added to the standard**. The story's own rule holds now: the code is never added ad hoc without updating the document, and the test says so when either side moves.
+
+**3. The declaration-level `any` scan — `packages/shared/src/exported-types.test.ts`.**
+
+AC #8 says the criterion is enforced by `@typescript-eslint/no-explicit-any` **plus** *"a declaration-level scan test over the built `.d.ts` output"*. The lint rule covers the source; this covers the **shape a consumer actually sees**. The two are not the same — a type can be clean in the source and still widen to `any` in the emitted `.d.ts` through an inferred return type, a re-export, or an unresolved import.
+
+The declarations are built **on demand** with `tsc --emitDeclarationOnly` into a temp directory, so the test needs no build step in the repository and cannot pass against a stale artefact.
+
+Three things had to be right, and each was found the hard way:
+
+- **`noEmit` has to be turned back off.** `tsconfig.base.json` sets `noEmit: true` for every package, so the declaration build emitted **nothing** — and the test's own *"emits declarations"* guard caught it. Without that guard the scan would have passed vacuously, which is worse than not existing.
+- **Comments are stripped before the scan.** `tsc` copies doc comments into the declarations, and the prose uses the English word *"any"* — *"no author identity of any kind"*, *"to any signed-in citizen"*. The first version matched the prose and reported two files that contained no type at all. The criterion is about the **type** `any`, so only the code is scanned.
+- **The `as unknown as` scan runs on the SOURCE, not the declarations.** `tsc` *erases* the cast: `value as unknown as string` is emitted as `(value: unknown) => string`, because the declaration describes the resolved type. A scan over the `.d.ts` for `as unknown as` can therefore **never** fire — it is a check that cannot fail, and a check that cannot fail has proved nothing. The first version was exactly that, and it passed while the codebase held a live `as unknown as`. The cast is a source-level shortcut, so the source is where it lives.
+
+**4. The CI-order guard — `packages/shared/src/ci-order.test.ts`.**
+
+AC #9 says the shared suite *"is executed as the first test job in CI, before the mobile and admin suites"*. The workflow is **parsed as YAML**, not grepped — the file explains its own job graph in prose, exactly the way the source files explain their own rules, so a grep for `shared-test` would match the comment above the job.
+
+The guard asserts **both** halves, because they are different things:
+
+- the `jobs:` block order — `shared-test` comes before `unit-test-mobile` and `unit-test-admin`;
+- the `needs:` edge — the consumers actually *depend* on `shared-test`.
+
+The order of the `jobs:` block is a presentation order; the `needs:` edge is the one GitHub honours. Without the edge the three jobs run in parallel and the shared contract is no longer the first signal.
+
+**5. The coverage guard — `packages/shared/src/coverage.test.ts`.**
+
+AC #9 also says the suite *"covers every Zod schema and every enum parser"*. That is a claim about **which names the tests mention**, and a claim like that rots: a schema added last month with no test is invisible — the suite is green, the coverage is not.
+
+So the coverage is **asserted**, the same way the boundary guard asserts that its shared-name list is not stale. The list is derived from the source — every exported Zod schema, every exported enum parser, every exported enum, every exported business-rule constant — and a name that no test mentions is reported by name.
+
+**This found a real gap.** `stationEntrySchema` and `hotlineEntrySchema` — the two schemas that validate the curated reference dataset at module load — had **no test at all**. They are now covered: a well-formed entry, a null Bangla name, a null address, an empty id, an unknown station type, a non-numeric coordinate, a missing active flag, a missing verification date, and every entry in the shipped dataset.
+
+**6. The factory test — `packages/shared/src/testing/testing.test.ts`.**
+
+AC #10 names three claims about the fixtures, and each has a check.
+
+- **Fully typed.** The factory's override parameter is `Partial<T>` for the concrete shape it builds, and the return type is that same shape. A factory that takes `Record<string, unknown>` accepts an override of *any* shape — `buildProfile({ role: 'not-a-role' })` compiles, and the mistake surfaces three screens later as a runtime error. The story's edge-case table says it directly: *"the factory's parameter type is `Partial<T>` and never `any`"*.
+
+  The compile half is asserted with `@ts-expect-error`. A compile error the compiler did **not** raise is itself an error, so the comment cannot rot into a no-op.
+
+- **No production PII.** The email is asserted to be on the `.test` domain (reserved by RFC 2606, can never resolve), and the fixture phones are parsed by the **shared** `phoneSchema` — so a fixture that drifted out of the app's own contract fails here.
+
+  **This found a real defect.** The station fixture's phone was `+880255000000` — a Dhaka **landline**, with nine national digits. The shared `phoneSchema` accepts `+880` followed by **ten** digits, so the fixture would have been rejected by the app's own phone validation. A fixture the server rejects cannot test anything. It is now `+8801550000000`.
+
+- **No `as unknown as` cast.** A scan of the factory source, with the comments stripped for the same reason the boundary scan strips them.
+
+### The names the story used, and what they are now
+
+The acceptance criteria and Technical Notes name several exports that were not built under those names. They are **now built**, because a reader following the criteria by name must find what the criteria name.
+
+| The story names | What it is now |
+|---|---|
+| `contactSchema` (AC #6) | an **alias** of `emergencyContactSchema` — the same schema object, so the two names cannot drift |
+| `areaHierarchySchema` (AC #6, Technical Notes) | **new** — `division`/`city`/`thana` required, `neighborhood` optional and normalised away when absent |
+| `parseAreaHierarchy` (Technical Notes) | **new** — returns the normalised hierarchy; throws on a malformed payload rather than returning a partial |
+| `parseReportCategory` (Technical Notes) | **new** — parses the 11 values; a value outside them **throws**, with no fallback and no case folding |
+| `resolveErrorMessage(code)` (Technical Notes) | **new** — the `code → bundle key` resolver. The mobile app's `errorCopy()` now calls it |
+
+**One correction to the story's own text.** The Technical Notes say the key namespace is `errors.<CODE>`. The shipped bundles use **camelCase** — `errors.authRequired`, not `errors.authrequired`. The bundle is the contract, and a key that does not exist renders as the key itself, which is how a user ended up seeing the literal word *"undefined"*. `resolveErrorMessage` returns the camelCase key, and a test pins it.
+
+### The causal checks
+
+Every guard was proved to **fail** when the thing it guards was broken, and restored afterwards.
+
+| Broken | The guard that failed |
+|---|---|
+| a local `z.object(...)` in `apps/admin/lib/` | *"builds a local Zod schema"*, naming the file |
+| a local `REPORT_CATEGORIES` in `apps/admin/lib/` | *"re-declares `REPORT_CATEGORIES`"*, naming the file |
+| a local `phoneSchema` in `apps/mobile/src/` | *"re-declares `phoneSchema`"*, naming the file |
+| `TEMPORARY_CAUSAL_CHECK_CODE` added to the union | *"matches the code table in the standard, exactly"* — the extra code, named |
+| a standard row renamed away from a union member | the same test — the missing code, named |
+| an exported type carrying `any` | *"contains no `any` in any exported type"* — the file, named |
+| an `as unknown as` cast in the source | *"contains no `as unknown as` narrowing shortcut"* — the file, named |
+| `needs: [shared-test]` removed from the mobile job | *"gates the mobile and admin suites on the shared suite"* |
+| `shared-test` moved below the consumers | *"runs the shared suite before the mobile and admin suites"* |
+| an untested schema added to the package | *"covers every exported Zod schema"* — the schema, named |
+
+### A dependency the mirror caught
+
+`areaHierarchySchema` needed the `AreaHierarchy` type, and the natural way to write it was `import type { AreaHierarchy } from '../types'`. That **breaks the Edge Functions**: the mirror copies `schemas/` but **not** `types/`, because the Edge Runtime mounts only the `supabase/` directory. The import resolves in the workspace and fails only inside the container.
+
+The fix is a dependency direction: `types/` derives its `AreaHierarchy` from the schema, and the schema owns the shape. The type and the parser cannot drift, and the mirrored module has no unmirrored dependency.
+
+**The mirror now checks this.** `tools/mirror-shared-to-functions.cjs` fails when a mirrored module imports one that is not mirrored, naming the file and the module — in both the write and the check mode, so the mistake is caught when the mirror is written rather than when the container refuses to boot.
+
+### A build failure the improved error reporting caught
+
+The declaration build was **silently failing** on a type error in the test file, and `execFileSync` with `stdio: 'pipe'` threw the diagnostics away — the failure read *"Command failed"* with no reason at all.
+
+The test now reads **stdout** (`tsc` writes its diagnostics there, not stderr) and puts them in the failure message. A build failure reported as "Command failed" is a bug report nobody can act on.
+
+
+

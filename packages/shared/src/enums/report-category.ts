@@ -23,6 +23,24 @@ export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
 export const REPORT_CATEGORY_SET: ReadonlySet<string> = new Set(REPORT_CATEGORIES);
 
 /**
+ * The exported parser for `ReportCategory`.
+ *
+ * The story says the enum is modelled as an `as const` array **plus** a
+ * runtime parser, so the two can never diverge. The parser lives here, next
+ * to the array, so the two are edited together.
+ *
+ * A value outside the eleven **fails** — there is no fallback and no
+ * coercion, because a silently substituted category would put a report in
+ * the wrong bucket with no trace.
+ */
+export function parseReportCategory(value: unknown): ReportCategory {
+  if (typeof value !== 'string' || !REPORT_CATEGORY_SET.has(value)) {
+    throw new Error(`Not a report category: ${String(value)}`);
+  }
+  return value as ReportCategory;
+}
+
+/**
  * Bangla / English display pairs, matching the prototype's alert card format
  * (e.g. "চুরি — Theft"). English is the canonical key; Bangla is the primary
  * locale (C-8 — Bangla + English only).

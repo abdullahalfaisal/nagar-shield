@@ -94,6 +94,26 @@ export interface ApiErrorBody {
   details?: Record<string, unknown>;
 }
 
+/**
+ * The i18n key for an error code — the exported resolver story
+ * `002-shared-contracts` names in its Technical Notes.
+ *
+ * It is a thin alias for `API_ERROR_I18N_KEYS[code]`, and it is what the
+ * mobile app's `errorCopy()` calls: the story says the mapping lives in the
+ * shared package so the client and the server agree, and a **resolver** is
+ * easier to call correctly than a map lookup — a caller that reaches for
+ * the map directly has to remember to handle a code it does not know.
+ *
+ * The Technical Notes say the key is in the `errors.<CODE>` namespace; the
+ * shipped keys are **camelCase** (`errors.authRequired`), because that is
+ * what the i18n bundles actually carry. The bundle is the contract — a
+ * key that does not exist renders as the key itself, which is how a user
+ * ended up seeing the literal word "undefined".
+ */
+export function resolveErrorMessage(code: ApiErrorCode): string {
+  return API_ERROR_I18N_KEYS[code] ?? 'errors.internal';
+}
+
 export interface ApiErrorResponse {
   error: ApiErrorBody;
 }

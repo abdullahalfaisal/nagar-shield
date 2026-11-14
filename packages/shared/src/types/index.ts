@@ -12,14 +12,22 @@ import type {
   StationType,
   Theme,
 } from '../enums';
+import type { AreaHierarchyInput } from '../schemas';
 
-/** Reverse-geocode result. W-3: Dhaka-local table first, online geocode is backup. */
-export interface AreaHierarchy {
-  division: string;
-  city: string;
-  thana: string;
-  neighborhood?: string;
-}
+/**
+ * Reverse-geocode result. W-3: Dhaka-local table first, online geocode is
+ * backup.
+ *
+ * **The schema is the source of truth** and this interface is derived from
+ * it, so the type and the runtime parser cannot disagree.
+ *
+ * The dependency runs `schemas/` → **not** → `types/`, because the Edge
+ * Functions mirror copies `schemas/` but **not** `types/`: the Edge Runtime
+ * mounts only the `supabase/` directory, so a mirrored module cannot import
+ * a module that was not mirrored. The other way round is fine — `types/`
+ * may import from `schemas/`, which is.
+ */
+export type AreaHierarchy = AreaHierarchyInput;
 
 export interface Profile {
   id: string;

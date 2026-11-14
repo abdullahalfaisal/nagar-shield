@@ -21,6 +21,9 @@ import {
   BIOMETRIC_FAILS_TO_DISABLE,
   BIOMETRIC_FAILS_TO_PASSWORD,
   REMEMBER_ME_DAYS,
+  areaHierarchySchema,
+  contactSchema,
+  parseAreaHierarchy,
 } from '../schemas';
 
 describe('phone normalisation', () => {
@@ -186,5 +189,73 @@ describe('business-rule constants', () => {
 
   it('locks the Remember me window at 30 days (FR-AUTH-2)', () => {
     expect(REMEMBER_ME_DAYS).toBe(30);
+  });
+});
+
+describe('areaHierarchySchema', () => {
+  const valid = { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur', neighborhood: 'Kazipara' };
+
+  it('accepts a complete hierarchy', () => {
+    expect(areaHierarchySchema.parse(valid)).toEqual(valid);
+  });
+
+  it('accepts a hierarchy without a neighborhood — the area table is not exhaustive', () => {
+    const parsed = areaHierarchySchema.parse({ division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' });
+    expect(parsed.neighborhood).toBeUndefined();
+  });
+
+  it('normalises a null neighborhood to absent, not to null', () => {
+    // A consumer should not have to check two shapes for "no neighborhood".
+    const parsed = areaHierarchySchema.parse({ ...valid, neighborhood: null });
+    expect(parsed.neighborhood).toBeUndefined();
+    expect('neighborhood' in parsed && parsed.neighborhood === null).toBe(false);
+  });
+
+  it('requires division, city and thana', () => {
+    for (const missing of ['division', 'city', 'thana'] as const) {
+      const payload: Record<string, unknown> = { ...valid };
+      delete payload[missing];
+      expect(() => areaHierarchySchema.parse(payload)).toThrow();
+    }
+  });
+
+  it('rejects a blank required field', () => {
+    expect(() => areaHierarchySchema.parse({ ...valid, thana: '   ' })).toThrow();
+  });
+});
+
+describe('parseAreaHierarchy', () => {
+  it('returns the normalised hierarchy', () => {
+    const parsed = parseAreaHierarchy({
+      division: 'Dhaka',
+      city: 'Dhaka',
+      thana: 'Mirpur',
+      neighborhood: null,
+    });
+
+    expect(parsed.division).toBe('Dhaka');
+    expect(parsed.neighborhood).toBeUndefined();
+  });
+
+  it('throws on a malformed payload rather than returning a partial', () => {
+    expect(() => parseAreaHierarchy({ division: 'Dhaka' })).toThrow();
+  });
+});
+
+describe('contactSchema', () => {
+  it('is the same schema as emergencyContactSchema, under the story\'s name', () => {
+    // An alias, not a second definition — so the two names cannot drift.
+    expect(contactSchema).toBe(emergencyContactSchema);
+  });
+
+  it('validates a contact', () => {
+    const parsed = contactSchema.parse({
+      name: 'Fixture Contact',
+      phone: '+8801800000000',
+      isPrimary: true,
+      sortOrder: 0,
+    });
+
+    expect(parsed.groupName).toBe('other');
   });
 });

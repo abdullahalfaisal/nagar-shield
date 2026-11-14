@@ -152,6 +152,16 @@ export const emergencyContactSchema = z.object({
 
 export type EmergencyContactInput = z.infer<typeof emergencyContactSchema>;
 
+/**
+ * The contact schema, under the name the acceptance criteria use.
+ *
+ * `emergencyContactSchema` is the name the code uses; `contactSchema` is the
+ * name story `002-shared-contracts` names in AC #6 and in the Technical
+ * Notes. They are the **same** schema — an alias, not a second definition,
+ * so the two names can never drift.
+ */
+export const contactSchema = emergencyContactSchema;
+
 /** FR-CAPTURE-1..5 — the Capture submission payload. */
 export const captureSubmissionSchema = z.object({
   clientRequestId: z.string().uuid(),
@@ -178,6 +188,50 @@ export const areaFilterSchema = z.object({
 });
 
 export type AreaFilter = z.infer<typeof areaFilterSchema>;
+
+/**
+ * The reverse-geocode payload — W-3: the Dhaka-local table first, the online
+ * geocode as the backup.
+ *
+ * `division`, `city` and `thana` are **required**. A report without a thana
+ * cannot be placed on the map or routed to a station, so a payload missing
+ * one is a failure rather than a partial. `neighborhood` is **optional**
+ * because the Dhaka-local area table is not exhaustive — the absence is
+ * normalised to `undefined` so the key stays absent rather than present and
+ * null, which would make every consumer check two shapes.
+ */
+export const areaHierarchySchema = z.object({
+  division: z.string().trim().min(1),
+  city: z.string().trim().min(1),
+  thana: z.string().trim().min(1),
+  neighborhood: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .nullable()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
+});
+
+export type AreaHierarchyInput = z.infer<typeof areaHierarchySchema>;
+
+/**
+ * The exported validator for `AreaHierarchy`.
+ *
+ * It returns the **normalised** hierarchy — a missing or blank
+ * `neighborhood` is gone from the result rather than null in it — so a
+ * caller never has to decide whether `undefined` and `null` mean the same
+ * thing.
+ *
+ * The return type is the schema's own inference rather than the
+ * `AreaHierarchy` interface from `types/`, because the Edge Functions mirror
+ * copies this module but **not** `types/`. The two are structurally
+ * identical, and `types/` derives its interface from this shape, so they
+ * cannot drift.
+ */
+export function parseAreaHierarchy(value: unknown): AreaHierarchyInput {
+  return areaHierarchySchema.parse(value);
+}
 
 /** FR-HIST-1 — History defaults: 1 km radius, 24-hour window. */
 export const HISTORY_DEFAULT_RADIUS_KM = 1;

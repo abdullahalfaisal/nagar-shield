@@ -131,7 +131,70 @@ function buildMirror() {
     }
   }
 
+  assertNoUnmirroredImports(files);
+
   return files;
+}
+
+/**
+ * Fails when a mirrored module imports a shared module that is **not**
+ * mirrored.
+ *
+ * The Edge Runtime mounts only the `supabase/` directory, so the vendored
+ * copy of `schemas/` cannot import a vendored copy of `types/` — `types/`
+ * is not mirrored at all. The import resolves in the workspace and fails
+ * only inside the container, which is exactly the kind of failure that
+ * reaches production.
+ *
+ * This check runs in **both** modes, so the mistake is caught when the
+ * mirror is written rather than when the container refuses to boot.
+ */
+function assertNoUnmirroredImports(files) {
+  const mirrored = new Set(
+    [...files.keys()].map((targetPath) => path.basename(path.dirname(targetPath))),
+  );
+
+  const problems = [];
+
+  for (const [targetPath, contents] of files) {
+    // The relative specifier, before it was rewritten.
+    const relative = path
+      .relative(SOURCE_ROOT, path.join(SOURCE_ROOT, path.dirname(path.relative(TARGET_ROOT, targetPath))))
+      .split(path.sep)
+      .join('/');
+
+    const source = fs.readFileSync(
+      path.join(SOURCE_ROOT, relative, path.basename(targetPath)),
+      'utf8',
+    );
+
+    for (const match of source.matchAll(/from\s+['"](\.[^'"]*)['"]/g)) {
+      const specifier = match[1];
+      const resolved = path.resolve(
+        path.dirname(path.join(SOURCE_ROOT, relative, path.basename(targetPath))),
+        specifier,
+      );
+      const owner = path.relative(SOURCE_ROOT, resolved).split(path.sep)[0];
+
+      if (owner && !mirrored.has(owner) && owner !== relative) {
+        problems.push(
+          `${path.relative(ROOT, targetPath)} imports \`${specifier}\` — ` +
+            `\`${owner}/\` is not mirrored into the Edge Functions tree`,
+        );
+      }
+    }
+  }
+
+  if (problems.length > 0) {
+    console.error('A mirrored module imports a module that is not mirrored:');
+    for (const problem of problems) console.error(`  - ${problem}`);
+    console.error(
+      'The Edge Runtime mounts only `supabase/`, so a mirrored module cannot\n' +
+        'import one that was not mirrored. Either mirror the module too, or\n' +
+        'remove the dependency.',
+    );
+    process.exit(1);
+  }
 }
 
 /** Removes a mirrored file that no longer has a source. */

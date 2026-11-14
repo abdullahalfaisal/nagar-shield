@@ -6,7 +6,7 @@
 > The Status column is derived from each story file's `implemented`
 > frontmatter, which is the authoritative source.
 >
-> **36 complete · 17 partial · 1 planned.** The index is reconciled against the
+> **37 complete · 16 partial · 1 planned.** The index is reconciled against the
 > story files on disk: 54 files, 54 rows, no duplicates, no orphans.
 >
 > **`partial`** means the feature ships and works, but at least one acceptance
@@ -17,7 +17,7 @@
 | Story | Title | Unit | Bolt | Priority | Status |
 |---|---|---|---|---|---|
 | 001-monorepo-workspace | Monorepo workspace and TypeScript configuration | 001-foundation | 001-foundation | must | partial |
-| 002-shared-contracts | Shared contracts package | 001-foundation | 001-foundation | must | partial |
+| 002-shared-contracts | Shared contracts package | 001-foundation | 001-foundation | must | complete |
 | 003-mobile-design-system | Mobile design system (theme tokens + UI primitives) | 001-foundation | 002-foundation | must | partial |
 | 004-mobile-app-shell | Mobile app shell (Router groups, i18n, Supabase client) | 001-foundation | 003-foundation | must | partial |
 | 005-admin-skeleton-and-ci | Admin app skeleton and CI pipeline | 001-foundation | 003-foundation | must | partial |
