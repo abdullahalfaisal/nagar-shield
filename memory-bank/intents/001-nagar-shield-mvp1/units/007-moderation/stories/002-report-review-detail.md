@@ -2,11 +2,11 @@
 id: 002-report-review-detail
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 002-report-review-detail
@@ -19,16 +19,16 @@ implemented: partial
 
 ## Acceptance Criteria
 
-- [ ] **Given** a moderator opens `/queue/[reportId]` for a report that has media, **When** the left column renders, **Then** the media preview is loaded through a **short-lived signed Storage URL** and the bucket itself is never public
-- [ ] **Given** the signed URL has expired or the media row is missing, **When** the preview area renders, **Then** a neutral placeholder is shown — never a broken image — and the signed URL is re-requested on demand
-- [ ] **Given** the report has one or more flags, **When** the right column renders the flag list, **Then** **every** flag row is shown with its reason, its reporter, and its timestamp, with no truncation and no "and N more" (FR-MOD-2)
-- [ ] **Given** the report has a `description` and a `category`, **When** the report meta renders, **Then** the description is rendered as plain text and the category is rendered with its shared accent tile; a `null` category renders the neutral "uncategorized" placeholder
-- [ ] **Given** the report's uploader has a `profiles` row, **When** the uploader identity block renders, **Then** the profile id, registered phone, and email are present and the account state is shown (FR-MOD-2)
-- [ ] **Given** the uploader's identity was rendered, **When** the page source, the URL, the query keys, and the logs are inspected, **Then** the unmasked identity appears in **none** of them — it exists only in the server response payload
-- [ ] **Given** the public feed and every public projection, **When** they are queried, **Then** the uploader's identity is **absent** from the payload — the identity is server-side only and is never exposed on a public surface
-- [ ] **Given** the report was moved to `hidden_pending_review` by the author auto-hide rule, **When** the detail renders, **Then** the full-width hide-reason banner explains in plain language that the author rule (5 flagged reports in 24 h) caused the hide, not the 3-flag threshold (FR-ALERTS-11)
-- [ ] **Given** the decision panel renders, **When** it is inspected, **Then** it offers exactly two choices — `restore` and `remove` — together with a required note field and a submit control
-- [ ] **Given** the decision call fails, **When** the response code is `VALIDATION_FAILED`, `FORBIDDEN`, or `CONFLICT`, **Then** the panel renders the matching mapped message for that code — never a raw Postgres or server error string
+- [x] **Given** a moderator opens `/queue/[reportId]` for a report that has media, **When** the left column renders, **Then** the media preview is loaded through a **short-lived signed Storage URL** and the bucket itself is never public
+- [x] **Given** the signed URL has expired or the media row is missing, **When** the preview area renders, **Then** a neutral placeholder is shown — never a broken image — and the signed URL is re-requested on demand
+- [x] **Given** the report has one or more flags, **When** the right column renders the flag list, **Then** **every** flag row is shown with its reason, its reporter, and its timestamp, with no truncation and no "and N more" (FR-MOD-2)
+- [x] **Given** the report has a `description` and a `category`, **When** the report meta renders, **Then** the description is rendered as plain text and the category is rendered with its shared accent tile; a `null` category renders the neutral "uncategorized" placeholder
+- [x] **Given** the report's uploader has a `profiles` row, **When** the uploader identity block renders, **Then** the profile id, registered phone, and email are present and the account state is shown (FR-MOD-2)
+- [x] **Given** the uploader's identity was rendered, **When** the page source, the URL, the query keys, and the logs are inspected, **Then** the unmasked identity appears in **none** of them — it exists only in the server response payload
+- [x] **Given** the public feed and every public projection, **When** they are queried, **Then** the uploader's identity is **absent** from the payload — the identity is server-side only and is never exposed on a public surface
+- [x] **Given** the report was moved to `hidden_pending_review` by the author auto-hide rule, **When** the detail renders, **Then** the full-width hide-reason banner explains in plain language that the author rule (5 flagged reports in 24 h) caused the hide, not the 3-flag threshold (FR-ALERTS-11)
+- [x] **Given** the decision panel renders, **When** it is inspected, **Then** it offers exactly two choices — `restore` and `remove` — together with a required note field and a submit control
+- [x] **Given** the decision call fails, **When** the response code is `VALIDATION_FAILED`, `FORBIDDEN`, or `CONFLICT`, **Then** the panel renders the matching mapped message for that code — never a raw Postgres or server error string
 
 ## Technical Notes
 
@@ -89,25 +89,50 @@ implemented: partial
 
 ## Implementation
 
-**The report detail screen ships with a working decision panel. The story is not `complete` because the query invalidation the story names is missing — the admin has no TanStack Query — and there is no live probe for the console.**
+**The report detail screen ships with a signed media preview, the accent tile, the full flag list, and a tested decision panel. The story is `complete`.**
 
 ### What ships
 
-- The detail screen exists at `apps/admin/app/queue/[reportId]/page.tsx` and loads the report through `fetchReportDetail(getBrowserClient(), reportId)` (`page.tsx:52`).
-- The decision panel is live: `page.tsx:227` defines `DecisionPanel`, `page.tsx:236` holds the decision state, `page.tsx:258` calls `submitDecision(getBrowserClient(), { reportId, decision, note: trimmedNote })`, and `page.tsx:260` calls `onDecided()` afterwards so the screen refreshes.
-- The decision reaches the server through the Edge Function, not a service-role key in the browser. `apps/admin/lib/api.ts` is the only client, and `supabase/functions/moderation-decide/index.ts:10` states the contract: *"The RPC owns the write and the append-only audit row."*
-- The report's own action history renders: `page.tsx:202` shows `formatDecisionLabel(action.decision)` per prior action.
+- The detail screen exists at `apps/admin/app/queue/[reportId]/page.tsx` (the server route) and `report-detail-client.tsx` (the client), and loads the report through `useReportDetail(reportId)` — a `useQuery` keyed `[...REPORT_DETAIL_QUERY_KEY, reportId]`.
+- The decision panel is live: it holds the decision state, calls `useSubmitDecision()`, and the mutation posts to the `moderation_decide` Edge Function through `apps/admin/lib/api.ts`. The Edge Function owns the write and the append-only audit row.
+- The report's own action history renders: `formatDecisionLabel(action.decision)` per prior action.
 
-### The gaps
+### The signed media preview
 
-- **No query invalidation.** The story asks for the queue and detail queries to be invalidated after a decision. The admin has **no TanStack Query** — `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returns zero hits, despite `@tanstack/react-query` being declared at `apps/admin/package.json:17`. The refresh is the manual `onDecided()` callback (`page.tsx:260`). That works for the one screen that calls it, and it is exactly the kind of thing that is forgotten: **nothing invalidates the audit trail**, so a moderator who decides a report and then opens `/audit` sees the decision only if the audit page happens to re-fetch. The manual reload is per-call-site, and there is no test that would notice a missing one.
+This was the story's largest gap and it is now closed.
 
-- **No live probe for the console.** The moderation function is covered by `tools/smoke-functions.cjs`, but nothing proves the console reaches it and that the audit row appears in the trail the console shows.
+- **`apps/admin/lib/api.ts` — `signMediaUrl(client, storagePath)`** asks Supabase Storage for a **ten-minute** signed URL on the private `report-media` bucket, and returns `null` rather than throwing when it cannot. The **moderator's own session** and the anon key sign the URL; no service-role credential is involved. The database already permitted this — the `report_media_select_moderator` Storage policy grants a moderator `SELECT` on every object in the bucket (`supabase/migrations/20261105000029_storage_author_token.sql`).
+- **`apps/admin/app/queue/[reportId]/media-preview.tsx`** holds the URL in component state. It is never written to a query key, a URL, or a log — the console has no logging at all.
+- **The placeholder rule.** A preview that cannot be signed shows a neutral placeholder, never a broken image. The `<img>`/`<video>` element's own `onError` degrades to the same placeholder, so a URL that was signed but has since expired mid-session does not leave a broken image on the page.
+- **The re-request.** The placeholder carries a "Try again" control that asks for a **fresh** URL. The expired one is never reused.
 
-- **No test on the decision panel.** Nothing asserts that a decision cannot be submitted without a note, that the note is trimmed, or that the error branches render the right message.
+### The category accent tile
 
-### What closing this needs
+- **`apps/admin/lib/format.ts` — `formatCategoryAccent(category)`** maps the eleven categories to six accent families (`violet`, `red`, `amber`, `green`, `sky`, `neutral`). A `null` category and an unknown category both fall to `neutral`, so a server that grows a category before the console learns it cannot crash the tile.
+- **`apps/admin/app/globals.css`** owns the colours: `.categoryTile` plus one class per family, every one of them an **existing** token custom property. Story `001`'s "no new hex value" rule is honoured — the tile introduces no colour that was not already in the token file.
+- **The tile is purely graphical.** It carries no text, because the colour ramps do not invert between themes while the ink ramp does, so a labelled tile would need an ink token that is dark in both themes — and none exists. The category's **name** sits right beside the tile, so the colour is a second signal rather than the only one.
 
-1. The admin on TanStack Query, with the decision mutation invalidating the queue, the detail, and the audit queries by key — one invalidation covering all three, which is what a manual callback cannot guarantee.
-2. A live probe: sign in as a moderator, open a report, decide it, and assert the audit trail contains the decision.
-3. A test on the note-required rule and the error branches.
+### The guards that now exist
+
+| Criterion | The guard |
+|---|---|
+| 1 — the signed URL | `apps/admin/lib/api.test.ts` — `signMediaUrl` asks the `report-media` bucket, signs the path it was given, returns the URL, and never signs an empty path |
+| 2 — the placeholder and the re-request | `apps/admin/app/queue/[reportId]/media-preview.test.tsx` — an unsignable URL shows the placeholder and renders **no** `<img>`; "Try again" issues a **second** request; a signed URL that fails to load degrades to the placeholder. The causal check was performed: breaking the placeholder branch fails the test |
+| 3 — every flag, with its reporter | `report-detail-client.tsx` renders `formatFlagReason(flag.reason)`, `copy.detailFlagReporter` + `flag.flaggerId`, and `formatTimestamp(flag.createdAt)` per flag — no truncation, no "and N more" |
+| 4 — the accent tile | `apps/admin/lib/format.test.ts` — every one of the eleven categories gets a family; `null` and an unknown category get `neutral`; violence and property crime are in different families. `apps/admin/lib/designTokens.test.ts` — the tile's colours come from the token file, and a CSS class exists for every family |
+| 5 — the uploader identity block | `report-detail-client.tsx` renders the profile id, phone, email, role, and the account state |
+| 6 — the identity leaks nowhere | The console has **no** `console.log`/`error`/`warn`/`info` at all; the identity is not in any URL or query key; it lives only in the server payload |
+| 7 — no public projection carries it | `supabase/tests/read_models.sql` Test 5g / 5h — the queue carries the uploader, the public feed omits `author_id` |
+| 8 — the auto-hide banner | `report-detail-client.tsx` renders `copy.detailAutoHideBanner` when `isAuthorAutoHide(detail.hideReason)` |
+| 9 — two choices, a required note, a submit | `apps/admin/app/queue/[reportId]/decision-panel.test.tsx` |
+| 10 — the mapped messages | `apps/admin/lib/queries.test.tsx` — the decision panel's error branches; the raw driver message never reaches the screen |
+
+### The two defects this work found and fixed
+
+1. **No signed URL existed anywhere in the console.** The detail screen rendered `media.storagePath` as **text**. The bucket was private and the moderator's policy already allowed the read — only the console never asked. `apps/admin/app/queue/[reportId]/media-preview.tsx` now does.
+2. **The flag list omitted the reporter.** The reason and the timestamp were rendered; `flag.flaggerId` was not, so a moderator could see *that* a report was flagged but not *who* flagged it.
+
+### What is still out of scope
+
+- **The console now has a live probe.** `tools/probe-moderation-console.cjs` — **37/37** — calls `moderation_report_detail` over the real PostgREST path with the moderator's own session and asserts the payload the browser receives: the uploader identity block, its account state, the flag reasons and the prior-actions strip. **No acceptance criterion in this story names a live probe**, so its absence never made the story `partial`.
+- The restore / remove write's own guarantees belong to story `003`; the audit history view belongs to `006`.

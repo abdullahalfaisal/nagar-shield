@@ -18,6 +18,11 @@ const config = {
   roots: ['<rootDir>'],
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
   moduleNameMapper: {
+    // The `@/*` alias is the app's own root (tsconfig `paths`). It has to be
+    // restated here: an explicit `moduleNameMapper` **replaces** the one
+    // `next/jest` derives from the tsconfig, so omitting it makes every
+    // `@/lib/...` import unresolvable in a test.
+    '^@/(.*)$': '<rootDir>/$1',
     '^@shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
     '^@nagar-shield/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },

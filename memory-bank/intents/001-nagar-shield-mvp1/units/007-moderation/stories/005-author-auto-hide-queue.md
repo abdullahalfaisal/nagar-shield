@@ -19,17 +19,17 @@ implemented: true
 
 ## Acceptance Criteria
 
-- [ ] **Given** the `/queue` list renders, **When** a report whose `hide_reason` is `'author_auto_hide'` or `'both'` is inspected, **Then** it carries a **distinct author auto-hide badge** that a report hidden by its own 3-flag threshold never carries — the two kinds of hidden report are separable in the list at a glance (FR-ALERTS-11)
-- [ ] **Given** the author auto-hide badge renders, **When** its label and explanation are read, **Then** the reason is stated in **Bangla and English** — that the report's author had **5 or more reports flagged in the last 24 hours** — and the copy names the **author rule**, never the report's own flag count
-- [ ] **Given** the queue contains both kinds of hidden report, **When** the moderator compares an author-auto-hidden report with a report hidden by its own 3-flag threshold, **Then** the two are distinguishable by badge, by the flag count shown on the row, and by the explanation text (FR-ALERTS-11 vs FR-ALERTS-7)
-- [ ] **Given** an author-auto-hidden report is opened from the group, **When** the moderator restores or removes it, **Then** the decision is submitted **per report** through `moderation_decide` with that report's own required note, and the other reports in the group are left untouched
-- [ ] **Given** the author-auto-hidden group holds more than one report, **When** the group's controls are inspected, **Then** there is **no bulk-restore control and no bulk-remove control** — no "restore all", no "remove all", no multi-select, and no shared-note action; every decision is made on one report with its own note
-- [ ] **Given** an author-auto-hidden report renders, **When** its row is inspected, **Then** the **author's aggregate 24 h flag count** is shown alongside the badge, and it is labelled separately from the report's **own** flag count so the two numbers cannot be confused
-- [ ] **Given** the queue is read, **When** the data source is inspected, **Then** the rows are `reports` where `moderation_status = 'hidden_pending_review'` **AND** the author's 24 h flag count is `>= 5` — the 24 h count is computed from `flags` joined on `reports.author_id`, and it is never confused with the per-report flag count `>= 3`
-- [ ] **Given** a moderator's own session reads the queue and the author-auto-hidden group, **When** the read completes, **Then** **no** `reports` row, **no** `flags` row, and **no** `moderation_actions` row is created or changed — a moderator's own read has no write side effect
-- [ ] **Given** a caller whose JWT does not belong to a `profiles.role = 'moderator'` account, **When** the queue is called, **Then** the response code is `FORBIDDEN` and no rows are returned; the group filter can only narrow the RPC's result, never widen it
-- [ ] **Given** a report was hidden by both rules — its own 3 flags **and** the author's 5-in-24 h — **When** its badge renders, **Then** it carries the **both** badge naming both causes rather than only one of them
-- [ ] **Given** an author-auto-hidden report has **zero flags of its own**, **When** its row renders, **Then** it still appears in the group with the badge and the author's 24 h count, and its own flag count renders as `0` — the report is not dropped for having no flags of its own
+- [x] **Given** the `/queue` list renders, **When** a report whose `hide_reason` is `'author_auto_hide'` or `'both'` is inspected, **Then** it carries a **distinct author auto-hide badge** that a report hidden by its own 3-flag threshold never carries — the two kinds of hidden report are separable in the list at a glance (FR-ALERTS-11)
+- [x] **Given** the author auto-hide badge renders, **When** its label and explanation are read, **Then** the reason is stated in **Bangla and English** — that the report's author had **5 or more reports flagged in the last 24 hours** — and the copy names the **author rule**, never the report's own flag count
+- [x] **Given** the queue contains both kinds of hidden report, **When** the moderator compares an author-auto-hidden report with a report hidden by its own 3-flag threshold, **Then** the two are distinguishable by badge, by the flag count shown on the row, and by the explanation text (FR-ALERTS-11 vs FR-ALERTS-7)
+- [x] **Given** an author-auto-hidden report is opened from the group, **When** the moderator restores or removes it, **Then** the decision is submitted **per report** through `moderation_decide` with that report's own required note, and the other reports in the group are left untouched
+- [x] **Given** the author-auto-hidden group holds more than one report, **When** the group's controls are inspected, **Then** there is **no bulk-restore control and no bulk-remove control** — no "restore all", no "remove all", no multi-select, and no shared-note action; every decision is made on one report with its own note
+- [x] **Given** an author-auto-hidden report renders, **When** its row is inspected, **Then** the **author's aggregate 24 h flag count** is shown alongside the badge, and it is labelled separately from the report's **own** flag count so the two numbers cannot be confused
+- [x] **Given** the queue is read, **When** the data source is inspected, **Then** the rows are `reports` where `moderation_status = 'hidden_pending_review'` **AND** the author's 24 h flag count is `>= 5` — the 24 h count is computed from `flags` joined on `reports.author_id`, and it is never confused with the per-report flag count `>= 3`
+- [x] **Given** a moderator's own session reads the queue and the author-auto-hidden group, **When** the read completes, **Then** **no** `reports` row, **no** `flags` row, and **no** `moderation_actions` row is created or changed — a moderator's own read has no write side effect
+- [x] **Given** a caller whose JWT does not belong to a `profiles.role = 'moderator'` account, **When** the queue is called, **Then** the response code is `FORBIDDEN` and no rows are returned; the group filter can only narrow the RPC's result, never widen it
+- [x] **Given** a report was hidden by both rules — its own 3 flags **and** the author's 5-in-24 h — **When** its badge renders, **Then** it carries the **both** badge naming both causes rather than only one of them
+- [x] **Given** an author-auto-hidden report has **zero flags of its own**, **When** its row renders, **Then** it still appears in the group with the badge and the author's 24 h count, and its own flag count renders as `0` — the report is not dropped for having no flags of its own
 
 ## Technical Notes
 
@@ -112,19 +112,47 @@ the derivation helpers in `apps/admin/lib/format.ts` and the copy in
 
 ### Verification
 
-- `apps/admin/lib/format.test.ts` — 6 new Jest tests: the group holds
-  `author_auto_hide` and `both` and excludes `flag_threshold` and `manual`;
-  the badge is `'author'` for the author rule, `'both'` for both causes, and
-  `null` for the threshold and the manual hide; and the two badge variants are
-  distinct from each other and from the threshold case.
-- `apps/admin/lib/noBulkActions.test.ts` — 6 Jest tests, including a **source
+- `apps/admin/lib/format.test.ts` — the group holds `author_auto_hide` and
+  `both` and excludes `flag_threshold` and `manual`; the badge is `'author'`
+  for the author rule, `'both'` for both causes, and `null` for the threshold
+  and the manual hide; and the two badge variants are distinct from each other
+  and from the threshold case.
+- `apps/admin/lib/noBulkActions.test.ts` — 8 Jest tests, including a **source
   scan** over `app/` and `lib/` that fails the build on any bulk action, any
   multi-select, any checkbox in a moderation list, any shared note, any
   `restoreAll` / `removeAll` / `bulkRestore` identifier, and any decision
   written for a set of report ids. It also asserts the group issues no second
-  request — there are exactly two `fetchModerationQueue` call sites (the page
-  load and "Load more"), neither of which takes the group — and that the
-  decision call does not sit in the queue list at all.
+  request and that the decision call does not sit in the queue list at all.
+
+  The "no second request" assertion was **re-expressed** when the console
+  moved onto TanStack Query. It used to count the `fetchModerationQueue`
+  call sites in the queue page — exactly two, the page load and "Load more",
+  neither taking the group. The fetch moved into the query hook, so the count
+  became zero and the assertion was measuring a proxy rather than the rule.
+
+  The rule is now asserted where it actually lives, and the stronger
+  statements replace the count:
+
+  - the queue page contains **no** `fetchModerationQueue` call — the read is
+    the hook's, and a call site in the page would be a second read;
+  - the queue page uses `useModerationQueue` and slices the accumulated pages
+    with `flatMap`;
+  - the queue page carries **no** `group:` parameter;
+  - **`lib/queries.ts` — where the read now lives — carries no `group:`
+    parameter and no `author_auto_hide` string at all.** The group is not in
+    the query key and never reaches the server. If it entered the key, the
+    server would be asked to filter by it, the console would issue a second
+    read for the same data, and the group would become a server-side concept
+    it is not.
+
+  The same file asserts the one-report shape of the write: the detail route
+  calls `useSubmitDecision`, the query layer's mutation variables are
+  `{ reportId, decision, note }`, and there is no `reportIds` and no `ids`
+  anywhere.
+- `apps/admin/lib/designTokens.test.ts` — the badge and the count chip are
+  built from the shared token subset: no file outside `app/globals.css`
+  contains a hex colour, and every `var(--token)` resolves to a declared
+  token.
 
 ## Dependencies
 

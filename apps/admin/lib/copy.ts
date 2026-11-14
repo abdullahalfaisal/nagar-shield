@@ -49,12 +49,15 @@ export interface AdminCopy {
   detailTitle: string;
   detailMedia: string;
   detailNoMedia: string;
+  detailMediaUnavailable: string;
+  detailMediaRetry: string;
   detailArea: string;
   detailCategory: string;
   detailUncategorised: string;
   detailDescription: string;
   detailCapturedAt: string;
   detailFlags: string;
+  detailFlagReporter: string;
   detailUploader: string;
   detailUploaderId: string;
   detailUploaderPhone: string;
@@ -164,12 +167,15 @@ const bn: AdminCopy = {
   detailTitle: 'রিপোর্ট পর্যালোচনা',
   detailMedia: 'মিডিয়া',
   detailNoMedia: 'কোনো মিডিয়া নেই',
+  detailMediaUnavailable: 'মিডিয়াটি দেখা যাচ্ছে না',
+  detailMediaRetry: 'আবার চেষ্টা করুন',
   detailArea: 'এলাকা',
   detailCategory: 'ক্যাটাগরি',
   detailUncategorised: 'শ্রেণিবদ্ধ নয়',
   detailDescription: 'বিবরণ',
   detailCapturedAt: 'ক্যাপচারের সময়',
   detailFlags: 'ফ্ল্যাগের কারণ',
+  detailFlagReporter: 'ফ্ল্যাগ করেছেন',
   detailUploader: 'আপলোডকারীর পরিচয়',
   detailUploaderId: 'প্রোফাইল আইডি',
   detailUploaderPhone: 'ফোন',
@@ -279,12 +285,15 @@ const en: AdminCopy = {
   detailTitle: 'Report review',
   detailMedia: 'Media',
   detailNoMedia: 'No media attached',
+  detailMediaUnavailable: 'Media unavailable',
+  detailMediaRetry: 'Try again',
   detailArea: 'Area',
   detailCategory: 'Category',
   detailUncategorised: 'Uncategorised',
   detailDescription: 'Description',
   detailCapturedAt: 'Captured at',
   detailFlags: 'Flag reasons',
+  detailFlagReporter: 'Flagged by',
   detailUploader: 'Uploader identity',
   detailUploaderId: 'Profile id',
   detailUploaderPhone: 'Phone',

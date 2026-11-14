@@ -1,5 +1,5 @@
 import { AppError } from '@nagar-shield/shared';
-import { parseErrorBody, toAppError } from '@/lib/api';
+import { parseErrorBody, signMediaUrl, toAppError } from '@/lib/api';
 
 /**
  * The console's error mapping.
@@ -69,5 +69,66 @@ describe('parseErrorBody', () => {
     expect(parseErrorBody(null).code).toBe('INTERNAL');
     expect(parseErrorBody({}).code).toBe('INTERNAL');
     expect(parseErrorBody({ error: {} }).code).toBe('INTERNAL');
+  });
+});
+
+describe('signMediaUrl', () => {
+  /**
+   * A minimal Storage double.
+   *
+   * The console signs a URL with the moderator's **own** session and the anon
+   * key — never a service-role credential — so the only thing that matters
+   * here is which bucket it asks and what it does with the answer.
+   */
+  function storageClient(result: { data?: unknown; error?: unknown }) {
+    const createSignedUrl = jest.fn().mockResolvedValue(result);
+    const from = jest.fn().mockReturnValue({ createSignedUrl });
+    return { client: { storage: { from } } as never, from, createSignedUrl };
+  }
+
+  it('asks the private report-media bucket', async () => {
+    const { client, from } = storageClient({ data: { signedUrl: 'https://signed/x.jpg' } });
+
+    await signMediaUrl(client, 'reports/token/media-1/photo.jpg');
+
+    expect(from).toHaveBeenCalledWith('report-media');
+  });
+
+  it('signs the URL for the path it was given', async () => {
+    const { client, createSignedUrl } = storageClient({ data: { signedUrl: 'https://signed/x.jpg' } });
+
+    await signMediaUrl(client, 'reports/token/media-1/photo.jpg');
+
+    expect(createSignedUrl).toHaveBeenCalledWith('reports/token/media-1/photo.jpg', expect.any(Number));
+  });
+
+  it('returns the signed URL', async () => {
+    const { client } = storageClient({ data: { signedUrl: 'https://signed/x.jpg' } });
+
+    expect(await signMediaUrl(client, 'reports/token/media-1/photo.jpg')).toBe(
+      'https://signed/x.jpg',
+    );
+  });
+
+  it('returns null when the URL cannot be signed', async () => {
+    // The placeholder rule: an unsignable URL is a **null**, never a throw.
+    // A thrown error would take down the whole review screen over one
+    // unavailable preview.
+    const { client } = storageClient({ error: { message: 'not allowed' } });
+
+    expect(await signMediaUrl(client, 'reports/token/media-1/photo.jpg')).toBeNull();
+  });
+
+  it('returns null when the bucket answers with no URL', async () => {
+    const { client } = storageClient({ data: { signedUrl: null } });
+
+    expect(await signMediaUrl(client, 'reports/token/media-1/photo.jpg')).toBeNull();
+  });
+
+  it('never asks for a URL with no path', async () => {
+    const { client, createSignedUrl } = storageClient({ data: { signedUrl: 'https://signed/x.jpg' } });
+
+    expect(await signMediaUrl(client, '')).toBeNull();
+    expect(createSignedUrl).not.toHaveBeenCalled();
   });
 });

@@ -341,6 +341,39 @@ export async function fetchReportDetail(
   return detail;
 }
 
+/**
+ * A signed URL for one media object.
+ *
+ * The `report-media` bucket is **private** — the bytes are never public, and
+ * a moderator reads them through a signed URL rather than a public one. The
+ * database already allows this: the `report_media_select_moderator` Storage
+ * policy grants a moderator `SELECT` on every object in the bucket, so the
+ * console signs the URL with the moderator's **own session** and the anon key.
+ * No service-role credential is involved.
+ *
+ * The URL is short-lived (ten minutes) and is never written to a query key, a
+ * URL, or a log — it lives in component state for as long as the preview is on
+ * screen, and it is re-requested on demand.
+ *
+ * A URL that cannot be signed returns `null` rather than throwing: the story's
+ * rule is that an unavailable preview shows a neutral placeholder, never a
+ * broken image and never a failed screen.
+ */
+export async function signMediaUrl(
+  client: SupabaseClient,
+  storagePath: string,
+): Promise<string | null> {
+  if (!storagePath) return null;
+
+  const { data, error } = await client.storage
+    .from('report-media')
+    .createSignedUrl(storagePath, 60 * 10);
+
+  if (error) return null;
+
+  return data?.signedUrl ?? null;
+}
+
 /** The append-only audit trail, newest first. */
 export async function fetchAuditTrail(
   client: SupabaseClient,

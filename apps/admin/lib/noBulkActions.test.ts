@@ -188,7 +188,7 @@ describe('the console has no bulk action', () => {
   });
 
   it('offers no multi-select affordance in the queue', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'page.tsx'), 'utf8');
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
 
     expect(stripProse(queue)).not.toMatch(/type\s*=\s*['"]checkbox['"]/);
     expect(stripProse(queue)).not.toMatch(/\bselectedIds\b/);
@@ -196,30 +196,67 @@ describe('the console has no bulk action', () => {
   });
 
   it('decides one report at a time, through the per-report decision', () => {
-    const decision = readFileSync(join(__dirname, '..', 'app', 'queue', '[reportId]', 'page.tsx'), 'utf8');
+    const decision = readFileSync(join(__dirname, '..', 'app', 'queue', '[reportId]', 'report-detail-client.tsx'), 'utf8');
     const code = stripProse(decision);
 
     // The per-report decision is the only decision path. It writes one row.
+    //
+    // The write itself lives in the query layer (`lib/queries.ts`) since the
+    // refactor onto TanStack Query, so the page's own contribution is that it
+    // calls the **single-report** mutation. The shape of that mutation's
+    // variables is what carries the "one row" guarantee — there is no
+    // `reportIds` and no `ids`.
+    expect(code).toContain('useSubmitDecision');
+    expect(code).not.toMatch(/\b(reportIds|ids)\s*:/);
+  });
+
+  it('offers no bulk-shaped write anywhere in the query layer', () => {
+    // The same guarantee, checked where the write actually happens now.
+    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8');
+    const code = stripProse(queries);
+
     expect(code).toContain('submitDecision');
     expect(code).not.toMatch(/\b(reportIds|ids)\s*:/);
+    // One decision, one report id. The mutation's variables are the
+    // single-report shape.
+    expect(code).toMatch(/reportId\s*:/);
   });
 });
 
 describe('the author-auto-hide group is a slice, not a second queue', () => {
   it('filters the rows already on screen, and issues no second request', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'page.tsx'), 'utf8');
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
     const code = stripProse(queue);
 
-    // One fetch call site for the queue page. The group narrows the result;
-    // it does not re-read.
-    expect(code.match(/fetchModerationQueue\(/g) ?? []).toHaveLength(2);
-    // Both call sites are the page load and "Load more" — neither takes the
-    // group as a parameter, because the group is not the server's concern.
+    // The queue page issues **no** fetch of its own. The read lives in the
+    // query hook (`useModerationQueue`), and the page narrows the rows it
+    // already has. A call site here would be a second read.
+    expect(code).not.toContain('fetchModerationQueue');
+    // The page reads through the hook, and slices the accumulated pages.
+    expect(code).toContain('useModerationQueue');
+    expect(code).toContain('flatMap');
+    // The group never reaches the server as a parameter.
     expect(code).not.toMatch(/group\s*:/);
   });
 
+  it('keeps the group out of the query key, so the server is never asked to filter by it', () => {
+    // The invariant the old call-site count was a proxy for. It now lives in
+    // the query layer, and it is checked there — where a change would
+    // actually be made.
+    //
+    // If the group entered the key, the server would be asked to filter by
+    // it, the console would issue a second read for the same data, and the
+    // group would become a server-side concept it is not.
+    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8');
+    const code = stripProse(queries);
+
+    expect(code).toContain('fetchModerationQueue');
+    expect(code).not.toMatch(/group\s*:/);
+    expect(code).not.toContain('author_auto_hide');
+  });
+
   it('writes nothing on a read — no decision call sits in the queue list', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'page.tsx'), 'utf8');
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
 
     // The decision lives on the per-report detail route. The list is a read.
     expect(stripProse(queue)).not.toContain('moderation_decide');

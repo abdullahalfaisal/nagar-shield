@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AppError } from '@nagar-shield/shared';
 import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
 import { getBrowserClient } from '@/lib/supabase/client';
+import { AccessOnlyState } from '@/app/access-only-state';
 
 /**
  * The moderator sign-in.
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accessOnly, setAccessOnly] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +65,11 @@ export default function LoginPage() {
         // The citizen is signed in but has no moderation access. The console
         // shows the access-only state rather than pretending the sign-in
         // failed — and the server refuses every call regardless.
-        router.replace('/queue');
+        //
+        // The state is **rendered here**, not routed to: routing to the queue
+        // would land the citizen on a screen that fails with FORBIDDEN and
+        // shows a generic error, which says nothing about why.
+        setAccessOnly(true);
         return;
       }
 
@@ -80,6 +86,10 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (accessOnly) {
+    return <AccessOnlyState />;
   }
 
   return (

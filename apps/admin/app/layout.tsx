@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Providers } from './providers';
 import './globals.css';
 
 /**
@@ -6,6 +7,9 @@ import './globals.css';
  *
  * Dark is the default — the prototype's `restoreTheme()` sets
  * `data-theme="dark"` on load, and the token layer mirrors that.
+ *
+ * `Providers` is the client boundary: it owns the query client, so the
+ * layout itself stays a server component.
  */
 
 export const metadata: Metadata = {
@@ -17,7 +21,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="bn" data-theme="dark">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

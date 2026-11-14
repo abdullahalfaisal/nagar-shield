@@ -484,6 +484,35 @@ jobs:
       - name: the account-deletion contract
         run: pnpm deletion:check
 
+      # The moderator console's **read models**, proved through the door the
+      # browser uses: GoTrue → PostgREST → the four moderator-only RPCs, with
+      # the moderator's **own** session.
+      #
+      # This is the one part of the console nothing else covered. The Edge
+      # Function smoke run proves `moderation-decide` and `disable-user`;
+      # `read_models.sql` asserts the four read models from inside Postgres,
+      # which cannot see the **JSON shape** the browser actually receives; and
+      # the component tests prove the console's own parsing. This probe joins
+      # the last two: it calls the RPCs as the browser does and asserts the
+      # keys the console renders.
+      #
+      # The assertions that earn their keep are the **negative** ones. A
+      # citizen must be refused the queue, the detail, the account search and
+      # the audit trail — that refusal is what makes the console
+      # moderator-only. And the account lookup must stay an **exact** match:
+      # an empty query, an unmatched query and a partial phone prefix must
+      # all return nothing, because the moment it became a fuzzy list it
+      # would be a user-database browser rather than a targeted tool
+      # (FR-NG-3).
+      #
+      # The fixture is **built**, not borrowed: the probe files its own
+      # report, flags it three times as three distinct citizens so the
+      # product's own threshold moves it into the queue, and decides it so
+      # the trail has a row. A probe that read whatever happened to be in the
+      # database would pass on a dirty instance and fail on a clean one.
+      - name: the moderator console contract
+        run: pnpm console:check
+
   # ---------------------------------------------------------------------------
   # The secret scan — the mechanical proof that the service-role key is never
   # in a bundle. It runs last because it inspects the **built** output.

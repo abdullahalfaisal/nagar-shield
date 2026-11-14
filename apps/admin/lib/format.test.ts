@@ -1,6 +1,7 @@
 import {
   authorAutoHideBadge,
   formatAreaLine,
+  formatCategoryAccent,
   formatCategoryLabel,
   formatDecisionLabel,
   formatFlagReason,
@@ -13,6 +14,7 @@ import {
   maskPhone,
   maskUploaderIdentity,
 } from '@/lib/format';
+import { REPORT_CATEGORIES } from '@nagar-shield/shared';
 
 /**
  * The console's display rules.
@@ -138,6 +140,38 @@ describe('formatCategoryLabel', () => {
   });
 });
 
+describe('formatCategoryAccent', () => {
+  it('gives every category an accent family', () => {
+    // All eleven, and none of them falls through to the neutral family
+    // except `other` — which is the neutral one by definition.
+    for (const category of REPORT_CATEGORIES) {
+      const accent = formatCategoryAccent(category);
+
+      expect(accent).toBeTruthy();
+      expect(['violet', 'red', 'amber', 'green', 'sky', 'neutral']).toContain(accent);
+    }
+  });
+
+  it('gives an uncategorised report the neutral accent', () => {
+    expect(formatCategoryAccent(null)).toBe('neutral');
+  });
+
+  it('gives an unknown category the neutral accent', () => {
+    // The category arrives from the server as a plain string. A server that
+    // grows a new category before the console learns it must not crash the
+    // tile.
+    expect(formatCategoryAccent('a_category_from_the_future' as never)).toBe('neutral');
+  });
+
+  it('separates violence from property crime', () => {
+    // The tile is a **second** signal, and it has to carry information. If
+    // every category shared a family the tile would be decoration.
+    expect(formatCategoryAccent('assault')).toBe('red');
+    expect(formatCategoryAccent('theft')).toBe('violet');
+    expect(formatCategoryAccent('assault')).not.toBe(formatCategoryAccent('theft'));
+  });
+});
+
 describe('formatDecisionLabel', () => {
   it('labels the three decisions', () => {
     expect(formatDecisionLabel('restore')).toContain('Restored');
@@ -157,6 +191,15 @@ describe('formatFlagReason', () => {
     expect(formatFlagReason('duplicate')).toContain('Duplicate');
     expect(formatFlagReason('off_topic')).toContain('Off topic');
     expect(formatFlagReason('other')).toContain('Other');
+  });
+
+  it('renders an unknown reason as itself, not as nothing', () => {
+    // The reason arrives from the server as a plain string. A server that
+    // grows a new reason before the console learns it must not render an
+    // **empty** chip — a chip with no text tells a moderator less than a
+    // chip with an unfamiliar word.
+    expect(formatFlagReason('a_reason_from_the_future')).toBe('a_reason_from_the_future');
+    expect(formatFlagReason('a_reason_from_the_future')).not.toBe('');
   });
 });
 

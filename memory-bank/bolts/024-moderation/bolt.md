@@ -3,7 +3,7 @@ id: 024-moderation
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [005-author-auto-hide-queue, 006-moderator-action-audit-log]
 created: 2026-11-04T00:00:00Z
 

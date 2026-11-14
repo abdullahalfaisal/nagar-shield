@@ -88,7 +88,7 @@ const STATES = ['complete', 'partial', 'planned'];
 
 /** Maps a story's `implemented` frontmatter to its index status. */
 function statusFor(story) {
-  if (story.implemented === 'true') return 'complete';
+  if (story.implemented === 'true' || story.implemented === 'complete') return 'complete';
   if (story.implemented === 'partial') return 'partial';
   return 'planned';
 }
@@ -98,13 +98,16 @@ function statusFor(story) {
  *
  * `planned` and `false` both mean "not built"; `planned` is the explicit
  * spelling, `false` is the original one. Both are accepted so a story can
- * move between them without the tool reporting drift.
+ * move between them without the tool reporting drift. `complete` and `true`
+ * likewise both mean "built".
  */
-const IMPLEMENTED_VALUES = ['true', 'false', 'partial', 'planned'];
+const IMPLEMENTED_VALUES = ['true', 'false', 'partial', 'planned', 'complete'];
 
 /** Reads every story file's `id` and `implemented` frontmatter. */
 function readStories() {
   const stories = [];
+  /** Story files whose `implemented:` value is not in the vocabulary. */
+  const unknownValues = [];
 
   for (const intentDir of findIntentDirs()) {
     const unitsRoot = path.join(intentDir, 'units');
@@ -127,15 +130,34 @@ function readStories() {
         const frontmatter = text.slice(0, text.indexOf('\n---', 3) + 4).replace(/\r/g, '');
 
         const id = frontmatter.match(/^id:\s*(.+)$/m);
-        const implemented = frontmatter.match(
-          new RegExp(`^implemented:\\s*(${IMPLEMENTED_VALUES.join('|')})$`, 'm'),
-        );
+        const implementedRaw = frontmatter.match(/^implemented:\s*(.+)$/m);
+        const implemented = implementedRaw
+          ? implementedRaw[1].trim()
+          : 'false';
 
         if (!id) continue;
 
+        // An unrecognised value must be a **hard error**, never a silent
+        // default. The vocabulary once accepted only `true`/`false`/
+        // `partial`/`planned`, so a story written as `implemented: complete`
+        // fell through to the default `'false'` and was reported as
+        // `planned` — and because the index was derived from the same broken
+        // parse, the gate agreed with itself and reported no drift. Five
+        // `complete` stories were silently demoted. The lesson: a gate that
+        // derives both sides of a comparison from one shared mistake cannot
+        // catch the mistake. A value the tool does not understand is a
+        // vocabulary gap, and it is reported as one.
+        if (!IMPLEMENTED_VALUES.includes(implemented)) {
+          unknownValues.push({
+            id: id[1].trim(),
+            value: implemented,
+            file: path.relative(ROOT, full),
+          });
+        }
+
         stories.push({
           id: id[1].trim(),
-          implemented: implemented ? implemented[1] : 'false',
+          implemented,
           unit: unit.name,
           file: path.relative(ROOT, full),
         });
@@ -143,7 +165,7 @@ function readStories() {
     }
   }
 
-  return stories;
+  return { stories, unknownValues };
 }
 
 /** The index's rows, parsed. */
@@ -215,11 +237,21 @@ function readBolts() {
 
 function main() {
   const write = process.argv.includes('--write');
-  const stories = readStories();
+  const { stories, unknownValues } = readStories();
   const { text, rows } = readIndexRows();
 
   const byId = new Map(stories.map((story) => [story.id, story]));
   const drift = [];
+
+  // 0. A story whose `implemented:` value the tool does not understand is a
+  //    **vocabulary gap**, not a `planned` story. It is reported first,
+  //    because every count below is derived from the same parse and would
+  //    be wrong for the same reason.
+  for (const unknown of unknownValues) {
+    drift.push(
+      `${unknown.id}: the story file says "implemented: ${unknown.value}", which is not one of ${IMPLEMENTED_VALUES.join(', ')}`,
+    );
+  }
 
   // 1. Every row's status must match its story file.
   for (const row of rows) {
@@ -265,7 +297,8 @@ function main() {
   const storyUpdates = [];
 
   for (const story of stories) {
-    const wantStatus = story.implemented === 'true' ? 'complete' : 'ready';
+    const wantStatus =
+      story.implemented === 'true' || story.implemented === 'complete' ? 'complete' : 'ready';
     const body = fs.readFileSync(path.join(ROOT, story.file), 'utf8');
     const frontmatter = body.slice(0, body.indexOf('\n---', 3) + 4).replace(/\r/g, '');
     const currentStatus = (frontmatter.match(/^status:\s*(.+)$/m) || [])[1];

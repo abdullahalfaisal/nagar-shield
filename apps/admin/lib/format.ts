@@ -78,8 +78,68 @@ export function formatCategoryLabel(category: ReportCategory | null): string | n
   return `${label.bn} — ${label.en}`;
 }
 
-/** The flag-reason label pair, matching the shared enum vocabulary. */
-export function formatFlagReason(reason: FlagReason): string {
+/**
+ * The category's accent **token family**.
+ *
+ * The console renders a category accent tile, and the tile's colour comes
+ * from the design-token custom properties in `globals.css` — never from a
+ * hex literal. Story `001` requires the console to be built from the
+ * web-safe CSS custom-property subset of `docs/design/design-tokens.md`, with
+ * **no new hex value**, so the shared package's per-category hex map
+ * (`REPORT_CATEGORY_ACCENTS`) is deliberately *not* used here: those values
+ * come from the prototype's alert card and are not in the token set.
+ *
+ * Instead each of the eleven categories is assigned one of the five accent
+ * families the token subset actually has — violet, red, amber, green, sky.
+ * The tile is therefore a **token reference**, and the CSS owns the colour.
+ *
+ * The assignment is by kind rather than by hue-matching: violence is red,
+ * property crime is violet, emergencies are amber, medical is green, and
+ * fraud and suspicion are sky. An uncategorised report gets the neutral
+ * ink, which is what the tile falls back to.
+ */
+export type CategoryAccentFamily = 'violet' | 'red' | 'amber' | 'green' | 'sky' | 'neutral';
+
+const CATEGORY_ACCENTS: Record<ReportCategory, CategoryAccentFamily> = {
+  // Property crime — violet, the brand family.
+  theft: 'violet',
+  vandalism: 'violet',
+  // Violence against a person — red.
+  assault: 'red',
+  robbery: 'red',
+  harassment: 'red',
+  // Emergencies — amber.
+  accident: 'amber',
+  fire: 'amber',
+  // Medical — green.
+  medical: 'green',
+  // Deception and suspicion — sky.
+  fraud: 'sky',
+  suspicious: 'sky',
+  // Everything else — the neutral ink.
+  other: 'neutral',
+};
+
+/**
+ * The accent family for a report's category.
+ *
+ * An unknown or absent category gets the neutral family — the tile still
+ * renders, in the same ink the rest of the console uses for "nothing here".
+ */
+export function formatCategoryAccent(category: ReportCategory | null): CategoryAccentFamily {
+  if (!category) return 'neutral';
+  return CATEGORY_ACCENTS[category] ?? 'neutral';
+}
+
+/**
+ * The flag-reason label pair, matching the shared enum vocabulary.
+ *
+ * The reason arrives from the server as a plain string, so an unknown value
+ * is possible — a server that grows a new reason before the console learns
+ * it. The fallback renders the raw value rather than nothing: a chip with
+ * no text tells a moderator less than a chip with an unfamiliar word.
+ */
+export function formatFlagReason(reason: FlagReason | string): string {
   const labels: Record<FlagReason, string> = {
     misinformation: 'ভুল তথ্য — Misinformation',
     harassment: 'উত্যন্তকরণ — Harassment',
@@ -87,7 +147,7 @@ export function formatFlagReason(reason: FlagReason): string {
     off_topic: 'অপ্রাসঙ্গিক — Off topic',
     other: 'অন্যান্য — Other',
   };
-  return labels[reason];
+  return labels[reason as FlagReason] ?? reason;
 }
 
 /** The decision label for the audit trail. Unknown values never crash. */

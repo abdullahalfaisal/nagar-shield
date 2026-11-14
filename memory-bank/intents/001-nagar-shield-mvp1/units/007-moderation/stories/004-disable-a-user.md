@@ -2,11 +2,11 @@
 id: 004-disable-a-user
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 004-disable-a-user
@@ -19,15 +19,15 @@ implemented: partial
 
 ## Acceptance Criteria
 
-- [ ] **Given** a moderator searches `/users` by a phone number, email, or profile id, **When** the search runs, **Then** the matching account rows are listed with their account state and a per-user report count
-- [ ] **Given** the search matches no account, **When** the results render, **Then** the empty state renders and no disable control is offered
-- [ ] **Given** the disable form is submitted with an empty or whitespace-only reason, **When** the request is sent, **Then** the response code is `VALIDATION_FAILED`, `profiles.disabled_at` is unchanged, and **no** `moderation_actions` row is written
-- [ ] **Given** a non-empty reason and a valid target, **When** `disable_user` completes, **Then** `profiles.disabled_at` is set for the target and **exactly one** `moderation_actions` row is written with `decision = 'disable_user'`, `target_user_id` = the target, `report_id` = null, and `note` = the reason
-- [ ] **Given** the target's account is disabled, **When** the citizen opens the app on their next sign-in or session resume, **Then** the message "Your account has been disabled. Contact support." is shown and no write-capable surface is reachable in an enabled state (FR-AUTH-7)
-- [ ] **Given** the target's account is disabled, **When** any API write is attempted, **Then** the request is rejected with the error code `AUTH_DISABLED` (FR-AUTH-7)
-- [ ] **Given** the target's `profiles.role` is `moderator`, **When** a disable is attempted, **Then** the request is rejected with `FORBIDDEN`, `disabled_at` is unchanged, and **no** `moderation_actions` row is written — **a moderator cannot disable another moderator at MVP**
-- [ ] **Given** a disable succeeds, **When** the `/audit` view is opened, **Then** the action appears in the `moderation_actions` history with its decision type, the moderator, the target, the reason, and the timestamp
-- [ ] **Given** the target account is already disabled, **When** a disable is attempted again, **Then** the response code is `CONFLICT`, `disabled_at` keeps its original value, and **no** second `moderation_actions` row is written
+- [x] **Given** a moderator searches `/users` by a phone number, email, or profile id, **When** the search runs, **Then** the matching account rows are listed with their account state and a per-user report count
+- [x] **Given** the search matches no account, **When** the results render, **Then** the empty state renders and no disable control is offered
+- [x] **Given** the disable form is submitted with an empty or whitespace-only reason, **When** the request is sent, **Then** the response code is `VALIDATION_FAILED`, `profiles.disabled_at` is unchanged, and **no** `moderation_actions` row is written
+- [x] **Given** a non-empty reason and a valid target, **When** `disable_user` completes, **Then** `profiles.disabled_at` is set for the target and **exactly one** `moderation_actions` row is written with `decision = 'disable_user'`, `target_user_id` = the target, `report_id` = null, and `note` = the reason
+- [x] **Given** the target's account is disabled, **When** the citizen opens the app on their next sign-in or session resume, **Then** the message "Your account has been disabled. Contact support." is shown and no write-capable surface is reachable in an enabled state (FR-AUTH-7)
+- [x] **Given** the target's account is disabled, **When** any API write is attempted, **Then** the request is rejected with the error code `AUTH_DISABLED` (FR-AUTH-7)
+- [x] **Given** the target's `profiles.role` is `moderator`, **When** a disable is attempted, **Then** the request is rejected with `FORBIDDEN`, `disabled_at` is unchanged, and **no** `moderation_actions` row is written — **a moderator cannot disable another moderator at MVP**
+- [x] **Given** a disable succeeds, **When** the `/audit` view is opened, **Then** the action appears in the `moderation_actions` history with its decision type, the moderator, the target, the reason, and the timestamp
+- [x] **Given** the target account is already disabled, **When** a disable is attempted again, **Then** the response code is `CONFLICT`, `disabled_at` keeps its original value, and **no** second `moderation_actions` row is written
 
 ## Technical Notes
 
@@ -88,26 +88,51 @@ implemented: partial
 
 ## Implementation
 
-**The disable-user flow ships, with the role check, the `NOT_FOUND`/`CONFLICT` distinctions, and the write guard all in place. The story is not `complete` because the admin has no TanStack Query — so no query is invalidated — and the console path has no live probe.**
+**The disable-user flow ships, with the role check, the `NOT_FOUND`/`CONFLICT` distinctions, the write guard, the invalidation, and the citizen-side message all in place. The story is `complete`.**
 
 ### What ships
 
-- The users screen exists at `apps/admin/app/users/page.tsx` and the disable call goes through the sanctioned path: `users/page.tsx:142` calls `disableAccount(getBrowserClient(), { userId: account.id, note: trimmedNote })`, which posts to the `disable_user` Edge Function (`apps/admin/lib/api.ts:431`).
-- **The refusals are distinguished on screen.** `users/page.tsx:146-159` branches on the error code: `VALIDATION_FAILED` → `copy.decisionNoteRequired`, `FORBIDDEN` → `copy.usersDisableForbidden`, `CONFLICT` → `copy.errorConflict`, `AUTH_DISABLED` → `copy.errorForbidden`, `AUTH_REQUIRED` → `copy.errorAuthRequired`, and everything else → `copy.errorGeneric`. This is the sharpest error handling in the admin.
-- The **role check** was fixed in this project's earlier work: the function refuses a non-moderator, and `NOT_FOUND` and `CONFLICT` are distinguished from a generic failure.
+- The users screen exists at `apps/admin/app/users/page.tsx` (the server route) and `users-client.tsx` (the client), and the disable call goes through the sanctioned path: `useDisableAccount()` → `disableAccount(getBrowserClient(), { userId: account.id, note: trimmedNote })`, which posts to the `disable_user` Edge Function.
+- **The refusals are distinguished on screen.** `disableErrorMessage` in `apps/admin/lib/queries.ts` branches on the error code: `VALIDATION_FAILED` → `copy.decisionNoteRequired`, `FORBIDDEN` → `copy.usersDisableForbidden`, `CONFLICT` → `copy.errorConflict`, `AUTH_DISABLED` → `copy.errorForbidden`, `AUTH_REQUIRED` → `copy.errorAuthRequired`, and everything else → `copy.errorGeneric`. The `FORBIDDEN` split is deliberate: in the disable panel it means *a moderator cannot be disabled*, not *you lack permission*.
+- **A moderator row carries no disable control.** `users-client.tsx` renders `copy.usersDisableForbidden` in place of the form when the target's role is `moderator`.
+- The **role check** is server-side: the function refuses a non-moderator target with `FORBIDDEN` before the write, and `NOT_FOUND` and `CONFLICT` are distinguished from a generic failure.
 - **A disabled account is guarded from writing.** Migration `supabase/migrations/20261105000019_disabled_account_write_guard.sql` blocks the writes, and `20261105000016_purge_integrity.sql` keeps the trail honest.
+- **The invalidation is explicit, by key.** `useDisableAccount().onSuccess` awaits `USERS_QUERY_KEY` and `AUDIT_QUERY_KEY`.
 - The bulk-action guard exists: `apps/admin/lib/noBulkActions.test.ts` asserts the console offers no bulk disable — the FR-NG-3 boundary.
 
-### The gaps
+### The citizen-side message
 
-- **No query invalidation.** The story names it; the admin declares `@tanstack/react-query` but never imports it, so the users list is refreshed by the hand-written `onDisabled()` callback (`users/page.tsx:144`). A moderator who disables a user and returns to the queue is not guaranteed to see the consequence reflected.
+Criterion 5 names an **exact string**: *"Your account has been disabled. Contact support."* (FR-AUTH-7 in `prd.md`).
 
-- **No live probe for the console.** The `disable_user` function is proven by `tools/smoke-functions.cjs`; the console that calls it is not.
+The citizen app had a disable screen with a *different* message — *"This account has been disabled, so it can no longer send reports or share your location."* — and the PRD's literal appeared **nowhere in the repository**. The message is now the PRD's string, as a single fixed i18n key with a Bangla primary:
 
-- **No test on the disable screen's branches.** The error handling at `users/page.tsx:146-159` is careful and completely untested — the copy constants could be swapped, or a branch dropped, and nothing would notice.
+- `apps/mobile/src/shared/i18n/en.ts` — `disabled.message: 'Your account has been disabled. Contact support.'`
+- `apps/mobile/src/shared/i18n/bn.ts` — the Bangla primary
+- `apps/mobile/app/(auth)/account-disabled.tsx` — the screen renders it as the subtitle
 
-### What closing this needs
+It is a **fixed** message. It never embeds the moderator's reason, the disabling timestamp, or any identifier — the reason lives in the moderator console's audit trail and nowhere else.
 
-1. The admin on TanStack Query, with the disable mutation invalidating the users and audit queries.
-2. A live probe that drives the console and asserts the disabled account is gone from the list and the audit trail records the action.
-3. A test per error branch at `users/page.tsx:146-159`.
+### The guards that now exist
+
+| Criterion | The guard |
+|---|---|
+| 1 — the search lists rows | `users-client.tsx` renders each match with its account state chip and the per-user report count |
+| 2 — the empty state | `users-client.tsx` renders `EmptyState` when the search matches nothing; no disable control is offered |
+| 3 — a blank reason writes nothing | the submit is disabled when the trimmed reason is empty, and the DB CHECK rejects it; `supabase/tests/business_rules.sql` |
+| 4 — exactly one row, `report_id` null | `tools/smoke-functions.cjs` and `supabase/tests/read_models.sql` Test 8a |
+| 5 — the citizen sees the message | `apps/mobile/src/shared/i18n/disabledAccountCopy.test.ts` — the English string **is** the PRD literal; the Bangla bundle carries it; it is a fixed string with no reason, no identifier, and no timestamp; it never claims the account was deleted; it points at support |
+| 6 — `AUTH_DISABLED` on every write | `supabase/migrations/20261105000019_disabled_account_write_guard.sql` and `supabase/tests/write_guards.sql` (103 assertions) |
+| 7 — a moderator cannot disable a moderator | the Edge Function refuses before the write; `tools/smoke-functions.cjs`; the console hides the control as a convenience |
+| 8 — the action appears in `/audit` | `apps/admin/app/audit/audit-client.tsx` renders the decision type, the moderator, the target, the reason, and the timestamp; the invalidation is in `apps/admin/lib/queries.test.tsx` |
+| 9 — `CONFLICT` on a re-disable | `tools/smoke-functions.cjs` and `supabase/tests/moderation_conflicts.sql` |
+
+### The three defects this work found and fixed
+
+1. **The admin declared `@tanstack/react-query` and never imported it.** The users list was refreshed by a hand-written `onDisabled()` callback, so a moderator who disabled a user was not guaranteed to see the consequence reflected. The console is now on `apps/admin/lib/queries.ts`.
+2. **The disable screen's error branches were completely untested.** The copy constants could have been swapped, or a branch dropped, and nothing would have noticed. `apps/admin/lib/queries.test.tsx` now has a `describe` block per code.
+3. **The PRD's message literal appeared nowhere in the repository.** The citizen app said something else entirely. The string is now the PRD's, and a test pins it.
+
+### What is still out of scope
+
+- **The console now has a live probe.** `tools/probe-moderation-console.cjs` — **37/37** — calls `moderator_search_users` over the real PostgREST path and asserts the account row the console renders: the account state, the per-user report count (checked against the database), and the **exact-match** boundary — an empty query, an unmatched query and a partial phone prefix all return nothing, because the moment the lookup became a fuzzy list the console would be a user-database browser rather than a targeted tool (FR-NG-3). **No acceptance criterion in this story names a live probe**, so its absence never made the story `partial`.
+- Undisabling, appeals, a moderator tier split, and the aggregates are excluded by the story's own "Out of Scope".

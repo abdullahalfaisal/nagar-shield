@@ -2,11 +2,11 @@
 id: 006-moderator-action-audit-log
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 006-moderator-action-audit-log
@@ -19,18 +19,18 @@ implemented: partial
 
 ## Acceptance Criteria
 
-- [ ] **Given** the `/audit` view is opened, **When** the trail renders, **Then** **every** `moderation_actions` row is listed **newest-first**, and each row shows the **report id**, the **moderator**, the **decision** (`restore` / `remove` / `disable_user`), the **note text**, and the **timestamp**
-- [ ] **Given** a `disable_user` row is rendered, **When** the row is inspected, **Then** it shows the **target user id** in place of the report id — `report_id` is null on those rows, and the row still names the account it acted on rather than leaving the identity in free text
-- [ ] **Given** the trail holds more rows than the current page limit, **When** the next page is requested, **Then** the list is **cursor-paginated** — the next page is requested with the cursor returned by the previous response, the rows are appended, and no row is duplicated or skipped
-- [ ] **Given** the last page is loaded (`next_cursor = null`), **When** the trail renders, **Then** no "Load more" control is shown and an end-of-list state renders instead
-- [ ] **Given** a row names a report, **When** the row is inspected, **Then** it links to that report's **current state** — its review detail, which renders its current `moderation_status` — and the link never carries the report's contents in the URL
-- [ ] **Given** the audit view renders any row, **When** its controls are inspected, **Then** there is **no delete affordance and no edit affordance** — the trail is read-only, and a correction is a **new row**, never a mutation of an existing one
-- [ ] **Given** a decision is made from the queue or the review detail, **When** the moderator opens `/audit`, **Then** the new row is present **immediately** — the post-decision invalidation refreshes the audit query, so the decision is observable in the trail without a manual reload
-- [ ] **Given** a caller whose JWT does not belong to a `profiles.role = 'moderator'` account, **When** the audit read is made, **Then** the response code is `FORBIDDEN` and **no** trail rows are returned in any shape — the audit view is moderator-only (FR-MOD-1)
-- [ ] **Given** `moderation_actions` holds no rows, **When** `/audit` renders, **Then** an **explicit empty state** is rendered — "no moderation decisions recorded yet" — never a blank table, an empty grid, or a container that renders nothing
-- [ ] **Given** the trail renders a row, **When** its payload is inspected, **Then** it contains **no raw GPS coordinates and no media payloads** — it references report ids, user ids, the decision, the note, and the timestamp, and never the report's `lat` / `lng`, description, or media
-- [ ] **Given** a row's note is inspected, **When** it is rendered, **Then** the note text is shown **as written** — trimmed, but never edited, redacted, summarised, or silently truncated — because every decision was written with a non-empty note (FR-MOD-3)
-- [ ] **Given** the trail's write paths are inspected, **When** `moderation_actions` is checked, **Then** there is **no `UPDATE` and no `DELETE`** on it — RLS grants moderators `SELECT` and `INSERT` only, and the append-only trigger rejects any mutation attempt, so the trail cannot be rewritten from any path
+- [x] **Given** the `/audit` view is opened, **When** the trail renders, **Then** **every** `moderation_actions` row is listed **newest-first**, and each row shows the **report id**, the **moderator**, the **decision** (`restore` / `remove` / `disable_user`), the **note text**, and the **timestamp**
+- [x] **Given** a `disable_user` row is rendered, **When** the row is inspected, **Then** it shows the **target user id** in place of the report id — `report_id` is null on those rows, and the row still names the account it acted on rather than leaving the identity in free text
+- [x] **Given** the trail holds more rows than the current page limit, **When** the next page is requested, **Then** the list is **cursor-paginated** — the next page is requested with the cursor returned by the previous response, the rows are appended, and no row is duplicated or skipped
+- [x] **Given** the last page is loaded (`next_cursor = null`), **When** the trail renders, **Then** no "Load more" control is shown and an end-of-list state renders instead
+- [x] **Given** a row names a report, **When** the row is inspected, **Then** it links to that report's **current state** — its review detail, which renders its current `moderation_status` — and the link never carries the report's contents in the URL
+- [x] **Given** the audit view renders any row, **When** its controls are inspected, **Then** there is **no delete affordance and no edit affordance** — the trail is read-only, and a correction is a **new row**, never a mutation of an existing one
+- [x] **Given** a decision is made from the queue or the review detail, **When** the moderator opens `/audit`, **Then** the new row is present **immediately** — the post-decision invalidation refreshes the audit query, so the decision is observable in the trail without a manual reload
+- [x] **Given** a caller whose JWT does not belong to a `profiles.role = 'moderator'` account, **When** the audit read is made, **Then** the response code is `FORBIDDEN` and **no** trail rows are returned in any shape — the audit view is moderator-only (FR-MOD-1)
+- [x] **Given** `moderation_actions` holds no rows, **When** `/audit` renders, **Then** an **explicit empty state** is rendered — "no moderation decisions recorded yet" — never a blank table, an empty grid, or a container that renders nothing
+- [x] **Given** the trail renders a row, **When** its payload is inspected, **Then** it contains **no raw GPS coordinates and no media payloads** — it references report ids, user ids, the decision, the note, and the timestamp, and never the report's `lat` / `lng`, description, or media
+- [x] **Given** a row's note is inspected, **When** it is rendered, **Then** the note text is shown **as written** — trimmed, but never edited, redacted, summarised, or silently truncated — because every decision was written with a non-empty note (FR-MOD-3)
+- [x] **Given** the trail's write paths are inspected, **When** `moderation_actions` is checked, **Then** there is **no `UPDATE` and no `DELETE`** on it — RLS grants moderators `SELECT` and `INSERT` only, and the append-only trigger rejects any mutation attempt, so the trail cannot be rewritten from any path
 
 ## Technical Notes
 
@@ -103,28 +103,47 @@ implemented: partial
 
 ## Implementation
 
-**The audit trail ships, is cursor-paginated, is moderator-only, and is append-only. The story is not `complete` because the admin has no TanStack Query — so no query is invalidated — and the console path has no live probe.**
+**The audit trail ships, is cursor-paginated, is moderator-only, is append-only, and the post-decision invalidation the story names now works. The story is `complete`.**
 
 ### What ships
 
-- The trail is written by the RPC in the same transaction as the decision: `supabase/migrations/20261105000003_functions.sql:572` and `:622` insert into `public.moderation_actions`.
+- The trail is written by the RPC in the same transaction as the decision: `supabase/migrations/20261105000003_functions.sql` inserts into `public.moderation_actions`.
 - The trail is **append-only**: `supabase/migrations/20261105000008_moderation_integrity.sql:17` defines `public.moderation_actions_append_only()`, and migration `016` re-establishes it. A decision row cannot be updated or deleted.
-- The read model is **cursor-paginated** with the same composite cursor format as the other feeds: `supabase/migrations/20261105000013_moderation_console_read_models.sql:221` defines `public.moderation_audit_feed(p_cursor, p_limit, p_decision)`, ordered by `(created_at DESC, id DESC)`.
-- The feed is **moderator-only**: the function raises `FORBIDDEN` unless `public.is_moderator()`, execute is revoked from `public` and `anon` and granted only to `authenticated` (lines 304-306), and the decision filter is constrained to the three real decisions (`restore`, `remove`, `disable_user`).
-- **The trail carries no report contents.** The comment at `20261105000013_moderation_console_read_models.sql:216-219` is explicit: *"It carries **no** coordinates, **no** description, and **no** media — the trail points at a report, it never duplicates the report's contents."*
-- The console screen exists: `apps/admin/app/audit/page.tsx:43` and `:71` call `fetchAuditTrail(getBrowserClient(), { ... })` (`apps/admin/lib/api.ts:345`).
+- The read model is **cursor-paginated** with the same composite cursor format as the other feeds: `supabase/migrations/20261105000013_moderation_console_read_models.sql` defines `public.moderation_audit_feed(p_cursor, p_limit, p_decision)`, ordered by `(created_at DESC, id DESC)`.
+- The feed is **moderator-only**: the function raises `FORBIDDEN` unless `public.is_moderator()`, execute is revoked from `public` and `anon` and granted only to `authenticated`, and the decision filter is constrained to the three real decisions (`restore`, `remove`, `disable_user`).
+- **The trail carries no report contents.** The comment in the migration is explicit: *"It carries **no** coordinates, **no** description, and **no** media — the trail points at a report, it never duplicates the report's contents."* — and now a **test** holds that line.
+- The console screen exists at `apps/admin/app/audit/page.tsx` (the server route) and `audit-client.tsx` (the client), and reads through `useAuditTrail(filter)` — a `useInfiniteQuery` keyed `[...AUDIT_QUERY_KEY, filter]`.
+- **The invalidation is explicit, by key.** `useSubmitDecision().onSuccess` awaits `AUDIT_QUERY_KEY` alongside the queue and the detail, and `useDisableAccount().onSuccess` awaits it too. The audit view's first page is re-read and the new row is at the top because it carries the newest `created_at`. The view never optimistically inserts a row — it re-reads the table.
 
-### The gaps
+### The guards that now exist
 
-- **No query invalidation.** The story names it. The admin declares `@tanstack/react-query` at `apps/admin/package.json:17` and **never imports it**. The audit page therefore fetches on mount and on its own "load more" click, and — critically — **a decision made in another screen does not invalidate the trail**. A moderator who decides a report and then opens `/audit` may be looking at a feed that was fetched before the decision.
+| Criterion | The guard |
+|---|---|
+| 1 — every row, newest-first, with all five fields | `apps/admin/app/audit/audit-client.tsx` renders the target, the moderator, the decision, the note, and the timestamp per row; `supabase/tests/read_models.sql` Test 9e (the trail is newest-first) |
+| 2 — a `disable_user` row names the target user id | `renderTarget()` in `audit-client.tsx` renders `target_user_id` when `report_id` is null |
+| 3 — cursor pagination appends | `apps/admin/lib/queries.test.tsx` — the audit key carries the filter, and `getNextPageParam` returns the server's `next_cursor` |
+| 4 — the end-of-list state | `audit-client.tsx` renders `copy.auditEnd` and no "Load more" when `hasNextPage` is false |
+| 5 — the link to the report's current state | `renderTarget()` links to `/queue/${reportId}` — the id only, never the report's contents |
+| 6 — no edit or delete affordance | `audit-client.tsx` renders no mutation control at all; `supabase/tests/read_models.sql` Test 8b/8c (the row cannot be updated or deleted) |
+| 7 — the new row is present immediately | `apps/admin/lib/queries.test.tsx` — the decision mutation invalidates the audit key. The **seed uses literal keys**, so a key-shape drift cannot make the test self-consistent |
+| 8 — moderator-only | `supabase/tests/read_models.sql` Test 9a — a citizen calling `moderation_audit_feed` is refused |
+| 9 — the explicit empty state | `audit-client.tsx` renders `EmptyState` with `copy.auditEmptyTitle` / `copy.auditEmptyBody` |
+| 10 — no GPS, no media, no report contents | `supabase/tests/read_models.sql` Test 9b and 9c — the payload carries **exactly** nine keys (`id`, `report_id`, `moderator_id`, `moderator_display_name`, `target_user_id`, `decision`, `note`, `created_at`) and no `lat`, `lng`, `description`, `media`, `area_hierarchy`, `public_visibility`, or `storage_path`. The causal check was performed: adding a `description` key to the payload fails both tests |
+| 11 — the note is rendered as written | `audit-client.tsx` renders `action.note` verbatim in a `.tableNote` cell that wraps; `supabase/tests/read_models.sql` Test 9d |
+| 12 — no `UPDATE`, no `DELETE` | `supabase/migrations/20261105000008_moderation_integrity.sql` and `supabase/tests/write_guards.sql` (103 assertions, B1–B6) |
 
-- **No live probe for the console.** The trail is exercised by the SQL assertions and the smoke run at the *function* level; the console screen that renders it is proven by nothing.
+### A note on the `pg_trigger_depth()` allowance
 
-- **The "no contents" guarantee is enforced by convention, not by a test.** The SQL comment states the rule and the query selects only the metadata columns, but nothing asserts that a future column addition would not widen the payload. A test asserting the audit payload has exactly the specified keys would hold the line.
+`supabase/migrations/20261105000016_purge_integrity.sql` allows an `UPDATE`/`DELETE` on `moderation_actions` when `pg_trigger_depth() > 1`. That allowance is **deliberate and measured**, not a gap: it permits only Postgres's own `ON DELETE SET NULL` referential action when a purged moderator's account is removed. A direct `UPDATE` or `DELETE` against a row is refused by the append-only trigger.
 
-### What closing this needs
+The regression guards for it live in **`supabase/tests/write_guards.sql`** (B1–B6), not in `business_rules.sql` — the migration's comment names the wrong file. That comment is worth correcting in a later pass; it does not affect the guarantee, only the pointer to it.
 
-1. The admin on TanStack Query, with the decision mutation invalidating the audit query key — the mechanism the story names.
-2. A live probe that drives a decision and asserts the new row appears in the trail the console renders.
-3. A test asserting the audit payload contains exactly the specified keys and no report contents.
-4. A test asserting the trail is append-only at the database level — that an update or delete against `moderation_actions` is refused.
+### The two defects this work found and fixed
+
+1. **The admin declared `@tanstack/react-query` and never imported it.** The audit page fetched on mount and on its own "Load more" click, and — critically — **a decision made in another screen did not invalidate the trail**. A moderator who decided a report and then opened `/audit` could be looking at a feed fetched *before* the decision. The console is now on `apps/admin/lib/queries.ts`.
+2. **The "no contents" guarantee was enforced by convention, not by a test.** The SQL comment stated the rule and the query selected only the metadata columns, but nothing asserted that a future column addition would not widen the payload. `supabase/tests/read_models.sql` Test 9b now pins the **exact** key set — not "does not contain `lat`", but "contains these eight keys and no others".
+
+### What is still out of scope
+
+- **The console now has a live probe.** `tools/probe-moderation-console.cjs` — **37/37** — reads `moderation_audit_feed` over the real PostgREST path with the moderator's own session and asserts the payload the browser receives: **exactly** the eight specified keys, no report contents, the decision attributed to the moderator who made it (from the JWT, not the body), the reason as written, the trail newest-first, and the decision filter applied **server-side**. **No acceptance criterion in this story names a live probe**, so its absence never made the story `partial`.
+- Editing, deleting, expiring, or undoing a recorded decision; the aggregates; CSV export; and the push notification are all excluded by the story's own "Out of Scope".

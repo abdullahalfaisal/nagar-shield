@@ -274,6 +274,62 @@ body {
   border-left: 4px solid var(--violet-300);
 }
 
+/*
+ * The category accent tile.
+ *
+ * The tile is a small square in the report's category colour, drawn from the
+ * design-token custom properties. **No new hex value is introduced** — every
+ * colour below is a token that already exists in `:root` (story `001`'s
+ * "no new hex value" rule).
+ *
+ * The five families map to the eleven categories in `lib/format.ts`
+ * (`formatCategoryAccent`). The CSS owns the colour; the mapping owns the
+ * category → family decision.
+ *
+ * The tile is **purely graphical** — it carries no text. The colour ramps
+ * are the same in both themes while the ink ramp inverts, so a tile with a
+ * label would need an ink token that is dark in both themes and no such
+ * token exists. The category's name sits right beside the tile, so the
+ * colour is a second signal rather than the only one.
+ */
+.categoryTile {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+  border-left: 4px solid var(--ink-400);
+}
+
+.categoryTileViolet {
+  background-color: var(--violet-100);
+  border-left-color: var(--violet-600);
+}
+
+.categoryTileRed {
+  background-color: var(--red-100);
+  border-left-color: var(--red-600);
+}
+
+.categoryTileAmber {
+  background-color: var(--amber-100);
+  border-left-color: var(--amber-600);
+}
+
+.categoryTileGreen {
+  background-color: var(--green-100);
+  border-left-color: var(--green-600);
+}
+
+.categoryTileSky {
+  background-color: var(--sky-100);
+  border-left-color: var(--sky-600);
+}
+
+.categoryTileNeutral {
+  background-color: var(--ink-100);
+  border-left-color: var(--ink-400);
+}
+
 .stack {
   display: flex;
   flex-direction: column;

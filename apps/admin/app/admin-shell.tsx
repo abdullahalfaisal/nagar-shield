@@ -9,19 +9,19 @@ import { getBrowserClient } from '@/lib/supabase/client';
 /**
  * The admin shell — the rail plus the page.
  *
- * The shell renders **only** for a moderator. A signed-in citizen gets the
- * "moderator access only" state and no report data is ever fetched, but the
- * real enforcement is still server-side: every RPC and Edge Function re-checks
- * the role.
+ * The shell renders **only** for a moderator. The role check happens in
+ * `ModeratorGate` — a server component that reads the cookie-backed session
+ * before the console's client bundle mounts — so a non-moderator never
+ * reaches this component at all. The real enforcement is still server-side:
+ * every RPC and Edge Function re-checks the role.
  */
 
 interface AdminShellProps {
   children: React.ReactNode;
   active: 'queue' | 'users' | 'audit';
-  role: 'citizen' | 'moderator';
 }
 
-export function AdminShell({ children, active, role }: AdminShellProps) {
+export function AdminShell({ children, active }: AdminShellProps) {
   const copy = getCopy(DEFAULT_ADMIN_LOCALE);
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -34,19 +34,6 @@ export function AdminShell({ children, active, role }: AdminShellProps) {
       router.replace('/login');
     }
   }, [router]);
-
-  if (role !== 'moderator') {
-    return (
-      <main className="main">
-        <div className="page">
-          <div className="card emptyState">
-            <h1 className="emptyTitle">{copy.accessOnlyTitle}</h1>
-            <p className="emptyBody">{copy.accessOnlyBody}</p>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <div className="shell">

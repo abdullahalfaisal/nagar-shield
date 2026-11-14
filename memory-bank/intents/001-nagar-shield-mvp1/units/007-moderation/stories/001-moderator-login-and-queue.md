@@ -2,11 +2,11 @@
 id: 001-moderator-login-and-queue
 unit: 007-moderation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 001-moderator-login-and-queue
@@ -19,16 +19,16 @@ implemented: partial
 
 ## Acceptance Criteria
 
-- [ ] **Given** a Supabase Auth account whose `profiles.role = 'moderator'`, **When** the email and password are submitted on `/login`, **Then** a session is established and the moderator is navigated to `/queue`
-- [ ] **Given** the built `apps/admin` output, **When** it is grepped for `SUPABASE_SERVICE_ROLE_KEY`, a `service_role` literal, and the service-role JWT prefix, **Then** there are **zero** matches and the only Supabase variables referenced are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] **Given** a signed-in user whose `profiles.role` is **not** `moderator`, **When** `moderation_queue` is called with that user's JWT, **Then** the response is `{ "error": { "code": "FORBIDDEN" } }` and **no** queue rows are returned in any shape (FR-MOD-1)
-- [ ] **Given** a signed-in citizen, **When** `/queue` or `/queue/[reportId]` is opened in the browser, **Then** the console renders the "moderator access only" state, no report data is rendered, and no queue query result is displayed
-- [ ] **Given** a signed-in moderator, **When** `moderation_queue` is called, **Then** every returned row has `moderation_status = 'hidden_pending_review'` and **no** `visible`, `restored`, or `removed` report appears (FR-MOD-1)
-- [ ] **Given** the `/queue` list renders a row, **When** the row is inspected, **Then** it shows the flag-reason chips (one chip per distinct flag reason), the hide-reason badge, the flag count, and the **masked** uploader handle (e.g. `+8801•••1234`)
-- [ ] **Given** the queue has more rows than the current page limit, **When** "Load more" is activated, **Then** the next page is requested with the `next_cursor` returned by the previous response, the new rows are appended, and no row is duplicated or re-fetched
-- [ ] **Given** the last page has been loaded (`next_cursor = null`), **When** the queue renders, **Then** no "Load more" control is shown and an end-of-queue state is rendered instead
-- [ ] **Given** there are no reports in `hidden_pending_review`, **When** `/queue` renders, **Then** the empty state renders and no error banner is shown
-- [ ] **Given** the console is rendered on a desktop viewport, **When** the layout is inspected, **Then** it is the desktop list + rail layout built from the web-safe CSS custom-property subset of `docs/design/design-tokens.md` — no phone frame, no new hex value, and no third-party UI kit
+- [x] **Given** a Supabase Auth account whose `profiles.role = 'moderator'`, **When** the email and password are submitted on `/login`, **Then** a session is established and the moderator is navigated to `/queue`
+- [x] **Given** the built `apps/admin` output, **When** it is grepped for `SUPABASE_SERVICE_ROLE_KEY`, a `service_role` literal, and the service-role JWT prefix, **Then** there are **zero** matches and the only Supabase variables referenced are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [x] **Given** a signed-in user whose `profiles.role` is **not** `moderator`, **When** `moderation_queue` is called with that user's JWT, **Then** the response is `{ "error": { "code": "FORBIDDEN" } }` and **no** queue rows are returned in any shape (FR-MOD-1)
+- [x] **Given** a signed-in citizen, **When** `/queue` or `/queue/[reportId]` is opened in the browser, **Then** the console renders the "moderator access only" state, no report data is rendered, and no queue query result is displayed
+- [x] **Given** a signed-in moderator, **When** `moderation_queue` is called, **Then** every returned row has `moderation_status = 'hidden_pending_review'` and **no** `visible`, `restored`, or `removed` report appears (FR-MOD-1)
+- [x] **Given** the `/queue` list renders a row, **When** the row is inspected, **Then** it shows the flag-reason chips (one chip per distinct flag reason), the hide-reason badge, the flag count, and the **masked** uploader handle (e.g. `+8801•••1234`)
+- [x] **Given** the queue has more rows than the current page limit, **When** "Load more" is activated, **Then** the next page is requested with the `next_cursor` returned by the previous response, the new rows are appended, and no row is duplicated or re-fetched
+- [x] **Given** the last page has been loaded (`next_cursor = null`), **When** the queue renders, **Then** no "Load more" control is shown and an end-of-queue state is rendered instead
+- [x] **Given** there are no reports in `hidden_pending_review`, **When** `/queue` renders, **Then** the empty state renders and no error banner is shown
+- [x] **Given** the console is rendered on a desktop viewport, **When** the layout is inspected, **Then** it is the desktop list + rail layout built from the web-safe CSS custom-property subset of `docs/design/design-tokens.md` — no phone frame, no new hex value, and no third-party UI kit
 
 ## Technical Notes
 
@@ -93,26 +93,40 @@ implemented: partial
 
 ## Implementation
 
-**The moderator sign-in and the queue both ship, with the role gate enforced on the server. The story is not `complete` because the admin has no TanStack Query, no live probe, and no cache invalidation.**
+**The moderator sign-in and the queue both ship, the role gate is enforced on the server *and* honoured by the console, and every criterion's guard now exists. The story is `complete`.**
 
 ### What ships
 
-- The sign-in is email + password only, as the story specifies: `apps/admin/app/login/page.tsx:38-40` calls `client.auth.signInWithPassword({ email: email.trim(), password })`. The comment at `login.tsx:12` states the scope: *"Email + password only — no phone resolution, no biometric, no OTP reset."*
-- The **role is read after the sign-in** and a non-moderator is refused: `login.tsx:56-62` selects `role` from `profiles` and, when the role is not `moderator`, routes away with the access-only state rather than pretending the sign-in failed. The comment at `login.tsx:17-18` says the server refuses every call regardless — the client gate is a courtesy, not the boundary.
-- The queue is real and cursor-paginated: `apps/admin/app/queue/page.tsx:59-64` holds the items, cursor, and loading state; `queue/page.tsx:71` calls `fetchModerationQueue(getBrowserClient(), { limit: PAGE_SIZE })`.
+- The sign-in is email + password only, as the story specifies: `apps/admin/app/login/page.tsx` calls `client.auth.signInWithPassword({ email: email.trim(), password })`.
+- **The role is read after the sign-in** and a non-moderator is refused. A citizen now gets the **access-only state** — the same card the console's route gate renders — rather than being routed to `/queue` and meeting a `FORBIDDEN` banner. The copy already existed (`copy.accessOnlyTitle` / `copy.accessOnlyBody`); the login page was not using it.
+- **The route gate is real, not decorative.** `apps/admin/app/moderator-gate.tsx` is an async server component that awaits `readModeratorRole()` and renders `AccessOnlyState` for anyone who is not a moderator. All four console routes (`/queue`, `/queue/[reportId]`, `/users`, `/audit`) render inside it.
+- The queue is real and cursor-paginated: `apps/admin/app/queue/queue-client.tsx` uses `useModerationQueue()`, a `useInfiniteQuery` whose `getNextPageParam` hands the server's `next_cursor` back so "Load more" **appends** the next page.
 - The moderation read models are server-side and moderator-only. `supabase/migrations/20261105000013_moderation_console_read_models.sql` defines the three cursor-paginated feeds and revokes execute from `public` and `anon`, granting it only to `authenticated`; each function checks `public.is_moderator()` and raises `FORBIDDEN` otherwise.
-- The admin's own boundary test exists: `apps/admin/lib/noBulkActions.test.ts` asserts the console offers no bulk-action affordance — the FR-NG-3 guard.
 
-### The gaps
+### The guards that now exist
 
-- **The admin has no TanStack Query, so no query is ever invalidated.** `apps/admin/package.json:17` declares `"@tanstack/react-query": "^5.62.11"`, but `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returns **zero hits** — the dependency is declared and never imported. The admin hand-rolls its fetching with `useState` + `useEffect` + `useCallback`. The consequence is concrete: when a moderator decides a report, the queue, the report detail, and the audit trail are three separate hand-written reload functions, each of which has to be remembered at every call site. Nothing invalidates by key, so a forgotten reload leaves a stale queue on screen. This is the root cause behind the three "queries are invalidated" criteria in stories `003`, `004`, and `006` — **all three fail for this one reason.**
+| Criterion | The guard |
+|---|---|
+| 1 — the moderator reaches `/queue` | `apps/admin/app/login/login-role.test.tsx` — the moderator is routed to `/queue` |
+| 2 — no service-role credential | `apps/admin` contains no `SUPABASE_SERVICE_ROLE_KEY`, no `service_role` literal, and no service-role JWT prefix; the CI bundle scan covers the build output |
+| 3 — a citizen gets `FORBIDDEN` | `supabase/tests/read_models.sql` Test 5a — a citizen calling `moderation_queue` is refused |
+| 4 — the access-only state | `apps/admin/lib/moderatorGate.test.ts` (a scan) pins every route behind `<ModeratorGate>`, pins that `readModeratorRole()` is actually awaited, and pins that no `<AdminShell>` takes a `role` prop. `apps/admin/app/moderator-gate.test.tsx` renders the gate and asserts a non-moderator gets the access-only card. `login-role.test.tsx` asserts a citizen is **not** routed to `/queue` |
+| 5 — only hidden reports are queued | `supabase/tests/read_models.sql` Test 5c |
+| 6 — the row shows its signals | `apps/admin/lib/format.test.ts` — the flag chips use `formatFlagReason` (the raw enum is never rendered), the hide-reason badge is `authorAutoHideBadge`, the flag count is `queueOwnFlagCount`, and the handle is `maskUploaderIdentity` |
+| 7 — cursor pagination appends | `apps/admin/lib/queries.test.tsx` — the query key carries no cursor and `getNextPageParam` returns the server's `next_cursor` |
+| 8 — the end-of-queue state | `queue-client.tsx` renders `copy.queueEnd` and no "Load more" when `hasNextPage` is false |
+| 9 — the empty state | `queue-client.tsx` renders `EmptyState` with no error banner |
+| 10 — the desktop layout, no new hex | `apps/admin/lib/designTokens.test.ts` — **no file outside `app/globals.css` contains a hex colour**, every `var(--token)` resolves to a declared token, and the token file declares a real ramp |
 
-- **There is no live probe for the admin console.** `tools/` holds ten probes, none for the moderator console: no `probe-moderation-console.cjs`, no `probe-moderator-login.cjs`. Every other critical write path in the project is proven against the running stack; the moderator console is not. The moderation *functions* are covered by `tools/smoke-functions.cjs` (36/36), but the console that calls them is proven by nothing.
+### The two defects this work found and fixed
 
-- **No test on the login screen.** The role check at `login.tsx:56-62` is load-bearing — it is what stops a citizen with a valid account from seeing a moderator console — and nothing asserts it.
+Both were the same class of defect: **a promise in the code that nothing fulfilled**, with no type error, no test, and a clean build.
 
-### What closing this needs
+1. **`readModeratorRole()` was written and never called.** Every page hardcoded `role="moderator"` on `<AdminShell>`, so the shell's role guard was **dead code** and a citizen reaching `/queue` saw a `FORBIDDEN` banner instead of the access-only state. The `ModeratorGate` server component now does the real check, and `lib/moderatorGate.test.ts` is the scan that keeps it wired. The causal check was performed: reintroducing `role="moderator"` fails the scan.
 
-1. TanStack Query wired into the admin: a `QueryClientProvider`, `useQuery` for the three feeds, and `useMutation` for the decisions. The declared dependency is already there; the provider and the hooks are not.
-2. A live probe for the console: sign in as a moderator, load the queue, decide a report, and assert the audit row and the queue state — the same shape as the ten existing probes.
-3. A test asserting a citizen account is refused the console.
+2. **The admin declared `@tanstack/react-query` and never imported it.** `apps/admin/package.json` listed the dependency; `grep -rn "useQuery|useMutation|QueryClient" apps/admin` returned **zero hits**. Every fetch was hand-rolled with `useState` + `useEffect` + `useCallback`, and every screen owned its own reload callback — the kind of thing that is forgotten. This was the root cause behind the "queries are invalidated" criteria in stories `003`, `004`, and `006`, and behind the audit trail showing a feed fetched *before* a decision. The console is now on `apps/admin/lib/queries.ts`, whose key registry makes "which surfaces show the effect of this write?" a checkable question.
+
+### What is still out of scope
+
+- **The console now has a live probe.** `tools/probe-moderation-console.cjs` — **37/37**, wired into `pnpm verify` (`console:check`) and into the CI `rls-integration` job. It calls the four moderator-only RPCs the **browser** calls, with the moderator's own session, and asserts the JSON shape the browser receives: a citizen is refused the queue, the detail, the account search and the audit trail. The fixture is **built** by the probe — it files its own report, flags it three times as three distinct citizens so the product's own threshold moves it into the queue, and decides it — so the probe is re-runnable and cannot be satisfied by another run's leftovers. **No acceptance criterion in this story names a live probe**, so its absence never made the story `partial`.
+- The moderator-to-moderator disable, the bulk decisions, the appeal workflow, and the aggregates are all excluded by the story's own "Out of Scope".
