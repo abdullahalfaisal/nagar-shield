@@ -30,6 +30,15 @@ export interface AccountStatusState {
   status: AccountStatus
   /** The moment the account was disabled, when it is known. */
   disabledAt: string | null
+  /**
+   * The last moment a soft-deleted account can be restored, when it is known.
+   *
+   * The recovery screen needs this: the 30-day window is the promise the user
+   * was given, and a screen that cannot say when it ends cannot tell the user
+   * whether they still have a choice. It is `null` for every account that is
+   * not deleted.
+   */
+  recoverableUntil: string | null
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -43,12 +52,14 @@ export interface AccountStatusState {
 export function useAccountStatus(userId: string | undefined): AccountStatusState {
   const [status, setStatus] = useState<AccountStatus>('unknown')
   const [disabledAt, setDisabledAt] = useState<string | null>(null)
+  const [recoverableUntil, setRecoverableUntil] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!userId) {
       setStatus('unknown')
       setDisabledAt(null)
+      setRecoverableUntil(null)
       return
     }
 
@@ -56,6 +67,7 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
     try {
       const account = await loadAccountStatus(userId)
       setDisabledAt(account.disabledAt)
+      setRecoverableUntil(account.recoverableUntil)
       if (account.disabled) {
         setStatus('disabled')
       } else if (account.deleted) {
@@ -77,6 +89,7 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
     if (!userId) {
       setStatus('unknown')
       setDisabledAt(null)
+      setRecoverableUntil(null)
       return
     }
     void refresh()
@@ -95,7 +108,7 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
     }
   }, [refresh])
 
-  return { status, disabledAt, loading, refresh }
+  return { status, disabledAt, recoverableUntil, loading, refresh }
 }
 
 /**

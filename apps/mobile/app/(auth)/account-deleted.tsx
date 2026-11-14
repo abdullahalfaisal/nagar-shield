@@ -6,7 +6,10 @@ import { useTheme } from '@/shared/theme'
 import { Button, WizardScreen } from '@/shared/ui'
 import { Icon } from '@/shared/ui/Icon'
 import { restoreAccount } from '@/shared/api/account'
+import { recoveryWindowSummary, restoreErrorCopy } from '@/shared/api/recovery-window'
 import { logOut } from '@/shared/auth/authService'
+import { useAccountStatus } from '@/shared/auth/useAccountStatus'
+import { useAuthSession } from '@/shared/auth/useAuthSession'
 
 /**
  * Screen — Account Deleted.
@@ -24,14 +27,32 @@ import { logOut } from '@/shared/auth/authService'
  * Restoring clears `deleted_at` and the account becomes fully usable again —
  * the reports it authored are never touched by the delete (FR-DATA-3 keeps
  * the identity server-side for moderation).
+ *
+ * ## The window is stated, not implied
+ *
+ * "Sign in again within 30 days" is a rule, not a date. The user needs to
+ * know **when** the promise runs out — the day it runs out is the day they
+ * have to act. So the screen reads the deadline from the account row and
+ * states it, and the Restore button is disabled once the window has closed.
+ *
+ * The screen is also honest about the failure. The RPC refuses an expired
+ * restore with `VALIDATION_FAILED`; the citizen is told *"the recovery period
+ * has ended"* rather than *"something went wrong"*, because the second is a
+ * lie and the first is the answer.
  */
 export default function AccountDeletedScreen() {
   const theme = useTheme()
   const router = useRouter()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  const { session } = useAuthSession()
+  const { recoverableUntil } = useAccountStatus(session?.user?.id)
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
+
+  const window = recoveryWindowSummary(recoverableUntil)
+  const locale = i18n.language === 'bn' ? 'bn-BD' : 'en-GB'
 
   const onRestore = async () => {
     setBusy(true)
@@ -39,10 +60,8 @@ export default function AccountDeletedScreen() {
     try {
       await restoreAccount()
       router.replace('/(app)/home')
-    } catch {
-      // The RPC raises CONFLICT when there is nothing to restore — the
-      // window has closed and the purge job has taken the row.
-      setError(t('errors.internal'))
+    } catch (caught) {
+      setError(restoreErrorCopy(caught, t, window.open))
       setBusy(false)
     }
   }
@@ -69,7 +88,7 @@ export default function AccountDeletedScreen() {
             label={t('disabled.restore')}
             variant="primary"
             size="lg"
-            disabled={busy}
+            disabled={busy || !window.open}
             onPress={onRestore}
           />
           <Button
@@ -88,6 +107,35 @@ export default function AccountDeletedScreen() {
           {t('disabled.deletedBody')}
         </Text>
       </View>
+
+      {/*
+        The deadline. The fact comes from the account row, so it is the
+        server's own clock rather than the device's — and the device's clock
+        is not the authority on when the promise runs out.
+      */}
+      {recoverableUntil ? (
+        <View style={[styles.deadlineCard, { backgroundColor: theme.colors.surface.white }]}>
+          <Icon
+            name={window.open ? 'schedule' : 'block'}
+            size={20}
+            color={window.open ? theme.palette.violet[600] : theme.palette.red[600]}
+          />
+          <View style={styles.deadlineText}>
+            <Text style={[styles.deadlineTitle, { color: theme.colors.ink[950] }]}>
+              {window.open
+                ? t('disabled.recoverableUntilDays', { count: window.daysLeft })
+                : t('disabled.recoveryWindowClosed')}
+            </Text>
+            <Text style={[styles.deadlineBody, { color: theme.colors.ink[500] }]}>
+              {new Date(recoverableUntil).toLocaleDateString(locale, {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       <Text style={[styles.support, { color: theme.colors.ink[400] }]}>
         {t('settings.deleteWarning')}
@@ -108,6 +156,13 @@ export default function AccountDeletedScreen() {
   )
 }
 
+/**
+ * The message for a failed restore lives in `@/shared/api/recovery-window`,
+ * beside the window rules it depends on — so it is a pure function of
+ * (failure, window state) and can be tested against the real bundles
+ * without a React tree.
+ */
+
 const styles = StyleSheet.create({
   noticeRow: {
     flexDirection: 'row',
@@ -118,6 +173,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 20,
+  },
+  deadlineCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 20,
+  },
+  deadlineText: {
+    flex: 1,
+  },
+  deadlineTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  deadlineBody: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   support: {
     fontSize: 11,

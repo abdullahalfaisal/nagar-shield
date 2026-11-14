@@ -7,7 +7,9 @@ import {
   isAccountPurgeCandidate,
   isGeocodeCacheEvictionCandidate,
   isMediaPurgeCandidate,
+  isRecoveryWindowOpen,
   isTombstoneProfile,
+  recoveryDeadline,
   tombstoneToken,
 } from '../jobs'
 
@@ -56,6 +58,49 @@ describe('the account recovery window', () => {
 
   it('uses the 30-day window', () => {
     expect(ACCOUNT_RECOVERY_WINDOW_DAYS).toBe(30)
+  })
+})
+
+describe('the recovery deadline', () => {
+  it('is 30 days from the deletion', () => {
+    // `NOW` is 2026-11-05, so a deletion a day earlier is 2026-11-04 and
+    // its deadline is 2026-12-04.
+    expect(recoveryDeadline(daysAgo(1)).toISOString()).toBe('2026-12-04T00:00:00.000Z')
+  })
+
+  it('agrees with the purge cut-off', () => {
+    // The two sides of the promise: an account is recoverable until the
+    // moment it becomes purge-eligible. If they disagreed, the account would
+    // be purged while it was still recoverable, or the promise would
+    // outlast the data.
+    const deletedAt = daysAgo(1)
+
+    expect(recoveryDeadline(deletedAt).getTime() - deletedAt.getTime()).toBe(
+      ACCOUNT_RECOVERY_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    )
+  })
+})
+
+describe('the open window', () => {
+  it('is open one millisecond before the deadline', () => {
+    const deletedAt = new Date(NOW.getTime() - (30 * 24 * 60 * 60 * 1000 - 1))
+
+    expect(isRecoveryWindowOpen(deletedAt, NOW)).toBe(true)
+  })
+
+  it('is closed at exactly the deadline', () => {
+    // The database's predicate is `now() >= deleted_at + interval '30 days'`,
+    // so the boundary is **exclusive**. A client that used `<=` would offer a
+    // restore the server refuses.
+    const deletedAt = new Date(NOW.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    expect(isRecoveryWindowOpen(deletedAt, NOW)).toBe(false)
+  })
+
+  it('is closed past the deadline', () => {
+    const deletedAt = daysAgo(31)
+
+    expect(isRecoveryWindowOpen(deletedAt, NOW)).toBe(false)
   })
 })
 

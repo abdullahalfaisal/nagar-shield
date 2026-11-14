@@ -6,7 +6,7 @@
 > The Status column is derived from each story file's `implemented`
 > frontmatter, which is the authoritative source.
 >
-> **40 complete · 13 partial · 1 planned.** The index is reconciled against the
+> **41 complete · 12 partial · 1 planned.** The index is reconciled against the
 > story files on disk: 54 files, 54 rows, no duplicates, no orphans.
 >
 > **`partial`** means the feature ships and works, but at least one acceptance
@@ -27,7 +27,7 @@
 | 004-biometric-reauth-gate | Biometric re-auth gate | 002-identity | 005-identity | must | complete |
 | 006-emergency-contacts-crud | Emergency contacts CRUD | 002-identity | 006-identity | must | complete |
 | 005-remote-account-disable | Remote account disable | 002-identity | 006-identity | must | complete |
-| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | partial |
+| 007-account-deletion-and-recovery | Account deletion + 30-day recovery | 002-identity | 006-identity | should | complete |
 | 001-home-and-help-alert-grid | Home surface + Help Alert panic grid | 003-help-seek | 007-help-seek | must | partial |
 | 002-personal-emergency-picker | Personal Emergency contact picker | 003-help-seek | 007-help-seek | must | planned |
 | 003-bundled-station-hotline-dataset | Bundled station + hotline dataset | 003-help-seek | 008-help-seek | must | partial |

@@ -292,6 +292,33 @@ select 'Contract 6a: the scheduler functions are not executable by anon or authe
            )
        ) as passed;
 
+-- Every `job_*` function is a **worklist** — a server-side batch query with
+-- no internal authorisation of its own. `job_purge_deleted_accounts` returns
+-- every account awaiting its PII purge and the instant it was deleted;
+-- `job_purge_media_candidates` returns the storage paths of arbitrary
+-- reports; `job_geocode_cache_evictions` returns cache keys.
+--
+-- A client role that can call them can read all of that. Migration 012
+-- revoked execute only from `public`, which does not remove the direct
+-- grants Supabase's default privileges give `anon` and `authenticated` — so
+-- the leak was real until migration 036 revoked those two explicitly.
+--
+-- The check is over **every** `job_*` function rather than a named list, so
+-- a new worklist cannot be added without this test failing.
+select 'Contract 6a2: no job worklist is executable by anon or authenticated' as test,
+       not exists (
+         select 1
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname like 'job\_%'
+           and (
+             p.proacl @> ARRAY['=X/postgres']::aclitem[]
+             or p.proacl @> ARRAY['anon=X/postgres']::aclitem[]
+             or p.proacl @> ARRAY['authenticated=X/postgres']::aclitem[]
+           )
+       ) as passed;
+
 select 'Contract 6b: the scheduler functions are executable by service_role' as test,
        not exists (
          select 1
@@ -299,6 +326,18 @@ select 'Contract 6b: the scheduler functions are executable by service_role' as 
          join pg_namespace n on n.oid = p.pronamespace
          where n.nspname = 'public'
            and p.proname in ('run_scheduled_job', 'refresh_job_schedules', 'job_keep_project_awake_ping')
+           and not (p.proacl @> ARRAY['service_role=X/postgres']::aclitem[])
+       ) as passed;
+
+-- The worklists are the service role's too — the job runner is the only
+-- caller.
+select 'Contract 6b2: every job worklist is executable by service_role' as test,
+       not exists (
+         select 1
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public'
+           and p.proname like 'job\_%'
            and not (p.proacl @> ARRAY['service_role=X/postgres']::aclitem[])
        ) as passed;
 

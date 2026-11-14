@@ -281,9 +281,9 @@ jobs:
         run: pnpm shared:check
 
       # The SQL suites — the schema contract, the business rules, the read
-      # models, the write guards, the password-reset contract, the contacts
-      # contract, and the report-category contract — against the freshly
-      # migrated database.
+      # models, the write guards, the account-deletion contract, the
+      # password-reset contract, the contacts contract, and the
+      # report-category contract — against the freshly migrated database.
       - name: run the SQL test suites
         run: pnpm db:test
 
@@ -515,6 +515,10 @@ jobs:
       # deletion is back-dated past 30 days, the way the passage of time
       # would, and the restore must be refused by the **database**. A client
       # timer would be defeated by a device with a wrong clock.
+      #
+      # The **privilege** assertions matter just as much: a signed-in
+      # citizen's call to the purge worklist must be refused (HTTP 403),
+      # and the worklist must hold a freshly deleted account not at all.
       - name: the account-deletion contract
         run: pnpm deletion:check
 

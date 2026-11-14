@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 918 unit tests · 462 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 956 unit tests · 476 SQL assertions · 37/37 console probes
 
 ---
 
@@ -14,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 40 `complete`, 13
+**The stories are now counted three ways, not two: 41 `complete`, 12
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -78,15 +78,16 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **195 unit tests** |
-| Database | **36 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, and the **30-day restore window** |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **200 unit tests** |
+| Database | **37 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, the **30-day restore window**, and the **purge worklist boundary + job privileges** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
-| SQL test suites | **462 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (57), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
+| SQL test suites | **476 assertions pass** — `schema_contract` (24), `business_rules` (35), `read_models` (57), `write_guards` (103), `account_deletion` (12), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
 | Alternate phone | `tools/probe-alternate-phone.cjs` — **9/9** over the real PostgREST path |
 | Dual-identifier sign-in | `tools/probe-dual-identifier-login.cjs` — **17/17** over the real GoTrue + PostgREST path: the phone and the email resolve to **one** `auth.users` row and one `profiles.id` |
+| Account deletion | `tools/probe-account-deletion.cjs` — **26/26** over the real GoTrue + PostgREST path: the soft delete, the 30-day window, the restore inside and outside it, the write guard, and the **privilege refusal** — a signed-in citizen's call to the purge worklist is refused with HTTP 403 |
 | Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
 | Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
 | Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
@@ -123,14 +124,15 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 918 tests (579 mobile, 195 shared, 144 admin)
-pnpm db:test          # 462 SQL assertions
+pnpm test             # 956 tests (612 mobile, 200 shared, 144 admin)
+pnpm db:test          # 476 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
 pnpm dual-identifier:check # 17 dual-identifier sign-in probes (live GoTrue + PostgREST)
+pnpm deletion:check   # 26 account-deletion probes (live GoTrue + PostgREST)
 pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
@@ -920,9 +922,79 @@ code is returned for an unknown identifier (the resolver, HTTP 401) and for a
 wrong password (GoTrue, HTTP 400). The substance of AC #4 — both paths fail
 alike, with no "user not found" signal — holds; the code name differs.
 
+### ✅ M6 — Story `007-account-deletion-and-recovery`: the screen told the truth, and the purge told it **too late** — FIXED
+
+**Story:** `002-identity / 007-account-deletion-and-recovery`.
+
+The story's `## Implementation` section named three gaps, all in the recovery
+**screen**:
+
+| # | The gap as written | What was actually true |
+|---|---|---|
+| 1 | "An expired restore is misreported as an internal error." | ✅ the screen's bare `catch { setError(t('errors.internal')) }` threw the failure code away — a citizen whose 30 days had run out was told the app broke, and told to try again, when trying again could never work |
+| 2 | "`recoverableUntil` is fetched but never read." | ✅ the deadline was in the payload and on screen nowhere — the 30-day promise was only useful if the citizen knew the date |
+| 3 | "The screen has no guard against pressing Restore after the window closed." | ✅ the button stayed live after the window closed |
+
+**The fix is one module.** `apps/mobile/src/shared/api/recovery-window.ts` holds
+the window rules and the failure classification as **pure functions**, beside
+the shared `recoveryDeadline()` so the app, the purge leg and the database
+cannot drift apart. `VALIDATION_FAILED` renders *"the 30-day recovery period
+has ended"* in Bangla and English; `CONFLICT` renders the conflict copy; only
+an unknown failure is `errors.internal`. The button is disabled once the
+window has closed, and the screen states the deadline.
+
+**Two decisions worth recording.**
+
+- **A missing deadline is treated as *open*, not closed.** The app does not
+  know when the window ends; the server does. Assuming "closed" on missing
+  information would take away a restore the user was entitled to.
+- **The device's clock is not the authority.** A device *ahead* of the server
+  may show the window closed early — the server would still have honoured the
+  restore. That is the safe direction to be wrong in. The opposite case is
+  handled as the real answer: the screen believes the server over itself.
+
+**AC #8 was the one that needed a new layer — and it found two real defects.**
+AC #8 says *"the PII purge leg scrubs the profile, and the purge does not run
+before the window closes"*. The purge leg is unit 008's, but the *promise* is
+this story's, so its half of the contract is proved here too. Nothing was
+asserting it anywhere. Writing the guard found:
+
+| # | The defect | The fix |
+|---|---|---|
+| 1 | The purge's window was **one microsecond too narrow**. Its predicate was `deleted_at < now() - interval '30 days'` while the restore refuses at `now() >= deleted_at + interval '30 days'` — the same instant, written with a strict inequality. In the sliver between them the account was **unrecoverable but not yet purgeable**: the citizen's account was gone, the app said the recovery period had ended, and their PII was still on disk with the job refusing to touch it. | Migration `036` makes it `deleted_at <= now() - interval '30 days'`. The three statements of the boundary — the restore's refusal, the shared package's `isRecoveryWindowOpen`, and the purge's worklist — now name the same instant. |
+| 2 | The job worklists were executable by **`anon` and `authenticated`**. `job_purge_deleted_accounts` returns every account awaiting its purge and the instant it was deleted; `job_purge_media_candidates` returns arbitrary reports' storage paths. Migration 012 revoked execute only from `public`, which does not remove the **direct** grants Supabase's default privileges give those roles. | Migration `036` revokes from `public`, `anon` **and** `authenticated` explicitly — the three-line pattern migration 015 already used for `job_keep_project_awake_ping`. `schema_contract.sql` now asserts that **no** `job_*` function is client-executable, over the *pattern* so a new worklist cannot be added without the test failing. |
+
+**The privilege leak was live, not theoretical.** The probe's causal check
+re-granted the leak, and the failing assertion printed exactly what had been
+exposed: another account's id and the instant it was deleted.
+
+**The guards**
+
+| Guard | What it proves |
+|---|---|
+| `apps/mobile/src/shared/api/recovery-window.test.ts` (18) | The deadline, the floored days, the exclusive boundary, and that a missing deadline is *open* |
+| `apps/mobile/src/__tests__/account-deleted.dom.test.tsx` (15) | The **message**, against the real bundles — and the structural half: the screen routes the failure through `restoreErrorCopy`, renders it, and disables the button |
+| `packages/shared/src/jobs/jobs.test.ts` (5 new) | `recoveryDeadline` agrees with `ACCOUNT_RECOVERY_WINDOW_DAYS` and with the purge cut-off |
+| `supabase/tests/account_deletion.sql` (12) | The purge's half: a 1-day and a 29-day deletion are not candidates, a 31-day one is, the boundary account at exactly 30 days **is**, and the two halves of the promise agree in both directions |
+| `supabase/tests/schema_contract.sql` (2 new) | No `job_*` worklist is client-executable; every one is service-role executable |
+| `tools/probe-account-deletion.cjs` (**26/26**) | The whole contract over the live stack, including the privilege refusal (HTTP 403) |
+
+**Seven causal checks**, each proved to fail and then restored: the bare catch
+(2 tests), the un-disabled button (1), an inclusive client boundary (1), the
+misclassified failure (5), the reverted purge predicate (2 SQL assertions),
+the re-granted privilege (1 SQL assertion and the probe at 25/26), and the
+`anon` grant on a sibling worklist (1 schema contract).
+
+**Unit 008's story was corrected, not just this one.** Its
+`002-deleted-account-pii-purge` specified the predicate as `<` **and** said in
+its own edge-case table that an account deleted exactly 30 days ago is
+"selected and purged". Those two statements contradicted each other, and the
+shipped `<` never did that. The story now states the corrected predicate and
+carries the detailed account of both defects.
+
 ---
 
-## 4. What is NOT DONE — 13 `partial`, 1 `planned`
+## 4. What is NOT DONE — 12 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -978,7 +1050,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > | Unit | complete | partial | planned |
 > |---|---|---|---|
 > | `001-foundation` | 4 | 1 | 0 |
-> | `002-identity` | 5 | 2 | 0 |
+> | `002-identity` | 6 | 1 | 0 |
 > | `003-help-seek` | 5 | 2 | 1 |
 > | `004-capture` | 3 | 4 | 0 |
 > | `005-location` | 5 | 0 | 0 |
@@ -991,7 +1063,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > **void** criterion — a placeholder-route requirement that unit 007 superseded
 > with live screens. Its five missing guards are all built (§3 M3).
 
-### 4.0 The 13 stories that are not `complete`
+### 4.0 The 12 stories that are not `complete`
 
 Each row's story file carries an `## Implementation` section naming the exact
 gap. **Open the story file, not this table, when you pick one up.**
@@ -1000,7 +1072,6 @@ gap. **Open the story file, not this table, when you pick one up.**
 |---|---|---|---|
 | `005-admin-skeleton-and-ci` | 001-foundation | partial | AC2 is **void, not unmet** — unit 007 replaced the route stubs with live screens; closing it means amending or retiring the criterion, never reintroducing the stubs |
 | `002-dual-identifier-login` | 002-identity | partial | AC7/AC8 are **void, not unmet** — they describe a login-screen OTP step that W-1 removed (email-primary, password-only); closing them means amending or retiring the criterion, never putting a second credential path back. Both named gaps are closed — see §3 M5 |
-| `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
 | `001-home-and-help-alert-grid` | 003-help-seek | partial | the grid is on its own route, not Home; the numbers are hardcoded, not read from the dataset |
 | `002-personal-emergency-picker` | 003-help-seek | **planned** | **nothing exists** — no route, no component, no action |
 | `003-bundled-station-hotline-dataset` | 003-help-seek | partial | the drift check compares row **ids**, not values; no APK size check; no byte-identity test |
@@ -1036,13 +1107,13 @@ shipped behaviour, or retire it as superseded.
 
 ### 4.1 Identity — unit `002-identity`
 
-> The rows below record the **defects that were found and fixed**. Two of this
-> unit's seven stories are still `partial` — `002-dual-identifier-login` (both
+> The rows below record the **defects that were found and fixed**. One of this
+> unit's seven stories is still `partial` — `002-dual-identifier-login` (both
 > named gaps are closed; the two open criteria are **void**, because they
-> describe a login-screen OTP step that W-1 removed — §3 M5) and
-> `007-account-deletion-and-recovery` (I3's flow is live, but an expired
-> restore is misreported as `errors.internal` and `recoverableUntil` is
-> fetched but never read). See the §4.0 table.
+> describe a login-screen OTP step that W-1 removed — §3 M5).
+> `007-account-deletion-and-recovery` is now `complete` (§3 M6): the recovery
+> screen reports a closed window truthfully, states the deadline, and the
+> purge leg's half of the contract is proved too. See the §4.0 table.
 
 | # | Gap | Where |
 |---|---|---|
@@ -1052,6 +1123,7 @@ shipped behaviour, or retire it as superseded.
 | I4 | ✅ **FIXED** — the alternate-phone step is live: `phone.tsx` routes to `app/(auth)/alternate-phone.tsx` with the **normalised** primary number, the step rejects an alternate equal to the primary (both sides normalised, so `01711-111111` and `+8801711111111` compare equal), and `register.tsx` writes the column after the signup via `setAlternatePhone` — the `handle_new_user` trigger does not carry it. Migration 020 adds the format CHECK the schema never had. `pnpm alternate:check` proves the constraint over PostgREST (9/9); `pnpm signup:check` proves the signup contract (13/13). | [004] story 001 |
 | I5 | ✅ **FIXED** — the password-reset OTP flow is live end to end. `app/(auth)/forgot-password.tsx` sends the code; `app/(auth)/verify-otp.tsx` takes it; `app/(auth)/reset-password.tsx` sets the new password and adopts the session. The challenge lives in `public.password_reset_challenges` (migration 021) and the **database owns the code** — bcrypt hash, `extensions.crypt(code, hash) = hash` — because GoTrue's `verify` endpoint accepts only `{type, token_hash}` / `{type, token}` and **silently ignores a 6-digit code**. The GoTrue token is released only after the comparison succeeds. The app owns the mail (`supabase/functions/_shared/mailer.ts`). `pnpm reset:check` proves the whole path over the real GoTrue + mailbox (30/30); `supabase/tests/password_reset.sql` adds 47 DB-side assertions. | [005] story 003 |
 | I6 | ✅ **FIXED** — the **dual-identifier sign-in** is live end to end, and it had **no** end-to-end guard. The FR-AUTH-2 30-day Remember-me window **did not exist anywhere in the codebase** — `rememberMe` changed nothing about persistence, so AC #6 was **false**, not merely untested. The window is now enforced in `secureStore.getItem`, the only place a session is read back; the policy is stored *beside* the session and set **before** the sign-in (because `supabase-js` writes the session as part of it). `tools/probe-dual-identifier-login.cjs` (**17/17**, wired into `pnpm verify` and CI) now proves the phone and the email resolve to **one** `auth.users` row and one `profiles.id`. `apps/mobile/src/__tests__/noSocialLogin.test.ts` guards FR-AUTH-6. See §3 M5. | [002] story 002 |
+| I7 | ✅ **FIXED** — the **recovery screen** now tells the truth. Its bare `catch` reported every restore failure as `errors.internal`, so a citizen whose 30 days had run out was told the app broke, and told to try again, when trying again could never work. `src/shared/api/recovery-window.ts` classifies the failure (`VALIDATION_FAILED` → the window closed; `CONFLICT` → nothing was deleted) and the screen states the deadline and disables the Restore button once the window has closed. A **missing** deadline is treated as *open*, because the server decides, not the app. The purge leg's half of the promise is proved too, and writing that guard found **two live defects**: the purge's window was one microsecond too narrow (an account could be unrecoverable while its PII sat on disk), and the job worklists were executable by **`anon` and `authenticated`** — migration 012 revoked execute only from `public`, which does not remove the direct grants Supabase's default privileges give those roles. Migration `036` fixes both; `schema_contract.sql` now asserts no `job_*` function is client-executable. See §3 M6. | [006] story 007 |
 
 ### 4.2 Contacts — unit `002-identity`
 
@@ -1338,13 +1410,16 @@ shipped behaviour, or retire it as superseded.
        they describe a login-screen OTP step that W-1 removed. Closing them
        is a decision for the story's author, **not** something to paper over
        by putting a second credential path back.
-    4. The remaining `partial` stories, one at a time, each against its own
+    4. ~~**`007-account-deletion-and-recovery`**~~ ✅ **DONE** — see §3 M6.
+       The recovery screen reports a closed window truthfully and states the
+       deadline, and the purge leg's half of the contract is proved too —
+       which found **two live defects**: the purge's window was one
+       microsecond too narrow, and the job worklists were callable by
+       `anon` and `authenticated` (migration 036 fixes both).
+    5. The remaining `partial` stories, one at a time, each against its own
        `## Implementation` section. The next-cheapest unit is
-       `002-identity` (one story left: `007-account-deletion-and-recovery` —
-       an expired restore is misreported as `errors.internal`, and
-       `recoverableUntil` is fetched but never read) and then
        `006-alerts` (four stories, three of them missing tests).
-    5. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
+    6. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
        stories. It has no route, no component and no action.
 17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
     placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries the
@@ -1482,8 +1557,8 @@ apps/mobile/src/shared/      api/ (supabase, alerts, alertDetail, history,
 apps/admin/app/              login, queue, queue/[reportId], users, audit
 apps/admin/lib/              copy.ts, format.ts, api.ts
 packages/shared/src/         schemas, enums, errors, jobs, data, types
-supabase/migrations/         36 forward-only migrations
-supabase/tests/              10 SQL suites (457 assertions)
+supabase/migrations/         37 forward-only migrations
+supabase/tests/              11 SQL suites (476 assertions)
 supabase/functions/          8 Edge Functions + _shared/
 tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              mirror-*, secret-scan, release-verify,
@@ -1554,3 +1629,4 @@ Dev accounts: `mod@nagar.local` / `citizen@nagar.local`, password
 | Q-6 | A distinct **public** alert-detail screen is required (not the author's own report detail). | low |
 | Q-7 | `002-dual-identifier-login`'s **AC7 and AC8** describe a login-screen OTP step that **W-1 removed** — the login screen is email-primary and password-only. They are **void, not unmet**: making them true would mean putting a second credential path back. Amend the criterion to describe the shipped behaviour, or retire it as superseded — the same call as `005-admin-skeleton-and-ci`'s AC2. | low |
 | Q-8 | `002-dual-identifier-login`'s **AC #4** names `VALIDATION_FAILED`; the codebase uses `AUTH_REQUIRED`, and the *same* code is returned for an unknown identifier (HTTP 401) and a wrong password (HTTP 400). The substance of the criterion holds — both paths fail alike, with no "user not found" signal — but the code name differs. | low |
+| Q-9 | **The job worklists are now service-role only.** Migration `036` revokes execute on `job_purge_deleted_accounts`, `job_purge_media_candidates` and `job_geocode_cache_evictions` from `anon` and `authenticated`, because they returned other users' rows and the previous `REVOKE … FROM public` did not remove Supabase's direct grants. If any *other* part of the platform is expected to call a worklist directly — a dashboard, a cron-invoked Edge Function that is not the service role — it must be re-granted explicitly. Today nothing is: the job runner is the only caller. | low |

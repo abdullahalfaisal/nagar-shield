@@ -21,7 +21,7 @@ implemented: true
 
 - [ ] **Given** an account whose `profiles.deleted_at` is **29 days** old, **When** `purgeDeletedAccounts()` runs, **Then** the account is **not** selected, **nothing** about it is modified, and it remains fully recoverable through the app's restore path — the purge never runs before the window closes
 - [ ] **Given** an account whose `profiles.deleted_at` is **31 days** old, **When** `purgeDeletedAccounts()` runs, **Then** the account **is** selected and its PII is scrubbed: the phone, the email, the Auth identity, the emergency contacts, and the location-share audit rows are removed, and `profiles.pii_purged_at` is set to the run timestamp (FR-DATA-6)
-- [ ] **Given** the purge's selection query, **When** it is inspected, **Then** the predicate is exactly `profiles.deleted_at < now() - interval '30 days' AND profiles.pii_purged_at IS NULL` — the comparison is evaluated **server-side** by Postgres `now()`, so scheduler clock skew can never shorten the window
+- [ ] **Given** the purge's selection query, **When** it is inspected, **Then** the predicate is exactly `profiles.deleted_at <= now() - interval '30 days' AND profiles.pii_purged_at IS NULL` — the comparison is evaluated **server-side** by Postgres `now()`, so scheduler clock skew can never shorten the window
 - [ ] **Given** the purge has already scrubbed an account, **When** `purgeDeletedAccounts()` is invoked again, **Then** the account is **not** re-selected (its `pii_purged_at` is set), the second scrub is skipped, and the job is **idempotent** — no second PII write and no second `pii_purged_at` stamp
 - [ ] **Given** an account whose `deleted_at` is inside the window but whose `pii_purged_at` is already set, **When** the purge runs, **Then** the account is skipped entirely — the two timestamps are deliberately independent so the "recoverable until" state and the "PII is gone" state are each separately observable
 - [ ] **Given** an account that authored reports, **When** its PII is purged, **Then** **the report rows survive** with their `category`, `description`, `area_hierarchy`, `lat` / `lng`, `captured_at`, and `moderation_status` intact — the purge **never** deletes report metadata, and `reports.author_id` still resolves to the surviving non-PII tombstone row
@@ -41,13 +41,25 @@ implemented: true
   ```sql
   SELECT id
   FROM profiles
-  WHERE deleted_at < now() - interval '30 days'
+  WHERE deleted_at <= now() - interval '30 days'
     AND pii_purged_at IS NULL
   ORDER BY deleted_at ASC
   LIMIT $batch_size;
   ```
 
   `now()` is the **database** clock, evaluated inside Postgres. A scheduler whose clock is behind, or an operator invoking the function by hand with a forged timestamp, cannot shorten the window. The comparison is `>` / `<` on the server and is never computed in the function runtime.
+
+  **The comparison is `<=`, not `<`, and that was a defect until migration `036`.** The story originally specified `<` — but it also specified, in its own edge-case table, that *"the account was deleted exactly 30 days ago → selected and purged"*. Those two statements contradict each other: `deleted_at < now() - interval '30 days'` does **not** select an account deleted exactly 30 days ago. The shipped predicate was `<`, so the stated edge case was never true.
+
+  The truth is in the sibling half of the same promise. Unit `002`'s `restore_account` refuses with `VALIDATION_FAILED` when `now() >= deleted_at + interval '30 days'`, and the shared package's `isRecoveryWindowOpen` is open only while `now() < deleted_at + 30 days`. Both put the boundary **at** 30 days, inclusive. The purge now says the same thing from the other side:
+
+  ```
+  deleted_at <= now() - interval '30 days'
+  ⟺ deleted_at + interval '30 days' <= now()
+  ⟺ now() >= deleted_at + interval '30 days'
+  ```
+
+  So the account becomes unrecoverable and becomes purge-eligible at the **same instant**. Before the fix there was a sliver — one microsecond wide, but a real one — in which the citizen's account was gone (the app said the recovery period had ended) while their PII was still on disk and the job would not touch it. The account was also *selected* one instant later than the promise said, which is why the boundary assertion in `supabase/tests/account_deletion.sql` had to be written to pin the exact instant rather than the day.
 - **The 30-day recovery window belongs to unit `002`; this story owns only the purge leg.** Unit `002` writes `profiles.deleted_at` at soft-delete time and offers the restore path inside the window. This job runs **after** that window closes. The two halves share `profiles.deleted_at` as the single contract — a purge that fires early is a defect, and it is verified jointly with unit `002`'s story `007-account-deletion-and-recovery`.
 - **`deleted_at` and `pii_purged_at` are deliberately separate columns.** `deleted_at` starts the clock ("recoverable until"); `pii_purged_at` records the ending ("the PII is gone"). Because they are separate, a re-run selects nothing and the "already scrubbed" state is observable without a second scrub.
 - **The scrub is a tombstone, not a `DELETE` on `profiles`.** The `profiles` row survives so that `reports.author_id` (FR-DATA-3 — server-side identity retained for moderation and dispute handling), `reports.author_id`'s FK, and the `moderation_actions` trail (whose FKs are `ON DELETE SET NULL`) all keep holding. What changes is:
@@ -90,7 +102,7 @@ implemented: true
 | Scenario | Expected Behavior |
 |----------|-------------------|
 | The account was deleted 29 days and 23 hours ago | Not selected — the window has not closed; the account is untouched and still recoverable |
-| The account was deleted exactly 30 days ago | Selected and purged — the predicate is `deleted_at < now() - interval '30 days'`, evaluated on the database clock |
+| The account was deleted exactly 30 days ago | Selected and purged — the predicate is `deleted_at <= now() - interval '30 days'`, evaluated on the database clock. This is the same instant at which `restore_account` refuses the restore, so the account becomes unrecoverable and purge-eligible together. |
 | The scheduler's clock is 10 minutes behind the database clock | The window is the database's, not the caller's; the account at 29 days 23 hours is still not purged |
 | The purge runs twice in the same minute | The second run selects nothing (`pii_purged_at` is set), reports `items_processed = 0`, and exits `0` — no second scrub |
 | The function crashes after deleting the Auth identity but before writing `pii_purged_at` | The account stays re-selectable; the next run finds the identity already gone (a no-op), completes the remaining steps, and writes `pii_purged_at` — the retry converges |
@@ -103,6 +115,42 @@ implemented: true
 | The Auth Admin API is unreachable | The item is counted in `items_failed`, `error_detail` is recorded on the single `job_runs` row, and the account keeps `pii_purged_at IS NULL` for the next run — the purge is resumable |
 | The service-role key is missing from the function's environment | The function returns the standard error envelope with `code = 'INTERNAL'`, closes its single `job_runs` row as `failed`, and scrubs nothing |
 | The account was soft-deleted but never had any contacts or location shares | The scrub completes normally; the missing rows are a no-op and `items_processed` still counts the account |
+
+## Implementation
+
+The purge leg ships. Two defects were found in it by the guard this story's
+sibling — unit `002`'s `007-account-deletion-and-recovery` — added, and both
+are fixed by migration `036`.
+
+### The two defects
+
+| # | The defect | The fix |
+|---|---|---|
+| 1 | The worklist's window was one microsecond too narrow. The predicate was `deleted_at < now() - interval '30 days'`, while the restore refused at `now() >= deleted_at + interval '30 days'` — the same instant written with a strict inequality. For the sliver between them the account was **unrecoverable but not yet purgeable**: the citizen's account was gone, the app said the recovery period had ended, and their PII was still on disk with the job refusing to touch it. The story's own edge-case table said *"the account was deleted exactly 30 days ago → selected and purged"*, which the shipped `<` never did. | The predicate is `deleted_at <= now() - interval '30 days'`. The three statements of the boundary — the restore's refusal, the shared package's `isRecoveryWindowOpen`, and the purge's worklist — now name the same instant. |
+| 2 | `job_purge_deleted_accounts`, `job_purge_media_candidates` and `job_geocode_cache_evictions` were executable by `anon` and `authenticated`. Migration 012 revoked execute only from `public`, which does not remove the **direct** grants Supabase's default privileges give those roles. The ACL was `{postgres=X, anon=X, authenticated=X, service_role=X}`, so any signed-in citizen could enumerate every account awaiting its purge, with the instant each was deleted; and any anonymous caller could read arbitrary reports' storage paths and the geocode cache's keys. | Migration `036` revokes from `public`, `anon` **and** `authenticated` explicitly — the three-line pattern migration 015 already used for `job_keep_project_awake_ping`. |
+
+### The guards
+
+| Guard | What it proves |
+|---|---|
+| `supabase/tests/account_deletion.sql` (12 assertions) | The worklist waits: a 1-day-old and a 29-day-old deletion are not candidates; a 31-day-old one is; the boundary account (exactly 30 days) **is**; one second inside the window is not; a stamped account leaves the list; and the two halves of the promise agree in both directions. |
+| `supabase/tests/schema_contract.sql` Contract 6a2 / 6b2 (2 assertions) | **No** `job_*` function is executable by `anon` or `authenticated`, and **every** one of them is executable by `service_role`. The check is over the pattern `job\_%`, not a named list, so a new worklist cannot be added without the test failing. |
+| `tools/probe-account-deletion.cjs` (26/26) | Over the live GoTrue + PostgREST path: a signed-in citizen's call to the worklist is refused with HTTP 403; the service role's succeeds; a freshly deleted account is not on the list; an account back-dated past the window is. |
+
+### The causal checks
+
+Each guard was proved to **fail** when the thing it guards is broken, then
+restored:
+
+| Break | The guard that caught it |
+|---|---|
+| The worklist's predicate reverted to `<` | 2 assertions fail in `account_deletion.sql` (Test A4, Test B1) |
+| `grant execute … to authenticated` on the worklist | Test E1 fails in `account_deletion.sql`; the probe drops to 25/26 and prints the leaked rows |
+| `grant execute … to anon` on `job_purge_media_candidates` | Contract 6a2 fails in `schema_contract.sql` |
+
+### What this story does **not** own
+
+- The soft-delete, the countdown and the restore path — unit `002`'s `007-account-deletion-and-recovery`. The two halves share `profiles.deleted_at` as the single contract, and this story's `deleted_at` boundary is now the *same instant* as unit `002`'s restore refusal.
 
 ## Out of Scope
 

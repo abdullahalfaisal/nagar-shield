@@ -28,6 +28,7 @@ const SUITES = [
   'business_rules.sql',
   'read_models.sql',
   'write_guards.sql',
+  'account_deletion.sql',
   'password_reset.sql',
   'contacts.sql',
   'report_category.sql',

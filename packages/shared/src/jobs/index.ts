@@ -67,6 +67,37 @@ export function isAccountPurgeCandidate(
 }
 
 /**
+ * The last moment a soft-deleted account can be restored.
+ *
+ * The window is **30 days from `deleted_at`**, exactly — the same length the
+ * purge leg waits out, because both sides of the promise must agree: the
+ * account is recoverable until the moment the purge becomes eligible.
+ *
+ * The database is the authority (migration 035 makes `restore_account` a
+ * conditional update bounded by `recoverable_until`), so this helper is for
+ * the **app's** two jobs — showing the user the deadline, and refusing to
+ * offer a restore that the server will reject. It never shortens the window
+ * the server would honour; a device with a wrong clock can lose a restore it
+ * still had, and the server would have said yes.
+ */
+export function recoveryDeadline(deletedAt: Date): Date {
+  return new Date(deletedAt.getTime() + ACCOUNT_RECOVERY_WINDOW_DAYS * MS_PER_DAY)
+}
+
+/**
+ * True when the recovery window is still open.
+ *
+ * The boundary is **exclusive**: at exactly `deleted_at + 30 days` the
+ * window has closed. The database's predicate is `now() >= deleted_at +
+ * interval '30 days'`, so a client that used `<=` would offer a restore the
+ * server refuses — the story's edge-case table says the boundary is treated
+ * as expired, and the two must agree.
+ */
+export function isRecoveryWindowOpen(deletedAt: Date, now: Date = new Date()): boolean {
+  return now.getTime() < recoveryDeadline(deletedAt).getTime()
+}
+
+/**
  * Builds the non-PII tombstone values for a purged account.
  *
  * The placeholders are **not** a reversible hash of the original values and

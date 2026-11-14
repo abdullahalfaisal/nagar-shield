@@ -444,6 +444,17 @@ export const en: TranslationSchema = {
     deletedTitle: 'Account deleted',
     deletedBody: 'Your account was deleted. Sign in again within 30 days to restore it.',
     restore: 'Restore my account',
+    // The recovery deadline, stated in the user's language. The window is the
+    // promise the user was given, so the screen has to say when it ends —
+    // "within 30 days" is not a date, and the day the promise runs out is the
+    // day the user needs to act.
+    recoverableUntil: 'You can restore your account until {{date}}.',
+    recoverableUntilDays: 'You can restore your account for {{count}} more days.',
+    // The window has closed. This is **not** an app failure — it is the
+    // truthful answer to "can I still get my account back?", and the citizen
+    // is told so plainly.
+    recoveryWindowClosed:
+      'The 30-day recovery period has ended, so this account can no longer be restored.',
   },
   settings: {
     title: 'Settings',

@@ -113,7 +113,8 @@ they need `pnpm db:reset` to have run first.
 ```
 typecheck → lint → format:check → test → data:check → shared:check
           → story:index:check → db:test → db:smoke → dual-identifier:check
-          → alert:check → console:check → maestro:check → fn:typecheck
+          → deletion:check → alert:check → console:check → maestro:check
+          → fn:typecheck
 ```
 
 It must exit `0`. The individual steps can be run on their own while

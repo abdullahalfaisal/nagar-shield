@@ -203,7 +203,7 @@ Notes on the schema:
 |-----------|-------------|--------|---------|
 | `purgeMedia()` | **Edge Function — the 90-day media purge (FR-DATA-4).** Derives the worklist from `report_media.created_at`; for each candidate: delete the **Storage object**, then set `report_media.purged_at = now()`. The **report row is never touched** — the metadata outlives the media. Also sweeps media belonging to reports whose `reports.deleted_at` is set. **Idempotent** — a re-run deletes nothing further and exits `0` | `POST /functions/v1/purge-media` (service-role or cron invocation); optional `{"dry_run": true}` | `{ "data": { "job_name": "purge_media", "items_processed": n, "items_failed": m, "bytes_reclaimed": b, "dry_run": false } }`; on failure `{ "error": { "code": "INTERNAL", "message": "…", "details": { "error_detail": "…" } } }` |
 | `cleanupGeocodeCache()` | **Edge Function — the geocode-cache eviction.** Drops `geocode_cache` rows whose `created_at` is older than **90 days**. The cache is a cache: evicting a row is always safe and only costs one re-resolve | `POST /functions/v1/cleanup-geocode-cache` | `{ "data": { "job_name": "cleanup_geocode_cache", "items_processed": n, "items_failed": m } }` |
-| `purgeDeletedAccounts()` | **Edge Function — the FR-DATA-6 purge leg.** Selects accounts with `profiles.deleted_at < now() - interval '30 days'` **and** `pii_purged_at IS NULL`; scrubs the PII (phone, email, the Auth identity, the emergency contacts, the location-share audit rows) and marks `pii_purged_at`. It **never** purges before day 30, and it **never** deletes the report metadata an account authored | `POST /functions/v1/purge-deleted-accounts` | `{ "data": { "job_name": "purge_deleted_accounts", "items_processed": n, "items_failed": m, "window_days": 30 } }` |
+| `purgeDeletedAccounts()` | **Edge Function — the FR-DATA-6 purge leg.** Selects accounts with `profiles.deleted_at <= now() - interval '30 days'` **and** `pii_purged_at IS NULL`; scrubs the PII (phone, email, the Auth identity, the emergency contacts, the location-share audit rows) and marks `pii_purged_at`. It **never** purges before day 30, and it **never** deletes the report metadata an account authored | `POST /functions/v1/purge-deleted-accounts` | `{ "data": { "job_name": "purge_deleted_accounts", "items_processed": n, "items_failed": m, "window_days": 30 } }` |
 | `keepProjectAwake()` | **Edge Function — the free-tier heartbeat (NFR-Availability).** A trivial, cheap invocation that touches the project (a `select 1` plus a no-op read) on a cadence well inside the free tier's inactivity-pause window. It is a **reliability** control, not an optimisation | `POST /functions/v1/keep-project-awake` (cron) | `{ "data": { "job_name": "keep_project_awake", "items_processed": 0, "items_failed": 0 } }` |
 | `recordJobRun()` | **Shared helper — the single writer of `job_runs`.** Opens a row with `status = 'running'` at the start of a job, and closes it with `status`, `items_processed`, `items_failed`, `finished_at`, and `error_detail` at the end. Every job goes through it, so **exactly one row per invocation** is a structural property rather than a convention | `{ job_name, started_at }` → a run id | a `job_runs` row id, and a `closeJobRun(id, { status, items_processed, items_failed, error_detail })` update |
 | `eas build -p android --profile preview` | The **staging** APK build — an Android **APK** (not an AAB) against the staging env vars | the `preview` profile in `eas.json` | an `.apk` artifact, sideloaded with `adb install` |
@@ -364,9 +364,12 @@ No stage may be skipped, and each **Verify** is a command, not an opinion.
   survive. The metadata retention **outlives** the media (FR-DATA-4).
 - **The account purge must respect the 30-day recovery window and must not
   purge earlier.** The selection predicate is
-  `deleted_at < now() - interval '30 days' AND pii_purged_at IS NULL`. An
+  `deleted_at <= now() - interval '30 days' AND pii_purged_at IS NULL`. An
   account inside the window is **never** touched — the user can still restore
-  it (unit `002`).
+  it (unit `002`). The `<=` is the same instant at which unit `002`'s
+  `restore_account` refuses the restore (`now() >= deleted_at + interval
+  '30 days'`), so the account becomes unrecoverable and purge-eligible
+  together.
 - **The account purge must not delete the report metadata an account
   authored.** FR-DATA-3 requires server-side identity for moderation and
   dispute handling, and FR-DATA-4 retains metadata longer than the media; the
@@ -563,10 +566,18 @@ No stage may be skipped, and each **Verify** is a command, not an opinion.
   trail (`moderation_actions`, with `ON DELETE SET NULL` FKs) must survive
   both purges.
 - **The account purge never shortens the window.** The predicate is
-  `deleted_at < now() - interval '30 days'`. The user can restore inside the
+  `deleted_at <= now() - interval '30 days'`. The user can restore inside the
   window (unit `002`); the purge only runs after it closes. A clock skew
   between the scheduler and the database is absorbed by the database's own
   `now()` — the comparison is always evaluated server-side.
+- **The job worklists are the service role's alone.** `job_purge_deleted_accounts`,
+  `job_purge_media_candidates` and `job_geocode_cache_evictions` return other
+  users' rows — accounts awaiting their purge and the instants they were
+  deleted, arbitrary reports' storage paths, cache keys. They are
+  `SECURITY DEFINER` batch queries with no authorisation of their own, so
+  `anon` and `authenticated` are revoked explicitly (migration `036`): a
+  `REVOKE … FROM public` alone does not remove the direct grants Supabase's
+  default privileges give those roles.
 - **A paused project is also a paused scheduler.** If the project pauses, the
   cron stops and the purge stops — and a stopped purge is exactly the failure
   that exhausts the Storage quota. The heartbeat and the purge therefore

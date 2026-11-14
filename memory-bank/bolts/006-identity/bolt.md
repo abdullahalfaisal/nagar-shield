@@ -3,7 +3,7 @@ id: 006-identity
 unit: 002-identity
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [006-emergency-contacts-crud, 005-remote-account-disable, 007-account-deletion-and-recovery]
 created: 2026-11-04T00:00:00Z
 

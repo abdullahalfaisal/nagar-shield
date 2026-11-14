@@ -77,9 +77,11 @@ created: 2026-11-05T13:40:00Z
 **002-deleted-account-pii-purge**
 
 - ✅ **PII is erased only after the 30-day window, evaluated server-side**:
-      the worklist predicate is `deleted_at < now() - interval '30 days' AND
+      the worklist predicate is `deleted_at <= now() - interval '30 days' AND
       pii_purged_at IS NULL`, evaluated by Postgres, so a scheduler whose
-      clock is behind cannot shorten the window.
+      clock is behind cannot shorten the window. The `<=` is the same instant
+      at which the restore is refused, so the account becomes unrecoverable
+      and purge-eligible together.
 - ✅ **The report records survive, with the author de-identified**: the
       function replaces the phone and the email with a non-reversible
       tombstone and deletes the emergency contacts, the location-share audit

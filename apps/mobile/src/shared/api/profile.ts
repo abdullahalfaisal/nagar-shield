@@ -1,4 +1,4 @@
-import { AppError, alternatePhoneSchema } from '@nagar-shield/shared'
+import { AppError, alternatePhoneSchema, recoveryDeadline } from '@nagar-shield/shared'
 import { supabase } from '@/shared/api/supabase'
 import { fromSupabaseError } from '@/shared/api/errors'
 import type { Database } from '@/shared/api/database.types'
@@ -43,11 +43,22 @@ export async function loadProfile(userId: string): Promise<ProfileRow> {
  * resume, every app foreground. Selecting three columns instead of the whole
  * row keeps that cheap, and keeps the PII columns out of the memory of a
  * screen that does not need them.
+ *
+ * `deletedAt` and `recoverableUntil` ride along because the recovery screen
+ * **needs** the deadline: the 30-day window is the promise the user was
+ * given, and a screen that cannot say when it ends cannot tell the user
+ * whether they still have a choice. They cost nothing — the two columns are
+ * already in the select — and they are `null` for every account that is not
+ * deleted.
  */
 export async function loadAccountStatus(userId: string): Promise<{
   disabled: boolean
   deleted: boolean
   disabledAt: string | null
+  /** When the account was soft-deleted, when it has been. */
+  deletedAt: string | null
+  /** The last moment the account can be restored, when it has been. */
+  recoverableUntil: string | null
 }> {
   const { data, error } = await supabase
     .from('profiles')
@@ -62,13 +73,23 @@ export async function loadAccountStatus(userId: string): Promise<{
   // tombstone whose `deleted_at` was already cleared. Either way, the account
   // is not disabled.
   if (!data) {
-    return { disabled: false, deleted: false, disabledAt: null }
+    return {
+      disabled: false,
+      deleted: false,
+      disabledAt: null,
+      deletedAt: null,
+      recoverableUntil: null,
+    }
   }
 
   return {
     disabled: Boolean(data.disabled_at),
     deleted: Boolean(data.deleted_at),
     disabledAt: data.disabled_at,
+    deletedAt: data.deleted_at,
+    recoverableUntil: data.deleted_at
+      ? recoveryDeadline(new Date(data.deleted_at)).toISOString()
+      : null,
   }
 }
 

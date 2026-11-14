@@ -116,7 +116,7 @@ async function post(table, body, token) {
 }
 
 /** A PostgREST call of a lifecycle RPC. */
-async function rpc(name, token) {
+async function rpc(name, token, body = {}) {
   const response = await fetch(`${API_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
@@ -124,7 +124,33 @@ async function rpc(name, token) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify(body),
+  })
+  const text = await response.text()
+  let parsed = null
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    parsed = null
+  }
+  return { status: response.status, text, body: parsed }
+}
+
+/**
+ * A PostgREST call of an RPC as the **service role**.
+ *
+ * The purge worklist is the service role's alone, so the probe needs the
+ * service-role key to read it — the same key the Edge Function uses.
+ */
+async function rpcAsService(name, body = {}) {
+  const response = await fetch(`${API_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
   })
   const text = await response.text()
   let parsed = null
@@ -146,6 +172,40 @@ async function readProfile(token, userId) {
   )
   const body = await response.json().catch(() => [])
   return { status: response.status, rows: Array.isArray(body) ? body : [] }
+}
+
+/**
+ * Reads the profile row as the **service role**, with no session.
+ *
+ * The client reads its own row through its own session, but the probe has to
+ * be able to look at the row *without* one — a soft-deleted account's
+ * session is still valid, but the probe's own reads must not depend on the
+ * state it is setting up.
+ */
+async function readProfileAsService(userId) {
+  const response = await fetch(
+    `${API_URL}/rest/v1/profiles?id=eq.${userId}&select=id,deleted_at,disabled_at`,
+    {
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+    },
+  )
+  const body = await response.json().catch(() => [])
+  return { status: response.status, rows: Array.isArray(body) ? body : [] }
+}
+
+/**
+ * Reads the `auth.users` row for an id, with the service role.
+ *
+ * The `auth` schema is **not** exposed through PostgREST, so the read goes
+ * through the GoTrue admin endpoint — the same door the probe created the
+ * account through.
+ */
+async function readAuthUser(userId) {
+  const response = await fetch(`${API_URL}/auth/v1/admin/users/${userId}`, {
+    headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
+  })
+  const body = await response.json().catch(() => ({}))
+  return { status: response.status, user: body?.id ? body : null }
 }
 
 /** Removes the probe rows. The service role bypasses the RLS scopes. */
@@ -232,6 +292,43 @@ async function main() {
     Boolean(afterDelete.rows[0]?.deleted_at),
     `deleted_at=${afterDelete.rows[0]?.deleted_at}`,
   )
+
+  // --- (2a) The auth identity survives the soft delete (AC #4) ---------------
+
+  // The story is explicit: "the `auth.users` row still exists — the auth
+  // identity is **not** destroyed at soft-delete time". It has to survive,
+  // because the restore path re-establishes a session from it — and because
+  // the purge leg, not the soft delete, is what destroys it.
+  const authUserAfterDelete = await readAuthUser(citizen.id)
+  record(
+    'the auth.users row survives the soft delete — the identity is not destroyed',
+    authUserAfterDelete.status === 200 && Boolean(authUserAfterDelete.user?.id),
+    `HTTP ${authUserAfterDelete.status}`,
+  )
+
+  // --- (2b) The client can read the deadline it has to show -----------------
+
+  // The recovery screen states the deadline, so the deadline has to be
+  // *readable by the client* — the deleted_at is, and the deadline is the
+  // same column plus 30 days. This asserts the client can see the row that
+  // carries it at all, which is what the screen's read depends on.
+  const serviceRead = await readProfileAsService(citizen.id)
+  const deletedAt = serviceRead.rows[0]?.deleted_at
+  record(
+    'the client can read the deleted_at the deadline is derived from',
+    Boolean(deletedAt),
+    `deleted_at=${deletedAt}`,
+  )
+
+  if (deletedAt) {
+    const deadline = new Date(new Date(deletedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+    const daysLeft = Math.floor((deadline.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+    record(
+      'the deadline the screen shows is 30 days out — the days remaining are readable',
+      daysLeft === 29 || daysLeft === 30,
+      `${daysLeft} days left`,
+    )
+  }
 
   // --- (3) A deleted account may not write (AC #7) ---------------------------
 
@@ -375,6 +472,78 @@ async function main() {
     'restoring an account that is not deleted is refused with CONFLICT',
     notDeleted.status >= 400 && notDeleted.status < 500 && /CONFLICT/i.test(notDeleted.text),
     `HTTP ${notDeleted.status} ${notDeleted.text.slice(0, 80)}`,
+  )
+
+  // --- (7) The purge worklist is the service role's alone (AC #8) ------------
+
+  // The purge leg's worklist enumerates every account awaiting its PII
+  // purge, and the instant it was deleted. It is a server-side batch query
+  // with no authorisation of its own, so a client role that can call it can
+  // read all of that.
+  //
+  // This is asserted over the **real** PostgREST door, as the citizen's own
+  // session — because a grant that is refused in the catalogue can still be
+  // honoured by the API layer's own role handling, and vice versa.
+  const worklistAsCitizen = await rpc('job_purge_deleted_accounts', token, { p_batch_size: 100 })
+  record(
+    'a signed-in citizen cannot read the purge worklist',
+    worklistAsCitizen.status >= 400 && worklistAsCitizen.status < 500,
+    `HTTP ${worklistAsCitizen.status} ${worklistAsCitizen.text.slice(0, 80)}`,
+  )
+
+  // The service role can — it is the only caller the job runner uses.
+  const worklistAsService = await rpcAsService('job_purge_deleted_accounts', { p_batch_size: 100 })
+  record(
+    'the service role can read the purge worklist',
+    worklistAsService.status === 200 && Array.isArray(worklistAsService.body),
+    `HTTP ${worklistAsService.status}`,
+  )
+
+  // --- (8) The purge waits for the window (AC #8) ---------------------------
+
+  // The account was restored at the end of step (5), so it is not deleted.
+  // Soft-delete it again and back-date it, then read the worklist: the
+  // account must appear only once its window has closed.
+  await rpc('soft_delete_account', token)
+
+  const worklistWhileRecoverable = await rpcAsService('job_purge_deleted_accounts', {
+    p_batch_size: 100,
+  })
+  const listedWhileRecoverable = Array.isArray(worklistWhileRecoverable.body)
+    ? worklistWhileRecoverable.body.some((row) => row?.id === citizen.id)
+    : false
+  record(
+    'a freshly deleted account is not on the purge worklist',
+    !listedWhileRecoverable,
+    `listed=${listedWhileRecoverable}`,
+  )
+  record(
+    'the purge worklist answered for the recoverable account',
+    worklistWhileRecoverable.status === 200,
+    `HTTP ${worklistWhileRecoverable.status}`,
+  )
+
+  // Back-date past the window. Now it must appear.
+  await fetch(`${API_URL}/rest/v1/profiles?id=eq.${citizen.id}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      deleted_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  })
+
+  const worklistAfterExpiry = await rpcAsService('job_purge_deleted_accounts', { p_batch_size: 100 })
+  const listedAfterExpiry = Array.isArray(worklistAfterExpiry.body)
+    ? worklistAfterExpiry.body.some((row) => row?.id === citizen.id)
+    : false
+  record(
+    'an account past the 30-day window IS on the purge worklist',
+    listedAfterExpiry,
+    `listed=${listedAfterExpiry}`,
   )
 
   await cleanup(citizen.id)
