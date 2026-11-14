@@ -275,7 +275,8 @@ const styles = StyleSheet.create({
   },
   cancel: {
     marginTop: 8,
-    height: 44,
+    // The 48 dp tap target for the cancel button (FR-UX-4).
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',

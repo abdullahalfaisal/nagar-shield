@@ -2,11 +2,11 @@
 id: 003-mobile-design-system
 unit: 001-foundation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 003-mobile-design-system
@@ -91,7 +91,7 @@ implemented: partial
 
 ## Implementation
 
-**The theme tokens, the UI primitives, and the Bangla/English copy all ship. The story is not `complete` because the cross-checks it names were never built.**
+**The theme tokens, the UI primitives, and the Bangla/English copy all ship, and every cross-check the story names is now built and green. The story is `complete`.**
 
 ### What ships
 
@@ -100,22 +100,75 @@ implemented: partial
 - The primitive library is real and used: `apps/mobile/src/shared/ui/` carries `Button`, `Card`, `InputField`, `ListRow`, `ListRowGroup`, `Screen`, `AppBar`, `StatusBanner`, `EmptyState`, `SectionTitle`, `Toggle`, `RadioGroup`, `SegmentedTabs`, `BottomSheet`, `AlertCard`, `Icon`, `PulseDot`, `PermissionRow`, `LocationPill`, `ContactAvatar`, `WizardScreen`, and the degraded-mode surfaces added with story `004-graceful-degradation` (`ManualDialGuidance.tsx`). `apps/mobile/src/shared/ui/index.ts` is the barrel.
 - The copy ships in both scripts: `apps/mobile/src/shared/i18n/en.ts` and `bn.ts`.
 
-### The gaps
+### The four cross-checks that were missing now ship
 
-- **No test parses `docs/design/design-tokens.md` and asserts the mobile theme matches it.** The story says *"The token values are cross-checked by the same kind of test used on the mobile side: a test parses `docs/design/design-tokens.md` and asserts the admin CSS custom properties match. The document is the contract for both surfaces."* The only thing that references the document is `tools/extract-design-tokens.cjs` — an extraction tool that is **not wired into CI** (`grep -n "extract-design-tokens" .github/workflows/ci.yml package.json` returns nothing). Nothing fails when the tokens and the document disagree.
-- **No tap-target size test.** The story names a tap-target minimum; no test measures the rendered hit area of the primitives, and the admin's own `--tap-target: 48px` is an invented value (see story `005-admin-skeleton-and-ci`).
-- **No design-system showcase route.** The story asks for a screen that exercises every primitive; no such route exists under `apps/mobile/app/`.
-- **No i18n key-parity gate.** `apps/mobile/src/shared/i18n/` contains `en.ts`, `bn.ts`, `index.ts`, `errorCopy.ts`, `errorCopy.test.ts`, `degradationCopy.test.ts`, and `thanaFallbackCopy.test.ts` — the test files each audit one namespace, but **nothing checks that `en` and `bn` have the same keys**. A key added to one bundle and forgotten in the other ships silently, and the Bangla screen renders `undefined` for it.
+**1. The token-parity test — `apps/mobile/src/shared/theme/designTokens.test.ts` and `apps/admin/lib/designTokens.test.ts`.**
 
-  **This gap was demonstrated by a live bug, not hypothetically.** The mobile app built its error key by hand at **ten** call sites — `t(\`errors.${appError.code.toLowerCase()}\`)` — while the bundle's key is camelCase (`errors.authRequired`). The key did not exist, i18next fell back to rendering **the key itself**, and the login screen showed the literal word *"undefined"* where the error message should have been. The correct mapping **already existed** — `API_ERROR_I18N_KEYS` in `packages/shared` — and the app was re-deriving it wrongly ten times. `apps/mobile/src/shared/i18n/errorCopy.ts` is now the one place that consults the map, with an `errors.internal` fallback for a code the app does not know.
+Both parse `docs/design/design-tokens.md` itself and compare it against the shipped tokens: the mobile `tokens.ts` on one side, the admin's CSS custom properties on the other. The document is the contract; the tests never compare a token file against a hand-maintained copy of the document. The admin's own `--tap-target: 48px` — an invented value — was removed rather than checked, because the document does not declare it.
 
-  The lesson is the one this gap already names, made concrete: **a parity gate over the bundles cannot catch a wrong key at a call site.** Both bundles carried `errors.authRequired` faithfully; the screen asked for `errors.authrequired`. The parity gate is still the right gate for a *missing* key, but the *wrong* key needed a different guard — `errorCopy.test.ts` (**7 tests**) resolves every code through the **real** bundles and asserts the resulting string exists, which is what actually caught this class of bug.
-- **No hardcoded-string scan.** Nothing in `tools/` or the CI workflow asserts that user-facing copy comes from the bundles rather than a literal in a component.
+**2. The i18n key-parity gate — `apps/mobile/src/shared/i18n/keyParity.test.ts`.**
 
-### What closing this needs
+It asserts `en` and `bn` carry the same key set, and that the Bangla bundle — the source of truth for the key set — is the one the English bundle is typed against (`en.ts` is `TranslationSchema`-typed, so a missing key is a compile error).
 
-1. A token-parity test that parses `docs/design/design-tokens.md` and asserts `apps/mobile/src/shared/theme/tokens.ts` matches it — and the same assertion for the admin's CSS custom properties.
-2. An i18n key-parity test asserting `en` and `bn` carry the same key set, wired into CI.
-3. A tap-target test over the primitives.
-4. A showcase route that renders every primitive, so a regression in one is visible.
-5. A scan for hardcoded user-facing strings in the components.
+**3. The tap-target test — `apps/mobile/src/shared/ui/tapTarget.test.ts`.**
+
+The story's criterion names `Button`, `AppBar` back and icon buttons, `TextField`, `QuickActionCard`, `ListRow`, `Toggle`, `Chip`, `SegmentedTabs`, and `BottomSheet` actions. `@testing-library/react-native` is not installed in this workspace, so the test reads the **source** of every primitive, parses each `StyleSheet.create({...})` into a name→property map, resolves each `<Pressable>`'s style reference, and computes the effective hit box — following `height` → `minHeight` → `paddingVertical × 2 + tallest child` → the parent's height for a `flex: 1` child → the font size for a text control, with `hitSlop` credited as the extension it is.
+
+**The gate found eight real FR-UX-4 violations in the shipped primitives**, and every one was fixed without changing the visual:
+
+| Primitive | The violation | The fix |
+|---|---|---|
+| `AreaChipRow` | the chip's box is 28 dp tall | `hitSlop={10}` |
+| `RadioGroup` | the choice chip is 40 dp tall | `hitSlop={4}` |
+| `EmptyState` | a `<Text onPress>` action link has no box at all | a transparent 48 dp `<Pressable>` wrapper |
+| `SectionTitle` | the same | the same |
+| `WizardScreen` | the escape link is a `<Text onPress>` | the same |
+| `ContactAvatar` | the primary star is a 13 dp glyph | a 48 dp `<Pressable>` wrapper |
+| `WrongNumberSheet` | the cancel button is 44 dp tall | `minHeight: 48` |
+| `AppBar` | the back and icon buttons are 40 dp | `hitSlop={8}` |
+
+The rule the fixes follow is the story's own: *"the prototype's 40 px `.back-btn` / `.icon-btn` are grown to a 48 × 48 dp hit area (transparent padding around the 40 px visual) so the FR-UX-4 minimum holds without changing the visual design."*
+
+**4. The showcase route — `apps/mobile/app/showcase.tsx`, with `apps/mobile/src/shared/ui/Showcase.tsx` and `apps/mobile/src/__tests__/showcase.test.ts`.**
+
+One route rendering every primitive the story names, with a light/dark toggle in the app bar so a primitive that only reads in one theme is visible immediately. It lives **outside** the `(app)` group on purpose — the showcase is how a reviewer checks the primitives, and requiring a signed-in account to look at a button would defeat that. It fetches nothing and touches no account state.
+
+Three primitives the story names did not exist and were built for it: `Brand` (the `.brand-display` mark — a gradient tile carrying the shield glyph, extracted from the brand block that was hardcoded in the login screen), `Skeleton` (the loading placeholder in the same radius and surface vocabulary), and `StickyFooter` (the `.sticky-cta` / `.wizard-sticky` footer). The story's `TextField` is the app's `InputField` and its `QuickActionCard` is the app's `ActionCard`; `ActionCard` is now also exported under the story's name, and the mapping is asserted by the test rather than left implicit.
+
+`apps/mobile/src/__tests__/showcase.test.ts` requires each primitive to be **imported and rendered as a JSX element** — not merely imported — because a primitive that is imported but no longer rendered is exactly the regression the criterion guards against.
+
+**5. The hardcoded-string scan — `apps/mobile/src/__tests__/hardcodedStrings.test.ts`.**
+
+It reads every source file under `apps/mobile/app` and `apps/mobile/src` and reports two things: a **JSX text node** (`>Some words<`) and a **string literal in a copy-carrying prop** (`accessibilityLabel`, `title`, `label`, `placeholder`, `helper`, `body`, `description`, `subtitle`, `message`, `eyebrow`, `tagline`, `actionLabel`).
+
+**The scan found and fixed ten real violations** — every one of them a string the Bangla screen would never have translated:
+
+| Site | The literal | The fix |
+|---|---|---|
+| `SplashView` | `নগর শিল্ড` / `NAGAR SHIELD` | `t('common.appName')` / `t('common.appNameEn')` |
+| `AppBar` | `accessibilityLabel="Go back"` | `t('common.back')` |
+| `BottomSheet` | `accessibilityLabel="Close"` (twice) | `t('common.close')` |
+| `AlertCard` | `✎ বিস্তারিত দেখুন` | `t('alerts.detailLink')` |
+| `AlertCard` | `accessibilityLabel="রিপোর্ট করুন"` | `t('alerts.reportThis')` |
+| `home.tsx` | the avatar initial `না` | `t('common.appNameInitial')` |
+| `home.tsx` | `এলাকা খুঁজুন...` | `t('home.searchPlaceholder')` |
+| `home.tsx` | `Auto-refreshes every 60s` | `t('home.autoRefreshNote')` |
+| `home.tsx` | `accessibilityLabel="আরও বিকল্প"` | `t('more.moreOptions')` |
+| `login.tsx` | the brand tagline | `t('common.brandTagline')` |
+| `settings.tsx` | the avatar initial `না`, the locale badge | `t('common.appNameInitial')`, `t('settings.languageBangla' / 'languageEnglish')` |
+
+The scan also proves the **stronger** claim the parity gate cannot: every `t('…')` key the app asks for **resolves in both bundles**. A parity gate proves the two bundles agree with each other; only this proves the app agrees with them. That is the check that catches the *"undefined"* bug — the wrong key at a call site — which the parity gate structurally cannot see.
+
+### The guards are proved to fail
+
+Every gate was checked by breaking the thing it guards and confirming the gate failed, then restoring it:
+
+- **The tap-target gate** fails when `AreaChipRow`'s `hitSlop={10}` is removed (*"the pressable is 28 dp tall (paddingVertical 8 × 2 + 12 dp of content) (hitSlop 0)"*), and fails when a brand-new 20 dp primitive is added to the tree — so it protects against what is added **tomorrow**, not only what exists today.
+- **The showcase gate** fails when a primitive is removed from the showcase, and fails when a primitive is imported but no longer rendered.
+- **The hardcoded-string gate** fails when a component with one hardcoded sentence is added (*"src/shared/ui/CausalProbe.tsx:12 — JSX text — \"Your report has been sent.\""*), and fails when a `t()` key is misspelled (*"home.autoRefreshNoteTypo"*), which is the *"undefined"* bug reproduced on purpose.
+
+### What is still open
+
+- The admin console's own copy (`apps/admin/lib/copy.ts`) has no equivalent scan. The admin is **out of scope** for this story (*"The admin web token subset and CSS custom properties — 005-admin-skeleton-and-ci"*), and the story's criterion speaks of "the components", meaning the mobile primitives. The admin's copy registry is story `005`'s to guard.
+- The showcase's **visual** acceptance is a human act: the route renders every primitive in both themes, but no automated test can assert that a primitive *looks* right. The scan proves each one renders and is wired into both themes; a reviewer still opens the route.
+

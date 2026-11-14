@@ -4,8 +4,7 @@ import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { AppError } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { Button, InputField, Toggle } from '@/shared/ui'
-import { Icon } from '@/shared/ui/Icon'
+import { Brand, Button, InputField, Toggle } from '@/shared/ui'
 import { logIn } from '@/shared/auth/authService'
 import { markPasswordSignIn } from '@/shared/auth/useBiometricGate'
 import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService'
@@ -70,24 +69,7 @@ export default function LoginScreen() {
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
       <View style={styles.content}>
         <View style={styles.brand}>
-          <View
-            style={[
-              styles.brandLogo,
-              {
-                shadowColor: '#7C3AED',
-                shadowOpacity: 0.32,
-                shadowRadius: 28,
-                shadowOffset: { width: 0, height: 12 },
-                elevation: 8,
-              },
-            ]}
-          >
-            <Icon name="shield" size={44} color="#FFFFFF" filled />
-          </View>
-          <Text style={[styles.brandName, { color: theme.colors.ink[950] }]}>
-            {t('common.appName')}
-          </Text>
-          <Text style={[styles.brandTag, { color: theme.colors.ink[500] }]}>শহরে, সদা সতর্ক</Text>
+          <Brand name={t('common.appName')} tagline={t('common.brandTagline')} />
         </View>
 
         <View style={styles.hero}>
@@ -187,24 +169,6 @@ const styles = StyleSheet.create({
   brand: {
     alignItems: 'center',
     marginBottom: 24,
-  },
-  brandLogo: {
-    width: 80,
-    height: 80,
-    borderRadius: 22,
-    backgroundColor: '#7C3AED',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  brandName: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  brandTag: {
-    fontSize: 12,
-    marginTop: 4,
   },
   hero: {
     alignItems: 'center',

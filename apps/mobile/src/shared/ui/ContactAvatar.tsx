@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../theme'
 
@@ -106,17 +106,31 @@ export function PrimaryStar({
   accessibilityLabel?: string
 }) {
   const theme = useTheme()
-  const star = (
+  const glyph = (
     <Text
-      accessibilityRole={onPress ? 'button' : 'text'}
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
       style={[styles.star, { color: isPrimary ? theme.palette.amber[600] : theme.colors.ink[300] }]}
     >
       ★
     </Text>
   )
-  return star
+
+  // Read-only on the Location Sharing screen; a button on the Emergency
+  // Contacts screen, where it toggles the primary flag.
+  if (!onPress) return glyph
+
+  // The glyph is 13 dp; the tap target is padded to 48 dp without changing
+  // the visual (FR-UX-4). A `Pressable` rather than a `Text` with an
+  // `onPress`, because `Text` has no `hitSlop`.
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={styles.starHit}
+    >
+      {glyph}
+    </Pressable>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -142,5 +156,13 @@ const styles = StyleSheet.create({
   star: {
     fontSize: 13,
     marginLeft: 4,
+  },
+  starHit: {
+    // The 48 dp tap target for a 13 dp glyph (FR-UX-4). The padding is
+    // transparent, so the visual is unchanged.
+    minHeight: 48,
+    minWidth: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 })

@@ -422,7 +422,7 @@ export default function LocationSharingScreen() {
           onChangeText={setManualLat}
           keyboardType="numbers-and-punctuation"
           error={manualError ?? undefined}
-          placeholder="23.7806"
+          placeholder={t('location.manualLatPlaceholder')}
         />
         <View style={styles.manualGap} />
         <InputField
@@ -430,7 +430,7 @@ export default function LocationSharingScreen() {
           value={manualLng}
           onChangeText={setManualLng}
           keyboardType="numbers-and-punctuation"
-          placeholder="90.4066"
+          placeholder={t('location.manualLngPlaceholder')}
         />
         <View style={styles.manualGap} />
         <Button

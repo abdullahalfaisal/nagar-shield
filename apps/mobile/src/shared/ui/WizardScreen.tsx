@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../theme'
@@ -135,13 +135,16 @@ export function WizardBadge({
 export function EscapeLink({ label, onPress }: { label: string; onPress?: () => void }) {
   const theme = useTheme()
   return (
-    <Text
+    // A `Pressable` rather than a `Text` with an `onPress`, so the link has a
+    // real 48 dp box. The label itself is unchanged.
+    <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
-      style={[styles.escape, { color: theme.colors.ink[500] }]}
+      style={styles.escapeHit}
     >
-      {label}
-    </Text>
+      <Text style={[styles.escape, { color: theme.colors.ink[500] }]}>{label}</Text>
+    </Pressable>
   )
 }
 
@@ -230,5 +233,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 13,
     paddingVertical: 8,
+  },
+  escapeHit: {
+    // The 48 dp tap target for the escape link (FR-UX-4). The padding is
+    // transparent, so the visual is unchanged.
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 })

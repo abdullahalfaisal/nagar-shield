@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
 
@@ -48,18 +48,25 @@ export function EmptyState({ icon, title, description, action, style }: EmptySta
         </Text>
       ) : null}
       {action ? (
-        <Text
+        // A `Pressable` rather than a `Text` with an `onPress`, so the link
+        // has a real 48 dp box. The text itself is unchanged — the padding
+        // is transparent, so the visual is the prototype's 14 dp label.
+        <Pressable
           accessibilityRole="button"
+          accessibilityLabel={action.label}
           onPress={action.onPress}
-          style={{
-            color: theme.palette.violet[700],
-            fontSize: 14,
-            fontWeight: theme.typography.weight.semibold,
-            marginTop: 16,
-          }}
+          style={styles.action}
         >
-          {action.label}
-        </Text>
+          <Text
+            style={{
+              color: theme.palette.violet[700],
+              fontSize: 14,
+              fontWeight: theme.typography.weight.semibold,
+            }}
+          >
+            {action.label}
+          </Text>
+        </Pressable>
       ) : null}
     </View>
   )
@@ -75,6 +82,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  action: {
+    // The 48 dp tap target for a 14 dp label (FR-UX-4). The padding is
+    // transparent, so the visual is unchanged.
+    minHeight: 48,
+    minWidth: 48,
+    marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

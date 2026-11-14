@@ -77,6 +77,7 @@ export default function AppLayout() {
       <Stack.Screen name="contacts" />
       <Stack.Screen name="contact-editor" />
       <Stack.Screen name="history" />
+      <Stack.Screen name="history-map" />
       <Stack.Screen name="alerts" />
       <Stack.Screen name="alert-detail" />
       <Stack.Screen name="report-detail" />

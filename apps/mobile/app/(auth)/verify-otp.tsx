@@ -226,7 +226,7 @@ export default function VerifyOtpScreen() {
           label={t('auth.otpLabel')}
           value={code}
           onChangeText={setCode}
-          placeholder="000000"
+          placeholder={t('auth.otpPlaceholder')}
           keyboardType="number-pad"
           autoComplete="sms-otp"
           textContentType="oneTimeCode"

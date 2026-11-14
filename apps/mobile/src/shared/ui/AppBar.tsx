@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
 
@@ -38,6 +39,7 @@ export function AppBar({
 }: AppBarProps) {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   return (
     <View
@@ -57,7 +59,7 @@ export function AppBar({
       {onBack ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.back')}
           onPress={onBack}
           hitSlop={8}
           style={({ pressed }) => [

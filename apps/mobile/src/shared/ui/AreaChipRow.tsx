@@ -32,6 +32,9 @@ export function AreaChipRow({ chips, activeId, onSelect }: AreaChipRowProps) {
             accessibilityState={{ selected: active }}
             accessibilityLabel={chip.label}
             onPress={() => onSelect(chip)}
+            // The chip's visual box is 28 dp tall, but the tap target is
+            // padded to 48 dp without changing the visual (FR-UX-4).
+            hitSlop={10}
             style={[
               styles.chip,
               {

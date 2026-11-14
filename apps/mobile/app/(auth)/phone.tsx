@@ -99,7 +99,7 @@ export default function PhoneScreen() {
         label={t('auth.emailLabel')}
         value={email}
         onChangeText={setEmail}
-        placeholder="you@example.com"
+        placeholder={t('auth.emailPlaceholder')}
         keyboardType="email-address"
         textContentType="emailAddress"
         autoComplete="email"

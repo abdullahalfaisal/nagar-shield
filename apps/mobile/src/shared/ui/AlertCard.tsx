@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View, Pressable } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import {
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
@@ -34,6 +35,7 @@ interface AlertCardProps {
 
 export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const category = report.category as ReportCategory | null
   const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
   const icon = category ? REPORT_CATEGORY_ICONS[category] : 'help'
@@ -91,14 +93,14 @@ export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardPr
         <Text style={[styles.time, { color: theme.colors.ink[500] }]}>{relativeTime}</Text>
         {onPress ? (
           <Text style={[styles.detailLink, { color: theme.palette.violet[700] }]}>
-            ✎ বিস্তারিত দেখুন
+            {t('alerts.detailLink')}
           </Text>
         ) : null}
       </Pressable>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="রিপোর্ট করুন"
+        accessibilityLabel={t('alerts.reportThis')}
         onPress={onFlag}
         hitSlop={6}
         style={styles.flagButton}

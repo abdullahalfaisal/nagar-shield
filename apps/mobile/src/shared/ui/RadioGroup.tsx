@@ -86,6 +86,9 @@ export function ChoiceChip({
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       onPress={onPress}
+      // The chip's visual box is 40 dp tall; the tap target is padded to
+      // 48 dp without changing the visual (FR-UX-4).
+      hitSlop={4}
       style={[
         styles.chip,
         {

@@ -26,17 +26,24 @@ export function SectionTitle({ title, actionLabel, onActionPress }: SectionTitle
         {title}
       </Text>
       {actionLabel && onActionPress ? (
-        <Text
+        // A `Pressable` rather than a `Text` with an `onPress`, so the link
+        // has a real 48 dp box. The label itself is unchanged.
+        <Pressable
           accessibilityRole="button"
+          accessibilityLabel={actionLabel}
           onPress={onActionPress}
-          style={{
-            color: theme.palette.violet[700],
-            fontSize: 13,
-            fontWeight: theme.typography.weight.semibold,
-          }}
+          style={styles.action}
         >
-          {actionLabel}
-        </Text>
+          <Text
+            style={{
+              color: theme.palette.violet[700],
+              fontSize: 13,
+              fontWeight: theme.typography.weight.semibold,
+            }}
+          >
+            {actionLabel}
+          </Text>
+        </Pressable>
       ) : null}
     </View>
   )
@@ -120,6 +127,13 @@ export function ActionCard({
   )
 }
 
+/**
+ * `.action-card` — the prototype's name for the quick-action grid item. The
+ * story's primitive list calls it `QuickActionCard`; the app has always
+ * imported it as `ActionCard`, so both names point at the same component.
+ */
+export const QuickActionCard = ActionCard
+
 function actionTone(tone: string, theme: ReturnType<typeof useTheme>) {
   switch (tone) {
     case 'red':
@@ -146,6 +160,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     paddingHorizontal: 20,
+  },
+  action: {
+    // The 48 dp tap target for a 13 dp label (FR-UX-4). The padding is
+    // transparent, so the visual is unchanged.
+    minHeight: 48,
+    minWidth: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   card: {
     width: '31.6%',

@@ -135,7 +135,7 @@ export default function SettingsScreen() {
         ]}
       >
         <View style={[styles.avatar, { backgroundColor: theme.palette.violet[600] }]}>
-          <Text style={styles.avatarText}>না</Text>
+          <Text style={styles.avatarText}>{t('common.appNameInitial')}</Text>
         </View>
         <View style={styles.profileInfo}>
           <Text style={[styles.profileName, { color: theme.colors.ink[950] }]}>
@@ -163,7 +163,7 @@ export default function SettingsScreen() {
           tone="green"
           title={t('settings.language')}
           badge={{
-            text: isBangla ? 'বাংলা' : 'English',
+            text: isBangla ? t('settings.languageBangla') : t('settings.languageEnglish'),
             background: theme.palette.violet[100],
             color: theme.palette.violet[700],
           }}

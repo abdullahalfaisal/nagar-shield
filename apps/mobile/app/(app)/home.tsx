@@ -78,7 +78,7 @@ export default function HomeScreen() {
 
         <PressableMore onPress={() => router.push('/(app)/more')} />
         <View style={[styles.avatar, { backgroundColor: theme.palette.violet[600] }]}>
-          <Text style={styles.avatarText}>না</Text>
+          <Text style={styles.avatarText}>{t('common.appNameInitial')}</Text>
         </View>
       </View>
 
@@ -86,7 +86,7 @@ export default function HomeScreen() {
       <View style={[styles.searchBar, { backgroundColor: theme.colors.surface.white }]}>
         <Icon name="search" size={20} color={theme.colors.ink[400]} />
         <Text style={[styles.searchPlaceholder, { color: theme.colors.ink[400] }]}>
-          এলাকা খুঁজুন...
+          {t('home.searchPlaceholder')}
         </Text>
       </View>
 
@@ -141,7 +141,7 @@ export default function HomeScreen() {
       <View style={styles.refreshRow}>
         <View style={[styles.refreshDot, { backgroundColor: theme.palette.red[500] }]} />
         <Text style={[styles.refreshText, { color: theme.colors.ink[500] }]}>
-          Auto-refreshes every 60s
+          {t('home.autoRefreshNote')}
         </Text>
       </View>
 
@@ -176,11 +176,12 @@ export default function HomeScreen() {
 /** The `more_horiz` action button with the red badge dot. */
 function PressableMore({ onPress }: { onPress: () => void }) {
   const theme = useTheme()
+  const { t } = useTranslation()
   return (
     <View style={styles.moreWrap}>
       <Text
         accessibilityRole="button"
-        accessibilityLabel="আরও বিকল্প"
+        accessibilityLabel={t('more.moreOptions')}
         onPress={onPress}
         style={styles.moreBtn}
       >

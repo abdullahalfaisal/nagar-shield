@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
 
 /**
@@ -8,6 +9,7 @@ import { useTheme } from '../theme'
  */
 export function SplashView({ message }: { message?: string }) {
   const theme = useTheme()
+  const { t } = useTranslation()
 
   return (
     <View style={styles.container}>
@@ -17,8 +19,8 @@ export function SplashView({ message }: { message?: string }) {
         end={{ x: 1, y: 1 }}
         style={styles.hero}
       >
-        <Text style={styles.brand}>নগর শিল্ড</Text>
-        <Text style={styles.brandEn}>NAGAR SHIELD</Text>
+        <Text style={styles.brand}>{t('common.appName')}</Text>
+        <Text style={styles.brandEn}>{t('common.appNameEn')}</Text>
       </LinearGradient>
       {message ? (
         <Text style={[styles.message, { color: theme.colors.ink[500] }]}>{message}</Text>

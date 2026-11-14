@@ -95,6 +95,8 @@ function ThemedStack() {
         <Stack.Screen name="index" options={{ animation: 'fade' }} />
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
         <Stack.Screen name="(app)" />
+        {/* The design-system showcase — reachable without an account. */}
+        <Stack.Screen name="showcase" options={{ animation: 'fade' }} />
       </Stack>
     </>
   )
