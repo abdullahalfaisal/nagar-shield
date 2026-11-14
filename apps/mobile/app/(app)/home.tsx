@@ -12,8 +12,8 @@ import {
   QuickActionGrid,
   SectionTitle,
 } from '@/shared/ui'
-import type { AreaChip } from '@/shared/ui/AreaChipRow'
 import { alertsItems, alertsShowingCachedPage, useAlerts } from '@/shared/api/alerts'
+import { DEFAULT_AREA_CHIP_ID, resolveAreaFilter, useAreaChips } from '@/shared/api/areaChips'
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 import { Icon } from '@/shared/ui/Icon'
 import { Screen } from '@/shared/ui/Screen'
@@ -39,9 +39,22 @@ export default function HomeScreen() {
   const router = useRouter()
   const { t, i18n } = useTranslation()
 
-  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null })
+  // The chip row is **data-driven** — the reference areas come from the
+  // `area_lookup` table, not from a hardcoded array in this file.
+  const chips = useAreaChips(
+    t('alerts.areaChipAll'),
+    t('alerts.areaChipDivision'),
+    t('alerts.areaChipCity'),
+  )
 
-  const { data, isError, isLoading } = useAlerts(chip.value ?? {})
+  const [chipId, setChipId] = useState(DEFAULT_AREA_CHIP_ID)
+
+  // The selection is a **chip id**, and the filter is resolved from it by the
+  // one shared mapping function — so the chip row and the feed cannot
+  // disagree about what a selection means.
+  const chip = chips.find((entry) => entry.id === chipId) ?? chips[0]
+
+  const { data, isError, isLoading } = useAlerts(resolveAreaFilter(chip ?? { value: null }))
 
   // The feed is cursor-paginated, so the rows are **every loaded page**
   // flattened — not the first page alone.
@@ -50,18 +63,6 @@ export default function HomeScreen() {
   // The offline case — the last request failed and a cached page survives.
   // The feed block shows the last results and says so; it never blanks.
   const showingCachedPage = alertsShowingCachedPage({ isError, data })
-
-  const chips: AreaChip[] = [
-    { id: 'all', label: 'All BD', value: null },
-    { id: 'division', label: 'My division', value: { division: 'Dhaka' } },
-    { id: 'city', label: 'My city', value: { division: 'Dhaka', city: 'Dhaka' } },
-    { id: 'mirpur', label: 'Mirpur', value: { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' } },
-    {
-      id: 'dhanmondi',
-      label: 'Dhanmondi',
-      value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' },
-    },
-  ]
 
   return (
     <Screen scroll background={theme.colors.surface.lavender} contentBottomPadding={60}>
@@ -150,7 +151,7 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
+      <AreaChipRow chips={chips} activeId={chipId} onSelect={(entry) => setChipId(entry.id)} />
 
       {/* The offline case. The rows below are the cached page — the feed
           block never blanks. */}

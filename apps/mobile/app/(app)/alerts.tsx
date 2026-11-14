@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
@@ -11,9 +11,9 @@ import {
   OfflineNotice,
   PulseDot,
   Screen,
-  type AreaChip,
 } from '@/shared/ui'
 import { alertsItems, alertsShowingCachedPage, useAlerts } from '@/shared/api/alerts'
+import { DEFAULT_AREA_CHIP_ID, resolveAreaFilter, useAreaChips } from '@/shared/api/areaChips'
 import { useRefreshGuard } from '@/shared/services/refreshGuard'
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
@@ -36,10 +36,23 @@ export default function AlertsScreen() {
   const router = useRouter()
   const { t, i18n } = useTranslation()
 
-  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null })
+  const [chipId, setChipId] = useState(DEFAULT_AREA_CHIP_ID)
   const [flagTarget, setFlagTarget] = useState<string | null>(null)
 
   const guard = useRefreshGuard()
+
+  // The chip row is **data-driven** — the reference areas come from the
+  // `area_lookup` table, not from a hardcoded array in this file.
+  const chips = useAreaChips(
+    t('alerts.areaChipAll'),
+    t('alerts.areaChipDivision'),
+    t('alerts.areaChipCity'),
+  )
+
+  // The selection is a **chip id**, and the filter is resolved from it by the
+  // one shared mapping function — so the chip row and the feed cannot
+  // disagree about what a selection means.
+  const chip = chips.find((entry) => entry.id === chipId) ?? chips[0]
 
   // The polling interval is the shared 60 s, and it only runs while the guard
   // says the refresh may run.
@@ -52,7 +65,7 @@ export default function AlertsScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useAlerts(chip.value ?? {}, {
+  } = useAlerts(resolveAreaFilter(chip ?? { value: null }), {
     enabled: !guard.isPaused,
   })
 
@@ -63,25 +76,6 @@ export default function AlertsScreen() {
   // The offline case: the last request failed **and** there is a cached page
   // to show. The feed never blanks — it shows the last results and says so.
   const showingCachedPage = alertsShowingCachedPage({ isError: isError, data })
-
-  const chips: AreaChip[] = useMemo(
-    () => [
-      { id: 'all', label: t('alerts.areaChipAll'), value: null },
-      { id: 'division', label: t('alerts.areaChipDivision'), value: { division: 'Dhaka' } },
-      { id: 'city', label: t('alerts.areaChipCity'), value: { division: 'Dhaka', city: 'Dhaka' } },
-      {
-        id: 'mirpur',
-        label: 'Mirpur',
-        value: { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' },
-      },
-      {
-        id: 'dhanmondi',
-        label: 'Dhanmondi',
-        value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' },
-      },
-    ],
-    [t],
-  )
 
   const headerLabel = pausedLabel(guard.pausedReason, t)
 
@@ -110,7 +104,7 @@ export default function AlertsScreen() {
         </View>
 
         {/* The area chip row — exactly one. */}
-        <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
+        <AreaChipRow chips={chips} activeId={chipId} onSelect={(entry) => setChipId(entry.id)} />
 
         {/* The offline case. The list below is the cached page — the feed
             never blanks. */}

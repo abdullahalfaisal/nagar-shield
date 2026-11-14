@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 1013 unit tests · 476 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 1056 unit tests · 476 SQL assertions · 37/37 console probes
 
 ---
 
@@ -14,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 42 `complete`, 11
+**The stories are now counted three ways, not two: 43 `complete`, 10
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -62,6 +62,22 @@ Closing them exposed the **blank area line** — the database holds
 and the **pulsing dot did not pulse**: it drew a static halo while its own
 comment claimed *"the pulse is a React Native `Animated` loop"*. Six causal
 checks confirm each guard fires. See §4.6 A4.
+
+**The area chip row is `complete`, and it found two more real defects.** The
+row used a plain `View`, so the chips past the screen edge were not clipped
+but **unreachable**; the chip list was a **hardcoded array duplicated in two
+screens**, with *Mirpur* and *Dhanmondi* written into the screen files; and
+the **My division** chip sent a hardcoded `Dhaka`, so it said "My division"
+while filtering a division the user might not be in. The row is now a
+horizontal `ScrollView`, the list is built from the **`area_lookup`**
+reference table (a new area is a **data** change, not a code change in two
+files), and the location chips resolve from the **current fix** and are
+**disabled** without one — sending no parameter, so the feed keeps its result
+set rather than narrowing to an empty area. `resolveAreaFilter` is the
+**single** mapping both feed screens use. Two further defects surfaced: the
+chip's 28 dp height was **unstated**, so once the label moved into a variable
+the tap-target gate could not resolve its box, and the selected chip wore a
+flat violet instead of the prototype's `var(--grad-primary)`. See §4.6 A5.
 
 **One pre-existing quirk worth knowing.** After `pnpm db:reset`, the
 `alerts_feed` read model returns **zero items** — the seeded reports fall
@@ -117,6 +133,7 @@ Every command below was run green against the local Supabase stack.
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
 | Alerts feed | `useInfiniteQuery` with the **cursor as the page parameter** and the area filter alone in the query key; `alertsItems()` flattens the pages and is the only way the screens read the feed. The uncategorized card renders the **localized** placeholder on the neutral `--ink-300` ramp; the offline case is one shared rule (`alertsShowingCachedPage()`) driving one shared notice (`OfflineNotice.tsx`), and **neither** feed screen blanks on error. **17 unit tests** (`alerts.dom.test.ts`). |
 | Alert card rendering | `alertCard.test.ts` (25) — the box model, the accent map's single source, the uncategorized placeholder, the empty-description gap, the Bangla / English pair; `offlineNotice.test.ts` (15) — the notice exists, uses the bundle copy, is announced, and is rendered by **both** feed screens off the shared rule; `pulseDot.test.ts` (12) — the 1.5 s pulse, the 6 dp halo, and the paused state. See §4.6 A4. |
+| Area filter chips | `AreaChipRow.tsx` is a horizontal `ScrollView` with the prototype's `padding: 0 20px 12px` contract and a non-stretching content container; the chip list is built from **`area_lookup`** by the new `src/shared/api/areaChips.ts`, and `resolveAreaFilter` is the **single** mapping both feed screens use. The **My division** / **My city** chips resolve from the current fix and are **disabled** without one — a disabled chip sends **no** parameter, so the feed keeps its result set. **38 unit tests** (`areaChipRow.test.ts`). See §4.6 A5. |
 | Error copy | `errorCopy()` — one place that consults the shared `API_ERROR_I18N_KEYS` map, with an `errors.internal` fallback for an unknown code. **7 unit tests**, against the **real** bundles. |
 | Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
 | Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
@@ -1005,7 +1022,7 @@ carries the detailed account of both defects.
 
 ---
 
-## 4. What is NOT DONE — 11 `partial`, 1 `planned`
+## 4. What is NOT DONE — 10 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -1065,7 +1082,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `003-help-seek` | 5 | 2 | 1 |
 > | `004-capture` | 3 | 4 | 0 |
 > | `005-location` | 5 | 0 | 0 |
-> | `006-alerts` | 6 | 3 | 0 |
+> | `006-alerts` | 7 | 2 | 0 |
 > | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
@@ -1092,7 +1109,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `007-storage-upload-and-finalize` | 004-capture | partial | no unit test ties the client's storage path to the server's |
 | `001-alerts-feed-list` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A4** — the uncategorized placeholder, the offline indication and the rendering tests all landed; two real defects (the blank area line, the static pulsing dot) were found on the way |
 | `002-auto-refresh-and-pull-to-refresh` | 006-alerts | partial | neither the interval nor pull-to-refresh is tested |
-| `003-area-filter-chips` | 006-alerts | partial | the row uses a plain `View` and **clips** the chips; needs a horizontal `ScrollView` |
+| `003-area-filter-chips` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A5** — the row is a horizontal `ScrollView`, the chip list is **data-driven** from `area_lookup`, and the location chips are disabled without a fix |
 | `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
 
 **Unit `001-foundation` is down to one `partial`.** It has no subsection below
@@ -1183,10 +1200,9 @@ shipped behaviour, or retire it as superseded.
 
 ### 4.6 Alerts — unit `006-alerts`
 
-> **Three of this unit's nine stories are still `partial`:** 
+> **Two of this unit's nine stories are still `partial`:** 
 > `002-auto-refresh-and-pull-to-refresh`
-> (neither the interval nor pull-to-refresh is tested),
-> `003-area-filter-chips` (the row uses a plain `View` and clips the chips)
+> (neither the interval nor pull-to-refresh is tested)
 > and `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
 > the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant).
 > See the §4.0 table.
@@ -1197,6 +1213,7 @@ shipped behaviour, or retire it as superseded.
 | A2 | ✅ **FIXED** — the public alert detail is live. `app/(app)/alert-detail.tsx` renders the public projection, and the projection **omits `author_id` entirely** — not nulled, not renamed (FR-DATA-3 / FR-NG-5), so there is nothing for a render to pick up. The client type mirrors that, and `src/shared/api/alertDetail.test.ts` asserts the absence of every author-shaped key (`authorId` / `author_id` / `author` / `reporter` / `reporterId`) and that the serialised body contains no author uuid. The media paths are **author-token** paths, and a media whose URL cannot be signed is **dropped** rather than rendered broken. | [021] story 009 |
 | A3 | ✅ **FIXED** — the filters, the map, and the author auto-hide are live. **The filters**: one filter object, one query key — the list, the totals, the distribution and the map all move together, and a sheet that changes nothing does not re-query. **The map**: one shared wrapper, no fork — the attribution is owned by the wrapper, only `tile.openstreetmap.org` is contacted, and the marker set is capped at 150 keeping the markers **nearest the centre**. **The author auto-hide**: the transition lives in `public.flag_report` — one transaction, so a partial hide is impossible. **A real defect was found and fixed by migration 030**: the function counted `count(*)` over the author's flags, so **five flags on a single report** fired the auto-hide and swept in the author's other reports — exactly what the story forbids ("five flags on one report are one flagged report"). It now counts `count(distinct f.report_id)`, and the response carries **both** counts side by side (`author_flags_24h` and `author_flagged_reports_24h`) so the distinction is visible rather than implied. The old SQL test had encoded the wrong behaviour and was rewritten, and a new Test 10 asserts the negative case directly. The hide is `hidden_pending_review`, not `removed` — it is a moderator's to reverse. **The author still sees their own hidden reports**; the public hide never touches own-report visibility. | [020–021] |
 | A4 | ✅ **FIXED** — the alerts feed is `complete`. Three gaps closed, and **two real defects found on the way**. **(1) The uncategorized card rendered `'—'`.** The bundle already carried `alerts.uncategorized` = `অকার্যনির্দিষ্ট — Uncategorized`; the card used a literal instead. It now renders the localized placeholder and falls back to the **neutral `--ink-300` ramp** for the accent border, the icon tint and the category text. The repo's hardcoded-string scan **did not** catch it — `'—'` is one character with no space — so the guard added is behavioural, not lexical. **(2) The offline behaviour did not exist.** `apps/mobile/src/shared/ui/OfflineNotice.tsx` is new, and `alertsShowingCachedPage()` in `apps/mobile/src/shared/api/alerts.ts` is the **one rule** both feed screens render it from — and it needs **both** halves (the query is in error **and** a cached page with rows exists), so a cold start with no network shows the empty state rather than an offline notice over nothing. The feed never blanks. **(3) The rendering tests.** `alertCard.test.ts` (25), `offlineNotice.test.ts` (15) and `pulseDot.test.ts` (12). **The two defects:** the **area line rendered blank** — the database holds `"thana": null` on degraded captures, the client boundary normalises a null level to `''`, and the old `??` chain stopped there (an empty string is not nullish); the rule now lives in **one** function, `formatAreaHierarchy()`, used by four surfaces. And the **pulsing dot did not pulse** — `PulseDot.tsx` rendered a static halo while its own comment claimed *"the pulse is a React Native `Animated` loop"*; it now runs a real `Animated.loop` over the prototype's 1.5 s period, and when paused it **stops the animation outright** and renders no halo (a still-pulsing dot says the feed is still refreshing, falsely). Six **causal checks** confirm each guard fires. The honest residue is recorded in the story file: the Bangla half of the area line is **server-side only** (`area_lookup` is not in the public projection), and the **screenshot comparison** the Testing note asks for needs a device harness this repo does not have. | [018] story 001 |
+| A5 | ✅ **FIXED** — the area chip row is `complete`. Three gaps closed, and **two real defects found on the way**. **(1) The row clipped.** `AreaChipRow.tsx` used a plain `View`, so on a narrow phone with a dozen areas the chips past the edge were not clipped but **unreachable** — no gesture brought them into view. The row is now a horizontal `ScrollView` with `showsHorizontalScrollIndicator={false}`, the prototype's `padding: 0 20px 12px` contract on the content container, and `flexGrow: 0` on both the scroll view and the container (a `ScrollView`'s content stretches to the viewport by default, which would make the row swallow the feed beneath it). The chips keep `flexShrink: 0`, so a chip never squeezes to fit. **(2) The chip list was a hardcoded array in two screens.** `alerts.tsx` and `home.tsx` each carried their own five-chip array — the same one, twice — with **Mirpur** and **Dhanmondi** written into the screen files. The list is now built from the **`area_lookup`** reference table, so a new area is a **data** change, not a code change in two files. **(3) The location chips lied.** They sent `{ division: 'Dhaka' }` — a **hardcoded** division — so the chip said "My division" while filtering a division the user might not be in. They now resolve from the **current fix** (just-in-time, never at app open, never on the panic path), and with no fix they are **disabled** — rendered, marked unavailable, not pressed — and `resolveAreaFilter` sends **no** parameter for a disabled chip, so the feed keeps the result set it had rather than narrowing to an empty area. **The filter is now one shared mapping**: `resolveAreaFilter` in the new `src/shared/api/areaChips.ts` is the single function both feed screens use, so a narrowed feed can never come from a second, divergent mapping. The selection is a chip **id**, not a chip object, because the list is data-driven and a held chip could stop existing. **The two defects:** the chip's `height: 28` was unstated, so once the label moved into a variable the tap-target gate could not resolve the chip's box and reported it unmeasurable — the gate was right and the primitive was wrong; and the selected chip wore a flat violet rather than the prototype's `var(--grad-primary)`, which is now rendered through `expo-linear-gradient` as a **theme token** so it keeps AA contrast in both modes. **Five causal checks** confirm each guard fires, including the tap-target scanner's own brace tracking. The honest residue is recorded in the story file: the **Maestro flow** the Testing note asks for does not exist, the `neighborhood` selection comes from the Home search bar (unit `003` owns it), and the chip labels are the English area names. | [018] story 003 |
 
 ### 4.7 Moderation — unit `007-moderation`
 
@@ -1432,11 +1449,15 @@ shipped behaviour, or retire it as superseded.
        **DONE** — see §4.6 A4. The uncategorized placeholder, the offline
        indication and the rendering tests all landed, and the work found
        **two real defects** on the way (the blank area line, the static
-       pulsing dot). The next-cheapest unit is `006-alerts` (**three**
-       stories left: `002-auto-refresh-and-pull-to-refresh`,
-       `003-area-filter-chips` and `004-flag-an-alert`), and after that
-       `004-capture` (four) and `003-help-seek` (two, plus the one
-       genuinely unbuilt story).
+       pulsing dot). ~~**`003-area-filter-chips`**~~ ✅ **DONE** — see §4.6
+       A5. The row is a horizontal `ScrollView`, the chip list is
+       data-driven from `area_lookup`, the location chips are disabled
+       without a fix, and the work found **two real defects** on the way
+       (the unstated chip height, the flat violet in place of the
+       prototype's gradient). `006-alerts` has **two** stories left —
+       `002-auto-refresh-and-pull-to-refresh` and `004-flag-an-alert` —
+       and after that `004-capture` (four) and `003-help-seek` (two, plus
+       the one genuinely unbuilt story).
     6. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
        stories. It has no route, no component and no action.
 17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`

@@ -3,7 +3,7 @@ id: 018-alerts
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories: [001-alerts-feed-list, 003-area-filter-chips]
 created: 2026-11-04T00:00:00Z
 

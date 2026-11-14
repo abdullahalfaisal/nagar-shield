@@ -635,6 +635,11 @@ function elementBodyOf(code: string, openTagEnd: number): string {
  * A JSX attribute value may contain a `>` — an arrow function's `=>` is the
  * common case — so the tag is closed by tracking the brace depth of the
  * attribute expressions and taking the first `>` at depth zero.
+ *
+ * The brace depth is enough for the shape that actually occurs: a JSX
+ * attribute is always `name={...}`, so the arrow of an arrow-function handler
+ * sits **inside** the braces the scanner opened. A paren group is not
+ * required for the scanner to read the tag whole.
  */
 function openingTagEnd(code: string, start: number): number {
   let depth = 0
@@ -1078,6 +1083,78 @@ describe('the tap-target gate', () => {
       expect({ name, measured: result.measured }).toEqual({ name, measured: expect.any(Number) })
       expect(result.measured).toBeGreaterThan(0)
     }
+  })
+})
+
+/**
+ * The scanner's own blind spot.
+ *
+ * A gate that reads a file wrongly is worse than no gate, because it reports
+ * a verdict it did not actually reach. The scanner closes a JSX opening tag at
+ * the first `>` at brace depth zero — and a `>` also appears in an arrow
+ * function's `=>` and in a comparison.
+ *
+ * The brace depth is what makes that safe **for the shape that occurs**: a
+ * JSX attribute is always `name={...}`, so the arrow of an arrow-function
+ * handler sits inside the braces the scanner opened, and the depth is still
+ * one when the `=>` is passed. A `>` written as a bare comparison — one that
+ * is *not* inside an attribute expression — would close the tag early, so the
+ * shape is guarded here directly.
+ *
+ * These guards exist because the alternative is a silent misreading: a scanner
+ * that cuts a tag in half still returns *an* answer, so the failure looks like
+ * a defect in the component rather than in the gate.
+ */
+describe('the scanner reads a JSX tag whole', () => {
+  it('does not stop at an arrow function', () => {
+    // The `=>` is inside the attribute's braces, so the depth is one when it
+    // is passed and the tag does not close there.
+    const code = `<Pressable onPress={() => go()} style={styles.chip} />`
+
+    const end = openingTagEnd(code, 0)
+
+    expect(end).toBe(code.length - 1)
+  })
+
+  it('does not stop at a parenthesised parameter list', () => {
+    // The paren group closes before the `=>`, but the brace is still open.
+    const code = `<Pressable onPress={(x) => set(x)} style={styles.chip} />`
+
+    const end = openingTagEnd(code, 0)
+
+    expect(end).toBe(code.length - 1)
+  })
+
+  it('does not stop at a comparison inside a handler', () => {
+    const code = `<Pressable onPress={() => { if (a > b) go() }} style={styles.chip} />`
+
+    const end = openingTagEnd(code, 0)
+
+    expect(end).toBe(code.length - 1)
+  })
+
+  it("still stops at the tag's own closing bracket", () => {
+    const code = `<Pressable onPress={() => go()}>text</Pressable>`
+
+    const end = openingTagEnd(code, 0)
+
+    expect(code[end]).toBe('>')
+    // The tag ends before the content, not after it.
+    expect(code.slice(0, end + 1)).toBe('<Pressable onPress={() => go()}>')
+  })
+
+  it('reads the real chip element whole', () => {
+    // The shipped shape, read from the file a developer would open.
+    const source = readFileSync(join(UI_DIR, 'AreaChipRow.tsx'), 'utf8')
+    const start = source.indexOf('<Pressable')
+    expect(start).toBeGreaterThan(-1)
+
+    const end = openingTagEnd(source, start)
+
+    // The whole element — through the arrow, the style array and the
+    // closing bracket.
+    expect(source.slice(start, end)).toContain('hitSlop={10}')
+    expect(source.slice(start, end)).toContain('styles.chip')
   })
 })
 
