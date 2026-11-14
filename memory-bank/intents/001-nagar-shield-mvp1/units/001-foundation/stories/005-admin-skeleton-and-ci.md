@@ -115,39 +115,3 @@ implemented: partial
 3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
 4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
 5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
-Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
-
-### What closing this needs
-
-1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
-2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
-3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
-4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
-5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
-Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
-
-### What closing this needs
-
-1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
-2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
-3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
-4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
-5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
-Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
-
-### What closing this needs
-
-1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
-2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
-3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
-4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
-5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
-Zod schema is duplicated. But the criterion's mechanism is the `@shared/*` path alias, and it is unused. The required boundary test — *"asserts that `apps/admin` and `apps/mobile` contain no local copy of a shared Zod schema"* — **does not exist** anywhere in the repo; `tools/release-verify.cjs` has no such check either.
-
-### What closing this needs
-
-1. A `build` placeholder job in `ci.yml` (a `needs:` on the test jobs and an `if: false` body), so the pipeline shape is visible before unit 008 fills it in.
-2. A boundary test in `apps/admin` that fails when a Zod schema or enum is redefined inside `apps/admin` or `apps/mobile` — the check that would have caught the duplication this criterion exists to prevent.
-3. The `--tap-target` / `--rail-width` / `--page-max` values either added to `docs/design/design-tokens.md` as console-specific tokens or moved out of the token block into the layout rules, so the "no invented value" contract holds.
-4. `tools/secret-scan.cjs` taught to distinguish an embedded `sb_secret_` key from the SDK's own detector string, so the `secret-scan` CI job can pass on a real build.
-5. Either the admin switched to the `@shared/*` alias the criterion names, or the criterion amended to say `@nagar-shield/shared` — the current state satisfies neither reading.
