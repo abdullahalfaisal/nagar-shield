@@ -105,6 +105,53 @@ function declaredTokens(): Set<string> {
 
 const tokens = declaredTokens()
 
+/**
+ * The token file's **rules**, with the token blocks removed.
+ *
+ * `globals.css` is the one file allowed to declare hex values — it is the
+ * token file, and the declarations there *are* the tokens. But a hex inside
+ * a **rule** is something else: it is a value used without naming it, and
+ * it is invisible in review because `color: #ffffff` sits right next to
+ * `color: var(--static-white)` in the diff.
+ *
+ * The exemption was therefore blanket where it should have been narrow, and
+ * a hex could hide in the token file's rules with nothing watching it. This
+ * returns the file's rules with the two token blocks cut out, so the hex
+ * scan can be applied to them.
+ */
+function rulesOutsideTokenBlocks(css: string): string {
+  /** The spans of `:root { … }` and `:root[data-theme='dark'] { … }`. */
+  const tokenSpans: { start: number; end: number }[] = []
+
+  const openBlock = (pattern: RegExp): void => {
+    const match = pattern.exec(css)
+    if (!match) return
+
+    let depth = 0
+    for (let index = css.indexOf('{', match.index); index < css.length; index += 1) {
+      if (css[index] === '{') depth += 1
+      else if (css[index] === '}') {
+        depth -= 1
+        if (depth === 0) {
+          tokenSpans.push({ start: match.index, end: index })
+          return
+        }
+      }
+    }
+  }
+
+  openBlock(/:root\s*\{/)
+  openBlock(/:root\[data-theme=['"]dark['"]\]\s*\{/)
+
+  // The blocks are cut out from the back, so the earlier offsets stay valid.
+  let result = css
+  for (const span of [...tokenSpans].reverse()) {
+    result = result.slice(0, span.start) + result.slice(span.end + 1)
+  }
+
+  return result
+}
+
 describe('the console uses the design tokens', () => {
   it('reads a non-trivial number of source files — the scan is not vacuous', () => {
     expect(sourceFiles.length).toBeGreaterThan(3)
@@ -130,6 +177,24 @@ describe('the console uses the design tokens', () => {
     }
 
     expect(offenders).toEqual([])
+  })
+
+  it('contains no hex colour in the token file’s rules', () => {
+    // The token file may **declare** hex values — that is what a token is.
+    // It may not **use** one: a hex in a rule is a value that was chosen
+    // outside the token contract, and it is the one place a raw value could
+    // hide, because the token file was exempt from the scan above.
+    //
+    // Two such values existed — `color: #ffffff` on the primary and danger
+    // buttons. The second is the one that mattered: `--surface-white` is
+    // `#11112b` in the dark theme, so using it for on-brand text would put
+    // near-black text on a violet button. The on-brand colour is now
+    // `--static-white`, a static value in both themes, exactly as the mobile
+    // theme's `staticColors.white` is.
+    const css = readFileSync(join(ADMIN_ROOT, TOKEN_FILE), 'utf8')
+    const matches = rulesOutsideTokenBlocks(css).match(HEX_COLOUR)
+
+    expect(matches).toBeNull()
   })
 
   it('uses only declared tokens', () => {

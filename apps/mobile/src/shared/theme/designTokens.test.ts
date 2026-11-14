@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { darkColors, lightColors, palette } from './tokens'
+import { darkColors, lightColors, palette, staticColors } from './tokens'
 
 /**
  * The design-token parity gate.
@@ -82,24 +82,40 @@ function parseTokenDoc(text: string): {
   root: Map<string, string>
   dark: Map<string, string>
   light: Map<string, string>
+  static: Map<string, string>
+  layout: Map<string, string>
 } {
   const root = new Map<string, string>()
   const dark = new Map<string, string>()
   const light = new Map<string, string>()
+  const staticColours = new Map<string, string>()
+  const layoutConstants = new Map<string, string>()
 
   // The section boundaries. §1.1 is the `:root` table, §1.2 the dark
-  // overrides, §1.3 the alias table, §2 the radius/shadow/motion tables.
+  // overrides, §1.3 the alias table, §1.4 the static colours, §2 the
+  // radius/shadow/motion tables.
   const rootStart = text.indexOf('### 1.1 Light theme')
   const darkStart = text.indexOf('### 1.2 Dark theme overrides')
   const aliasStart = text.indexOf('### 1.3 Legacy alias resolution')
+  const staticStart = text.indexOf('### 1.4 Static colours')
+  const layoutStart = text.indexOf('### 1.5 Console layout constants')
   const radiusStart = text.indexOf('## 2. Radius, shadow, motion')
   const inventoryStart = text.indexOf('## 3. Component inventory')
 
-  if (rootStart === -1 || darkStart === -1 || radiusStart === -1 || inventoryStart === -1) {
+  if (
+    rootStart === -1 ||
+    darkStart === -1 ||
+    aliasStart === -1 ||
+    staticStart === -1 ||
+    layoutStart === -1 ||
+    radiusStart === -1 ||
+    inventoryStart === -1
+  ) {
     throw new Error(
       `The token document's structure changed — expected the "1.1 Light theme", ` +
-        `"1.2 Dark theme overrides", "2. Radius, shadow, motion", and ` +
-        `"3. Component inventory" headings in ${TOKEN_DOC}`,
+        `"1.2 Dark theme overrides", "1.3 Legacy alias resolution", ` +
+        `"1.4 Static colours", "1.5 Console layout constants", ` +
+        `"2. Radius, shadow, motion", and "3. Component inventory" headings in ${TOKEN_DOC}`,
     )
   }
 
@@ -173,7 +189,54 @@ function parseTokenDoc(text: string): {
     }
   }
 
-  return { root, dark, light }
+  // §1.4 — the static colours. Three columns: token, value, the React
+  // Native name. These do not invert between the themes, so they are **not**
+  // part of the `:root` table and are not theme-scoped on either surface.
+  //
+  // The slice ends at §1.5, not at §2: §1.5 has the same three-column
+  // shape, so reading to §2 would sweep the console's layout constants in
+  // with the colours.
+  for (const line of text.slice(staticStart, layoutStart).split('\n')) {
+    const cells = line.split('|').map((cell) => cell.trim())
+
+    // `| --static-white | `#FFFFFF` | `staticColors.white` |`
+    // → cells = ['', token, value, rn, '']
+    if (cells.length !== 5) continue
+
+    const name = unwrap(cells[1] ?? '')
+    const value = unwrap(cells[2] ?? '')
+
+    if (!name.startsWith('--')) continue
+    if (value === '') continue
+    // The separator row is `|---|---|---|`; its cells unwrap to `---`.
+    if (name === '---') continue
+
+    staticColours.set(name, value)
+  }
+
+  // §1.5 — the console's layout constants. Three columns: token, value,
+  // meaning. These are the console's own measurements, not design tokens,
+  // but they are documented so that the console's CSS holds nothing
+  // outside this document.
+  for (const line of text.slice(layoutStart, radiusStart).split('\n')) {
+    const cells = line.split('|').map((cell) => cell.trim())
+
+    // `| --tap-target | `48px` | The minimum height… |`
+    // → cells = ['', token, value, meaning, '']
+    if (cells.length !== 5) continue
+
+    const name = unwrap(cells[1] ?? '')
+    const value = unwrap(cells[2] ?? '')
+
+    if (!name.startsWith('--')) continue
+    if (value === '') continue
+    // The separator row is `|---|---|---|`; its cells unwrap to `---`.
+    if (name === '---') continue
+
+    layoutConstants.set(name, value)
+  }
+
+  return { root, dark, light, static: staticColours, layout: layoutConstants }
 }
 
 /**
@@ -212,6 +275,23 @@ function normaliseHex(value: string): string | undefined {
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim())
   if (!hex) return undefined
   return hex[0].toUpperCase()
+}
+
+/**
+ * The React Native name of a static colour.
+ *
+ * The two surfaces name the same colour differently — `--static-white` in
+ * the CSS custom property, `staticColors.white` in the theme — so the map
+ * between them is written out here rather than derived. A derived rule
+ * would guess at the naming and silently accept a colour the theme does
+ * not actually carry.
+ */
+function staticThemeName(tokenName: string): string | undefined {
+  const names: Record<string, string> = {
+    '--static-white': 'white',
+  }
+
+  return names[tokenName]
 }
 
 /**
@@ -267,15 +347,6 @@ function mismatch(name: string, documented: string, declared: string): string | 
 
   return `${name}: document "${documented}", implementation "${declared}"`
 }
-
-/**
- * The tokens the admin console adds that are **not** design tokens.
- *
- * They are the console's own layout constants. The console's CSS says so
- * itself, and they are not in the document, so the parity check must not
- * require them to be there.
- */
-const ADMIN_LAYOUT_CONSTANTS = new Set(['--tap-target', '--rail-width', '--page-max'])
 
 /**
  * The document's colours the admin console deliberately does **not**
@@ -471,12 +542,38 @@ describe('the admin console CSS', () => {
 
     for (const name of css.root.keys()) {
       if (doc.root.has(name)) continue
-      if (ADMIN_LAYOUT_CONSTANTS.has(name)) continue
+      // §1.4 — the static colours are documented too, just not in the
+      // `:root` table.
+      if (doc.static.has(name)) continue
+      // §1.5 — the console's own layout constants.
+      if (doc.layout.has(name)) continue
       if (name === '--violet-500' || name === '--violet-400') continue
       extras.push(name)
     }
 
     expect(extras).toEqual([])
+  })
+
+  it('carries the console layout constants at the document’s value', () => {
+    // §1.5. These are the console's own measurements, and the document
+    // lists them so that the console's CSS holds nothing outside the
+    // contract — the criterion is "no value is invented outside that
+    // contract", and an invented value is one the document does not state.
+    const mismatched: string[] = []
+
+    for (const [name, value] of doc.layout) {
+      const declared = css.root.get(name)
+
+      if (declared === undefined) {
+        mismatched.push(`${name} is missing`)
+        continue
+      }
+
+      const difference = mismatch(name, value, declared)
+      if (difference) mismatched.push(difference)
+    }
+
+    expect(mismatched).toEqual([])
   })
 
   it("keeps the console's tap target at the mobile minimum", () => {
@@ -486,6 +583,40 @@ describe('the admin console CSS', () => {
     // is that the two surfaces cannot drift apart on the one number that
     // is a usability requirement rather than a style choice.
     expect(css.root.get('--tap-target')).toBe('48px')
+  })
+
+  it('carries the static colours at the document’s value', () => {
+    // The static colours are the ones that do not invert between the
+    // themes, so they are documented in §1.4 rather than the `:root`
+    // table. The console has to carry them at the documented value, for
+    // the same reason it has to carry the themed colours.
+    const mismatched: string[] = []
+
+    for (const [name, value] of doc.static) {
+      const declared = css.root.get(name)
+
+      if (declared === undefined) {
+        mismatched.push(`${name} is missing`)
+        continue
+      }
+
+      const difference = mismatch(name, value, declared)
+      if (difference) mismatched.push(difference)
+    }
+
+    expect(mismatched).toEqual([])
+  })
+
+  it('declares a static colour for the on-brand text', () => {
+    // The console's primary and danger buttons put text on a saturated
+    // surface. That text is white in **both** themes, so it cannot use
+    // `--surface-white` — which is `#11112b` in the dark theme, and would
+    // put near-black text on a violet button.
+    //
+    // The guard is that the value is *named*. A raw `#ffffff` in the rule
+    // would look identical in the diff and would survive every review that
+    // was not looking for it.
+    expect(css.root.get('--static-white')).toBe('#ffffff')
   })
 })
 
@@ -555,6 +686,38 @@ describe('the mobile theme', () => {
       if (!colour) continue
 
       const difference = mismatch(key, colour, declared)
+      if (difference) mismatched.push(difference)
+    }
+
+    expect(mismatched).toEqual([])
+  })
+
+  it('carries the static colours at the document’s value', () => {
+    // The React Native theme keeps the static colours in `staticColors`,
+    // outside the themed ramps, for the same reason the document has a
+    // section for them: they sit on top of a saturated surface and cannot
+    // invert with the theme.
+    //
+    // The map from the document's token name to the theme's own name is
+    // written out, because the two surfaces name the same colour
+    // differently — `--static-white` on the web, `staticColors.white` in
+    // React Native. The doc's third column says which is which.
+    const mismatched: string[] = []
+
+    for (const [name, value] of doc.static) {
+      const themeName = staticThemeName(name)
+      if (!themeName) {
+        mismatched.push(`${name} has no counterpart in the theme`)
+        continue
+      }
+
+      const declared = staticColors[themeName as keyof typeof staticColors]
+      if (declared === undefined) {
+        mismatched.push(`${themeName} is missing from the theme`)
+        continue
+      }
+
+      const difference = mismatch(name, value, String(declared))
       if (difference) mismatched.push(difference)
     }
 

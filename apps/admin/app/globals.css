@@ -90,6 +90,21 @@
   --rail-width: 232px;
   --page-max: 1440px;
 
+  /* --- the on-brand colour (static, like the mobile's `staticColors`) --- */
+  /*
+   * Text and borders on a saturated surface — a violet primary button, a red
+   * danger button — are white in **both** themes. The ink and surface ramps
+   * invert between light and dark, but this one cannot: `--surface-white`
+   * is `#11112b` in the dark theme, which would put near-black text on a
+   * violet button.
+   *
+   * The mobile theme makes the same distinction: `staticColors.white` sits
+   * outside the themed ramps for exactly this reason. The value is the
+   * mobile's, so the two surfaces cannot drift apart on the one colour that
+   * sits on top of a saturated surface.
+   */
+  --static-white: #ffffff;
+
   color-scheme: light;
 }
 
@@ -415,7 +430,7 @@ body {
 
 .buttonPrimary {
   background: var(--violet-600);
-  color: #ffffff;
+  color: var(--static-white);
   box-shadow: var(--shadow-fab);
 }
 
@@ -436,7 +451,7 @@ body {
 
 .buttonDanger {
   background: var(--red-600);
-  color: #ffffff;
+  color: var(--static-white);
 }
 
 .buttonDanger:hover:not(:disabled) {

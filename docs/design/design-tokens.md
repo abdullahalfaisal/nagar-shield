@@ -129,6 +129,43 @@ They are **not** re-declared in the dark theme, so they keep their light violet 
 | `--purple-100` | `--violet-100` | `#EDE9FE` | not overridden |
 | `--purple-50` | `--violet-50` | `#F5F3FF` | not overridden |
 
+### 1.4 Static colours
+
+The ramps above invert between the light and the dark theme. A small number of
+colours **do not**: they sit on top of a saturated surface — a violet primary
+button, a red danger button, a live map pin — and they have to stay white in
+both themes, because the surface under them does not change.
+
+The React Native theme keeps these in `staticColors`, outside the themed
+ramps, for exactly this reason. The web console keeps them in a CSS custom
+property of the same name.
+
+| Token | Value | React Native |
+|---|---|---|
+| `--static-white` | `#FFFFFF` | `staticColors.white` |
+
+A surface colour is **not** the right token for this. `--surface-white` is
+`#11112B` in the dark theme, which would put near-black text on a violet
+button.
+
+### 1.5 Console layout constants
+
+The moderator console is a **desktop** surface and it has three measurements
+the mobile app has no use for. They are the console's own layout constants,
+not design tokens — they are listed here so that the console's CSS holds
+nothing outside this document, which is the whole point of the contract.
+
+| Token | Value | Meaning |
+|---|---|---|
+| `--tap-target` | `48px` | The minimum height of an interactive control |
+| `--rail-width` | `232px` | The width of the sidebar |
+| `--page-max` | `1440px` | The maximum width of the content frame |
+
+`--tap-target` is the one that is not a free choice: it is the same 48 dp the
+mobile theme declares as `MIN_TAP_TARGET`, so the two surfaces cannot drift
+apart on the one number that is a usability requirement rather than a style
+decision.
+
 ---
 
 ## 2. Radius, shadow, motion
