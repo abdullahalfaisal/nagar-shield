@@ -166,16 +166,33 @@ function psqlScalar(sql) {
  * citizens flag it — rather than a hand-written UPDATE that would bypass the
  * threshold the probe is beside. The flag's identity comes from the JWT, so
  * the three flags must be three real sessions.
+ *
+ * The report's **author is a throwaway created for this run**, not the seeded
+ * citizen. FR-CAPTURE-3 caps an author at 50 reports a day, and filing the
+ * fixture as a fixed account spends that account's daily allowance on every
+ * run — so after about fifty runs the probe failed with HTTP 429 against a
+ * **healthy** codebase. A throwaway author has an allowance of its own every
+ * time.
  */
-async function buildQueuedFixture(citizenToken) {
+async function buildQueuedFixture() {
   const clientRequestId = randomUUID()
   const note = `console probe ${clientRequestId}`
+
+  const authorEmail = `console-probe-author-${randomUUID()}@test.local`
+  const authorId = await createThrowawayCitizen(authorEmail)
+  if (!authorId) {
+    return { ok: false, reason: 'the throwaway author could not be created', status: 0 }
+  }
+  const authorSession = await signIn(authorEmail)
+  if (!authorSession.token) {
+    return { ok: false, reason: 'the throwaway author could not sign in', status: 0 }
+  }
 
   const created = await callFunction(
     'finalize-capture',
     {
       client_request_id: clientRequestId,
-      storage_path: `reports/${authorToken(CITIZEN.id)}/${clientRequestId}.jpg`,
+      storage_path: `reports/${authorToken(authorId)}/${clientRequestId}.jpg`,
       media_type: 'photo',
       byte_size: 2048,
       duration_seconds: null,
@@ -188,7 +205,7 @@ async function buildQueuedFixture(citizenToken) {
       public_visibility: 'anonymous',
       category: 'theft',
     },
-    citizenToken,
+    authorSession.token,
   )
 
   if (created.status !== 200 || !created.body?.data?.report_id) {
@@ -274,7 +291,7 @@ async function main() {
   // 0. The fixture — a report in the moderator's queue.
   // ---------------------------------------------------------------------
 
-  const fixture = await buildQueuedFixture(citizenToken)
+  const fixture = await buildQueuedFixture()
   record(
     'the fixture report is in the moderator queue',
     fixture.ok,

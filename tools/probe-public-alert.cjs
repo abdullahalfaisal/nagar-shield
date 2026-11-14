@@ -19,6 +19,11 @@
  * The signed URL is minted through the real Storage API against the real
  * bucket, so a policy that does not actually grant the read fails here.
  *
+ * The probe files its report as a **fresh author on every run** — see
+ * `RUN_ID` below for why. A reader that reuses a fixed seeded account cannot
+ * do the same: it would spend that account's daily capture allowance on every
+ * run and eventually fail against a healthy codebase.
+ *
  * Usage: node tools/probe-public-alert.cjs
  */
 
@@ -30,8 +35,34 @@ const crypto = require('node:crypto')
 const API_URL = 'http://127.0.0.1:54321'
 
 const DEV_PASSWORD = 'nagar-local-dev'
-const CITIZEN_EMAIL = 'citizen@nagar.local'
 const OTHER_EMAIL = 'citizen2@nagar.local'
+
+/**
+ * The probe files its report as a **fresh author on every run**.
+ *
+ * The seeded `citizen@nagar.local` was the author until this probe started
+ * failing with `CAPTURE_RATE_LIMIT` after about fifty runs. The cap is real
+ * and correct — FR-CAPTURE-3 allows 50 reports per author per day — but the
+ * probe was spending the seeded citizen's daily allowance on every run, so
+ * the probe eventually failed on a **healthy** codebase. A proof that stops
+ * working after N runs is not a proof; it is a time bomb.
+ *
+ * So the author is created fresh each time, with a unique phone (the signup
+ * trigger refuses a profile without one, and `profiles.phone` is UNIQUE).
+ * The reader stays a fixed seeded account: it only reads, so it never spends
+ * an allowance.
+ */
+const RUN_ID = crypto.randomUUID().slice(0, 8)
+const AUTHOR_EMAIL = `probe-author-${RUN_ID}@nagar.local`
+/**
+ * The phone has to be **digits only** and in the local form the normaliser
+ * accepts — `+88019` and eight more digits, the same shape the other probes
+ * use. A run id with letters in it is not a phone number, and `profiles.phone`
+ * is UNIQUE, so the digits have to differ from every other run's.
+ */
+const AUTHOR_PHONE = `+88019${String(
+  crypto.randomInt(0, 100000000),
+).padStart(8, '0')}`
 
 /** The second path segment — the hex SHA-256 of the author's uuid. */
 function authorToken(userId) {
@@ -70,6 +101,37 @@ async function signIn(email, password) {
   })
   const body = await response.json().catch(() => ({}))
   return { status: response.status, token: body.access_token, body }
+}
+
+/**
+ * Creates the run's author — a brand new account, every run.
+ *
+ * The `profiles` row is written by the signup trigger from the Auth metadata,
+ * and the trigger refuses a metadata without a phone (`PHONE_REQUIRED`).
+ */
+async function createAuthor() {
+  const response = await fetch(`${API_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: AUTHOR_EMAIL,
+      password: DEV_PASSWORD,
+      email_confirm: true,
+      user_metadata: { phone: AUTHOR_PHONE, full_name: 'Probe Author' },
+    }),
+  })
+
+  if (response.status !== 200) {
+    return { status: response.status, token: '', id: '', text: await response.text() }
+  }
+
+  const body = await response.json().catch(() => ({}))
+  const signedIn = await signIn(AUTHOR_EMAIL, DEV_PASSWORD)
+  return { status: signedIn.status, token: signedIn.token, id: body.id ?? '', text: '' }
 }
 
 async function rpc(name, body, key) {
@@ -114,23 +176,23 @@ async function signedUrl(path, token) {
 }
 
 async function main() {
-  const citizen = await signIn(CITIZEN_EMAIL, DEV_PASSWORD)
+  const author = await createAuthor()
   const other = await signIn(OTHER_EMAIL, DEV_PASSWORD)
 
-  record('the seeded citizen can sign in', citizen.status === 200 && !!citizen.token)
+  record('the run’s author can sign in', author.status === 200 && !!author.token)
   record('the second citizen can sign in', other.status === 200 && !!other.token)
 
-  if (!citizen.token || !other.token) {
+  if (!author.token || !other.token) {
     finish()
     return
   }
 
   // The author's own uuid — it must never appear in anything the other
   // citizen can read.
-  const authorId = citizen.body.user?.id
+  const authorId = author.id
   const token = authorToken(authorId)
 
-  // A report with one media, filed by the citizen.
+  // A report with one media, filed by the author.
   const clientRequestId = crypto.randomUUID()
 
   const finalized = await rpc(
@@ -150,7 +212,7 @@ async function main() {
       p_public_visibility: 'anonymous',
       p_category: 'theft',
     },
-    citizen.token,
+    author.token,
   )
 
   record(
@@ -171,7 +233,7 @@ async function main() {
   // token — the insert policy must accept it.
   const uploaded = await storageUpload(
     `reports/${token}/${clientRequestId}/photo.jpg`,
-    citizen.token,
+    author.token,
     Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
   )
 

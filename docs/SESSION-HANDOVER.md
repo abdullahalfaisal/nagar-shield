@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 841 unit tests · 462 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 870 unit tests · 462 SQL assertions · 37/37 console probes
 
 ---
 
@@ -78,7 +78,7 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **192 unit tests** |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **195 unit tests** |
 | Database | **36 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, and the **30-day restore window** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
 | SQL test suites | **462 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (57), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
@@ -121,7 +121,7 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 841 tests (527 mobile, 192 shared, 122 admin)
+pnpm test             # 870 tests (531 mobile, 195 shared, 144 admin)
 pnpm db:test          # 462 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
@@ -700,6 +700,152 @@ story and the code disagree** — recorded rather than silently "fixed":
 - **The Home route is `(app)/home.tsx`, not `(app)/index.tsx`** — and it is
   no longer a shell: unit 003 built the real Home screen.
 
+### ✅ M3 — Story `005-admin-skeleton-and-ci`: five guards that were never built — FIXED
+
+**Story:** `001-foundation / 005-admin-skeleton-and-ci`. Five of its nine
+acceptance criteria named a guard, a job, or a boundary that did not exist.
+
+#### 1. The bundle-scan test was blind to the credential it exists to catch
+
+The criterion asks for *"a bundle-scan **test** fails the build if one
+appears"*. `apps/admin/lib/bundleScan.test.ts` now exists (21 tests) — but
+**the first version of it passed with a credential sitting in the file**.
+
+The scan read a *comment-stripped* view of each source file, and stripping
+string literals is exactly what a credential is wrapped in. The scan could
+not see `SUPABASE_SERVICE_ROLE_KEY` because it could not see any string
+literal.
+
+The fix was to give each file **three views** instead of one:
+
+| View | What it holds | What it is for |
+|---|---|---|
+| `code` | comments stripped, **literals kept** | the leak checks — a credential is only in a literal |
+| `bare` | comments **and literals** stripped | the env-var inventory — `process.env.X` has no literal, so it is only visible here |
+| `raw` | the original | the bundle scan |
+
+A **positive control** now runs the scanner against synthetic samples of each
+credential class, so a blind scan *fails* rather than passing quietly. A
+negative claim ("the repo has no credential") cannot distinguish a clean repo
+from a blind scan; a positive control can.
+
+#### 2. The secret scan false-positived on the Supabase SDK's own detector
+
+`node tools/secret-scan.cjs apps/admin/.next` reported two `sb_secret_`
+findings — from the SDK's **own** `key.startsWith("sb_secret_")` detector,
+which ships in every bundle. The CI `secret-scan` job would have failed on
+every build.
+
+The scanner now requires **≥20 characters of key material** after the prefix,
+so a bare prefix literal is not a finding. The same three-view discipline, the
+same bare-prefix rule, and the same documented test-file exemption now live in
+`tools/secret-scan.cjs`.
+
+#### 3. The console's three layout constants were invented outside the contract
+
+`--tap-target`, `--rail-width` and `--page-max` sat in `globals.css` under a
+comment that said *"not design tokens"*. The fix was to put them **into** the
+contract: `docs/design/design-tokens.md` gained **§1.5 Console layout
+constants**, and the parity test now asserts the console's constants against
+the document's rows.
+
+**The check had a blind spot.** The guard carried an `ADMIN_LAYOUT_CONSTANTS`
+allow-list, which quietly exempted exactly the three properties the criterion
+was about — removing `--page-max` from the document left the CSS's copy
+un-flagged. The allow-list is gone, and there is now a **two-way** check: the
+parity test catches a console value that drifts, and the extras test catches a
+console property the document does not list — which is what a row *removed*
+from the document looks like, since the parity test iterates the document's
+rows and would have nothing to check.
+
+#### 4. A dark-theme contrast defect, found by taking the criterion literally
+
+The two raw `#ffffff` literals on the primary and danger buttons had to go.
+The naive fix — `var(--surface-white)` — would have been **wrong**:
+`--surface-white` is `#11112b` in the dark theme, so the button's label would
+have gone near-black on a saturated violet.
+
+The console needed a colour that does not invert between themes. The document
+gained **§1.4 Static colours** for exactly that — `--static-white` —
+mirroring the mobile theme's `staticColors.white`, which the mobile already
+distinguishes for the same reason.
+
+#### 5. No reserved build job, and the `@shared/*` alias question
+
+**The build job.** The criterion says *"a separate job is reserved for the
+build/release pipeline that unit 008 will fill in"*. `ci.yml` now declares
+one — `name: build (reserved — unit 008)`, `needs: [secret-scan]`,
+`if: false` — so the slot is visible in the graph without costing a runner or
+failing a pull request. `packages/shared/src/ci-order.test.ts` proves the job
+exists, that it is skipped, and that it hangs behind the gate it must clear.
+
+**The alias.** The criterion named `@shared/*` as the mechanism. It is the
+wrong mechanism, and the criterion was **amended** to name
+`@nagar-shield/shared` — the specifier both apps actually use. `@shared/*` is
+a *source* alias that reaches into `packages/shared/src/*` and bypasses the
+package's `exports` map and its subpath exports. More decisively, the
+criterion names **the mobile app as the reference**, and the mobile does not
+use `@shared/*` either — switching the admin alone would have made the
+criterion's own comparison false.
+
+`@shared/*` is a live convention in this repository, but it is a **Deno**
+convention: the Edge Functions resolve it through
+`supabase/functions/deno.json`'s import map, because Deno has no pnpm
+workspace and no package resolution to fall back on. Two apps in one pnpm
+workspace consume the package by name; a runtime without a package manager
+uses an import map.
+
+The **boundary test** the criterion names now exists too:
+`packages/shared/src/boundary.test.ts` scans both apps for a local Zod schema
+or enum, holds a ~110-name shared vocabulary, and checks that vocabulary
+against the package's real exports so it cannot go stale.
+
+#### What the story file now says
+
+`005-admin-skeleton-and-ci`'s `## Implementation` section records each of the
+five above, and the story stays **`partial`** on **AC2 alone** — which is
+**void, not unmet**. AC2 asks for *placeholder* routes; unit 007 replaced
+them with live moderation screens. Making AC2 true would mean undoing unit
+007, so closing it is a decision for the story's author (amend the criterion
+to describe the shipped behaviour, or retire it as superseded), **not**
+something to paper over by writing a stub.
+
+### ✅ M4 — A live probe that failed after fifty runs on a healthy codebase — FIXED
+
+`pnpm verify` failed with `CAPTURE_RATE_LIMIT` — a **live probe** failing
+against a codebase that was working perfectly.
+
+**The defect.** FR-CAPTURE-3 caps an author at **50 reports per day**. Three
+probes filed their fixture as the fixed seeded `citizen@nagar.local`, so every
+run spent that account's daily allowance. After about fifty runs the cap was
+reached and the probes failed with HTTP 429 — **against a healthy codebase**.
+
+**The failure grew by one report per `pnpm verify`** — the same worst-way-for-a-
+test-to-break shape as §3 M2's `alert_detail.sql` fixture, and for the same
+reason: the probe left state behind that the next run had to work around.
+
+| Probe | The fixture | Before | After |
+|---|---|---|---|
+| `tools/probe-public-alert.cjs` | a real capture, via the real RPC | filed as the seeded citizen | a **fresh author** created per run |
+| `tools/probe-moderation-console.cjs` | a real capture, via the real Edge Function | filed as the seeded citizen | a **fresh author** created per run |
+| `tools/probe-capture-submit.cjs` | a real capture, via the real Edge Function | filed as the seeded citizen | a **fresh author** created per run |
+
+The author is created through the Auth admin endpoint with a unique
+digits-only phone (`profiles.phone` is UNIQUE, and the signup trigger refuses
+a metadata without one). The **readers** stay fixed seeded accounts — they
+only read, so they never spend an allowance.
+
+**The verification** is the point: the seeded citizen was left sitting at
+exactly 50 reports, and all three probes still passed. Each fresh author has
+exactly **one** report afterwards, and running a probe twice in a row passes
+both times.
+
+Two other probes were checked and left alone: `probe-report-category.cjs`
+writes its row **directly to the database** with the service role, so the
+capture cap does not apply, and `probe-disabled-write.cjs` files as a
+**disabled** account — the refusal *is* the assertion, so nothing ever
+succeeds and nothing is ever counted.
+
 ---
 
 ## 4. What is NOT DONE — 13 `partial`, 1 `planned`
@@ -757,7 +903,7 @@ Ordered by dependency. Bolt numbers in brackets.
 >
 > | Unit | complete | partial | planned |
 > |---|---|---|---|
-> | `001-foundation` | 0 | 5 | 0 |
+> | `001-foundation` | 4 | 1 | 0 |
 > | `002-identity` | 5 | 2 | 0 |
 > | `003-help-seek` | 5 | 2 | 1 |
 > | `004-capture` | 3 | 4 | 0 |
@@ -766,9 +912,10 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
-> `001-foundation` is the unit to pick up if you want **cheap** wins: **four of
-> its five stories are now `complete`**, and the fifth's gaps are mostly
-> **missing CI jobs and a scan test** rather than missing behaviour.
+> `001-foundation` is **effectively closed**: **four of its five stories are
+> `complete`**, and the fifth (`005-admin-skeleton-and-ci`) is down to a single
+> **void** criterion — a placeholder-route requirement that unit 007 superseded
+> with live screens. Its five missing guards are all built (§3 M3).
 
 ### 4.0 The 13 stories that are not `complete`
 
@@ -777,7 +924,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 
 | Story | Unit | State | The gap, in one line |
 |---|---|---|---|
-| `005-admin-skeleton-and-ci` | 001-foundation | partial | no reserved `build` job in `ci.yml`; no bundle-scan **test**; the `@shared/*` alias is unused |
+| `005-admin-skeleton-and-ci` | 001-foundation | partial | AC2 is **void, not unmet** — unit 007 replaced the route stubs with live screens; closing it means amending or retiring the criterion, never reintroducing the stubs |
 | `002-dual-identifier-login` | 002-identity | partial | no component test on the login screen; Remember-me's effect on the session is untested |
 | `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
 | `001-home-and-help-alert-grid` | 003-help-seek | partial | the grid is on its own route, not Home; the numbers are hardcoded, not read from the dataset |
@@ -803,10 +950,15 @@ all *guards never built*. Four of its five stories are now `complete`:
 | `003-mobile-design-system` | the token-parity test against `design-tokens.md`, the i18n key-parity gate, the tap-target test |
 | `004-mobile-app-shell` | §3 M2 — the boot test, the session-store decision, the theme-coverage scan |
 
-**`005-admin-skeleton-and-ci` is the last one.** Its gaps are a reserved
-`build` job in `ci.yml`, a bundle-scan **test** (the scan exists, the *test*
-around it does not), and an unused `@shared/*` alias. The features are there;
-the proofs and the CI job are not. This is the **cheapest** unit to close.
+**`005-admin-skeleton-and-ci` is the last one, and it is down to one
+criterion.** The reserved `build` job, the bundle-scan **test**, the shared
+boundary test, the two invented CSS custom properties, and the `@shared/*`
+alias question are **all closed** — see §3 M8. What is left is **AC2**, and
+it cannot be closed by writing code: the criterion asks for *placeholder*
+routes, and unit 007 replaced them with live moderation screens. Making AC2
+true would mean undoing unit 007. The criterion is **void, not unmet**, and
+closing it is a decision for the story's author: amend it to describe the
+shipped behaviour, or retire it as superseded.
 
 ### 4.1 Identity — unit `002-identity`
 
@@ -1088,10 +1240,16 @@ the proofs and the CI job are not. This is the **cheapest** unit to close.
        the code disagree (no `(onboarding)` group; no `I18nProvider` or
        `SupabaseProvider` component; the Home route is `home.tsx`, not
        `index.tsx`).
-    2. **`005-admin-skeleton-and-ci`** — the **last** `001-foundation`
-       story, and the cheapest. Its gaps are a reserved `build` job in
-       `ci.yml`, a bundle-scan **test** (the scan exists; the *test* around
-       it does not), and an unused `@shared/*` alias.
+    2. ~~**`005-admin-skeleton-and-ci`**~~ ✅ **DONE, apart from one void
+       criterion** — see §3 M3. The reserved `build` job, the bundle-scan
+       **test** (21 tests, with a positive control so a blind scan cannot
+       pass), the shared boundary test, the two invented CSS custom
+       properties, and the `@shared/*` alias question (the criterion was
+       amended to name `@nagar-shield/shared` — the specifier both apps use).
+       The story stays `partial` on **AC2 alone**, and AC2 is **void, not
+       unmet**: it asks for placeholder routes that unit 007 replaced with
+       live screens. Closing it is a decision for the story's author, **not**
+       something to paper over by writing a stub.
     3. The remaining `partial` stories, one at a time, each against its own
        `## Implementation` section. The next-cheapest units are
        `002-identity` (two stories, both missing component tests) and

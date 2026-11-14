@@ -42,8 +42,18 @@ const { randomUUID, createHash } = require('node:crypto')
 const API_URL = 'http://127.0.0.1:54321'
 const DEV_PASSWORD = 'nagar-local-dev'
 
-/** The seeded citizen. Their uuid is FIXED by the seed migration. */
-const AUTHOR = { email: 'citizen@nagar.local', id: '11111111-1111-1111-1111-1111111111a1' }
+/**
+ * The probe's author — a **fresh account on every run**.
+ *
+ * It was the seeded `citizen@nagar.local`, whose uuid the seed migration
+ * fixes. But FR-CAPTURE-3 caps an author at 50 reports a day, and this probe
+ * files a real capture through the real Edge Function — so every run spent
+ * that account's daily allowance, and after about fifty runs the probe failed
+ * with HTTP 429 against a **healthy** codebase. A proof that stops working
+ * after N runs is not a proof. The account is created through the Auth admin
+ * endpoint instead, so every run has an allowance of its own.
+ */
+const AUTHOR = { email: `capture-probe-author-${randomUUID()}@test.local`, id: '' }
 
 /** The media bucket. Private by construction — the probe proves it. */
 const MEDIA_BUCKET = 'report-media'
@@ -77,6 +87,36 @@ async function signIn(email) {
   })
   const body = await response.json().catch(() => ({}))
   return { status: response.status, token: body.access_token, body }
+}
+
+/**
+ * Creates the run's author and returns its uuid.
+ *
+ * The `profiles` row is written by the signup trigger from the Auth metadata,
+ * and the trigger refuses a metadata without a phone (`PHONE_REQUIRED`). The
+ * phone has to be **digits only** — `profiles.phone` is UNIQUE, so every run
+ * needs its own.
+ */
+async function createAuthor() {
+  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0')
+  const response = await fetch(`${API_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: AUTHOR.email,
+      password: DEV_PASSWORD,
+      email_confirm: true,
+      user_metadata: { phone: `+88019${subscriber}` },
+    }),
+  })
+
+  if (response.status !== 200) return ''
+  const body = await response.json().catch(() => ({}))
+  return body.id ?? ''
 }
 
 /**
@@ -165,6 +205,13 @@ function onePixelPng() {
 }
 
 async function main() {
+  AUTHOR.id = await createAuthor()
+  if (!AUTHOR.id) {
+    console.log('SKIP: the run’s author could not be created')
+    process.exitCode = 0
+    return
+  }
+
   const signInAuthor = await signIn(AUTHOR.email)
 
   if (signInAuthor.status !== 200 || !signInAuthor.token) {
