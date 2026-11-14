@@ -87,6 +87,196 @@ export const MAX_SECURE_STORE_VALUE_BYTES = 2048
 export const SESSION_KEY_PREFIX = 'nagar-shield.'
 
 /**
+ * FR-AUTH-2 — how long a "Remember me" session stays valid.
+ *
+ * Thirty days, which is what the story names: *"the refresh token is written
+ * to `expo-secure-store` with a 30-day expiry"*.
+ */
+export const REMEMBERED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * FR-AUTH-2 — how long a session that was **not** remembered survives.
+ *
+ * The story says an unchecked Remember-me means *"the session survives only
+ * the configured grace window and then the user returns to Login"*. The
+ * window is one day: long enough that closing the app and opening it again
+ * does not sign the user out, short enough that a phone left on a table does
+ * not keep a session alive for a month.
+ *
+ * A day, not an hour — an hour would sign out a user who put the phone down
+ * for a coffee, which is the kind of "security" nobody asked for.
+ */
+export const SESSION_GRACE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The key the persistence envelope is written under.
+ *
+ * The envelope wraps the session so the store knows **when** the session was
+ * written and **how long** it was meant to live. The session itself is
+ * `supabase-js`'s JSON and must not be reshaped — `supabase-js` reads the
+ * value back and parses it, so the envelope has to be unwrapped by this
+ * module and nothing else.
+ */
+const PERSISTED_AT_KEY = `${SESSION_KEY_PREFIX}session-persisted-at`
+
+/**
+ * The key `supabase-js` writes the session under.
+ *
+ * This is the default `storageKey` of the client in `shared/api/supabase.ts`,
+ * and it is the only key in the store that carries a **window**. The other
+ * values this module owns — the biometric flags in `useBiometricGate.ts` — are
+ * not sessions and must never be expired by the session's policy, so the
+ * expiry check is scoped to this key and not to "the last value written".
+ */
+const SESSION_STORAGE_KEY = 'sb-localhost-auth-token'
+
+/**
+ * The persistence policy in force for the current session.
+ *
+ * `undefined` means **no policy has been set** — the app has not signed in
+ * yet, or has signed out. That is not the same as "do not persist": the
+ * difference matters at boot, where a session read from the store must be
+ * judged against the window it was written with, not against the policy of a
+ * sign-in that has not happened.
+ *
+ * So the policy is a record of the **last** sign-in's choice, and it is
+ * persisted alongside the session so a relaunch can still read it.
+ */
+export interface SessionPersistencePolicy {
+  /** Whether the session was written to be remembered across launches. */
+  remembered: boolean
+  /** The window the session was written under. */
+  windowMs: number
+  /** When the session was written, in epoch milliseconds. */
+  persistedAt: number
+}
+
+/**
+ * The policy in force, or `undefined` when none has been set.
+ *
+ * Module state, because the store is a module singleton and `supabase-js`
+ * calls it without passing context. The login flow sets it *before* the
+ * sign-in, so the very first `_saveSession` already honours the user's
+ * choice — which is the whole point.
+ */
+let currentPolicy: SessionPersistencePolicy | undefined
+
+/**
+ * Records the persistence policy for the session that is about to be created.
+ *
+ * Called by the login flow with the user's "Remember me" choice, **before**
+ * `signInWithPassword` — because `supabase-js` writes the session to the
+ * store as part of the sign-in, and a policy set afterwards would be too late
+ * for the first write.
+ */
+export function setSessionPersistencePolicy(policy: SessionPersistencePolicy): void {
+  currentPolicy = policy
+}
+
+/** The policy in force, or `undefined`. */
+export function sessionPersistencePolicy(): SessionPersistencePolicy | undefined {
+  return currentPolicy
+}
+
+/**
+ * Forgets the policy.
+ *
+ * Called on sign-out: the next session must not inherit the last one's
+ * window.
+ */
+export function clearSessionPersistencePolicy(): void {
+  currentPolicy = undefined
+}
+
+/**
+ * Whether a session written under `policy` is still within its window.
+ *
+ * The clock is the device's. The story's edge case says: *"the server
+ * remains the source of truth for token validity; the client treats an
+ * expired refresh as signed out and shows Login"* — so this is a
+ * **convenience** window, and a device with a wrong clock is corrected by the
+ * server on the next call, not by this function.
+ */
+export function isWithinWindow(
+  policy: SessionPersistencePolicy,
+  now: number = Date.now(),
+): boolean {
+  return now - policy.persistedAt < policy.windowMs
+}
+
+/**
+ * The window a "Remember me" choice maps to.
+ *
+ * Checked → the 30-day window. Unchecked → the grace window.
+ */
+export function windowForRememberMe(rememberMe: boolean): number {
+  return rememberMe ? REMEMBERED_WINDOW_MS : SESSION_GRACE_WINDOW_MS
+}
+
+/**
+ * Reads the policy that was persisted alongside the session.
+ *
+ * The policy is written to the store on every session write, so a relaunch
+ * can still judge the session it finds against the window it was written
+ * under. A policy that cannot be read is treated as **no policy** — and
+ * "no policy" means "do not expire", because a device that cannot read the
+ * Keystore has no session to expire either.
+ */
+async function readPersistedPolicy(): Promise<SessionPersistencePolicy | undefined> {
+  try {
+    const raw = await SecureStore.getItemAsync(PERSISTED_AT_KEY)
+    if (!raw) return undefined
+
+    const parsed = JSON.parse(raw) as Partial<SessionPersistencePolicy>
+    if (
+      typeof parsed?.persistedAt !== 'number' ||
+      typeof parsed?.windowMs !== 'number' ||
+      typeof parsed?.remembered !== 'boolean'
+    ) {
+      return undefined
+    }
+
+    return {
+      remembered: parsed.remembered,
+      windowMs: parsed.windowMs,
+      persistedAt: parsed.persistedAt,
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Writes the policy alongside the session.
+ *
+ * A write that fails is ignored for the same reason a session write that
+ * fails is ignored: the store records the failure, it does not throw at
+ * `supabase-js`.
+ */
+async function writePersistedPolicy(policy: SessionPersistencePolicy): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PERSISTED_AT_KEY, JSON.stringify(policy), {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    })
+  } catch {
+    // Nothing to do — the session itself is still in the store.
+  }
+}
+
+/**
+ * Removes the persisted policy.
+ *
+ * Called on sign-out, and when a session is found to be past its window.
+ */
+async function removePersistedPolicy(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(PERSISTED_AT_KEY)
+  } catch {
+    // Nothing to do.
+  }
+}
+
+/**
  * Whether a value is small enough for SecureStore to hold.
  *
  * The check is on the **UTF-8 byte length**, not the character count —
@@ -186,10 +376,36 @@ export const secureStore = {
    *
    * A missing key is `null`, not an error — that is how `supabase-js` asks
    * "is there a stored session?" on boot.
+   *
+   * For the **session** key, a value that is past its window reads as a
+   * miss: the entry is deleted on the way out, and the app boots
+   * unauthenticated. That is the mechanism behind FR-AUTH-2's "the session
+   * survives only the configured grace window and then the user returns to
+   * Login" — the window is enforced at the only place a session is read
+   * back, which is the boot path.
    */
   async getItem(key: string): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(key)
+      const value = await SecureStore.getItemAsync(key)
+      if (value === null) return null
+
+      // Only the session entry carries a window. The other values this
+      // module owns — the biometric flags — are not sessions and must not
+      // be expired by the session's policy.
+      if (key !== SESSION_STORAGE_KEY) return value
+
+      const policy = await readPersistedPolicy()
+      // No policy means the session was written by a version of the app that
+      // did not write one, or the policy could not be read. Either way the
+      // session is honoured: an unreadable policy is not evidence of an
+      // expired session.
+      if (!policy) return value
+      if (isWithinWindow(policy)) return value
+
+      // Past the window: the session is gone as far as the app is concerned.
+      await SecureStore.deleteItemAsync(key)
+      await removePersistedPolicy()
+      return null
     } catch {
       // A device that cannot read the Keystore has no stored session. That
       // is a miss, not a crash: the app boots unauthenticated and the user
@@ -203,6 +419,10 @@ export const secureStore = {
    *
    * A value that is too large, or a Keystore that refuses the write, is
    * **recorded** and then ignored. It is never written anywhere else.
+   *
+   * When the value written is the session, the policy in force is persisted
+   * **beside** it, so the next launch can judge the session against the
+   * window it was written under.
    */
   async setItem(key: string, value: string): Promise<void> {
     if (!fitsInSecureStore(value)) {
@@ -226,6 +446,14 @@ export const secureStore = {
           error instanceof Error ? error.message : String(error)
         }`,
       )
+      return
+    }
+
+    if (key === SESSION_STORAGE_KEY) {
+      const policy = currentPolicy
+      if (policy) {
+        await writePersistedPolicy({ ...policy, persistedAt: Date.now() })
+      }
     }
   },
 
@@ -242,6 +470,10 @@ export const secureStore = {
       await SecureStore.deleteItemAsync(key)
     } catch {
       // Nothing to do.
+    }
+
+    if (key === SESSION_STORAGE_KEY) {
+      await removePersistedPolicy()
     }
   },
 }

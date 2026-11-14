@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 870 unit tests · 462 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 918 unit tests · 462 SQL assertions · 37/37 console probes
 
 ---
 
@@ -86,6 +86,7 @@ Every command below was run green against the local Supabase stack.
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
 | Alternate phone | `tools/probe-alternate-phone.cjs` — **9/9** over the real PostgREST path |
+| Dual-identifier sign-in | `tools/probe-dual-identifier-login.cjs` — **17/17** over the real GoTrue + PostgREST path: the phone and the email resolve to **one** `auth.users` row and one `profiles.id` |
 | Signup contract | `tools/probe-signup-contract.cjs` — **13/13** over the real GoTrue + PostgREST path |
 | Password reset | `tools/probe-password-reset.cjs` — **30/30** over the real GoTrue + mailbox path |
 | Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
@@ -108,7 +109,8 @@ Every command below was run green against the local Supabase stack.
 | Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
 | Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
 | App shell | `boot.dom.test.tsx` — **29 tests**: the provider stack is **rendered** in jsdom and the root layout's structure is **read from source** (the provider order, the unconfigured branch, every `<Redirect>` target resolving to a real file). See §3 M2. |
-| Session storage | `session-storage.ts` — the session goes to `expo-secure-store` and **nowhere else**; the 2048-byte figure is Apple's Keychain limit, not Expo's, and Android has none (a measured session is ~1550 bytes). A device that cannot write degrades to **memory-only**, with a localized notice. **27 tests**, including one that reads the installed `auth-js` source to assert the `supabase-js` rethrow contract. |
+| Session storage | `session-storage.ts` — the session goes to `expo-secure-store` and **nowhere else**; the 2048-byte figure is Apple's Keychain limit, not Expo's, and Android has none (a measured session is ~1550 bytes). A device that cannot write degrades to **memory-only**, with a localized notice. **27 tests**, including one that reads the installed `auth-js` source to assert the `supabase-js` rethrow contract. The FR-AUTH-2 window (30 days remembered / 24 hours otherwise) is enforced here, at the only place a session is read back. |
+| Login screen | `apps/mobile/src/__tests__/login.dom.test.tsx` (12), `apps/mobile/src/shared/api/session-window.test.ts` (14), `apps/mobile/src/shared/auth/authService.test.ts` (11), `apps/mobile/src/__tests__/noSocialLogin.test.ts` (11) — the identifier passes through **unchanged**, the Remember-me flag reaches the session write **before** the sign-in and **changes** the window, and no social sign-in method is wired. See §3 M5. |
 | Theme coverage | `themeCoverage.test.ts` — **5 tests**: every route screen reaches the theme, directly or **transitively** through a component it renders. |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
 | Nightly build | `.github/workflows/build.yml` — preview APK + emulator smoke (`maestro/panic-path.yaml`) |
@@ -121,13 +123,14 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 870 tests (531 mobile, 195 shared, 144 admin)
+pnpm test             # 918 tests (579 mobile, 195 shared, 144 admin)
 pnpm db:test          # 462 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
 pnpm biometric:check  # 10 biometric-accounting probes (live PostgREST)
 pnpm alternate:check  # 9 alternate-phone constraint probes (live PostgREST)
+pnpm dual-identifier:check # 17 dual-identifier sign-in probes (live GoTrue + PostgREST)
 pnpm signup:check     # 13 signup-contract probes (live GoTrue + PostgREST)
 pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
@@ -846,6 +849,77 @@ capture cap does not apply, and `probe-disabled-write.cjs` files as a
 **disabled** account — the refusal *is* the assertion, so nothing ever
 succeeds and nothing is ever counted.
 
+**The same defect, a second shape.** `flag_report` caps a flagger at **10
+flags an hour**, and the moderation-console probe's fixture was flagged by the
+fixed seeded `citizen2` and `mod`. After ten runs the flags silently
+**stopped counting** — the RPC answered `200` and returned `duplicate`, the
+report stayed `visible`, never entered the queue, and the probe failed on a
+**count** rather than an error. Fixed the same way: **three throwaway flaggers
+per run**, in `tools/probe-moderation-console.cjs` *and* in
+`tools/smoke-functions.cjs`, which had the identical defect. The general
+rule: **any rate limit is a shared allowance, and a fixed account spends it.**
+A writer needs a throwaway account; a reader may keep the seeded one.
+
+### ✅ M5 — Story `002-dual-identifier-login`: two gaps closed, one void, one **much bigger than it said** — FIXED
+
+**Story:** `002-identity / 002-dual-identifier-login`.
+
+The story's `## Implementation` section named three gaps. Two closed. The
+third turned out to be **stale**, and one gap was **not named at all**.
+
+| # | The gap as written | What was actually true |
+|---|---|---|
+| 1 | no component test on the login screen | ✅ closed — `apps/mobile/src/__tests__/login.dom.test.tsx` (12 tests) |
+| 2 | "Remember-me's effect on the session is untested" | ✅ closed, and **AC #6 had been failing outright** — see below |
+| 3 | "no i18n key-parity gate" | **stale** — the gate already existed |
+| — | *not named* | **nothing proved the phone and the email resolve to the same account** |
+
+**Gap 2 was much bigger than it said.** The FR-AUTH-2 30-day window **did
+not exist anywhere in the codebase** — `rememberMe` changed nothing about
+persistence. AC #6 was not merely untested; it was **false**. The window is
+now enforced at the only place a session is read back: `secureStore.getItem`
+reads the policy stored *beside* the session, and a session past its window
+reads as a miss (and the stale entry is deleted on the way out). The policy
+is set **before** `signInWithPassword`, because `supabase-js` writes the
+session *as part of* the sign-in — a policy set afterwards is too late for the
+first write. Windows: **30 days** remembered, **24 hours** otherwise.
+
+**The unnamed gap was the biggest one.** The story's `## Implementation`
+claimed `tools/probe-alternate-phone.cjs` "signs in with the alternate
+identifier" — it does not; that probe is about the `profiles.alternate_phone`
+**column**. The login-by-phone path had **no** end-to-end guard at all; only
+the RPC was covered inside Postgres. `tools/probe-dual-identifier-login.cjs`
+(**17 assertions**, wired into `pnpm verify` and into the CI `rls-integration`
+job) now resolves a phone over REST as an **anonymous** caller, signs in with
+the resolved email, asserts the session's `profiles.id` **and** `profiles.phone`,
+signs in by email and asserts the **same** `profiles.id`, asserts exactly one
+`auth.users` row, and asserts a wrong password is refused through both paths
+with the same status.
+
+**AC #9 had no guard either.** `apps/mobile/src/__tests__/noSocialLogin.test.ts`
+(11 tests) now scans the auth screens, both i18n bundles, the Supabase client
+and the auth service for a social provider. It reads the **literals** (a
+provider name lives in a string, and the code view strips strings), and it
+carries **three positive controls** — a synthetic Google button, a synthetic
+wired `provider: 'facebook'`, and a plain `"Sign in"` that must not be
+flagged. A social provider would be worse than cosmetic: a second credential
+system with its own account rows breaks the "one person, one `auth.users` row"
+invariant the identity model rests on.
+
+**Two criteria stay open, and they are void, not unmet.** AC #7 and AC #8
+describe a login-screen OTP step that **W-1 removed** — the login screen is
+email-primary and password-only. Making them true would mean putting a second
+credential path back, which is the opposite of the shipped behaviour. The
+story stays `partial` on those two, and closing them is the story author's
+call (amend the criterion to describe the shipped behaviour, or retire it as
+superseded) — the same call recorded for `005-admin-skeleton-and-ci`'s AC2.
+
+**One naming difference is recorded rather than papered over.** The criterion
+names `VALIDATION_FAILED`; the codebase uses `AUTH_REQUIRED`, and the *same*
+code is returned for an unknown identifier (the resolver, HTTP 401) and for a
+wrong password (GoTrue, HTTP 400). The substance of AC #4 — both paths fail
+alike, with no "user not found" signal — holds; the code name differs.
+
 ---
 
 ## 4. What is NOT DONE — 13 `partial`, 1 `planned`
@@ -925,7 +999,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 | Story | Unit | State | The gap, in one line |
 |---|---|---|---|
 | `005-admin-skeleton-and-ci` | 001-foundation | partial | AC2 is **void, not unmet** — unit 007 replaced the route stubs with live screens; closing it means amending or retiring the criterion, never reintroducing the stubs |
-| `002-dual-identifier-login` | 002-identity | partial | no component test on the login screen; Remember-me's effect on the session is untested |
+| `002-dual-identifier-login` | 002-identity | partial | AC7/AC8 are **void, not unmet** — they describe a login-screen OTP step that W-1 removed (email-primary, password-only); closing them means amending or retiring the criterion, never putting a second credential path back. Both named gaps are closed — see §3 M5 |
 | `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
 | `001-home-and-help-alert-grid` | 003-help-seek | partial | the grid is on its own route, not Home; the numbers are hardcoded, not read from the dataset |
 | `002-personal-emergency-picker` | 003-help-seek | **planned** | **nothing exists** — no route, no component, no action |
@@ -963,8 +1037,9 @@ shipped behaviour, or retire it as superseded.
 ### 4.1 Identity — unit `002-identity`
 
 > The rows below record the **defects that were found and fixed**. Two of this
-> unit's seven stories are still `partial` — `002-dual-identifier-login` (no
-> component test; Remember-me's effect on the session is untested) and
+> unit's seven stories are still `partial` — `002-dual-identifier-login` (both
+> named gaps are closed; the two open criteria are **void**, because they
+> describe a login-screen OTP step that W-1 removed — §3 M5) and
 > `007-account-deletion-and-recovery` (I3's flow is live, but an expired
 > restore is misreported as `errors.internal` and `recoverableUntil` is
 > fetched but never read). See the §4.0 table.
@@ -976,6 +1051,7 @@ shipped behaviour, or retire it as superseded.
 | I3 | ✅ **FIXED** (folded into I1) — the Settings "Delete account" row now confirms and calls `soft_delete_account`; a soft-deleted account that signs back in lands on `app/(auth)/account-deleted.tsx`, which can restore it inside the 30-day window. | [006] story 007 |
 | I4 | ✅ **FIXED** — the alternate-phone step is live: `phone.tsx` routes to `app/(auth)/alternate-phone.tsx` with the **normalised** primary number, the step rejects an alternate equal to the primary (both sides normalised, so `01711-111111` and `+8801711111111` compare equal), and `register.tsx` writes the column after the signup via `setAlternatePhone` — the `handle_new_user` trigger does not carry it. Migration 020 adds the format CHECK the schema never had. `pnpm alternate:check` proves the constraint over PostgREST (9/9); `pnpm signup:check` proves the signup contract (13/13). | [004] story 001 |
 | I5 | ✅ **FIXED** — the password-reset OTP flow is live end to end. `app/(auth)/forgot-password.tsx` sends the code; `app/(auth)/verify-otp.tsx` takes it; `app/(auth)/reset-password.tsx` sets the new password and adopts the session. The challenge lives in `public.password_reset_challenges` (migration 021) and the **database owns the code** — bcrypt hash, `extensions.crypt(code, hash) = hash` — because GoTrue's `verify` endpoint accepts only `{type, token_hash}` / `{type, token}` and **silently ignores a 6-digit code**. The GoTrue token is released only after the comparison succeeds. The app owns the mail (`supabase/functions/_shared/mailer.ts`). `pnpm reset:check` proves the whole path over the real GoTrue + mailbox (30/30); `supabase/tests/password_reset.sql` adds 47 DB-side assertions. | [005] story 003 |
+| I6 | ✅ **FIXED** — the **dual-identifier sign-in** is live end to end, and it had **no** end-to-end guard. The FR-AUTH-2 30-day Remember-me window **did not exist anywhere in the codebase** — `rememberMe` changed nothing about persistence, so AC #6 was **false**, not merely untested. The window is now enforced in `secureStore.getItem`, the only place a session is read back; the policy is stored *beside* the session and set **before** the sign-in (because `supabase-js` writes the session as part of it). `tools/probe-dual-identifier-login.cjs` (**17/17**, wired into `pnpm verify` and CI) now proves the phone and the email resolve to **one** `auth.users` row and one `profiles.id`. `apps/mobile/src/__tests__/noSocialLogin.test.ts` guards FR-AUTH-6. See §3 M5. | [002] story 002 |
 
 ### 4.2 Contacts — unit `002-identity`
 
@@ -1250,11 +1326,25 @@ shipped behaviour, or retire it as superseded.
        unmet**: it asks for placeholder routes that unit 007 replaced with
        live screens. Closing it is a decision for the story's author, **not**
        something to paper over by writing a stub.
-    3. The remaining `partial` stories, one at a time, each against its own
-       `## Implementation` section. The next-cheapest units are
-       `002-identity` (two stories, both missing component tests) and
+    3. ~~**`002-dual-identifier-login`**~~ ✅ **DONE, apart from two void
+       criteria** — see §3 M5. The login-screen component test (12 tests), the
+       Remember-me session-window test (14 tests), the auth-service ordering
+       test (11 tests) and the no-social-login scan (11 tests) are all built.
+       **A gap the story did not name was the real one**: the FR-AUTH-2
+       30-day window **did not exist**, so AC #6 was *false*, and the
+       login-by-phone path had **no** end-to-end guard — `pnpm
+       dual-identifier:check` (17/17) is now the live proof. The story stays
+       `partial` on **AC7 and AC8 alone**, and both are **void, not unmet**:
+       they describe a login-screen OTP step that W-1 removed. Closing them
+       is a decision for the story's author, **not** something to paper over
+       by putting a second credential path back.
+    4. The remaining `partial` stories, one at a time, each against its own
+       `## Implementation` section. The next-cheapest unit is
+       `002-identity` (one story left: `007-account-deletion-and-recovery` —
+       an expired restore is misreported as `errors.internal`, and
+       `recoverableUntil` is fetched but never read) and then
        `006-alerts` (four stories, three of them missing tests).
-    4. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
+    5. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
        stories. It has no route, no component and no action.
 17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
     placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries the
@@ -1401,6 +1491,7 @@ tools/                       run-sql-tests, smoke-rpc, smoke-functions,
                              check-i18n-keys, reconcile-story-index,
                              probe-disabled-write, probe-biometric-gate,
                              probe-alternate-phone, probe-signup-contract,
+                             probe-dual-identifier-login,
                              probe-password-reset, probe-contacts-crud,
                              probe-report-category, probe-public-alert,
                              probe-server-side-write, probe-capture-submit,
@@ -1461,3 +1552,5 @@ Dev accounts: `mod@nagar.local` / `citizen@nagar.local`, password
 | Q-4 | Video copy says 30 s (PRD-X-4) vs the prototype's 60 s. PRD wins by default. | low |
 | Q-5 | Screen 20's dispatch-style failover copy — the 2026-10-12 override forbids it. Brief corrects the copy. | low |
 | Q-6 | A distinct **public** alert-detail screen is required (not the author's own report detail). | low |
+| Q-7 | `002-dual-identifier-login`'s **AC7 and AC8** describe a login-screen OTP step that **W-1 removed** — the login screen is email-primary and password-only. They are **void, not unmet**: making them true would mean putting a second credential path back. Amend the criterion to describe the shipped behaviour, or retire it as superseded — the same call as `005-admin-skeleton-and-ci`'s AC2. | low |
+| Q-8 | `002-dual-identifier-login`'s **AC #4** names `VALIDATION_FAILED`; the codebase uses `AUTH_REQUIRED`, and the *same* code is returned for an unknown identifier (HTTP 401) and a wrong password (HTTP 400). The substance of the criterion holds — both paths fail alike, with no "user not found" signal — but the code name differs. | low |

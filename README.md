@@ -63,46 +63,47 @@ pnpm shared             # the shared contracts
 
 ## The root scripts
 
-| Script                   | What it does                                        |
-| ------------------------ | --------------------------------------------------- |
-| `pnpm dev`               | Start the admin console's dev server.               |
-| `pnpm build`             | Build the admin console for production.             |
-| `pnpm typecheck`         | `tsc --noEmit` across all three workspaces.         |
-| `pnpm lint`              | ESLint across all three workspaces.                 |
-| `pnpm test`              | Every unit and shared-contract suite.               |
-| `pnpm format`            | Prettier, writing the changes.                      |
-| `pnpm format:check`      | Prettier, reporting the differences.                |
-| `pnpm verify`            | **The full gate** — see below.                      |
-| `pnpm db:reset`          | Recreate the local database and reseed it.          |
-| `pnpm db:test`           | The SQL suites, against the local stack.            |
-| `pnpm db:smoke`          | The REST read models and the RPCs.                  |
-| `pnpm fn:serve`          | Serve the Edge Functions locally.                   |
-| `pnpm fn:smoke`          | The Edge Function smoke checks.                     |
-| `pnpm fn:typecheck`      | `deno check` over the Edge Function sources.        |
-| `pnpm data:check`        | Verify the seeded reference data has not drifted.   |
-| `pnpm data:write-seed`   | Regenerate the seed from the curated dataset.       |
-| `pnpm shared:check`      | Verify the Edge Functions mirror has not drifted.   |
-| `pnpm shared:mirror`     | Regenerate the Edge Functions mirror.               |
-| `pnpm story:index:check` | Verify the story index matches the story files.     |
-| `pnpm story:index:write` | Recompute the story index from the story files.     |
-| `pnpm secret:scan`       | Scan the sources and the built bundles for secrets. |
-| `pnpm release:verify`    | The release gate.                                   |
-| `pnpm maestro:check`     | Validate the Maestro flows.                         |
-| `pnpm purge:dry-run`     | Report what the media purge would delete.           |
-| `pnpm guard:check`       | Prove a disabled account cannot write.              |
-| `pnpm biometric:check`   | Prove the biometric failure accounting.             |
-| `pnpm alternate:check`   | Prove the alternate phone's format constraint.      |
-| `pnpm signup:check`      | Prove the signup contract end to end.               |
-| `pnpm reset:check`       | Prove the password-reset contract end to end.       |
-| `pnpm contacts:check`    | Prove the emergency-contacts CRUD contract.         |
-| `pnpm category:check`    | Prove the report-detail category contract.          |
-| `pnpm alert:check`       | Prove the public alert contract.                    |
-| `pnpm capture:check`     | Prove the capture submit contract.                  |
-| `pnpm deletion:check`    | Prove the account-deletion contract.                |
-| `pnpm console:check`     | Prove the moderator console contract.               |
-| `pnpm mobile`            | Run a command in the mobile app.                    |
-| `pnpm admin`             | Run a command in the admin console.                 |
-| `pnpm shared`            | Run a command in the shared package.                |
+| Script                       | What it does                                               |
+| ---------------------------- | ---------------------------------------------------------- |
+| `pnpm dev`                   | Start the admin console's dev server.                      |
+| `pnpm build`                 | Build the admin console for production.                    |
+| `pnpm typecheck`             | `tsc --noEmit` across all three workspaces.                |
+| `pnpm lint`                  | ESLint across all three workspaces.                        |
+| `pnpm test`                  | Every unit and shared-contract suite.                      |
+| `pnpm format`                | Prettier, writing the changes.                             |
+| `pnpm format:check`          | Prettier, reporting the differences.                       |
+| `pnpm verify`                | **The full gate** — see below.                             |
+| `pnpm db:reset`              | Recreate the local database and reseed it.                 |
+| `pnpm db:test`               | The SQL suites, against the local stack.                   |
+| `pnpm db:smoke`              | The REST read models and the RPCs.                         |
+| `pnpm fn:serve`              | Serve the Edge Functions locally.                          |
+| `pnpm fn:smoke`              | The Edge Function smoke checks.                            |
+| `pnpm fn:typecheck`          | `deno check` over the Edge Function sources.               |
+| `pnpm data:check`            | Verify the seeded reference data has not drifted.          |
+| `pnpm data:write-seed`       | Regenerate the seed from the curated dataset.              |
+| `pnpm shared:check`          | Verify the Edge Functions mirror has not drifted.          |
+| `pnpm shared:mirror`         | Regenerate the Edge Functions mirror.                      |
+| `pnpm story:index:check`     | Verify the story index matches the story files.            |
+| `pnpm story:index:write`     | Recompute the story index from the story files.            |
+| `pnpm secret:scan`           | Scan the sources and the built bundles for secrets.        |
+| `pnpm release:verify`        | The release gate.                                          |
+| `pnpm maestro:check`         | Validate the Maestro flows.                                |
+| `pnpm purge:dry-run`         | Report what the media purge would delete.                  |
+| `pnpm guard:check`           | Prove a disabled account cannot write.                     |
+| `pnpm biometric:check`       | Prove the biometric failure accounting.                    |
+| `pnpm alternate:check`       | Prove the alternate phone's format constraint.             |
+| `pnpm dual-identifier:check` | Prove the phone and email sign-ins resolve to one account. |
+| `pnpm signup:check`          | Prove the signup contract end to end.                      |
+| `pnpm reset:check`           | Prove the password-reset contract end to end.              |
+| `pnpm contacts:check`        | Prove the emergency-contacts CRUD contract.                |
+| `pnpm category:check`        | Prove the report-detail category contract.                 |
+| `pnpm alert:check`           | Prove the public alert contract.                           |
+| `pnpm capture:check`         | Prove the capture submit contract.                         |
+| `pnpm deletion:check`        | Prove the account-deletion contract.                       |
+| `pnpm console:check`         | Prove the moderator console contract.                      |
+| `pnpm mobile`                | Run a command in the mobile app.                           |
+| `pnpm admin`                 | Run a command in the admin console.                        |
+| `pnpm shared`                | Run a command in the shared package.                       |
 
 The `*:check` probes each drive one contract against a running stack, so
 they need `pnpm db:reset` to have run first.
@@ -111,8 +112,8 @@ they need `pnpm db:reset` to have run first.
 
 ```
 typecheck → lint → format:check → test → data:check → shared:check
-          → story:index:check → db:test → db:smoke → alert:check
-          → console:check → maestro:check → fn:typecheck
+          → story:index:check → db:test → db:smoke → dual-identifier:check
+          → alert:check → console:check → maestro:check → fn:typecheck
 ```
 
 It must exit `0`. The individual steps can be run on their own while

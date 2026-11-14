@@ -400,6 +400,24 @@ jobs:
       - name: the alternate phone constraint
         run: pnpm alternate:check
 
+      # The dual-identifier sign-in, proved end to end: phone → the
+      # `resolve_login_identifier` RPC → the account's email → the password
+      # → a session → the account's `profiles.id`.
+      #
+      # The SQL suite proves the RPC inside Postgres — that a phone resolves
+      # to the account's email, and that an unknown identifier raises
+      # `AUTH_REQUIRED`. It cannot prove the other half: that the resolved
+      # email actually **authenticates**, and that the session behind it
+      # belongs to the account the phone belongs to. A resolver that
+      # returned the wrong email would pass every RPC test and fail every
+      # user.
+      #
+      # So the probe does the whole trip twice — once by phone, once by
+      # email — and asserts the two sessions resolve to the SAME
+      # `profiles.id`, over ONE `auth.users` row.
+      - name: the dual-identifier sign-in
+        run: pnpm dual-identifier:check
+
       # The signup contract, proved over the public Auth door — the same
       # door the app uses. The SQL suite cannot prove this half: the signup
       # trigger, the phone normalisation, and the UNIQUE constraint all live

@@ -460,12 +460,22 @@ async function main() {
     // threshold. The flags go through the real `flag_report` RPC as real
     // signed-in citizens — the transition is the product's own, not a
     // hand-written UPDATE that would bypass the rule it is meant to test.
-    const flaggerEmails = [
-      CITIZEN2_EMAIL,
-      MODERATOR_EMAIL,
-      `smoke-flagger-${randomUUID()}@test.local`,
-    ]
-    await createThrowawayCitizen(flaggerEmails[2])
+    // Three **throwaway** flaggers, created for this run.
+    //
+    // Not the seeded accounts: `flag_report` rate-limits a flagger to **10
+    // flags an hour**, and the seeded `citizen2` and `mod` are shared by
+    // every run — so after ten runs they sat at exactly the cap and the
+    // fixture silently stopped reaching three flags. The report stayed
+    // `visible`, never entered the queue, and the smoke test failed against
+    // a healthy codebase.
+    //
+    // A **writer** needs its own account; a reader may keep using the
+    // seeded one, because a reader never spends an allowance.
+    const flaggerEmails = []
+    for (let index = 0; index < 3; index += 1) {
+      const email = `smoke-flagger-${randomUUID()}@test.local`
+      if (await createThrowawayCitizen(email)) flaggerEmails.push(email)
+    }
 
     let flagged = 0
     for (const email of flaggerEmails) {

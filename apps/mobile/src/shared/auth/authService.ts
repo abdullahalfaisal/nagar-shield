@@ -1,6 +1,11 @@
 import { AppError, signupSchema } from '@nagar-shield/shared'
 import { supabase } from '@/shared/api/supabase'
 import { fromSupabaseError } from '@/shared/api/errors'
+import {
+  clearSessionPersistencePolicy,
+  setSessionPersistencePolicy,
+  windowForRememberMe,
+} from '@/shared/api/session-storage'
 import { clearQueue } from '@/shared/services/uploadQueue'
 
 /**
@@ -151,12 +156,28 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
 export async function logIn({ identifier, password, rememberMe }: LoginParams): Promise<void> {
   const email = await resolveEmail(identifier)
 
+  // FR-AUTH-2 — the "Remember me" choice is recorded **before** the sign-in.
+  //
+  // `supabase-js` writes the session to the store as part of
+  // `signInWithPassword` (`_saveSession`), so a policy set afterwards would
+  // be too late for the first write — and the first write is the one that
+  // decides the session's window. Setting it here means the very first
+  // `_saveSession` already honours the user's choice.
+  setSessionPersistencePolicy({
+    remembered: rememberMe,
+    windowMs: windowForRememberMe(rememberMe),
+    persistedAt: Date.now(),
+  })
+
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
   if (error) {
+    // The sign-in failed, so there is no session to govern. Leaving a policy
+    // behind would expire the *next* session against a window nobody chose.
+    clearSessionPersistencePolicy()
     if (/invalid login credentials/i.test(error.message)) {
       throw new AppError('AUTH_REQUIRED')
     }
@@ -190,6 +211,9 @@ export async function logOut(): Promise<{ discardedUploads: number }> {
 
   const { error } = await supabase.auth.signOut()
   if (error) throw fromSupabaseError(error)
+
+  // The next session must not inherit this one's window.
+  clearSessionPersistencePolicy()
 
   return { discardedUploads }
 }

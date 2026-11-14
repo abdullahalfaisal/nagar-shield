@@ -217,16 +217,31 @@ async function buildQueuedFixture() {
   // Three distinct flaggers — and **none of them the author**. `flag_report`
   // refuses an own-report flag ("A user cannot flag their own report"), so
   // the author would silently contribute nothing and the report would never
-  // reach the queue. The two remaining seeded citizens plus a throwaway
-  // created for this run give three real sessions, because the flag's
-  // identity comes from the JWT and the flags table has a unique constraint
-  // on `(report_id, flagger_id)`.
-  const thirdEmail = `console-probe-flagger-${randomUUID()}@test.local`
-  await createThrowawayCitizen(thirdEmail)
+  // reach the queue. The flag's identity comes from the JWT and the flags
+  // table has a unique constraint on `(report_id, flagger_id)`, so three
+  // real sessions are needed.
+  //
+  // They are **throwaway accounts created for this run**, not the seeded
+  // ones. `flag_report` rate-limits a flagger to **10 flags an hour**, and
+  // the seeded `citizen2` and `mod` are shared by every run — so after ten
+  // runs they sat at exactly the cap and the fixture silently stopped
+  // reaching three flags. The report stayed `visible`, never entered the
+  // queue, and the probe failed against a healthy codebase.
+  //
+  // This is the same defect shape as the daily report cap: a probe that
+  // writes state as a **fixed** account spends that account's allowance,
+  // and a proof that stops working after N runs is not a proof. A writer
+  // needs its own account; a **reader** may keep using the seeded one,
+  // because a reader never spends an allowance.
+  const flaggerEmails = []
+  for (let index = 0; index < 3; index += 1) {
+    const email = `console-probe-flagger-${randomUUID()}@test.local`
+    const created2 = await createThrowawayCitizen(email)
+    if (created2) flaggerEmails.push(email)
+  }
 
-  const flaggers = [CITIZEN2.email, MODERATOR.email, thirdEmail]
   let flagged = 0
-  for (const email of flaggers) {
+  for (const email of flaggerEmails) {
     const session = await signIn(email)
     if (!session.token) continue
     const flag = await callRpc(session.token, 'flag_report', {

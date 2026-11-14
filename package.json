@@ -34,6 +34,7 @@
     "guard:check": "node tools/probe-disabled-write.cjs",
     "biometric:check": "node tools/probe-biometric-gate.cjs",
     "alternate:check": "node tools/probe-alternate-phone.cjs",
+    "dual-identifier:check": "node tools/probe-dual-identifier-login.cjs",
     "signup:check": "node tools/probe-signup-contract.cjs",
     "reset:check": "node tools/probe-password-reset.cjs",
     "contacts:check": "node tools/probe-contacts-crud.cjs",
@@ -42,7 +43,7 @@
     "capture:check": "node tools/probe-capture-submit.cjs",
     "deletion:check": "node tools/probe-account-deletion.cjs",
     "console:check": "node tools/probe-moderation-console.cjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm data:check && pnpm shared:check && pnpm story:index:check && pnpm db:test && pnpm db:smoke && pnpm alert:check && pnpm console:check && pnpm maestro:check && pnpm fn:typecheck",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm data:check && pnpm shared:check && pnpm story:index:check && pnpm db:test && pnpm db:smoke && pnpm dual-identifier:check && pnpm alert:check && pnpm console:check && pnpm maestro:check && pnpm fn:typecheck",
     "mobile": "pnpm --filter @nagar-shield/mobile",
     "admin": "pnpm --filter @nagar-shield/admin",
     "shared": "pnpm --filter @nagar-shield/shared"
