@@ -8,7 +8,7 @@
 #
 #   lint ─┐
 #   typecheck ─┼─> shared-test ─> unit-test-mobile ─┐
-#               │                 unit-test-admin  ─┼─> migration-dry-run ─> rls-integration ─> secret-scan
+#               │                 unit-test-admin  ─┼─> migration-dry-run ─> rls-integration ─> secret-scan ─> build (reserved)
 #               │                 unit-test-functions ─┘
 #   maestro-flow ────────────────────────────────────┘ (independent — validates the nightly flow)
 #
@@ -19,6 +19,10 @@
 # it inspects the **built** bundles. `maestro-flow` is independent: it
 # validates the nightly emulator flow, so a typo there fails the PR instead
 # of the nightly build.
+#
+# `build` is a **reserved slot**, not a build: `if: false` skips it, and
+# unit 008 fills it in. It sits behind `secret-scan` so the graph shows
+# where the release will attach.
 #
 # Fork PRs get no secrets and no write permissions. The migration, RLS, and
 # secret jobs run entirely against a local Supabase stack and a pattern list,
@@ -34,6 +38,8 @@ on:
 
 # The pipeline needs to read the repository and nothing else. There is no
 # deploy job here — the production release is a human-driven runbook step.
+# The `build` job at the end is a reserved slot, not a deploy, and it is
+# skipped.
 permissions:
   contents: read
 
@@ -574,3 +580,37 @@ jobs:
         run: |
           pnpm secret:scan apps/admin/.next apps/mobile/dist 2>/dev/null \
             || pnpm secret:scan apps/admin apps/mobile
+
+  # ---------------------------------------------------------------------------
+  # The reserved build / release slot.
+  #
+  # Story 005-admin-skeleton-and-ci asks for "a separate job is reserved for
+  # the build/release pipeline that unit 008 will fill in", so the pipeline
+  # shape is visible before the pipeline exists. This job is that slot.
+  #
+  # It is **not** the build. The APK pipeline already exists as its own
+  # workflow (`.github/workflows/build.yml` — `preview-apk` + `apk-smoke`),
+  # which is unit 008's deliverable and runs on its own schedule and on a
+  # manual dispatch. This job is the *PR-facing* slot for it: the place where
+  # a build and a release will run once unit 008 wires them together, so the
+  # dependency graph shows the release sitting behind every gate rather than
+  # floating outside the pipeline.
+  #
+  # `if: false` keeps it from running today. A reserved job that runs and
+  # does nothing is worse than one that is visibly skipped: GitHub marks a
+  # skipped job in the run list, so the slot is visible in the UI, and the
+  # job's name and needs are the shape unit 008 fills in.
+  #
+  # When unit 008 wires it, this becomes: checkout → install → build →
+  # upload the artifact, with `needs:` naming the gates it must clear.
+  # ---------------------------------------------------------------------------
+
+  build:
+    name: build (reserved — unit 008)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [secret-scan]
+    if: false
+    steps:
+      - name: reserved for the build and release pipeline
+        run: echo "unit 008 fills this job in — see .github/workflows/build.yml"

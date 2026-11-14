@@ -26,6 +26,7 @@ const WORKFLOW_PATH = join(__dirname, '..', '..', '..', '.github', 'workflows', 
 
 interface WorkflowJob {
   needs?: string | string[]
+  if?: unknown
   steps?: { run?: string }[]
 }
 
@@ -116,5 +117,45 @@ describe('the CI job graph', () => {
       .map((step) => step.run ?? '')
 
     expect(runs.some((run) => /pnpm\s+format:check/.test(run))).toBe(true)
+  })
+
+  it('reserves a job for the build and release pipeline', () => {
+    // Story 005-admin-skeleton-and-ci: *"when a push lands on `main`, then
+    // the same lint/typecheck/test jobs run, and a separate job is reserved
+    // for the build/release pipeline that unit 008 will fill in"*. The
+    // Technical Notes are explicit that the slot is what this story owes:
+    // *"this story leaves a named placeholder job so the pipeline shape is
+    // already visible."*
+    //
+    // The reserved job is what makes the *shape* visible. Without it, the
+    // release is nowhere in the graph and unit 008 has to invent where it
+    // attaches.
+    const jobs = workflow().jobs
+
+    expect(Object.keys(jobs)).toContain('build')
+  })
+
+  it('skips the reserved build job until unit 008 fills it in', () => {
+    // A reserved job that *runs* and does nothing is worse than one that is
+    // visibly skipped: it costs a runner, it can fail for reasons that have
+    // nothing to do with the change, and it stops looking like a slot.
+    //
+    // `if: false` is the marker. GitHub reports the job as skipped, so the
+    // slot is visible in the run list without doing any work.
+    const build = workflow().jobs.build
+
+    expect(build).toBeDefined()
+    expect(build?.if).toBe(false)
+  })
+
+  it('hangs the reserved build job behind the gates it must clear', () => {
+    // The slot has to sit behind the pipeline, or the graph does not show
+    // where a release will attach. `secret-scan` is the last gate: it
+    // inspects the **built** bundle, so nothing may be released before it.
+    const build = workflow().jobs.build
+    const needs = build?.needs
+    const list = Array.isArray(needs) ? needs : needs ? [needs] : []
+
+    expect(list).toContain('secret-scan')
   })
 })
