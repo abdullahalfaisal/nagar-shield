@@ -17,14 +17,36 @@
  *   * the literal `SUPABASE_SERVICE_ROLE_KEY`
  *   * a service-role JWT role claim (`"role":"service_role"`)
  *   * a base64 JWT that decodes to a service-role payload
- *   * the literal `sb_secret_` and `SUPABASE_SECRET_KEY` (the newer Supabase
- *     secret-key formats)
+ *   * a Supabase secret key — the `sb_secret_` prefix **followed by key
+ *     material**, not the bare prefix (see `SECRET_KEY_PREFIX_PATTERN`)
+ *   * the literal `SUPABASE_SECRET_KEY`
  *   * a third-party analytics or ad SDK in a dependency manifest (FR-DATA-5)
  *   * `EXPO_PUBLIC_SMS_OTP_ENABLED` set to `true` anywhere
  *
  * What it deliberately does NOT flag: `SUPABASE_ANON_KEY`,
  * `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. The
  * anon key is public by design and is protected by Row Level Security.
+ *
+ * It also does not flag the **bare** `sb_secret_` prefix. The Supabase SDK
+ * ships its own detector for the newer key format, and that detector is in
+ * every bundle that includes the SDK. Matching the bare prefix reported the
+ * detector as an embedded key, so the CI job failed on every real build
+ * while the rule it guards was never broken.
+ *
+ * Two more things it does not flag, and why:
+ *
+ *   * **A credential named in a comment.** The rule this scan enforces is
+ *     stated in the very files it scans — the docs, the code and the tests
+ *     all name `SUPABASE_SERVICE_ROLE_KEY` — so a comment that mentions the
+ *     name is prose, not a leak. For source files the comments are stripped
+ *     before the scan; string literals are **kept**, because that is where a
+ *     credential is held.
+ *   * **A credential in a test file.** A test legitimately holds the very
+ *     patterns this scan looks for, because the rule is written down as a
+ *     fixture — `apps/admin/lib/bundleScan.test.ts` asserts on the
+ *     service-role key name and carries a fake secret key. A test file is
+ *     never bundled and never shipped, so it cannot leak. The banned-SDK
+ *     manifest check still runs over a test tree's `package.json`.
  */
 
 'use strict'
@@ -105,16 +127,53 @@ const BINARY_EXTENSIONS = new Set([
 ])
 
 /**
+ * The extensions whose comments can be stripped.
+ *
+ * Only source files have comments. A `.md` file is prose throughout, a
+ * `.json` file has no comments at all, and a `.yml` file uses `#` — so for
+ * those the raw text is the right thing to scan.
+ */
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'])
+
+/**
  * The forbidden literals.
  *
  * Every one of these is a **server** credential or a server-only role. The
  * anon key is deliberately absent — it is public by design.
+ *
+ * `sb_secret_` is the one **prefix** rather than a whole literal, because
+ * the newer Supabase secret keys are a prefix followed by random material.
+ * It therefore needs the special handling in `scanText` below — see
+ * `SECRET_KEY_PREFIX_PATTERN`.
  */
 const FORBIDDEN_LITERALS = [
   { label: 'service-role key env name', pattern: 'SUPABASE_SERVICE_ROLE_KEY' },
   { label: 'service-role key env name', pattern: 'SUPABASE_SECRET_KEY' },
-  { label: 'Supabase secret-key prefix', pattern: 'sb_secret_' },
 ]
+
+/**
+ * The Supabase secret-key prefix, followed by the **key material**.
+ *
+ * The bare prefix is not a secret. The Supabase SDK ships its own detector
+ * — `key.startsWith('sb_secret_')` in `supabase-js/src/lib/fetch.ts` — and
+ * that detector ends up in every bundle that includes the SDK. A scan that
+ * matched the bare prefix flagged the *detector* and reported it as an
+ * embedded key, so the CI `secret-scan` job failed on every real build while
+ * the actual rule it guards was never broken.
+ *
+ * So the pattern requires **key material after the prefix**: a run of
+ * base64url/base62 characters. A detector literal is the prefix followed by
+ * a quote, a parenthesis or nothing — none of which the pattern accepts.
+ *
+ * The material must be at least `SECRET_KEY_MIN_MATERIAL` characters, so a
+ * truncated prefix in a bundle is not mistaken for a key either.
+ */
+const SECRET_KEY_MIN_MATERIAL = 20
+
+const SECRET_KEY_PREFIX_PATTERN = new RegExp(
+  `sb_secret_[A-Za-z0-9_-]{${SECRET_KEY_MIN_MATERIAL},}`,
+  'g',
+)
 
 /** The service-role JWT role claim, with optional whitespace. */
 const SERVICE_ROLE_CLAIM = /["']role["']\s*:\s*["']service_role["']/
@@ -273,15 +332,129 @@ function looksLikeZip(buffer) {
 }
 
 /**
+ * Strips **comments only** from a source file.
+ *
+ * The rule this scan enforces is *stated* in the very files it scans — the
+ * docs, the code and the tests all name `SUPABASE_SERVICE_ROLE_KEY` — so a
+ * comment that mentions the name is prose, not a leak.
+ *
+ * String literals are left exactly as they are, because a credential is
+ * *held* in a string literal. A scan that removed the literals before
+ * looking for them could never find one.
+ *
+ * The scanner has to track whether it is inside a literal or inside a
+ * comment, because the two share characters: a URL has `//` in it, a glob
+ * has `/*` in it, and a sentence in a comment has an apostrophe in it.
+ */
+function stripComments(source) {
+  let result = ''
+  let index = 0
+  let inLiteral = ''
+
+  while (index < source.length) {
+    const char = source[index]
+    const next = source[index + 1]
+
+    // Inside a string literal: copy it through verbatim, honouring escapes.
+    if (inLiteral) {
+      result += char
+      if (char === '\\') {
+        const escaped = source[index + 1]
+        if (escaped !== undefined) {
+          result += escaped
+          index += 2
+          continue
+        }
+      }
+      if (char === inLiteral) inLiteral = ''
+      index += 1
+      continue
+    }
+
+    // A line comment runs to the end of the line.
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index)
+      index = end === -1 ? source.length : end
+      continue
+    }
+
+    // A block comment runs to its closing delimiter.
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2)
+      index = end === -1 ? source.length : end + 2
+      result += ' '
+      continue
+    }
+
+    // A quote opens a string literal.
+    if (char === "'" || char === '"' || char === '`') {
+      inLiteral = char
+      result += char
+      index += 1
+      continue
+    }
+
+    result += char
+    index += 1
+  }
+
+  return result
+}
+
+/**
+ * True when a file is a **test** — and so never ships.
+ *
+ * A test file legitimately holds the very patterns this scan looks for: the
+ * admin's `bundleScan.test.ts` asserts on the service-role key name and
+ * carries a fake secret key as a fixture. Those are not leaks; they are the
+ * rule, written down. A test file is never bundled, never shipped, and never
+ * reaches a phone or a browser.
+ *
+ * So a test file is skipped for the **credential** checks — the ones that
+ * look for the material itself. The **banned-SDK manifest** check still runs
+ * over a test file's `package.json`, because a banned SDK in a dependency
+ * manifest is a banned SDK whether or not a test mentions it.
+ */
+function isTestFile(file) {
+  const name = path.basename(file)
+  return /\.test\.[cm]?[jt]sx?$/.test(name) || /__tests__/.test(file.replace(/\\/g, '/'))
+}
+
+/**
  * Scans one blob of text for the forbidden material.
  *
  * `source` is a human-readable label used in the report.
+ *
+ * `options.skipCredentials` is set for a **test** file: a test legitimately
+ * holds the very patterns this scan looks for, because the rule is written
+ * down as a fixture. See `isTestFile`.
  */
-function scanText(source, text, findings) {
+function scanText(source, text, findings, options = {}) {
+  if (options.skipCredentials) {
+    // The SMS OTP flag is a *behaviour*, not a credential. A test may assert
+    // that the flag is off, or that it reads as on, and either way the
+    // assertion is the point. The flag is checked in the app config and the
+    // EAS profiles, which are shippable, not in the test tree.
+    return
+  }
+
   for (const { label, pattern } of FORBIDDEN_LITERALS) {
     if (text.includes(pattern)) {
       findings.push({ source, kind: label, match: pattern, snippet: redact(pattern) })
     }
+  }
+
+  // The secret-key prefix, with the key material after it. A bare prefix —
+  // the SDK's own detector — is not a finding; see
+  // `SECRET_KEY_PREFIX_PATTERN`.
+  for (const match of text.matchAll(SECRET_KEY_PREFIX_PATTERN)) {
+    const token = match[0]
+    findings.push({
+      source,
+      kind: 'Supabase secret key',
+      match: token,
+      snippet: redact(token),
+    })
   }
 
   if (SERVICE_ROLE_CLAIM.test(text)) {
@@ -305,7 +478,16 @@ function scanText(source, text, findings) {
       })
     }
   }
+}
 
+/**
+ * Scans one blob of text for the behaviour flags.
+ *
+ * The SMS OTP feature flag is a *behaviour* rather than a credential, so it
+ * is checked even in a test file: a test that asserted the flag reads as
+ * enabled would be asserting the wrong thing.
+ */
+function scanFlags(source, text, findings) {
   if (/EXPO_PUBLIC_SMS_OTP_ENABLED["'\s:=]*true/i.test(text)) {
     findings.push({
       source,
@@ -405,8 +587,10 @@ function main() {
           if (!TEXT_EXTENSIONS.has(ext)) continue
 
           const text = entry.data.toString('utf8')
-          scanText(`${relative(file)}!/${entry.name}`, text, findings)
-          scannedFiles.push(`${relative(file)}!/${entry.name}`)
+          const label = `${relative(file)}!/${entry.name}`
+          scanText(label, text, findings)
+          scanFlags(label, text, findings)
+          scannedFiles.push(label)
         }
         continue
       }
@@ -424,7 +608,15 @@ function main() {
         scanManifest(file, text, findings)
       }
 
-      scanText(relative(file), text, findings)
+      // The credential checks read the **comments-stripped** text, and only
+      // for source files — for a `.md` or a `.json` the whole file is the
+      // text that matters. String literals are kept: that is where a
+      // credential lives.
+      const ext = path.extname(file).toLowerCase()
+      const scannable = SOURCE_EXTENSIONS.has(ext) ? stripComments(text) : text
+
+      scanText(relative(file), scannable, findings, { skipCredentials: isTestFile(file) })
+      scanFlags(relative(file), scannable, findings)
     }
   }
 
