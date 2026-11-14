@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
-import { alertsItems, fetchAlerts, useAlerts } from './alerts'
+import { alertsItems, alertsShowingCachedPage, fetchAlerts, useAlerts } from './alerts'
 import { supabase } from '@/shared/api/supabase'
 
 /**
@@ -228,5 +228,79 @@ describe('alertsItems', () => {
     })
 
     expect(items.map((report) => report.id)).toEqual(['a'])
+  })
+})
+
+/**
+ * The offline case.
+ *
+ * The story's promise is *"the offline behaviour is a cached page, not an
+ * empty screen"*: when the network is down the feed renders the **last
+ * cached page** with an offline indication, and it never blanks the list.
+ *
+ * That needs **both** halves:
+ *
+ *   * the query is in an error state — the last request failed; and
+ *   * a cached page exists — there is something to show.
+ *
+ * The second half is what stops the app claiming it is showing "the last
+ * results" on a cold start with no network and no cache. There, the feed is
+ * genuinely empty and the honest surface is the empty state, not an offline
+ * notice over nothing.
+ */
+describe('alertsShowingCachedPage', () => {
+  const cached = {
+    pages: [{ items: [{ id: 'a' } as never], nextCursor: null }],
+    pageParams: [null],
+  }
+
+  it('is true when the query failed and a cached page survives', () => {
+    expect(alertsShowingCachedPage({ isError: true, data: cached })).toBe(true)
+  })
+
+  it('is false when the query succeeded', () => {
+    // A healthy feed shows no offline notice — the notice would be a lie.
+    expect(alertsShowingCachedPage({ isError: false, data: cached })).toBe(false)
+  })
+
+  it('is false on a cold start with no network and no cache', () => {
+    // There is nothing to show, so the empty state is the honest surface.
+    expect(alertsShowingCachedPage({ isError: true, data: undefined })).toBe(false)
+  })
+
+  it('is false when the cached pages hold no rows', () => {
+    // A cache of an empty page is not "the last results".
+    const empty = { pages: [{ items: [], nextCursor: null }], pageParams: [null] }
+
+    expect(alertsShowingCachedPage({ isError: true, data: empty })).toBe(false)
+  })
+})
+
+describe('the feed keeps its rows when the next request fails', () => {
+  beforeEach(() => {
+    rpc.mockReset()
+  })
+
+  it('keeps the cached page and reports the error', async () => {
+    // The first request succeeds; the second — the 60 s poll — fails. The
+    // feed must still hold the rows it had, and the query must be in the
+    // error state so the screen can say so.
+    rpc.mockResolvedValueOnce(envelope([row('a')], null) as never)
+    rpc.mockRejectedValueOnce(new Error('network down') as never)
+
+    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    await result.current.refetch()
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+
+    // The rows survived the failure.
+    expect(alertsItems(result.current.data).map((report) => report.id)).toEqual(['a'])
+    // And the rule agrees: this is the cached-page case.
+    expect(
+      alertsShowingCachedPage({ isError: result.current.isError, data: result.current.data }),
+    ).toBe(true)
   })
 })

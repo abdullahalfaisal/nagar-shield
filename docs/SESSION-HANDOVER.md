@@ -5,7 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 956 unit tests · 476 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 1013 unit tests · 476 SQL assertions · 37/37 console probes
 
 ---
 
@@ -14,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 41 `complete`, 12
+**The stories are now counted three ways, not two: 42 `complete`, 11
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -52,6 +52,16 @@ literal word *"undefined"* instead of an error message (a hand-built i18n key at
 **ten** call sites), and a missing build setting **crashed the whole app** at import
 time. Each is fixed, each has a test, and each fix was proved by a **causal check**
 that failed when the defect was put back. See §3 M1.
+
+**The alerts feed is `complete`, and it found two more real defects.** The
+uncategorized card rendered `'—'` instead of the bundle's placeholder; the
+offline behaviour did not exist at all; and the rendering had **no** test.
+Closing them exposed the **blank area line** — the database holds
+`"thana": null` on degraded captures, the client normalised a null level to
+`''`, and the `??` chain stopped there, so the card rendered an empty line —
+and the **pulsing dot did not pulse**: it drew a static halo while its own
+comment claimed *"the pulse is a React Native `Animated` loop"*. Six causal
+checks confirm each guard fires. See §4.6 A4.
 
 **One pre-existing quirk worth knowing.** After `pnpm db:reset`, the
 `alerts_feed` read model returns **zero items** — the seeded reports fall
@@ -105,7 +115,8 @@ Every command below was run green against the local Supabase stack.
 | Location sharing | `apps/mobile/src/shared/services/` — the just-in-time fix, the snapshot payload, the OS share sheet, the fan-out, the intent telemetry, and the app-user lookup. **67 new unit tests** across four suites, plus 37 SQL assertions. |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
-| Alerts feed | `useInfiniteQuery` with the **cursor as the page parameter** and the area filter alone in the query key; `alertsItems()` flattens the pages and is the only way the screens read the feed. **12 unit tests** (`alerts.dom.test.ts`). |
+| Alerts feed | `useInfiniteQuery` with the **cursor as the page parameter** and the area filter alone in the query key; `alertsItems()` flattens the pages and is the only way the screens read the feed. The uncategorized card renders the **localized** placeholder on the neutral `--ink-300` ramp; the offline case is one shared rule (`alertsShowingCachedPage()`) driving one shared notice (`OfflineNotice.tsx`), and **neither** feed screen blanks on error. **17 unit tests** (`alerts.dom.test.ts`). |
+| Alert card rendering | `alertCard.test.ts` (25) — the box model, the accent map's single source, the uncategorized placeholder, the empty-description gap, the Bangla / English pair; `offlineNotice.test.ts` (15) — the notice exists, uses the bundle copy, is announced, and is rendered by **both** feed screens off the shared rule; `pulseDot.test.ts` (12) — the 1.5 s pulse, the 6 dp halo, and the paused state. See §4.6 A4. |
 | Error copy | `errorCopy()` — one place that consults the shared `API_ERROR_I18N_KEYS` map, with an `errors.internal` fallback for an unknown code. **7 unit tests**, against the **real** bundles. |
 | Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
 | Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
@@ -124,7 +135,7 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 956 tests (612 mobile, 200 shared, 144 admin)
+pnpm test             # 1013 tests (669 mobile, 200 shared, 144 admin)
 pnpm db:test          # 476 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
@@ -994,7 +1005,7 @@ carries the detailed account of both defects.
 
 ---
 
-## 4. What is NOT DONE — 12 `partial`, 1 `planned`
+## 4. What is NOT DONE — 11 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -1054,7 +1065,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `003-help-seek` | 5 | 2 | 1 |
 > | `004-capture` | 3 | 4 | 0 |
 > | `005-location` | 5 | 0 | 0 |
-> | `006-alerts` | 5 | 4 | 0 |
+> | `006-alerts` | 6 | 3 | 0 |
 > | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
@@ -1063,7 +1074,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > **void** criterion — a placeholder-route requirement that unit 007 superseded
 > with live screens. Its five missing guards are all built (§3 M3).
 
-### 4.0 The 12 stories that are not `complete`
+### 4.0 The 11 stories that are not `complete`
 
 Each row's story file carries an `## Implementation` section naming the exact
 gap. **Open the story file, not this table, when you pick one up.**
@@ -1079,7 +1090,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `002-area-hierarchy-extraction` | 004-capture | partial | `areaHierarchySchema` does not exist; the resolution is cache-first, contradicting the story |
 | `004-exif-strip-and-media-caps` | 004-capture | partial | the video path copies the original bytes — no trim, no metadata strip; the cap is 1080, not 1920 |
 | `007-storage-upload-and-finalize` | 004-capture | partial | no unit test ties the client's storage path to the server's |
-| `001-alerts-feed-list` | 006-alerts | partial | `next_cursor` was computed and **discarded** — page 2 was unreachable — ✅ **FIXED in §3 M1** (`useInfiniteQuery` + `alertsItems()`); the remaining gap is the **test** |
+| `001-alerts-feed-list` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A4** — the uncategorized placeholder, the offline indication and the rendering tests all landed; two real defects (the blank area line, the static pulsing dot) were found on the way |
 | `002-auto-refresh-and-pull-to-refresh` | 006-alerts | partial | neither the interval nor pull-to-refresh is tested |
 | `003-area-filter-chips` | 006-alerts | partial | the row uses a plain `View` and **clips** the chips; needs a horizontal `ScrollView` |
 | `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
@@ -1172,9 +1183,8 @@ shipped behaviour, or retire it as superseded.
 
 ### 4.6 Alerts — unit `006-alerts`
 
-> Four of this unit's nine stories are still `partial`: `001-alerts-feed-list`
-> (the `next_cursor` **discard** is fixed — §3 M1 — so what remains is the
-> **test**), `002-auto-refresh-and-pull-to-refresh`
+> **Three of this unit's nine stories are still `partial`:** 
+> `002-auto-refresh-and-pull-to-refresh`
 > (neither the interval nor pull-to-refresh is tested),
 > `003-area-filter-chips` (the row uses a plain `View` and clips the chips)
 > and `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
@@ -1186,6 +1196,7 @@ shipped behaviour, or retire it as superseded.
 | A1 | ✅ **FIXED** — the History screen is live. `app/(app)/history.tsx` carries the prototype's three segmented tabs — **ধরন** (the rows), **মোট** (the totals) and **বিতরণ** (the per-category counts) — plus the **My Reports** tab that unit `004` added for the author. The prototype's second sentence, *"Detailed map + filters coming soon,"* is **removed**: both ship in Phase 1, so the claim would have been false. The **বিতরণ** tab is a **list of counts** — never a chart, a bar, a percentage or a trend (FR-NG-3 / FR-NG-4 / ADR-010) — and a **source scan** (`src/__tests__/noChartCode.test.ts`) fails the build if a chart library or a chart-shaped identifier appears in the app. The scan reads **code only** — comments and string literals are stripped first — because the rule is *stated in prose* inside the very files it scans; a naive scan would fail on the rule itself. The own-reports branch is **independent of the radius and the window** (FR-HIST-3), and the rows route to the right surface: an own report opens the author's own detail, a neighbour opens the **public** alert detail. | [020] story 006 |
 | A2 | ✅ **FIXED** — the public alert detail is live. `app/(app)/alert-detail.tsx` renders the public projection, and the projection **omits `author_id` entirely** — not nulled, not renamed (FR-DATA-3 / FR-NG-5), so there is nothing for a render to pick up. The client type mirrors that, and `src/shared/api/alertDetail.test.ts` asserts the absence of every author-shaped key (`authorId` / `author_id` / `author` / `reporter` / `reporterId`) and that the serialised body contains no author uuid. The media paths are **author-token** paths, and a media whose URL cannot be signed is **dropped** rather than rendered broken. | [021] story 009 |
 | A3 | ✅ **FIXED** — the filters, the map, and the author auto-hide are live. **The filters**: one filter object, one query key — the list, the totals, the distribution and the map all move together, and a sheet that changes nothing does not re-query. **The map**: one shared wrapper, no fork — the attribution is owned by the wrapper, only `tile.openstreetmap.org` is contacted, and the marker set is capped at 150 keeping the markers **nearest the centre**. **The author auto-hide**: the transition lives in `public.flag_report` — one transaction, so a partial hide is impossible. **A real defect was found and fixed by migration 030**: the function counted `count(*)` over the author's flags, so **five flags on a single report** fired the auto-hide and swept in the author's other reports — exactly what the story forbids ("five flags on one report are one flagged report"). It now counts `count(distinct f.report_id)`, and the response carries **both** counts side by side (`author_flags_24h` and `author_flagged_reports_24h`) so the distinction is visible rather than implied. The old SQL test had encoded the wrong behaviour and was rewritten, and a new Test 10 asserts the negative case directly. The hide is `hidden_pending_review`, not `removed` — it is a moderator's to reverse. **The author still sees their own hidden reports**; the public hide never touches own-report visibility. | [020–021] |
+| A4 | ✅ **FIXED** — the alerts feed is `complete`. Three gaps closed, and **two real defects found on the way**. **(1) The uncategorized card rendered `'—'`.** The bundle already carried `alerts.uncategorized` = `অকার্যনির্দিষ্ট — Uncategorized`; the card used a literal instead. It now renders the localized placeholder and falls back to the **neutral `--ink-300` ramp** for the accent border, the icon tint and the category text. The repo's hardcoded-string scan **did not** catch it — `'—'` is one character with no space — so the guard added is behavioural, not lexical. **(2) The offline behaviour did not exist.** `apps/mobile/src/shared/ui/OfflineNotice.tsx` is new, and `alertsShowingCachedPage()` in `apps/mobile/src/shared/api/alerts.ts` is the **one rule** both feed screens render it from — and it needs **both** halves (the query is in error **and** a cached page with rows exists), so a cold start with no network shows the empty state rather than an offline notice over nothing. The feed never blanks. **(3) The rendering tests.** `alertCard.test.ts` (25), `offlineNotice.test.ts` (15) and `pulseDot.test.ts` (12). **The two defects:** the **area line rendered blank** — the database holds `"thana": null` on degraded captures, the client boundary normalises a null level to `''`, and the old `??` chain stopped there (an empty string is not nullish); the rule now lives in **one** function, `formatAreaHierarchy()`, used by four surfaces. And the **pulsing dot did not pulse** — `PulseDot.tsx` rendered a static halo while its own comment claimed *"the pulse is a React Native `Animated` loop"*; it now runs a real `Animated.loop` over the prototype's 1.5 s period, and when paused it **stops the animation outright** and renders no halo (a still-pulsing dot says the feed is still refreshing, falsely). Six **causal checks** confirm each guard fires. The honest residue is recorded in the story file: the Bangla half of the area line is **server-side only** (`area_lookup` is not in the public projection), and the **screenshot comparison** the Testing note asks for needs a device harness this repo does not have. | [018] story 001 |
 
 ### 4.7 Moderation — unit `007-moderation`
 
@@ -1417,8 +1428,15 @@ shipped behaviour, or retire it as superseded.
        microsecond too narrow, and the job worklists were callable by
        `anon` and `authenticated` (migration 036 fixes both).
     5. The remaining `partial` stories, one at a time, each against its own
-       `## Implementation` section. The next-cheapest unit is
-       `006-alerts` (four stories, three of them missing tests).
+       `## Implementation` section. ~~**`001-alerts-feed-list`**~~ ✅
+       **DONE** — see §4.6 A4. The uncategorized placeholder, the offline
+       indication and the rendering tests all landed, and the work found
+       **two real defects** on the way (the blank area line, the static
+       pulsing dot). The next-cheapest unit is `006-alerts` (**three**
+       stories left: `002-auto-refresh-and-pull-to-refresh`,
+       `003-area-filter-chips` and `004-flag-an-alert`), and after that
+       `004-capture` (four) and `003-help-seek` (two, plus the one
+       genuinely unbuilt story).
     6. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
        stories. It has no route, no component and no action.
 17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`

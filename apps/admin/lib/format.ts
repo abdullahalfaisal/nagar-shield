@@ -71,11 +71,22 @@ export function formatAreaLine(
 ): string {
   if (!area) return '—'
 
-  const english = area.neighborhood ?? area.thana ?? area.city ?? area.division ?? null
-  if (!english) return '—'
+  // A level that is **absent** is skipped, not rendered empty. The client
+  // boundary normalises a null level to the empty string, and an empty string
+  // is not nullish — so a plain `??` chain would stop there and render a
+  // blank area line.
+  const level = (value: string | null | undefined): string | undefined => {
+    const trimmed = typeof value === 'string' ? value.trim() : ''
+    return trimmed.length > 0 ? trimmed : undefined
+  }
+
+  const named =
+    level(area.neighborhood) ?? level(area.thana) ?? level(area.city) ?? level(area.division)
+
+  if (!named) return '—'
 
   // The curated dataset is Bangla-first; the mobile card shows one line.
-  return english
+  return named
 }
 
 /** The category label, or the neutral placeholder when it is null. */

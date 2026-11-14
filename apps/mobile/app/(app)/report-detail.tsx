@@ -21,6 +21,7 @@ import { useTheme } from '@/shared/theme'
 import { AppBar } from '@/shared/ui/AppBar'
 import { BottomSheet } from '@/shared/ui/BottomSheet'
 import { Icon } from '@/shared/ui/Icon'
+import { formatAreaHierarchy } from '@/shared/ui/AlertCard'
 import { useAuthSession } from '@/shared/auth/useAuthSession'
 import {
   signMediaUrl,
@@ -121,13 +122,11 @@ export default function ReportDetailScreen() {
   const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
   const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
+  // The area line is the **card's** rule, not a second copy of it — the same
+  // place, named the same way, on both surfaces.
   const areaLine = useMemo(() => {
-    const area = report?.areaHierarchy
-    if (!area) return null
-    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division
-    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division
-    if (!english) return null
-    return english === bangla ? english : `${english} · ${bangla}`
+    if (!report) return null
+    return formatAreaHierarchy(report.areaHierarchy)
   }, [report])
 
   const capturedAt = report ? formatRelativeTimeForLocale(report.capturedAt, i18n.language) : ''

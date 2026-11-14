@@ -8,11 +8,12 @@ import {
   AlertCard,
   AreaChipRow,
   EmptyState,
+  OfflineNotice,
   QuickActionGrid,
   SectionTitle,
 } from '@/shared/ui'
 import type { AreaChip } from '@/shared/ui/AreaChipRow'
-import { alertsItems, useAlerts } from '@/shared/api/alerts'
+import { alertsItems, alertsShowingCachedPage, useAlerts } from '@/shared/api/alerts'
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 import { Icon } from '@/shared/ui/Icon'
 import { Screen } from '@/shared/ui/Screen'
@@ -40,11 +41,15 @@ export default function HomeScreen() {
 
   const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null })
 
-  const { data, isLoading } = useAlerts(chip.value ?? {})
+  const { data, isError, isLoading } = useAlerts(chip.value ?? {})
 
   // The feed is cursor-paginated, so the rows are **every loaded page**
   // flattened — not the first page alone.
   const items = alertsItems(data)
+
+  // The offline case — the last request failed and a cached page survives.
+  // The feed block shows the last results and says so; it never blanks.
+  const showingCachedPage = alertsShowingCachedPage({ isError, data })
 
   const chips: AreaChip[] = [
     { id: 'all', label: 'All BD', value: null },
@@ -146,6 +151,10 @@ export default function HomeScreen() {
       </View>
 
       <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
+
+      {/* The offline case. The rows below are the cached page — the feed
+          block never blanks. */}
+      {showingCachedPage ? <OfflineNotice /> : null}
 
       {isLoading ? (
         <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>

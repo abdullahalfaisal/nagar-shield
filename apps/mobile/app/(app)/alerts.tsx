@@ -8,11 +8,12 @@ import {
   AreaChipRow,
   EmptyState,
   FlagSheet,
+  OfflineNotice,
   PulseDot,
   Screen,
   type AreaChip,
 } from '@/shared/ui'
-import { alertsItems, useAlerts } from '@/shared/api/alerts'
+import { alertsItems, alertsShowingCachedPage, useAlerts } from '@/shared/api/alerts'
 import { useRefreshGuard } from '@/shared/services/refreshGuard'
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
@@ -42,14 +43,26 @@ export default function AlertsScreen() {
 
   // The polling interval is the shared 60 s, and it only runs while the guard
   // says the refresh may run.
-  const { data, isLoading, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useAlerts(chip.value ?? {}, {
-      enabled: !guard.isPaused,
-    })
+  const {
+    data,
+    isError,
+    isLoading,
+    isRefetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAlerts(chip.value ?? {}, {
+    enabled: !guard.isPaused,
+  })
 
   // The feed is cursor-paginated, so the rows are **every loaded page**
   // flattened — not the first page alone.
   const items = alertsItems(data)
+
+  // The offline case: the last request failed **and** there is a cached page
+  // to show. The feed never blanks — it shows the last results and says so.
+  const showingCachedPage = alertsShowingCachedPage({ isError: isError, data })
 
   const chips: AreaChip[] = useMemo(
     () => [
@@ -98,6 +111,10 @@ export default function AlertsScreen() {
 
         {/* The area chip row — exactly one. */}
         <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
+
+        {/* The offline case. The list below is the cached page — the feed
+            never blanks. */}
+        {showingCachedPage ? <OfflineNotice /> : null}
 
         {isLoading ? (
           <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>

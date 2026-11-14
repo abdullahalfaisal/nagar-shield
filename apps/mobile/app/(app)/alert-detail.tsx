@@ -8,7 +8,7 @@ import {
   REPORT_CATEGORY_LABELS,
 } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { AppBar, Button, EmptyState, FlagSheet, Icon } from '@/shared/ui'
+import { AppBar, Button, EmptyState, FlagSheet, Icon, formatAreaHierarchy } from '@/shared/ui'
 import { signAlertMediaUrls, usePublicAlertDetail } from '@/shared/api/alertDetail'
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
@@ -85,13 +85,12 @@ export default function AlertDetailScreen() {
   const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
   const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
+  // The area line is the **card's** rule, not a second copy of it: the detail
+  // surface is behind the card's detail link, so the two must name the same
+  // place the same way — including the fallback when a level is absent.
   const areaLine = useMemo(() => {
-    const area = alert?.areaHierarchy
-    if (!area) return null
-    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division
-    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division
-    if (!english) return null
-    return english === bangla ? english : `${english} · ${bangla}`
+    if (!alert) return null
+    return formatAreaHierarchy(alert.areaHierarchy)
   }, [alert])
 
   const relativeTime = alert ? formatRelativeTimeForLocale(alert.capturedAt, i18n.language) : ''

@@ -19,6 +19,7 @@ import {
   MapViewLink,
   Screen,
   SegmentedTabs,
+  formatAreaHierarchy,
 } from '@/shared/ui'
 import { countByCategory, useHistory } from '@/shared/api/history'
 import { resolveOrigin, useCurrentFix } from '@/shared/services/location'
@@ -340,12 +341,8 @@ function HistoryList({
             ? REPORT_CATEGORY_ACCENTS[report.category]
             : theme.colors.ink[400]
 
-          const area =
-            report.areaHierarchy?.neighborhood ??
-            report.areaHierarchy?.thana ??
-            report.areaHierarchy?.city ??
-            report.areaHierarchy?.division ??
-            ''
+          // The area line is the **card's** rule, not a fourth copy of it.
+          const area = formatAreaHierarchy(report.areaHierarchy)
 
           const distance =
             report.distanceM !== null

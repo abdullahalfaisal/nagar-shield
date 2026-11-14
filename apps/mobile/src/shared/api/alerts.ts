@@ -147,3 +147,29 @@ export function alertsItems(data: AlertsFeedData | undefined): PublicReport[] {
   if (!data) return []
   return data.pages.flatMap((page) => page.items)
 }
+
+/**
+ * Whether the feed is showing **cached** results because the last request
+ * failed.
+ *
+ * The story's promise is *"the offline behaviour is a cached page, not an empty
+ * screen"*: the feed renders the last cached page with an offline indication
+ * and never blanks the list. That needs **both** halves:
+ *
+ *   * the query is in an error state — the last request failed; and
+ *   * a cached page exists — there is something to show.
+ *
+ * The second half is what stops the app claiming it is showing "the last
+ * results" on a cold start with no network and no cache. There, the feed is
+ * genuinely empty and the honest surface is the empty state, not an offline
+ * notice over nothing.
+ *
+ * The rule lives here, next to `alertsItems`, so the two feed screens cannot
+ * disagree about what "offline" means.
+ */
+export function alertsShowingCachedPage(
+  query: Pick<UseInfiniteQueryResult<AlertsFeedData, Error>, 'isError' | 'data'>,
+): boolean {
+  if (!query.isError) return false
+  return alertsItems(query.data).length > 0
+}

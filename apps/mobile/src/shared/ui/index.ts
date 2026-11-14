@@ -1,5 +1,12 @@
 export { AppBar } from './AppBar'
-export { AlertCard, formatArea, withAlpha } from './AlertCard'
+export {
+  AlertCard,
+  alertAccent,
+  alertCategoryLabel,
+  formatArea,
+  formatAreaHierarchy,
+  withAlpha,
+} from './AlertCard'
 export { AreaChipRow, type AreaChip } from './AreaChipRow'
 export { BottomSheet } from './BottomSheet'
 export { Brand } from './Brand'
@@ -22,6 +29,7 @@ export { ListRowGroup, CountRow, MapViewLink } from './ListRowGroup'
 export { LocationPill } from './LocationPill'
 export { ManualDialGuidance } from './ManualDialGuidance'
 export { MoreHelpSheet } from './MoreHelpSheet'
+export { OfflineNotice } from './OfflineNotice'
 export { PermissionRow } from './PermissionRow'
 export { PulseDot } from './PulseDot'
 export { RadioGroup, RadioRow, ChoiceChip, CheckRow, type RadioReason } from './RadioGroup'
