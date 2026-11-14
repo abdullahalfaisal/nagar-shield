@@ -1,5 +1,5 @@
-import { createBrowserClient } from '@supabase/ssr';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * The browser-side Supabase client.
@@ -21,19 +21,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * prerenders every route and the env vars are absent on the build machine.
  */
 function getSupabaseConfig(): { url: string; anonKey: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
   if (!url || !anonKey) {
     throw new Error(
       'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
-    );
+    )
   }
 
-  return { url, anonKey };
+  return { url, anonKey }
 }
 
-let browserClient: SupabaseClient | undefined;
+let browserClient: SupabaseClient | undefined
 
 /**
  * The browser client is created once per page load.
@@ -44,8 +44,8 @@ let browserClient: SupabaseClient | undefined;
  */
 export function getBrowserClient(): SupabaseClient {
   if (!browserClient) {
-    const { url, anonKey } = getSupabaseConfig();
-    browserClient = createBrowserClient(url, anonKey);
+    const { url, anonKey } = getSupabaseConfig()
+    browserClient = createBrowserClient(url, anonKey)
   }
-  return browserClient;
+  return browserClient
 }

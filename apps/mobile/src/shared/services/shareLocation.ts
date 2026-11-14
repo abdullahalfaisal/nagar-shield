@@ -1,17 +1,17 @@
-import type { EmergencyContact } from '@nagar-shield/shared';
+import type { EmergencyContact } from '@nagar-shield/shared'
 import {
   resolveAppUserContactIds,
   writeLocationShare,
   type SharePosition,
-} from '@/shared/api/locationShares';
-import { fireOsShare } from '@/shared/services/osShare';
+} from '@/shared/api/locationShares'
+import { fireOsShare } from '@/shared/services/osShare'
 import {
   buildPayloadWithoutLocation,
   buildSnapshotPayload,
   type ShareChannel,
   type SnapshotPayload,
-} from '@/shared/services/snapshotPayload';
-import { recordShareIntent } from '@/shared/services/shareTelemetry';
+} from '@/shared/services/snapshotPayload'
+import { recordShareIntent } from '@/shared/services/shareTelemetry'
 
 /**
  * The Location Sharing fan-out.
@@ -57,24 +57,24 @@ export type RecipientOutcome =
   /** The OS could not present the sheet. Nothing was sent. */
   | { contactId: string; channel: 'os_share_sheet'; status: 'failed' }
   /** The in-app row could not be saved. The snapshot was not recorded. */
-  | { contactId: string; channel: 'app'; status: 'failed' };
+  | { contactId: string; channel: 'app'; status: 'failed' }
 
 /** The fan-out's result. */
 export interface ShareResult {
   /** One entry per recipient, in the order they were processed. */
-  outcomes: RecipientOutcome[];
+  outcomes: RecipientOutcome[]
   /** How many recipients received a snapshot, by channel. */
-  shared: { app: number; os_share_sheet: number };
+  shared: { app: number; os_share_sheet: number }
   /** How many recipients did not, by channel. */
-  failed: { app: number; os_share_sheet: number };
+  failed: { app: number; os_share_sheet: number }
   /** The elapsed milliseconds from the confirm tap to the intent firing. */
-  elapsedMs: number;
+  elapsedMs: number
 }
 
 /** The input to the fan-out. */
 export interface ShareLocationInput {
   /** The recipients, already filtered to the user's explicit selection. */
-  recipients: EmergencyContact[];
+  recipients: EmergencyContact[]
   /**
    * The position, or `null` for a "share without location" share.
    *
@@ -82,13 +82,13 @@ export interface ShareLocationInput {
    * timestamp and a note that the location is unavailable, and the audit
    * row writes a **null** position rather than a zeroed one.
    */
-  position: SharePosition | null;
+  position: SharePosition | null
   /** The note that says the location is unavailable. */
-  withoutLocationNote: string;
+  withoutLocationNote: string
   /** The epoch millisecond of the user's confirm tap. */
-  startedAt: number;
+  startedAt: number
   /** The active locale, for the human-readable timestamp. */
-  locale?: string;
+  locale?: string
 }
 
 /**
@@ -105,11 +105,11 @@ export function selectPrimaryRecipients(
   contacts: EmergencyContact[],
   deselectedIds: string[] = [],
 ): EmergencyContact[] {
-  const deselected = new Set(deselectedIds);
+  const deselected = new Set(deselectedIds)
 
   return contacts
     .filter((contact) => contact.isPrimary && !deselected.has(contact.id))
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 /**
@@ -122,9 +122,9 @@ export function selectExplicitRecipients(
   contacts: EmergencyContact[],
   selectedIds: string[],
 ): EmergencyContact[] {
-  const selected = new Set(selectedIds);
+  const selected = new Set(selectedIds)
 
-  return contacts.filter((contact) => selected.has(contact.id));
+  return contacts.filter((contact) => selected.has(contact.id))
 }
 
 /**
@@ -137,26 +137,26 @@ export function selectExplicitRecipients(
 export async function shareLocation(input: ShareLocationInput): Promise<ShareResult> {
   // De-duplicate by contact id. A contact that is both checked manually and
   // reached by the toggle must receive exactly one snapshot.
-  const seen = new Set<string>();
+  const seen = new Set<string>()
   const recipients = input.recipients.filter((contact) => {
-    if (seen.has(contact.id)) return false;
-    seen.add(contact.id);
-    return true;
-  });
+    if (seen.has(contact.id)) return false
+    seen.add(contact.id)
+    return true
+  })
 
-  const outcomes: RecipientOutcome[] = [];
+  const outcomes: RecipientOutcome[] = []
 
   if (recipients.length === 0) {
     // Nothing to share with. No row is written and no sheet is fired, but
     // the caller still gets a result — the screen says there is nobody to
     // share with, and the clock is closed honestly.
-    const elapsedMs = Math.max(0, Math.round(Date.now() - input.startedAt));
+    const elapsedMs = Math.max(0, Math.round(Date.now() - input.startedAt))
     return {
       outcomes,
       shared: { app: 0, os_share_sheet: 0 },
       failed: { app: 0, os_share_sheet: 0 },
       elapsedMs,
-    };
+    }
   }
 
   // The payload is built **once** for the whole fan-out.
@@ -172,20 +172,20 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
         capturedAt: new Date().toISOString(),
         locale: input.locale,
         note: input.withoutLocationNote,
-      });
+      })
 
   // The audit position: a null position for a share without a location.
-  const auditPosition: SharePosition = input.position ?? { lat: null, lng: null, accuracyM: null };
+  const auditPosition: SharePosition = input.position ?? { lat: null, lng: null, accuracyM: null }
 
   // Which recipients are app users. A failed lookup answers "none
   // confirmed", and every recipient then goes down the OS path — the
   // direction that claims nothing and needs no network.
   const appContactIds = new Set(
     await resolveAppUserContactIds(recipients.map((contact) => contact.id)),
-  );
+  )
 
   for (const contact of recipients) {
-    const isAppUser = appContactIds.has(contact.id);
+    const isAppUser = appContactIds.has(contact.id)
 
     if (isAppUser) {
       try {
@@ -193,25 +193,25 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
           recipientContactId: contact.id,
           position: auditPosition,
           channel: 'app',
-        });
-        outcomes.push({ contactId: contact.id, channel: 'app', status: 'shared' });
+        })
+        outcomes.push({ contactId: contact.id, channel: 'app', status: 'shared' })
       } catch {
         // The in-app record could not be saved. The snapshot was **not**
         // recorded — and no receipt is fabricated for this recipient.
-        outcomes.push({ contactId: contact.id, channel: 'app', status: 'failed' });
+        outcomes.push({ contactId: contact.id, channel: 'app', status: 'failed' })
       }
-      continue;
+      continue
     }
 
     // The OS share path. The sheet is fired **once** per non-app recipient.
-    const outcome = await fireOsShare(payload.message);
+    const outcome = await fireOsShare(payload.message)
 
     if (outcome.status === 'dismissed') {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'dismissed' });
+      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'dismissed' })
     } else if (outcome.status === 'unavailable') {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'failed' });
+      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'failed' })
     } else {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'shared' });
+      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'shared' })
     }
 
     // The audit row for an OS share-sheet recipient carries **no** contact
@@ -222,7 +222,7 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
         recipientContactId: null,
         position: auditPosition,
         channel: 'os_share_sheet',
-      });
+      })
     } catch {
       // The audit row is best-effort. The share itself already happened, and
       // a failed record must not turn a sent snapshot into a "not sent".
@@ -231,15 +231,15 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
 
   // The SLA clock closes when the last intent fired. The metric measures
   // **our** work only — never carrier delivery, never recipient open time.
-  const finishedAt = Date.now();
-  const elapsedMs = Math.max(0, Math.round(finishedAt - input.startedAt));
+  const finishedAt = Date.now()
+  const elapsedMs = Math.max(0, Math.round(finishedAt - input.startedAt))
 
   await recordShareIntent({
     startedAt: input.startedAt,
     finishedAt,
     channel: dominantChannel(outcomes),
     recipientCount: outcomes.length,
-  });
+  })
 
   return {
     outcomes,
@@ -252,7 +252,7 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
       os_share_sheet: countStatus(outcomes, 'os_share_sheet', 'failed'),
     },
     elapsedMs,
-  };
+  }
 }
 
 /**
@@ -263,7 +263,7 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
  * the **first** thing the share did, not a claim about the others.
  */
 function dominantChannel(outcomes: RecipientOutcome[]): ShareChannel {
-  return outcomes.some((outcome) => outcome.channel === 'app') ? 'app' : 'os_share_sheet';
+  return outcomes.some((outcome) => outcome.channel === 'app') ? 'app' : 'os_share_sheet'
 }
 
 /** Counts the outcomes with a given channel and status. */
@@ -272,7 +272,6 @@ function countStatus(
   channel: 'app' | 'os_share_sheet',
   status: 'shared' | 'failed',
 ): number {
-  return outcomes.filter(
-    (outcome) => outcome.channel === channel && outcome.status === status,
-  ).length;
+  return outcomes.filter((outcome) => outcome.channel === channel && outcome.status === status)
+    .length
 }

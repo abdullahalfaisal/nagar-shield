@@ -1,4 +1,4 @@
-import type { TranslationSchema } from './bn';
+import type { TranslationSchema } from './bn'
 
 /**
  * English strings. `bn` is the source of truth for the key set — this file is
@@ -55,12 +55,12 @@ export const en: TranslationSchema = {
     phoneLabel: 'Mobile number',
     phonePlaceholder: '01712345678',
     alternatePhoneTitle: 'Alternative number',
-    alternatePhoneSubtitle:
-      'Add a family member’s number so they can be reached in an emergency.',
+    alternatePhoneSubtitle: 'Add a family member’s number so they can be reached in an emergency.',
     alternatePhoneLabel: 'Alternative mobile number',
     alternatePhoneMustDiffer: 'Must be different from your primary number.',
     alternatePhoneOptional: 'An alternative number is optional — you can continue without one.',
-    alternatePhoneNotSaved: 'Your account was created, but the alternative number could not be saved.',
+    alternatePhoneNotSaved:
+      'Your account was created, but the alternative number could not be saved.',
     sendOtp: 'Send code',
     stepOf: 'Step {{current}} of {{total}}',
     loginTitle: 'Sign in',
@@ -403,7 +403,8 @@ export const en: TranslationSchema = {
     // fault, not a user error — the copy says so plainly, and it does not
     // blame the person holding the phone.
     title: 'App not set up correctly',
-    message: 'This build is missing its server settings, so it cannot reach the service. Please update the app.',
+    message:
+      'This build is missing its server settings, so it cannot reach the service. Please update the app.',
     detail: 'If you keep seeing this, the app needs to be reinstalled or updated.',
   },
   disabled: {
@@ -412,7 +413,8 @@ export const en: TranslationSchema = {
     // embeds the moderator's reason, the disabling timestamp, or any
     // identifier — and it points the user at the support path.
     message: 'Your account has been disabled. Contact support.',
-    subtitle: 'This account has been disabled, so it can no longer send reports or share your location.',
+    subtitle:
+      'This account has been disabled, so it can no longer send reports or share your location.',
     whatYouCanDo: 'What you can still do',
     deleteTitle: 'Delete your account',
     deleteBody: 'Your data is kept for 30 days, then permanently deleted.',
@@ -449,7 +451,8 @@ export const en: TranslationSchema = {
     deleteBody:
       'Deleting your account signs you out. Sign in again within 30 days and it comes back — after that it is permanently deleted.',
     deleteConfirm: 'Delete it',
-    discardQueueWarning: '{{count}} unsent report(s) were saved on this phone. Signing out discards them.',
+    discardQueueWarning:
+      '{{count}} unsent report(s) were saved on this phone. Signing out discards them.',
     version: 'Version',
   },
   permissions: {
@@ -540,8 +543,7 @@ export const en: TranslationSchema = {
     step3Eyebrow: 'Setup · 4 steps',
     step3Title: 'One more contact',
     step3Highlight: 'contact',
-    step3Subtitle:
-      'After this, location permission is the last step before Nagar Shield opens up.',
+    step3Subtitle: 'After this, location permission is the last step before Nagar Shield opens up.',
     nameLabel: 'Contact name',
     phoneLabel: 'Their mobile (01XXXXXXXXX)',
     slotTitle: 'Contact {{number}}',
@@ -550,8 +552,7 @@ export const en: TranslationSchema = {
     saveCta: 'Save & continue',
     continueToLocation: 'Continue to location',
     allSavedTitle: 'All three saved.',
-    allSavedBody:
-      'You can edit or add more contacts any time from Settings → Safety Profile.',
+    allSavedBody: 'You can edit or add more contacts any time from Settings → Safety Profile.',
     savedBadge: 'Saved',
   },
   wizardLocation: {
@@ -597,4 +598,4 @@ export const en: TranslationSchema = {
     detectionUnavailable:
       'This phone does not tell the app whether battery saver is on. If the dialler does not open, dial the number yourself.',
   },
-};
+}

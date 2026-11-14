@@ -1,13 +1,13 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
-export type RadioReason = 'misinformation' | 'harassment' | 'duplicate' | 'off_topic' | 'other';
+export type RadioReason = 'misinformation' | 'harassment' | 'duplicate' | 'off_topic' | 'other'
 
 interface RadioRowProps {
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
+  label: string
+  selected: boolean
+  onSelect: () => void
 }
 
 /**
@@ -17,7 +17,7 @@ interface RadioRowProps {
  * 48 dp so the whole row is reachable (FR-UX-4).
  */
 export function RadioRow({ label, selected, onSelect }: RadioRowProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <Pressable
@@ -41,7 +41,7 @@ export function RadioRow({ label, selected, onSelect }: RadioRowProps) {
       </View>
       <Text style={[styles.label, { color: theme.colors.ink[950] }]}>{label}</Text>
     </Pressable>
-  );
+  )
 }
 
 /** The vertical radio group used by the flag sheet and the history filters. */
@@ -50,9 +50,9 @@ export function RadioGroup({
   selectedId,
   onSelect,
 }: {
-  options: Array<{ id: string; label: string }>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  options: Array<{ id: string; label: string }>
+  selectedId: string | null
+  onSelect: (id: string) => void
 }) {
   return (
     <View style={styles.group}>
@@ -65,7 +65,7 @@ export function RadioGroup({
         />
       ))}
     </View>
-  );
+  )
 }
 
 /** A compact choice chip used for the History radius / window filters. */
@@ -74,11 +74,11 @@ export function ChoiceChip({
   selected,
   onPress,
 }: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
+  label: string
+  selected: boolean
+  onPress: () => void
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <Pressable
@@ -104,7 +104,7 @@ export function ChoiceChip({
         {label}
       </Text>
     </Pressable>
-  );
+  )
 }
 
 /** A tappable row with a trailing check mark — the "All categories" reset. */
@@ -113,11 +113,11 @@ export function CheckRow({
   selected,
   onPress,
 }: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
+  label: string
+  selected: boolean
+  onPress: () => void
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <Pressable
@@ -130,7 +130,7 @@ export function CheckRow({
       <Text style={[styles.label, { color: theme.colors.ink[950] }]}>{label}</Text>
       {selected ? <Icon name="check" size={18} color={theme.palette.violet[600]} /> : null}
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -176,4 +176,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-});
+})

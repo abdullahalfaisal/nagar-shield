@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 /**
  * The exported type surface.
@@ -20,13 +20,13 @@ import { join } from 'node:path';
  * stale artefact.
  */
 
-const PACKAGE_ROOT = join(__dirname, '..');
+const PACKAGE_ROOT = join(__dirname, '..')
 
 describe('the exported type surface', () => {
-  let declarationDir: string;
+  let declarationDir: string
 
   beforeAll(() => {
-    declarationDir = mkdtempSync(join(tmpdir(), 'nagar-shield-dts-'));
+    declarationDir = mkdtempSync(join(tmpdir(), 'nagar-shield-dts-'))
 
     try {
       execFileSync(
@@ -47,47 +47,47 @@ describe('the exported type surface', () => {
           declarationDir,
         ],
         { cwd: PACKAGE_ROOT, stdio: 'pipe' },
-      );
+      )
     } catch (error) {
       // The compiler's diagnostics are the whole point of the failure, and
       // `stdio: 'pipe'` buries them. `tsc` writes its diagnostics to
       // **stdout**, not stderr, so both streams are read.
-      const failure = error as { stdout?: Buffer; stderr?: Buffer };
-      const output = `${failure.stdout?.toString() ?? ''}${failure.stderr?.toString() ?? ''}`;
-      throw new Error(`The declaration build failed:\n${output}`);
+      const failure = error as { stdout?: Buffer; stderr?: Buffer }
+      const output = `${failure.stdout?.toString() ?? ''}${failure.stderr?.toString() ?? ''}`
+      throw new Error(`The declaration build failed:\n${output}`)
     }
-  }, 120_000);
+  }, 120_000)
 
   afterAll(() => {
-    rmSync(declarationDir, { recursive: true, force: true });
-  });
+    rmSync(declarationDir, { recursive: true, force: true })
+  })
 
   /** Every `.d.ts` the build produced. */
   const declarationFiles = (): string[] => {
-    const found: string[] = [];
+    const found: string[] = []
 
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) walk(full);
-        else if (entry.name.endsWith('.d.ts')) found.push(full);
+        const full = join(dir, entry.name)
+        if (entry.isDirectory()) walk(full)
+        else if (entry.name.endsWith('.d.ts')) found.push(full)
       }
-    };
+    }
 
-    walk(declarationDir);
-    return found;
-  };
+    walk(declarationDir)
+    return found
+  }
 
   it('emits declarations', () => {
     // A build that produced nothing would make every check below vacuous.
-    expect(declarationFiles().length).toBeGreaterThan(0);
-  });
+    expect(declarationFiles().length).toBeGreaterThan(0)
+  })
 
   it('contains no `any` in any exported type', () => {
-    const offenders: string[] = [];
+    const offenders: string[] = []
 
     for (const file of declarationFiles()) {
-      const text = readFileSync(file, 'utf8');
+      const text = readFileSync(file, 'utf8')
 
       // The comments are stripped first. `tsc` copies doc comments into the
       // emitted declarations, and the prose uses the English word "any" —
@@ -95,21 +95,21 @@ describe('the exported type surface', () => {
       // that does not strip comments matches the prose and reports a type
       // that is not there. The criterion is about the *type* `any`, so only
       // the code is scanned.
-      const code = stripComments(text);
+      const code = stripComments(text)
 
       // The type `any` in a declaration position: `any`, `<any>`, `: any`,
       // `Array<any>`, `readonly any[]`. A *reference* to a type whose name
       // merely contains "any" (say, `Many`) is not a match, so the word
       // boundary is required on both sides.
-      const matches = code.match(/\bany\b/g);
+      const matches = code.match(/\bany\b/g)
 
       if (matches) {
-        offenders.push(`${file.slice(declarationDir.length + 1)}: ${matches.length} occurrence(s)`);
+        offenders.push(`${file.slice(declarationDir.length + 1)}: ${matches.length} occurrence(s)`)
       }
     }
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('contains no `as unknown as` narrowing shortcut', () => {
     // **This one scans the source, not the declarations** — and that is not
@@ -127,56 +127,57 @@ describe('the exported type surface', () => {
     // `unknown`-to-`any` casts, and no `as` narrowing shortcuts in the
     // exported surface — `unknown` plus narrowing is the required pattern."
     // The cast is a *source-level* shortcut, so the source is where it lives.
-    const offenders: string[] = [];
+    const offenders: string[] = []
 
     for (const file of sourceFiles()) {
-      const code = stripComments(readFileSync(file, 'utf8'));
+      const code = stripComments(readFileSync(file, 'utf8'))
       if (code.includes('as unknown as')) {
-        offenders.push(file.slice(PACKAGE_ROOT.length + 1));
+        offenders.push(file.slice(PACKAGE_ROOT.length + 1))
       }
     }
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('proves the `as unknown as` scan can fail', () => {
     // The check on the check. If the scan could not fire, this would pass
     // with the pattern present — so this test asserts it *does* fire on a
     // snippet carrying the pattern, and does not fire on one that does not.
-    const offender = 'export const x = (v: unknown) => v as unknown as string;\n';
-    const clean = 'export const x = (v: unknown): string => {\n  if (typeof v === "string") return v;\n  return "";\n};\n';
+    const offender = 'export const x = (v: unknown) => v as unknown as string;\n'
+    const clean =
+      'export const x = (v: unknown): string => {\n  if (typeof v === "string") return v;\n  return "";\n};\n'
 
-    expect(stripComments(offender)).toContain('as unknown as');
-    expect(stripComments(clean)).not.toContain('as unknown as');
-  });
+    expect(stripComments(offender)).toContain('as unknown as')
+    expect(stripComments(clean)).not.toContain('as unknown as')
+  })
 
   it('scans the type surface, not the prose around it', () => {
     // The scan above strips comments. This is the check on the stripper: a
     // declaration whose only "any" is English prose must not be an offender,
     // and a declaration whose `any` is a real type must be. Without this the
     // scan could silently degrade into "never reports anything".
-    const prose = '/** no author identity of any kind */\nexport declare const x: string;\n';
-    const real = 'export declare const x: any;\n';
+    const prose = '/** no author identity of any kind */\nexport declare const x: string;\n'
+    const real = 'export declare const x: any;\n'
 
-    expect(stripComments(prose)).not.toMatch(/\bany\b/);
-    expect(stripComments(real)).toMatch(/\bany\b/);
-  });
-});
+    expect(stripComments(prose)).not.toMatch(/\bany\b/)
+    expect(stripComments(real)).toMatch(/\bany\b/)
+  })
+})
 
 /** Every source file in the package, excluding the tests themselves. */
 function sourceFiles(): string[] {
-  const found: string[] = [];
+  const found: string[] = []
 
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) found.push(full);
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) found.push(full)
     }
-  };
+  }
 
-  walk(join(PACKAGE_ROOT, 'src'));
-  return found;
+  walk(join(PACKAGE_ROOT, 'src'))
+  return found
 }
 
 /**
@@ -189,5 +190,5 @@ function sourceFiles(): string[] {
  * on its own line.
  */
 function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (comment) => ' '.repeat(comment.length));
+  return source.replace(/\/\*[\s\S]*?\*\//g, (comment) => ' '.repeat(comment.length))
 }

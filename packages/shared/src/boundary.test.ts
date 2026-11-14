@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 
 /**
  * The shared-contracts boundary.
@@ -23,11 +23,11 @@ import { join, relative, sep } from 'node:path';
  * only one app's suite runs would leave the other unguarded.
  */
 
-const REPO_ROOT = join(__dirname, '..', '..', '..');
-const APP_ROOTS = [join(REPO_ROOT, 'apps', 'mobile'), join(REPO_ROOT, 'apps', 'admin')];
+const REPO_ROOT = join(__dirname, '..', '..', '..')
+const APP_ROOTS = [join(REPO_ROOT, 'apps', 'mobile'), join(REPO_ROOT, 'apps', 'admin')]
 
 /** The directories that hold source. Everything else is build output. */
-const SOURCE_DIRS = ['app', 'src', 'lib', 'components'];
+const SOURCE_DIRS = ['app', 'src', 'lib', 'components']
 
 /** Files that are build output or vendored, not source. */
 const IGNORED_DIRS = new Set([
@@ -40,9 +40,9 @@ const IGNORED_DIRS = new Set([
   '.turbo',
   'android',
   'ios',
-]);
+])
 
-const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs'];
+const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs']
 
 /**
  * Strips comments and string literals from a source file.
@@ -57,96 +57,96 @@ const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs'];
  * *unmatchable* by the patterns below.
  */
 function stripCommentsAndStrings(source: string): string {
-  let out = '';
-  let i = 0;
+  let out = ''
+  let i = 0
 
   while (i < source.length) {
-    const two = source.slice(i, i + 2);
+    const two = source.slice(i, i + 2)
 
     if (two === '//') {
-      while (i < source.length && source[i] !== '\n') i += 1;
-      continue;
+      while (i < source.length && source[i] !== '\n') i += 1
+      continue
     }
 
     if (two === '/*') {
-      i += 2;
-      while (i < source.length && source.slice(i, i + 2) !== '*/') i += 1;
-      i += 2;
-      out += ' ';
-      continue;
+      i += 2
+      while (i < source.length && source.slice(i, i + 2) !== '*/') i += 1
+      i += 2
+      out += ' '
+      continue
     }
 
-    const char = source[i];
+    const char = source[i]
     if (char === "'" || char === '"' || char === '`') {
-      const quote = char;
-      i += 1;
+      const quote = char
+      i += 1
       while (i < source.length) {
         if (source[i] === '\\') {
-          i += 2;
-          continue;
+          i += 2
+          continue
         }
         if (source[i] === quote) {
-          i += 1;
-          break;
+          i += 1
+          break
         }
         // A template literal's `${…}` can hold real code. Blanking the whole
         // template would hide a schema inside one, so the substitution is
         // kept and only the literal text around it is removed.
         if (quote === '`' && source[i] === '$' && source[i + 1] === '{') {
-          let depth = 1;
-          i += 2;
+          let depth = 1
+          i += 2
           while (i < source.length && depth > 0) {
-            if (source[i] === '{') depth += 1;
-            if (source[i] === '}') depth -= 1;
-            i += 1;
+            if (source[i] === '{') depth += 1
+            if (source[i] === '}') depth -= 1
+            i += 1
           }
-          out += ' ';
-          continue;
+          out += ' '
+          continue
         }
-        i += 1;
+        i += 1
       }
-      out += ' ';
-      continue;
+      out += ' '
+      continue
     }
 
-    out += char;
-    i += 1;
+    out += char
+    i += 1
   }
 
-  return out;
+  return out
 }
 
 /** Every source file under a directory, as absolute paths. */
 function sourceFiles(root: string): string[] {
-  const found: string[] = [];
+  const found: string[] = []
 
   const walk = (dir: string): void => {
-    let entries: string[];
+    let entries: string[]
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir)
     } catch {
-      return; // a directory that does not exist is not a failure
+      return // a directory that does not exist is not a failure
     }
 
     for (const entry of entries) {
-      if (IGNORED_DIRS.has(entry)) continue;
-      const full = join(dir, entry);
-      let stats;
+      if (IGNORED_DIRS.has(entry)) continue
+      const full = join(dir, entry)
+      let stats
       try {
-        stats = statSync(full);
+        stats = statSync(full)
       } catch {
-        continue;
+        continue
       }
       if (stats.isDirectory()) {
-        walk(full);
+        walk(full)
       } else if (SOURCE_EXTENSIONS.some((ext) => entry.endsWith(ext))) {
-        found.push(full);
+        found.push(full)
       }
     }
-  };
+  }
 
-  walk(root);
-  return found;
+  walk(root)
+  return found
 }
 
 /**
@@ -274,7 +274,7 @@ const SHARED_NAMES = [
 
   // Jobs — `packages/shared/src/jobs/`
   'TOMBSTONE_PREFIX',
-];
+]
 
 /**
  * A local `const NAME = …` or `function NAME(…)`.
@@ -284,7 +284,7 @@ const SHARED_NAMES = [
  * correct usage and must not be flagged.
  */
 function declaresLocally(code: string, name: string): boolean {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const patterns = [
     new RegExp(`\\bconst\\s+${escaped}\\b`),
     new RegExp(`\\blet\\s+${escaped}\\b`),
@@ -294,8 +294,8 @@ function declaresLocally(code: string, name: string): boolean {
     new RegExp(`\\benum\\s+${escaped}\\b`),
     new RegExp(`\\btype\\s+${escaped}\\b`),
     new RegExp(`\\binterface\\s+${escaped}\\b`),
-  ];
-  return patterns.some((pattern) => pattern.test(code));
+  ]
+  return patterns.some((pattern) => pattern.test(code))
 }
 
 /**
@@ -311,99 +311,99 @@ function declaresLocally(code: string, name: string): boolean {
  */
 function buildsLocalZodSchema(original: string, stripped: string): boolean {
   const importsZod =
-    /\bfrom\s*['"]zod['"]/.test(original) || /require\(\s*['"]zod['"]\s*\)/.test(original);
-  if (!importsZod) return false;
-  return /\bz\s*\.\s*(object|enum|union|discriminatedUnion|intersection)\s*\(/.test(stripped);
+    /\bfrom\s*['"]zod['"]/.test(original) || /require\(\s*['"]zod['"]\s*\)/.test(original)
+  if (!importsZod) return false
+  return /\bz\s*\.\s*(object|enum|union|discriminatedUnion|intersection)\s*\(/.test(stripped)
 }
 
 /** The files in an app that are source rather than build output. */
 function appSourceFiles(appRoot: string): string[] {
   const direct = SOURCE_DIRS.filter((dir) => {
     try {
-      return statSync(join(appRoot, dir)).isDirectory();
+      return statSync(join(appRoot, dir)).isDirectory()
     } catch {
-      return false;
+      return false
     }
-  });
+  })
 
   // `app` and `src` are the two layouts in use. `lib` and `components` are
   // included for a future layout that has not arrived yet — a directory
   // that does not exist contributes nothing.
-  const files: string[] = [];
+  const files: string[] = []
   for (const dir of direct) {
-    files.push(...sourceFiles(join(appRoot, dir)));
+    files.push(...sourceFiles(join(appRoot, dir)))
   }
 
   // A stray source file at the app's root (a `*.test.ts` beside the config)
   // is source too.
   try {
     for (const entry of readdirSync(appRoot)) {
-      const full = join(appRoot, entry);
+      const full = join(appRoot, entry)
       if (statSync(full).isFile() && SOURCE_EXTENSIONS.some((ext) => entry.endsWith(ext))) {
-        files.push(full);
+        files.push(full)
       }
     }
   } catch {
     // no root-level files
   }
 
-  return Array.from(new Set(files)).sort();
+  return Array.from(new Set(files)).sort()
 }
 
 describe('the shared-contracts boundary', () => {
   const apps = APP_ROOTS.map((root) => ({
     name: root.split(sep).slice(-2).join('/'),
     root,
-  }));
+  }))
 
   it('scans both apps', () => {
     // A scan that silently found nothing would pass every other test here.
     for (const app of apps) {
-      const files = appSourceFiles(app.root);
-      expect(files.length).toBeGreaterThan(0);
+      const files = appSourceFiles(app.root)
+      expect(files.length).toBeGreaterThan(0)
     }
-  });
+  })
 
   it.each(apps.map((app) => [app.name, app.root] as const))(
     '%s declares no shared schema or enum of its own',
     (_name, root) => {
-      const offenders: string[] = [];
+      const offenders: string[] = []
 
       for (const file of appSourceFiles(root)) {
-        const original = readFileSync(file, 'utf8');
-        const code = stripCommentsAndStrings(original);
-        const where = relative(REPO_ROOT, file);
+        const original = readFileSync(file, 'utf8')
+        const code = stripCommentsAndStrings(original)
+        const where = relative(REPO_ROOT, file)
 
         for (const shared of SHARED_NAMES) {
           if (declaresLocally(code, shared)) {
-            offenders.push(`${where} re-declares \`${shared}\``);
+            offenders.push(`${where} re-declares \`${shared}\``)
           }
         }
 
         if (buildsLocalZodSchema(original, code)) {
-          offenders.push(`${where} builds a local Zod schema`);
+          offenders.push(`${where} builds a local Zod schema`)
         }
       }
 
-      expect(offenders).toEqual([]);
+      expect(offenders).toEqual([])
     },
-  );
+  )
 
   it('has a shared-name list that is not stale', async () => {
     // The list above is a hand-written vocabulary. If the shared package
     // gains an export and the list does not follow, the guard would stop
     // catching that export — silently. So the list must name **every**
     // exported constant, not just the ones it happens to remember.
-    const shared = await import('./index');
+    const shared = await import('./index')
 
     const exported = Object.keys(shared).filter((key) => {
-      const value = (shared as Record<string, unknown>)[key];
-      return typeof value === 'string' || Array.isArray(value);
-    });
+      const value = (shared as Record<string, unknown>)[key]
+      return typeof value === 'string' || Array.isArray(value)
+    })
 
-    const known = new Set(SHARED_NAMES);
-    const missing = exported.filter((name) => !known.has(name));
+    const known = new Set(SHARED_NAMES)
+    const missing = exported.filter((name) => !known.has(name))
 
-    expect(missing).toEqual([]);
-  });
-});
+    expect(missing).toEqual([])
+  })
+})

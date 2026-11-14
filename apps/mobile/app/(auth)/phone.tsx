@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { phoneSchema } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { phoneSchema } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
 
 /**
  * Screen 2 — S-01 Own Phone.
@@ -22,29 +22,29 @@ import { Icon } from '@/shared/ui/Icon';
  * `+8801711111111` are the same number written two ways.
  */
 export default function PhoneScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   // The phone is checked with the shared schema, not a length test: the schema
   // normalises the number to E.164 and refuses anything that is not a valid
   // Bangladesh number.
-  const parsedPhone = phoneSchema.safeParse(phone);
+  const parsedPhone = phoneSchema.safeParse(phone)
 
-  const canContinue = parsedPhone.success && email.includes('@') && password.length >= 8;
+  const canContinue = parsedPhone.success && email.includes('@') && password.length >= 8
 
   const onContinue = () => {
-    const nextErrors: Record<string, string> = {};
-    if (!parsedPhone.success) nextErrors.phone = t('errors.validationFailed');
-    if (!email.includes('@')) nextErrors.email = t('errors.validationFailed');
-    if (password.length < 8) nextErrors.password = t('errors.validationFailed');
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const nextErrors: Record<string, string> = {}
+    if (!parsedPhone.success) nextErrors.phone = t('errors.validationFailed')
+    if (!email.includes('@')) nextErrors.email = t('errors.validationFailed')
+    if (password.length < 8) nextErrors.password = t('errors.validationFailed')
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
 
     router.push({
       pathname: '/(auth)/alternate-phone',
@@ -55,8 +55,8 @@ export default function PhoneScreen() {
         email,
         password,
       },
-    });
-  };
+    })
+  }
 
   return (
     <WizardScreen
@@ -126,7 +126,7 @@ export default function PhoneScreen() {
         </Text>
       </View>
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -140,4 +140,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
   },
-});
+})

@@ -1,5 +1,5 @@
-import { bn } from '@/shared/i18n/bn';
-import { en } from '@/shared/i18n/en';
+import { bn } from '@/shared/i18n/bn'
+import { en } from '@/shared/i18n/en'
 
 /**
  * The Supabase module must not take the app down.
@@ -25,7 +25,7 @@ import { en } from '@/shared/i18n/en';
 jest.mock('expo-constants', () => ({
   __esModule: true,
   default: { expoConfig: { extra: {} } },
-}));
+}))
 
 /**
  * The native storage modules do not run under Jest.
@@ -43,7 +43,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     setItem: jest.fn(async () => undefined),
     removeItem: jest.fn(async () => undefined),
   },
-}));
+}))
 
 jest.mock('expo-secure-store', () => ({
   __esModule: true,
@@ -51,9 +51,14 @@ jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(async () => null),
   setItemAsync: jest.fn(async () => undefined),
   deleteItemAsync: jest.fn(async () => undefined),
-}));
+}))
 
-type SupabaseModule = typeof import('@/shared/api/supabase');
+// The module is loaded lazily below (`require` inside `jest.isolateModules`),
+// so the type is imported rather than the value — a static `import` would
+// defeat the point of loading it fresh per test.
+import type * as SupabaseModuleType from '@/shared/api/supabase'
+
+type SupabaseModule = typeof SupabaseModuleType
 
 /**
  * Imports the module fresh, with the given credentials in the environment.
@@ -66,117 +71,115 @@ function loadModule(env: Record<string, string | undefined>): SupabaseModule {
   const previous = {
     url: process.env.EXPO_PUBLIC_SUPABASE_URL,
     key: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-  };
+  }
 
   // Assigning `undefined` to a `process.env` property stores the **string**
   // `"undefined"`, not the absence of a value — which would look like a
   // configured URL. The property is deleted instead.
   const set = (name: string, value: string | undefined) => {
     if (value === undefined) {
-      delete process.env[name];
+      delete process.env[name]
     } else {
-      process.env[name] = value;
+      process.env[name] = value
     }
-  };
+  }
 
-  set('EXPO_PUBLIC_SUPABASE_URL', env.url);
-  set('EXPO_PUBLIC_SUPABASE_ANON_KEY', env.key);
+  set('EXPO_PUBLIC_SUPABASE_URL', env.url)
+  set('EXPO_PUBLIC_SUPABASE_ANON_KEY', env.key)
 
-  let loaded: SupabaseModule | undefined;
+  let loaded: SupabaseModule | undefined
   jest.isolateModules(() => {
     // `require` is the only way to load the module **inside** the isolated
     // registry: a static `import` is hoisted and evaluated once, before the
     // environment for this call was set.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    loaded = require('@/shared/api/supabase') as SupabaseModule;
-  });
+    loaded = require('@/shared/api/supabase') as SupabaseModule
+  })
 
-  set('EXPO_PUBLIC_SUPABASE_URL', previous.url);
-  set('EXPO_PUBLIC_SUPABASE_ANON_KEY', previous.key);
+  set('EXPO_PUBLIC_SUPABASE_URL', previous.url)
+  set('EXPO_PUBLIC_SUPABASE_ANON_KEY', previous.key)
 
-  if (!loaded) throw new Error('the module did not load');
-  return loaded;
+  if (!loaded) throw new Error('the module did not load')
+  return loaded
 }
 
 describe('the Supabase module', () => {
   it('imports without throwing when the credentials are missing', () => {
     // The old module threw here. This is the assertion that pins it.
-    expect(() => loadModule({ url: undefined, key: undefined })).not.toThrow();
-  });
+    expect(() => loadModule({ url: undefined, key: undefined })).not.toThrow()
+  })
 
   it('reports that it is not configured when the credentials are missing', () => {
-    expect(loadModule({ url: undefined, key: undefined }).isSupabaseConfigured).toBe(false);
-  });
+    expect(loadModule({ url: undefined, key: undefined }).isSupabaseConfigured).toBe(false)
+  })
 
   it('reports that it is not configured when only the URL is present', () => {
-    expect(
-      loadModule({ url: 'http://127.0.0.1:54321', key: undefined }).isSupabaseConfigured,
-    ).toBe(false);
-  });
+    expect(loadModule({ url: 'http://127.0.0.1:54321', key: undefined }).isSupabaseConfigured).toBe(
+      false,
+    )
+  })
 
   it('reports that it is not configured when only the key is present', () => {
-    expect(
-      loadModule({ url: undefined, key: 'test-anon-key' }).isSupabaseConfigured,
-    ).toBe(false);
-  });
+    expect(loadModule({ url: undefined, key: 'test-anon-key' }).isSupabaseConfigured).toBe(false)
+  })
 
   it('reports that it is configured when both credentials are present', () => {
     const module = loadModule({
       url: 'http://127.0.0.1:54321',
       key: 'test-anon-key',
-    });
+    })
 
-    expect(module.isSupabaseConfigured).toBe(true);
-  });
+    expect(module.isSupabaseConfigured).toBe(true)
+  })
 
   it('fails a call with a clear message rather than a TypeError', async () => {
-    const module = loadModule({ url: undefined, key: undefined });
+    const module = loadModule({ url: undefined, key: undefined })
 
     // The app never reaches the stand-in — the root layout renders the
     // configuration-error screen first. But if a call does get through, it
     // must say what is wrong rather than fail with "not a function".
     await expect(module.supabase.rpc('alerts_feed', {})).rejects.toThrow(
       /Supabase is not configured/,
-    );
-  });
+    )
+  })
 
   it('exposes the secure store, which does not depend on the credentials', () => {
-    const module = loadModule({ url: undefined, key: undefined });
+    const module = loadModule({ url: undefined, key: undefined })
 
-    expect(typeof module.secureStore.getItem).toBe('function');
-    expect(typeof module.secureStore.setItem).toBe('function');
-    expect(typeof module.secureStore.removeItem).toBe('function');
-  });
-});
+    expect(typeof module.secureStore.getItem).toBe('function')
+    expect(typeof module.secureStore.setItem).toBe('function')
+    expect(typeof module.secureStore.removeItem).toBe('function')
+  })
+})
 
 describe('the configuration-error copy', () => {
   it('has a title, a message and a detail in English', () => {
-    expect(typeof en.config.title).toBe('string');
-    expect((en.config.title as string).length).toBeGreaterThan(0);
-    expect(typeof en.config.message).toBe('string');
-    expect((en.config.message as string).length).toBeGreaterThan(0);
-    expect(typeof en.config.detail).toBe('string');
-    expect((en.config.detail as string).length).toBeGreaterThan(0);
-  });
+    expect(typeof en.config.title).toBe('string')
+    expect((en.config.title as string).length).toBeGreaterThan(0)
+    expect(typeof en.config.message).toBe('string')
+    expect((en.config.message as string).length).toBeGreaterThan(0)
+    expect(typeof en.config.detail).toBe('string')
+    expect((en.config.detail as string).length).toBeGreaterThan(0)
+  })
 
   it('has a title, a message and a detail in Bangla', () => {
-    expect(typeof bn.config.title).toBe('string');
-    expect((bn.config.title as string).length).toBeGreaterThan(0);
-    expect(typeof bn.config.message).toBe('string');
-    expect((bn.config.message as string).length).toBeGreaterThan(0);
-    expect(typeof bn.config.detail).toBe('string');
-    expect((bn.config.detail as string).length).toBeGreaterThan(0);
-  });
+    expect(typeof bn.config.title).toBe('string')
+    expect((bn.config.title as string).length).toBeGreaterThan(0)
+    expect(typeof bn.config.message).toBe('string')
+    expect((bn.config.message as string).length).toBeGreaterThan(0)
+    expect(typeof bn.config.detail).toBe('string')
+    expect((bn.config.detail as string).length).toBeGreaterThan(0)
+  })
 
   it('does not blame the user, and does not leak the environment variable names', () => {
     const copy = [en.config.title, en.config.message, en.config.detail]
       .filter((value): value is string => typeof value === 'string')
-      .join(' ');
+      .join(' ')
 
     // The missing setting is a build fault. Naming the variable would tell a
     // user something they cannot act on.
-    expect(copy).not.toContain('EXPO_PUBLIC');
-    expect(copy).not.toContain('SUPABASE_URL');
-    expect(copy).not.toContain('ANON_KEY');
-  });
-});
+    expect(copy).not.toContain('EXPO_PUBLIC')
+    expect(copy).not.toContain('SUPABASE_URL')
+    expect(copy).not.toContain('ANON_KEY')
+  })
+})

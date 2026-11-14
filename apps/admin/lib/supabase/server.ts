@@ -1,6 +1,6 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * The server-side Supabase client.
@@ -19,16 +19,16 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * machine. The check belongs on the call that actually needs the client.
  */
 function getSupabaseConfig(): { url: string; anonKey: string } {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
   if (!url || !anonKey) {
     throw new Error(
       'Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
-    );
+    )
   }
 
-  return { url, anonKey };
+  return { url, anonKey }
 }
 
 /**
@@ -40,18 +40,18 @@ function getSupabaseConfig(): { url: string; anonKey: string } {
  * the next navigation.
  */
 export async function createServerSupabaseClient(): Promise<SupabaseClient> {
-  const cookieStore = await cookies();
-  const { url, anonKey } = getSupabaseConfig();
+  const cookieStore = await cookies()
+  const { url, anonKey } = getSupabaseConfig()
 
   return createServerClient(url, anonKey, {
     cookies: {
       getAll() {
-        return cookieStore.getAll();
+        return cookieStore.getAll()
       },
       setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
         try {
           for (const cookie of cookiesToSet) {
-            cookieStore.set(cookie.name, cookie.value, cookie.options);
+            cookieStore.set(cookie.name, cookie.value, cookie.options)
           }
         } catch {
           // A Server Component cannot write cookies. The middleware refreshes
@@ -60,7 +60,7 @@ export async function createServerSupabaseClient(): Promise<SupabaseClient> {
         }
       },
     },
-  });
+  })
 }
 
 /**
@@ -71,19 +71,19 @@ export async function createServerSupabaseClient(): Promise<SupabaseClient> {
  * Function, so a forged value here grants nothing.
  */
 export async function readModeratorRole(): Promise<'citizen' | 'moderator' | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient()
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser()
 
-  if (!user) return null;
+  if (!user) return null
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .maybeSingle();
+    .maybeSingle()
 
-  return (profile?.role as 'citizen' | 'moderator' | undefined) ?? null;
+  return (profile?.role as 'citizen' | 'moderator' | undefined) ?? null
 }

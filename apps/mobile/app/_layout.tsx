@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useFonts } from 'expo-font';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { ThemeProvider, useTheme } from '@/shared/theme';
-import { appFonts } from '@/shared/theme/fonts';
-import { loadStoredLocale } from '@/shared/i18n';
-import '@/shared/i18n';
-import { isSupabaseConfigured } from '@/shared/api/supabase';
-import { ConfigErrorView } from '@/shared/ui/ConfigErrorView';
+import { useEffect } from 'react'
+import { Stack } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useFonts } from 'expo-font'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { ThemeProvider, useTheme } from '@/shared/theme'
+import { appFonts } from '@/shared/theme/fonts'
+import { loadStoredLocale } from '@/shared/i18n'
+import '@/shared/i18n'
+import { isSupabaseConfigured } from '@/shared/api/supabase'
+import { ConfigErrorView } from '@/shared/ui/ConfigErrorView'
 
 /**
  * Root layout. Owns the font loading gate, the theme provider, the query
@@ -28,24 +28,24 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-});
+})
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts(appFonts);
+  const [fontsLoaded, fontError] = useFonts(appFonts)
 
   useEffect(() => {
-    void loadStoredLocale();
-  }, []);
+    void loadStoredLocale()
+  }, [])
 
   useEffect(() => {
     if (fontError) {
       // A missing icon font would render ligature text instead of icons.
-      console.warn('Font loading failed:', fontError.message);
+      console.warn('Font loading failed:', fontError.message)
     }
-  }, [fontError]);
+  }, [fontError])
 
   if (!fontsLoaded && !fontError) {
-    return null;
+    return null
   }
 
   // A build without its Supabase credentials cannot reach the API. The
@@ -63,7 +63,7 @@ export default function RootLayout() {
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
-    );
+    )
   }
 
   return (
@@ -76,11 +76,11 @@ export default function RootLayout() {
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
-  );
+  )
 }
 
 function ThemedStack() {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <>
@@ -97,5 +97,5 @@ function ThemedStack() {
         <Stack.Screen name="(app)" />
       </Stack>
     </>
-  );
+  )
 }

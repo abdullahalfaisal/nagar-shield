@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar, Button, InputField } from '@/shared/ui';
-import { sendPasswordResetOtp, stagePasswordReset } from '@/shared/auth/passwordResetService';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar, Button, InputField } from '@/shared/ui'
+import { sendPasswordResetOtp, stagePasswordReset } from '@/shared/auth/passwordResetService'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 13 — Forgot Password.
@@ -36,46 +36,44 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * screen — the channel is email only.
  */
 export default function ForgotPasswordScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [identifier, setIdentifier] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
+  const [identifier, setIdentifier] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
 
   const onSendCode = async () => {
-    const trimmed = identifier.trim();
+    const trimmed = identifier.trim()
 
     if (trimmed.length === 0) {
-      setErrors({ identifier: t('errors.validationFailed') });
-      return;
+      setErrors({ identifier: t('errors.validationFailed') })
+      return
     }
 
-    setErrors({});
-    setSubmitting(true);
-    setFormError(undefined);
+    setErrors({})
+    setSubmitting(true)
+    setFormError(undefined)
 
     try {
-      await sendPasswordResetOtp(trimmed);
+      await sendPasswordResetOtp(trimmed)
 
       // The answer is the same for a known identifier and an unknown one, so
       // the screen cannot say which happened — and does not try.
       //
       // The identifier travels in **memory**, not in the route params: it is
       // PII, and a route param is part of a URL.
-      stagePasswordReset(trimmed, '');
-      router.push('/(auth)/verify-otp');
+      stagePasswordReset(trimmed, '')
+      router.push('/(auth)/verify-otp')
     } catch (error) {
-      const appError = error instanceof AppError ? error : null;
-      setFormError(
-        appError ? errorCopy(t, appError.code) : t('errors.internal'),
-      );
+      const appError = error instanceof AppError ? error : null
+      setFormError(appError ? errorCopy(t, appError.code) : t('errors.internal'))
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -126,7 +124,7 @@ export default function ForgotPasswordScreen() {
         </Text>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -162,4 +160,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     paddingVertical: 14,
   },
-});
+})

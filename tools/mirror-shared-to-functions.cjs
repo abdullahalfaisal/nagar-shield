@@ -26,45 +26,45 @@
  *   node tools/mirror-shared-to-functions.cjs --check    # verify only
  */
 
-'use strict';
+'use strict'
 
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require('node:fs')
+const path = require('node:path')
 
-const ROOT = path.resolve(__dirname, '..');
-const SOURCE_ROOT = path.join(ROOT, 'packages', 'shared', 'src');
-const TARGET_ROOT = path.join(ROOT, 'supabase', 'functions', '_shared', 'vendor');
+const ROOT = path.resolve(__dirname, '..')
+const SOURCE_ROOT = path.join(ROOT, 'packages', 'shared', 'src')
+const TARGET_ROOT = path.join(ROOT, 'supabase', 'functions', '_shared', 'vendor')
 
 /** The modules the Edge Functions consume. */
-const MODULES = ['errors', 'enums', 'schemas', 'jobs', 'storage'];
+const MODULES = ['errors', 'enums', 'schemas', 'jobs', 'storage']
 
-const CHECK_ONLY = process.argv.includes('--check');
+const CHECK_ONLY = process.argv.includes('--check')
 
 /** Every file under a module directory, relative to the module root. */
 function collectFiles(directory, base = directory) {
-  const files = [];
+  const files = []
 
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const full = path.join(directory, entry.name);
+    const full = path.join(directory, entry.name)
 
     if (entry.isDirectory()) {
-      files.push(...collectFiles(full, base));
-      continue;
+      files.push(...collectFiles(full, base))
+      continue
     }
 
-    if (!entry.name.endsWith('.ts')) continue;
+    if (!entry.name.endsWith('.ts')) continue
     // The test files are not part of the server contract.
-    if (entry.name.endsWith('.test.ts')) continue;
+    if (entry.name.endsWith('.test.ts')) continue
 
-    files.push(path.relative(base, full));
+    files.push(path.relative(base, full))
   }
 
-  return files;
+  return files
 }
 
 /** The banner every mirrored file carries. */
 function banner(sourcePath) {
-  const relative = path.relative(ROOT, sourcePath).split(path.sep).join('/');
+  const relative = path.relative(ROOT, sourcePath).split(path.sep).join('/')
   return [
     '/**',
     ' * GENERATED FILE — do not edit.',
@@ -74,7 +74,7 @@ function banner(sourcePath) {
     ' * `node tools/mirror-shared-to-functions.cjs --check` to verify.',
     ' */',
     '',
-  ].join('\n');
+  ].join('\n')
 }
 
 /**
@@ -89,51 +89,48 @@ function banner(sourcePath) {
  * such as `'zod'` is left exactly as it is.
  */
 function rewriteDirectoryImports(contents, sourcePath) {
-  return contents.replace(
-    /(from\s+['"])(\.[^'"]*)(['"])/g,
-    (match, prefix, specifier, suffix) => {
-      if (specifier.endsWith('.ts') || specifier.endsWith('.js')) return match;
+  return contents.replace(/(from\s+['"])(\.[^'"]*)(['"])/g, (match, prefix, specifier, suffix) => {
+    if (specifier.endsWith('.ts') || specifier.endsWith('.js')) return match
 
-      const candidate = path.resolve(path.dirname(sourcePath), specifier);
+    const candidate = path.resolve(path.dirname(sourcePath), specifier)
 
-      // A directory → its index file.
-      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
-        return `${prefix}${specifier}/index.ts${suffix}`;
-      }
+    // A directory → its index file.
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+      return `${prefix}${specifier}/index.ts${suffix}`
+    }
 
-      // A module without an extension → the source file directly.
-      if (fs.existsSync(`${candidate}.ts`)) {
-        return `${prefix}${specifier}.ts${suffix}`;
-      }
+    // A module without an extension → the source file directly.
+    if (fs.existsSync(`${candidate}.ts`)) {
+      return `${prefix}${specifier}.ts${suffix}`
+    }
 
-      return match;
-    },
-  );
+    return match
+  })
 }
 
 /** Builds the mirror in memory and compares it with what is on disk. */
 function buildMirror() {
-  const files = new Map();
+  const files = new Map()
 
   for (const moduleName of MODULES) {
-    const moduleRoot = path.join(SOURCE_ROOT, moduleName);
+    const moduleRoot = path.join(SOURCE_ROOT, moduleName)
     if (!fs.existsSync(moduleRoot)) {
-      throw new Error(`Missing shared module: ${moduleRoot}`);
+      throw new Error(`Missing shared module: ${moduleRoot}`)
     }
 
     for (const relative of collectFiles(moduleRoot)) {
-      const sourcePath = path.join(moduleRoot, relative);
-      const targetPath = path.join(TARGET_ROOT, moduleName, relative);
+      const sourcePath = path.join(moduleRoot, relative)
+      const targetPath = path.join(TARGET_ROOT, moduleName, relative)
 
-      const source = fs.readFileSync(sourcePath, 'utf8');
-      const contents = `${banner(sourcePath)}${rewriteDirectoryImports(source, sourcePath)}`;
-      files.set(targetPath, contents);
+      const source = fs.readFileSync(sourcePath, 'utf8')
+      const contents = `${banner(sourcePath)}${rewriteDirectoryImports(source, sourcePath)}`
+      files.set(targetPath, contents)
     }
   }
 
-  assertNoUnmirroredImports(files);
+  assertNoUnmirroredImports(files)
 
-  return files;
+  return files
 }
 
 /**
@@ -152,111 +149,114 @@ function buildMirror() {
 function assertNoUnmirroredImports(files) {
   const mirrored = new Set(
     [...files.keys()].map((targetPath) => path.basename(path.dirname(targetPath))),
-  );
+  )
 
-  const problems = [];
+  const problems = []
 
   for (const [targetPath, contents] of files) {
     // The relative specifier, before it was rewritten.
     const relative = path
-      .relative(SOURCE_ROOT, path.join(SOURCE_ROOT, path.dirname(path.relative(TARGET_ROOT, targetPath))))
+      .relative(
+        SOURCE_ROOT,
+        path.join(SOURCE_ROOT, path.dirname(path.relative(TARGET_ROOT, targetPath))),
+      )
       .split(path.sep)
-      .join('/');
+      .join('/')
 
     const source = fs.readFileSync(
       path.join(SOURCE_ROOT, relative, path.basename(targetPath)),
       'utf8',
-    );
+    )
 
     for (const match of source.matchAll(/from\s+['"](\.[^'"]*)['"]/g)) {
-      const specifier = match[1];
+      const specifier = match[1]
       const resolved = path.resolve(
         path.dirname(path.join(SOURCE_ROOT, relative, path.basename(targetPath))),
         specifier,
-      );
-      const owner = path.relative(SOURCE_ROOT, resolved).split(path.sep)[0];
+      )
+      const owner = path.relative(SOURCE_ROOT, resolved).split(path.sep)[0]
 
       if (owner && !mirrored.has(owner) && owner !== relative) {
         problems.push(
           `${path.relative(ROOT, targetPath)} imports \`${specifier}\` — ` +
             `\`${owner}/\` is not mirrored into the Edge Functions tree`,
-        );
+        )
       }
     }
   }
 
   if (problems.length > 0) {
-    console.error('A mirrored module imports a module that is not mirrored:');
-    for (const problem of problems) console.error(`  - ${problem}`);
+    console.error('A mirrored module imports a module that is not mirrored:')
+    for (const problem of problems) console.error(`  - ${problem}`)
     console.error(
       'The Edge Runtime mounts only `supabase/`, so a mirrored module cannot\n' +
         'import one that was not mirrored. Either mirror the module too, or\n' +
         'remove the dependency.',
-    );
-    process.exit(1);
+    )
+    process.exit(1)
   }
 }
 
 /** Removes a mirrored file that no longer has a source. */
 function findStaleFiles(mirror) {
-  if (!fs.existsSync(TARGET_ROOT)) return [];
+  if (!fs.existsSync(TARGET_ROOT)) return []
 
-  const stale = [];
+  const stale = []
 
   const walk = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const full = path.join(directory, entry.name);
+      const full = path.join(directory, entry.name)
       if (entry.isDirectory()) {
-        walk(full);
-        continue;
+        walk(full)
+        continue
       }
-      if (!mirror.has(full)) stale.push(full);
+      if (!mirror.has(full)) stale.push(full)
     }
-  };
+  }
 
-  walk(TARGET_ROOT);
-  return stale;
+  walk(TARGET_ROOT)
+  return stale
 }
 
 function main() {
-  const mirror = buildMirror();
-  const stale = findStaleFiles(mirror);
+  const mirror = buildMirror()
+  const stale = findStaleFiles(mirror)
 
   if (CHECK_ONLY) {
-    const problems = [];
+    const problems = []
 
     for (const [targetPath, expected] of mirror) {
-      const actual = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : null;
+      const actual = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : null
       if (actual !== expected) {
-        problems.push(path.relative(ROOT, targetPath));
+        problems.push(path.relative(ROOT, targetPath))
       }
     }
 
     for (const stalePath of stale) {
-      problems.push(`${path.relative(ROOT, stalePath)} (no source)`);
+      problems.push(`${path.relative(ROOT, stalePath)} (no source)`)
     }
 
     if (problems.length > 0) {
-      console.error('The Edge Functions mirror has drifted from packages/shared:');
-      for (const problem of problems) console.error(`  - ${problem}`);
-      console.error('Re-run: node tools/mirror-shared-to-functions.cjs');
-      process.exit(1);
+      console.error('The Edge Functions mirror has drifted from packages/shared:')
+      for (const problem of problems) console.error(`  - ${problem}`)
+      console.error('Re-run: node tools/mirror-shared-to-functions.cjs')
+      process.exit(1)
     }
 
-    console.log(`✓ The Edge Functions mirror matches packages/shared (${mirror.size} files)`);
-    return;
+    console.log(`✓ The Edge Functions mirror matches packages/shared (${mirror.size} files)`)
+    return
   }
 
   for (const [targetPath, contents] of mirror) {
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, contents, 'utf8');
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+    fs.writeFileSync(targetPath, contents, 'utf8')
   }
 
   for (const stalePath of stale) {
-    fs.rmSync(stalePath, { force: true });
+    fs.rmSync(stalePath, { force: true })
   }
 
-  console.log(`✓ Mirrored ${mirror.size} shared modules into supabase/functions/_shared/vendor`);
+  console.log(`✓ Mirrored ${mirror.size} shared modules into supabase/functions/_shared/vendor`)
 }
 
-main();
+main()

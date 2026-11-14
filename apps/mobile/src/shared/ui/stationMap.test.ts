@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
-import { MAP_MARKER_CAP, capMarkers, type StationMarker } from './StationMap';
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
+import { MAP_MARKER_CAP, capMarkers, type StationMarker } from './StationMap'
 
 /**
  * The theme is stubbed out.
@@ -15,7 +15,7 @@ jest.mock('../theme', () => ({
     colors: { surface: { white: '#FFFFFF' }, ink: { 100: '#EEEEEE' } },
     palette: { violet: { 600: '#6B4EFF' }, sky: { 600: '#0EA5E9' } },
   }),
-}));
+}))
 
 /**
  * The shared map wrapper.
@@ -33,82 +33,82 @@ jest.mock('../theme', () => ({
  * `capMarkers`, which is the marker cap the story's AC #4 asks for.
  */
 
-const APP_ROOT = join(__dirname, '..', '..', '..');
+const APP_ROOT = join(__dirname, '..', '..', '..')
 
-const CENTER = { lat: 23.8103, lng: 90.4125 };
+const CENTER = { lat: 23.8103, lng: 90.4125 }
 
 function marker(id: string, lat: number, lng: number): StationMarker {
-  return { id, lat, lng, title: id, onPress: () => undefined };
+  return { id, lat, lng, title: id, onPress: () => undefined }
 }
 
 /** Every source file under the app root's `app/` and `src/`. */
 function collectSourceFiles(): string[] {
-  const files: string[] = [];
-  const ignored = new Set(['node_modules', '.git', 'dist', 'build', '.expo', 'coverage']);
+  const files: string[] = []
+  const ignored = new Set(['node_modules', '.git', 'dist', 'build', '.expo', 'coverage'])
 
   const walk = (directory: string) => {
-    let entries: string[];
+    let entries: string[]
     try {
-      entries = readdirSync(directory);
+      entries = readdirSync(directory)
     } catch {
-      return;
+      return
     }
 
     for (const entry of entries) {
-      if (ignored.has(entry)) continue;
+      if (ignored.has(entry)) continue
 
-      const absolute = join(directory, entry);
-      let stats;
+      const absolute = join(directory, entry)
+      let stats
       try {
-        stats = statSync(absolute);
+        stats = statSync(absolute)
       } catch {
-        continue;
+        continue
       }
 
       if (stats.isDirectory()) {
-        walk(absolute);
-        continue;
+        walk(absolute)
+        continue
       }
 
-      const path = relative(APP_ROOT, absolute).split(sep).join('/');
-      if (path.endsWith('.ts') || path.endsWith('.tsx')) files.push(path);
+      const path = relative(APP_ROOT, absolute).split(sep).join('/')
+      if (path.endsWith('.ts') || path.endsWith('.tsx')) files.push(path)
     }
-  };
+  }
 
-  walk(join(APP_ROOT, 'app'));
-  walk(join(APP_ROOT, 'src'));
+  walk(join(APP_ROOT, 'app'))
+  walk(join(APP_ROOT, 'src'))
 
-  return files;
+  return files
 }
 
-const sourceFiles = collectSourceFiles();
+const sourceFiles = collectSourceFiles()
 
 describe('the marker cap', () => {
   it('is documented at 150 markers', () => {
-    expect(MAP_MARKER_CAP).toBe(150);
-  });
+    expect(MAP_MARKER_CAP).toBe(150)
+  })
 
   it('leaves a small marker set untouched', () => {
-    const markers = [marker('a', 23.81, 90.41), marker('b', 23.82, 90.42)];
+    const markers = [marker('a', 23.81, 90.41), marker('b', 23.82, 90.42)]
 
-    expect(capMarkers(markers, CENTER)).toEqual(markers);
-  });
+    expect(capMarkers(markers, CENTER)).toEqual(markers)
+  })
 
   it('leaves a set exactly at the cap untouched', () => {
     const markers = Array.from({ length: MAP_MARKER_CAP }, (_, index) =>
       marker(`m${index}`, CENTER.lat + index * 0.0001, CENTER.lng),
-    );
+    )
 
-    expect(capMarkers(markers, CENTER)).toHaveLength(MAP_MARKER_CAP);
-  });
+    expect(capMarkers(markers, CENTER)).toHaveLength(MAP_MARKER_CAP)
+  })
 
   it('caps a dense set, so the map never freezes', () => {
     const markers = Array.from({ length: 500 }, (_, index) =>
       marker(`m${index}`, CENTER.lat + index * 0.0001, CENTER.lng),
-    );
+    )
 
-    expect(capMarkers(markers, CENTER)).toHaveLength(MAP_MARKER_CAP);
-  });
+    expect(capMarkers(markers, CENTER)).toHaveLength(MAP_MARKER_CAP)
+  })
 
   it('keeps the markers nearest the centre, not the newest', () => {
     // The marker nearest the centre is the *last* one in the list. A cap that
@@ -117,75 +117,75 @@ describe('the marker cap', () => {
       marker('far-1', CENTER.lat + 0.5, CENTER.lng),
       marker('far-2', CENTER.lat + 0.6, CENTER.lng),
       marker('near', CENTER.lat + 0.0001, CENTER.lng),
-    ];
+    ]
 
-    const capped = capMarkers(markers, CENTER, 1);
+    const capped = capMarkers(markers, CENTER, 1)
 
-    expect(capped.map((entry) => entry.id)).toEqual(['near']);
-  });
+    expect(capped.map((entry) => entry.id)).toEqual(['near'])
+  })
 
   it('places a surviving marker at its true coordinate, never at an approximation', () => {
     // The cap is a *selection* heuristic — a cheap planar distance is enough
     // to choose which markers to keep, but the marker itself stays put.
-    const markers = [marker('a', 23.9, 90.5), marker('b', 23.81031, 90.41251)];
+    const markers = [marker('a', 23.9, 90.5), marker('b', 23.81031, 90.41251)]
 
-    const capped = capMarkers(markers, CENTER, 1);
+    const capped = capMarkers(markers, CENTER, 1)
 
-    expect(capped[0]?.lat).toBe(23.81031);
-    expect(capped[0]?.lng).toBe(90.41251);
-  });
+    expect(capped[0]?.lat).toBe(23.81031)
+    expect(capped[0]?.lng).toBe(90.41251)
+  })
 
   it('does not mutate the caller array', () => {
     const markers = Array.from({ length: 300 }, (_, index) =>
       marker(`m${index}`, CENTER.lat + index * 0.0001, CENTER.lng),
-    );
-    const before = markers.map((entry) => entry.id);
+    )
+    const before = markers.map((entry) => entry.id)
 
-    capMarkers(markers, CENTER);
+    capMarkers(markers, CENTER)
 
-    expect(markers.map((entry) => entry.id)).toEqual(before);
-  });
-});
+    expect(markers.map((entry) => entry.id)).toEqual(before)
+  })
+})
 
 describe('the map is one shared component', () => {
   it('reads the attribution from the wrapper itself', () => {
-    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8');
+    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8')
 
     // The attribution is a condition of using the public OSM tile servers, so
     // it cannot be opt-in — a consumer that forgets it is the defect.
-    expect(wrapper).toContain('© OpenStreetMap contributors');
-    expect(wrapper).toContain("attribution = '© OpenStreetMap contributors'");
-  });
+    expect(wrapper).toContain('© OpenStreetMap contributors')
+    expect(wrapper).toContain("attribution = '© OpenStreetMap contributors'")
+  })
 
   it('has exactly one map wrapper and one map style in the app', () => {
-    const wrappers = sourceFiles.filter((path) => /StationMap\.tsx$/.test(path));
+    const wrappers = sourceFiles.filter((path) => /StationMap\.tsx$/.test(path))
     const localMaps = sourceFiles.filter(
       (path) =>
         /Map\.tsx$/.test(path) &&
         !path.endsWith('shared/ui/StationMap.tsx') &&
         !path.includes('.test.'),
-    );
+    )
 
-    expect(wrappers).toEqual(['src/shared/ui/StationMap.tsx']);
+    expect(wrappers).toEqual(['src/shared/ui/StationMap.tsx'])
     // A second map component is a fork, and a fork is how the attribution gets
     // dropped from one of the two surfaces.
-    expect(localMaps).toEqual([]);
-  });
+    expect(localMaps).toEqual([])
+  })
 
   it('uses the OSM raster tile server and no other tile source', () => {
-    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8');
-    const tiles = wrapper.match(/https:\/\/[^'"`]*\{z\}[^'"`]*/g) ?? [];
+    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8')
+    const tiles = wrapper.match(/https:\/\/[^'"`]*\{z\}[^'"`]*/g) ?? []
 
-    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles.length).toBeGreaterThan(0)
     for (const url of tiles) {
-      expect(url).toContain('tile.openstreetmap.org');
+      expect(url).toContain('tile.openstreetmap.org')
     }
-  });
+  })
 
   it('is consumed by the History map, not a local copy', () => {
-    const historyMap = readFileSync(join(APP_ROOT, 'app', '(app)', 'history-map.tsx'), 'utf8');
+    const historyMap = readFileSync(join(APP_ROOT, 'app', '(app)', 'history-map.tsx'), 'utf8')
 
-    expect(historyMap).toContain('StationMap');
-    expect(historyMap).not.toMatch(/from\s+['"]@maplibre\//);
-  });
-});
+    expect(historyMap).toContain('StationMap')
+    expect(historyMap).not.toMatch(/from\s+['"]@maplibre\//)
+  })
+})

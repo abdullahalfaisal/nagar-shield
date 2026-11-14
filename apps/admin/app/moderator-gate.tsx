@@ -1,5 +1,5 @@
-import { readModeratorRole } from '@/lib/supabase/server';
-import { AccessOnlyState } from '@/app/access-only-state';
+import { readModeratorRole } from '@/lib/supabase/server'
+import { AccessOnlyState } from '@/app/access-only-state'
 
 /**
  * The moderator gate.
@@ -41,15 +41,15 @@ import { AccessOnlyState } from '@/app/access-only-state';
  */
 
 interface ModeratorGateProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export async function ModeratorGate({ children }: ModeratorGateProps) {
-  const role = await readModeratorRole();
+  const role = await readModeratorRole()
 
   if (role !== 'moderator') {
-    return <AccessOnlyState />;
+    return <AccessOnlyState />
   }
 
-  return <>{children}</>;
+  return <>{children}</>
 }

@@ -1,13 +1,13 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { toAppError, type AuditAction } from '@/lib/api';
-import { useAuditTrail } from '@/lib/queries';
-import { formatDecisionLabel, formatTimestampShort } from '@/lib/format';
-import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { toAppError, type AuditAction } from '@/lib/api'
+import { useAuditTrail } from '@/lib/queries'
+import { formatDecisionLabel, formatTimestampShort } from '@/lib/format'
+import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell'
 
 /**
  * The append-only action log.
@@ -21,35 +21,35 @@ import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@
  * carries a report's coordinates, description, or media.
  */
 
-type DecisionFilter = 'all' | 'restore' | 'remove' | 'disable_user';
+type DecisionFilter = 'all' | 'restore' | 'remove' | 'disable_user'
 
 export function AuditClient() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
-  const router = useRouter();
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
+  const router = useRouter()
 
-  const [filter, setFilter] = useState<DecisionFilter>('all');
+  const [filter, setFilter] = useState<DecisionFilter>('all')
 
-  const trail = useAuditTrail(filter);
-  const { data, error: queryError, isLoading, isFetchingNextPage, hasNextPage } = trail;
+  const trail = useAuditTrail(filter)
+  const { data, error: queryError, isLoading, isFetchingNextPage, hasNextPage } = trail
 
   // An expired session is a redirect, not a message.
   useEffect(() => {
-    if (!queryError) return;
+    if (!queryError) return
     if (toAppError(queryError).code === 'AUTH_REQUIRED') {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [queryError, router]);
+  }, [queryError, router])
 
   const error = queryError
     ? (() => {
-        const appError = toAppError(queryError);
-        return appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric;
+        const appError = toAppError(queryError)
+        return appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric
       })()
-    : null;
+    : null
 
   // Every page loaded so far, flattened. The rows are appended, never
   // replaced — the cursor guarantees no duplicate and no skipped row.
-  const items: AuditAction[] = (data?.pages ?? []).flatMap((page) => page.items);
+  const items: AuditAction[] = (data?.pages ?? []).flatMap((page) => page.items)
 
   return (
     <AdminShell active="audit">
@@ -138,7 +138,7 @@ export function AuditClient() {
         </div>
       </div>
     </AdminShell>
-  );
+  )
 }
 
 /**
@@ -154,7 +154,7 @@ function renderTarget(action: AuditAction, copy: ReturnType<typeof getCopy>) {
       <Link href={`/users?target=${encodeURIComponent(action.targetUserId)}`} className="link">
         {action.targetUserId.slice(0, 8)}
       </Link>
-    );
+    )
   }
 
   if (action.reportId) {
@@ -162,8 +162,8 @@ function renderTarget(action: AuditAction, copy: ReturnType<typeof getCopy>) {
       <Link href={`/queue/${action.reportId}`} className="link">
         {action.reportId.slice(0, 8)}
       </Link>
-    );
+    )
   }
 
-  return <span className="muted">{copy.auditReportUnavailable}</span>;
+  return <span className="muted">{copy.auditReportUnavailable}</span>
 }

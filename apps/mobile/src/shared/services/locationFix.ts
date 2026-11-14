@@ -1,5 +1,5 @@
-import * as Location from 'expo-location';
-import { toPermissionState, type PermissionState } from './permissions';
+import * as Location from 'expo-location'
+import { toPermissionState, type PermissionState } from './permissions'
 
 /**
  * The Location Sharing fix — taken **just-in-time**.
@@ -31,7 +31,7 @@ export type FixOutcome =
   /** The permission was never determined — the prompt was refused or dismissed. */
   | { status: 'undetermined'; permission: PermissionState }
   /** The provider is off, or the fix timed out. */
-  | { status: 'unavailable' };
+  | { status: 'unavailable' }
 
 /**
  * Requests the permission and takes the fix — in that order, and only when
@@ -42,42 +42,42 @@ export type FixOutcome =
  * share rather than when the screen opened.
  */
 export async function takeLocationFix(): Promise<FixOutcome> {
-  let permission: PermissionState;
+  let permission: PermissionState
 
   try {
-    const response = await Location.requestForegroundPermissionsAsync();
-    permission = toPermissionState(response.status);
+    const response = await Location.requestForegroundPermissionsAsync()
+    permission = toPermissionState(response.status)
   } catch {
     // A failed permission query is a denied permission, not a crash. The
     // screen degrades.
-    return { status: 'denied', permission: 'denied' };
+    return { status: 'denied', permission: 'denied' }
   }
 
   if (permission === 'denied') {
-    return { status: 'denied', permission };
+    return { status: 'denied', permission }
   }
 
   if (permission !== 'granted') {
     // The prompt was shown and the user did not grant it — either they
     // refused or they dismissed it. Either way there is no fix.
-    return { status: 'undetermined', permission };
+    return { status: 'undetermined', permission }
   }
 
   try {
     const position = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
-    });
+    })
 
     return {
       status: 'ready',
       lat: position.coords.latitude,
       lng: position.coords.longitude,
       accuracyM: position.coords.accuracy ?? null,
-    };
+    }
   } catch {
     // The provider is disabled, or the fix timed out. The user is offered
     // the manual path; the share is never blocked.
-    return { status: 'unavailable' };
+    return { status: 'unavailable' }
   }
 }
 
@@ -97,18 +97,18 @@ export function parseManualCoordinates(
   latText: string,
   lngText: string,
 ): { ok: true; lat: number; lng: number; accuracyM: null } | { ok: false } {
-  const lat = Number(latText.trim());
-  const lng = Number(lngText.trim());
+  const lat = Number(latText.trim())
+  const lng = Number(lngText.trim())
 
-  if (latText.trim().length === 0 || lngText.trim().length === 0) return { ok: false };
+  if (latText.trim().length === 0 || lngText.trim().length === 0) return { ok: false }
 
   // `Number('')` is 0 and `Number('abc')` is NaN — both are rejected.
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false };
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false }
 
-  if (lat < -90 || lat > 90) return { ok: false };
-  if (lng < -180 || lng > 180) return { ok: false };
+  if (lat < -90 || lat > 90) return { ok: false }
+  if (lng < -180 || lng > 180) return { ok: false }
 
   // A coordinate of `0` is a real coordinate — the equator and the prime
   // meridian — and is never treated as absent.
-  return { ok: true, lat, lng, accuracyM: null };
+  return { ok: true, lat, lng, accuracyM: null }
 }

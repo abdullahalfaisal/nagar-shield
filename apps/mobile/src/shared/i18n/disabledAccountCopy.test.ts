@@ -1,5 +1,5 @@
-import { bn } from './bn';
-import { en } from './en';
+import { bn } from './bn'
+import { en } from './en'
 
 /**
  * The disable message audit.
@@ -25,44 +25,44 @@ import { en } from './en';
  */
 
 /** The literal FR-AUTH-7 names. */
-const PRD_MESSAGE = 'Your account has been disabled. Contact support.';
+const PRD_MESSAGE = 'Your account has been disabled. Contact support.'
 
 describe('the disable message', () => {
   it('is the exact string FR-AUTH-7 names', () => {
-    expect(en.disabled.message).toBe(PRD_MESSAGE);
-  });
+    expect(en.disabled.message).toBe(PRD_MESSAGE)
+  })
 
   it('is carried in Bangla too', () => {
     // The Bangla bundle is the **primary** one. A missing translation would
     // leave the primary language showing nothing at all.
-    expect(bn.disabled.message.length).toBeGreaterThan(0);
-    expect(bn.disabled.message).not.toBe('');
-  });
+    expect(bn.disabled.message.length).toBeGreaterThan(0)
+    expect(bn.disabled.message).not.toBe('')
+  })
 
   it('is a fixed string — it never embeds the moderator’s reason', () => {
     // The reason is a moderator's private note. Leaking it to the disabled
     // user would expose the internals of the moderation decision.
-    expect(en.disabled.message).not.toMatch(/reason/i);
-    expect(en.disabled.message).not.toMatch(/note/i);
-  });
+    expect(en.disabled.message).not.toMatch(/reason/i)
+    expect(en.disabled.message).not.toMatch(/note/i)
+  })
 
   it('never claims the account was deleted', () => {
     // A delete and a disable are different states with different recoveries.
     // The delete screen says so explicitly; the disable screen must not.
-    expect(en.disabled.message.toLowerCase()).not.toContain('deleted');
-    expect(bn.disabled.message).not.toContain('মুছে');
-  });
+    expect(en.disabled.message.toLowerCase()).not.toContain('deleted')
+    expect(bn.disabled.message).not.toContain('মুছে')
+  })
 
   it('points the user at the support path', () => {
-    expect(en.disabled.message.toLowerCase()).toContain('support');
-    expect(bn.disabled.message).toContain('সাপোর্ট');
-  });
+    expect(en.disabled.message.toLowerCase()).toContain('support')
+    expect(bn.disabled.message).toContain('সাপোর্ট')
+  })
 
   it('carries no identifier, timestamp, or id', () => {
     // The message is one fixed sentence. Anything that varies per account
     // would be a template, and the story forbids a template.
-    expect(en.disabled.message).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(en.disabled.message).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
-    expect(en.disabled.message).not.toMatch(/\d{2}:\d{2}/);
-  });
-});
+    expect(en.disabled.message).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+    expect(en.disabled.message).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i)
+    expect(en.disabled.message).not.toMatch(/\d{2}:\d{2}/)
+  })
+})

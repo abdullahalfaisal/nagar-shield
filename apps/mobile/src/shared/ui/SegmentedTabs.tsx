@@ -1,15 +1,15 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
 
 export interface SegmentedTab {
-  id: string;
-  label: string;
+  id: string
+  label: string
 }
 
 interface SegmentedTabsProps {
-  tabs: SegmentedTab[];
-  activeId: string;
-  onSelect: (id: string) => void;
+  tabs: SegmentedTab[]
+  activeId: string
+  onSelect: (id: string) => void
 }
 
 /**
@@ -20,7 +20,7 @@ interface SegmentedTabsProps {
  * segment is at least 48 dp tall so the control is reachable.
  */
 export function SegmentedTabs({ tabs, activeId, onSelect }: SegmentedTabsProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View
@@ -28,7 +28,7 @@ export function SegmentedTabs({ tabs, activeId, onSelect }: SegmentedTabsProps) 
       style={[styles.track, { backgroundColor: theme.colors.ink[100] }]}
     >
       {tabs.map((tab) => {
-        const active = tab.id === activeId;
+        const active = tab.id === activeId
         return (
           <Pressable
             key={tab.id}
@@ -38,9 +38,7 @@ export function SegmentedTabs({ tabs, activeId, onSelect }: SegmentedTabsProps) 
             onPress={() => onSelect(tab.id)}
             style={[
               styles.segment,
-              active
-                ? { backgroundColor: theme.colors.surface.white }
-                : null,
+              active ? { backgroundColor: theme.colors.surface.white } : null,
             ]}
           >
             <Text
@@ -56,10 +54,10 @@ export function SegmentedTabs({ tabs, activeId, onSelect }: SegmentedTabsProps) 
               {tab.label}
             </Text>
           </Pressable>
-        );
+        )
       })}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -81,4 +79,4 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
   },
-});
+})

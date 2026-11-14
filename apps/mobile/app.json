@@ -13,9 +13,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#1E0B47"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nagarshield.app"

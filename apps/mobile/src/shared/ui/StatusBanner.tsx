@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 /**
  * The queue status banner.
@@ -16,18 +16,18 @@ import { Icon } from './Icon';
  * The banner is deliberately **not** a toast and **not** a dialog. A queued
  * report is a state the app is in, and a state does not shout.
  */
-export type StatusBannerTone = 'saved' | 'warning';
+export type StatusBannerTone = 'saved' | 'warning'
 
 interface StatusBannerProps {
-  tone: StatusBannerTone;
-  title: string;
-  body?: string;
+  tone: StatusBannerTone
+  title: string
+  body?: string
 }
 
 export function StatusBanner({ tone, title, body }: StatusBannerProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
-  const isWarning = tone === 'warning';
+  const isWarning = tone === 'warning'
 
   return (
     <View
@@ -49,12 +49,10 @@ export function StatusBanner({ tone, title, body }: StatusBannerProps) {
       />
       <View style={styles.body}>
         <Text style={[styles.title, { color: theme.colors.ink[950] }]}>{title}</Text>
-        {body ? (
-          <Text style={[styles.text, { color: theme.colors.ink[500] }]}>{body}</Text>
-        ) : null}
+        {body ? <Text style={[styles.text, { color: theme.colors.ink[500] }]}>{body}</Text> : null}
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -81,4 +79,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 16,
   },
-});
+})

@@ -13,19 +13,19 @@
  * never bundled, never returned, and never written to a log line.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export function requireEnv(name: string): string {
-  const value = Deno.env.get(name);
+  const value = Deno.env.get(name)
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new Error(`Missing required environment variable: ${name}`)
   }
-  return value;
+  return value
 }
 
 /** The project URL — public by design; the anon key is scoped by RLS. */
 export function projectUrl(): string {
-  return requireEnv('SUPABASE_URL');
+  return requireEnv('SUPABASE_URL')
 }
 
 /** A client bound to the caller's JWT. RLS applies to every statement. */
@@ -33,14 +33,14 @@ export function createUserClient(accessToken: string): SupabaseClient {
   return createClient(projectUrl(), requireEnv('SUPABASE_ANON_KEY'), {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  })
 }
 
 /** A client bound to the service-role key. RLS is bypassed by design. */
 export function createServiceClient(): SupabaseClient {
   return createClient(projectUrl(), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  })
 }
 
 /**
@@ -50,8 +50,8 @@ export function createServiceClient(): SupabaseClient {
  * to `AUTH_REQUIRED`.
  */
 export function readBearerToken(request: Request): string | null {
-  const header = request.headers.get('authorization') ?? request.headers.get('Authorization');
-  if (!header) return null;
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || null;
+  const header = request.headers.get('authorization') ?? request.headers.get('Authorization')
+  if (!header) return null
+  const match = header.match(/^Bearer\s+(.+)$/i)
+  return match?.[1]?.trim() || null
 }

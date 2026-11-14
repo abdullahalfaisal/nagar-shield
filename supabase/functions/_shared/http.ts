@@ -11,9 +11,13 @@
  * string through the shared i18n bundles.
  */
 
-import { API_ERROR_HTTP_STATUS, API_ERROR_MESSAGES, type ApiErrorCode } from '@shared/errors/index.ts';
+import {
+  API_ERROR_HTTP_STATUS,
+  API_ERROR_MESSAGES,
+  type ApiErrorCode,
+} from '@shared/errors/index.ts'
 
-const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' } as const;
+const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' } as const
 
 /**
  * The CORS headers for the browser-facing functions.
@@ -26,15 +30,15 @@ export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+}
 
 export function jsonResponse(payload: unknown, status = 200, cors = false): Response {
-  const headers = cors ? { ...JSON_HEADERS, ...CORS_HEADERS } : { ...JSON_HEADERS };
-  return new Response(JSON.stringify(payload), { status, headers });
+  const headers = cors ? { ...JSON_HEADERS, ...CORS_HEADERS } : { ...JSON_HEADERS }
+  return new Response(JSON.stringify(payload), { status, headers })
 }
 
 export function successResponse<T>(data: T, status = 200, cors = false): Response {
-  return jsonResponse({ data }, status, cors);
+  return jsonResponse({ data }, status, cors)
 }
 
 export function errorResponse(
@@ -46,18 +50,18 @@ export function errorResponse(
   const body: Record<string, unknown> = {
     code,
     message: message ?? API_ERROR_MESSAGES[code],
-  };
-  if (details) body.details = details;
-  return jsonResponse({ error: body }, API_ERROR_HTTP_STATUS[code], cors);
+  }
+  if (details) body.details = details
+  return jsonResponse({ error: body }, API_ERROR_HTTP_STATUS[code], cors)
 }
 
 /** The pre-flight answer for a browser-facing function. */
 export function preflightResponse(cors = true): Response {
-  const headers = cors ? { ...CORS_HEADERS } : {};
+  const headers = cors ? { ...CORS_HEADERS } : {}
   // A 204 must NOT carry a body. Deno enforces this — `new Response('ok',
   // { status: 204 })` throws "Response with null body status cannot have
   // body" — so the throw surfaced as a 500 on every CORS preflight.
-  return new Response(null, { status: 204, headers });
+  return new Response(null, { status: 204, headers })
 }
 
 /**
@@ -66,50 +70,50 @@ export function preflightResponse(cors = true): Response {
  * driver text never reaches the client.
  */
 export function mapDatabaseError(error: unknown): {
-  code: ApiErrorCode;
-  message: string;
-  details?: Record<string, unknown>;
+  code: ApiErrorCode
+  message: string
+  details?: Record<string, unknown>
 } {
-  const candidate = error as { code?: string; message?: string; details?: string } | null;
-  const rawMessage = candidate?.message ?? '';
-  const rawCode = candidate?.code ?? '';
+  const candidate = error as { code?: string; message?: string; details?: string } | null
+  const rawMessage = candidate?.message ?? ''
+  const rawCode = candidate?.code ?? ''
 
   if (rawCode === '23505' || /duplicate key|already exists/i.test(rawMessage)) {
-    return { code: 'CONFLICT', message: API_ERROR_MESSAGES.CONFLICT };
+    return { code: 'CONFLICT', message: API_ERROR_MESSAGES.CONFLICT }
   }
   if (rawCode === '23503' || rawCode === '23514' || rawCode === '23502') {
-    return { code: 'VALIDATION_FAILED', message: API_ERROR_MESSAGES.VALIDATION_FAILED };
+    return { code: 'VALIDATION_FAILED', message: API_ERROR_MESSAGES.VALIDATION_FAILED }
   }
   if (rawCode === '42501') {
     if (/ACCOUNT_DISABLED/i.test(rawMessage)) {
-      return { code: 'AUTH_DISABLED', message: API_ERROR_MESSAGES.AUTH_DISABLED };
+      return { code: 'AUTH_DISABLED', message: API_ERROR_MESSAGES.AUTH_DISABLED }
     }
     if (/AUTH_REQUIRED/i.test(rawMessage)) {
-      return { code: 'AUTH_REQUIRED', message: API_ERROR_MESSAGES.AUTH_REQUIRED };
+      return { code: 'AUTH_REQUIRED', message: API_ERROR_MESSAGES.AUTH_REQUIRED }
     }
-    return { code: 'FORBIDDEN', message: API_ERROR_MESSAGES.FORBIDDEN };
+    return { code: 'FORBIDDEN', message: API_ERROR_MESSAGES.FORBIDDEN }
   }
   if (rawCode === 'P0002' || /not found/i.test(rawMessage)) {
-    return { code: 'NOT_FOUND', message: API_ERROR_MESSAGES.NOT_FOUND };
+    return { code: 'NOT_FOUND', message: API_ERROR_MESSAGES.NOT_FOUND }
   }
   if (/NOTE_REQUIRED/i.test(rawMessage) || /INVALID_DECISION/i.test(rawMessage)) {
-    return { code: 'VALIDATION_FAILED', message: API_ERROR_MESSAGES.VALIDATION_FAILED };
+    return { code: 'VALIDATION_FAILED', message: API_ERROR_MESSAGES.VALIDATION_FAILED }
   }
   if (/CANNOT_DISABLE_SELF|MODERATOR_TARGET/i.test(rawMessage)) {
-    return { code: 'FORBIDDEN', message: API_ERROR_MESSAGES.FORBIDDEN };
+    return { code: 'FORBIDDEN', message: API_ERROR_MESSAGES.FORBIDDEN }
   }
   if (/CAPTURE_RATE_LIMIT/i.test(rawMessage)) {
-    return { code: 'CAPTURE_RATE_LIMIT', message: API_ERROR_MESSAGES.CAPTURE_RATE_LIMIT };
+    return { code: 'CAPTURE_RATE_LIMIT', message: API_ERROR_MESSAGES.CAPTURE_RATE_LIMIT }
   }
   if (/FLAG_RATE_LIMIT/i.test(rawMessage)) {
-    return { code: 'FLAG_RATE_LIMIT', message: API_ERROR_MESSAGES.FLAG_RATE_LIMIT };
+    return { code: 'FLAG_RATE_LIMIT', message: API_ERROR_MESSAGES.FLAG_RATE_LIMIT }
   }
 
-  return { code: 'INTERNAL', message: API_ERROR_MESSAGES.INTERNAL };
+  return { code: 'INTERNAL', message: API_ERROR_MESSAGES.INTERNAL }
 }
 
 /** Turns a mapped database error into an HTTP response. */
 export function databaseErrorResponse(error: unknown, cors = false): Response {
-  const mapped = mapDatabaseError(error);
-  return errorResponse(mapped.code, mapped.message, mapped.details, cors);
+  const mapped = mapDatabaseError(error)
+  return errorResponse(mapped.code, mapped.message, mapped.details, cors)
 }

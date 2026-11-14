@@ -1,5 +1,5 @@
-import { TFunction } from 'i18next';
-import { resolveErrorMessage, type ApiErrorCode } from '@nagar-shield/shared';
+import type { TFunction } from 'i18next'
+import { resolveErrorMessage, type ApiErrorCode } from '@nagar-shield/shared'
 
 /**
  * The localized message for an API error code.
@@ -26,7 +26,7 @@ import { resolveErrorMessage, type ApiErrorCode } from '@nagar-shield/shared';
  * fallback, and the developer-facing message from `AppError` is never shown.
  */
 export function errorCopy(t: TFunction, code: ApiErrorCode): string {
-  return t(resolveErrorMessage(code));
+  return t(resolveErrorMessage(code))
 }
 
 /**
@@ -38,6 +38,6 @@ export function errorCopy(t: TFunction, code: ApiErrorCode): string {
  * of the app.
  */
 export function errorCopyForCode(t: TFunction, code: string): string {
-  const known = resolveErrorMessage(code as ApiErrorCode);
-  return t(known ?? 'errors.internal');
+  const known = resolveErrorMessage(code as ApiErrorCode)
+  return t(known ?? 'errors.internal')
 }

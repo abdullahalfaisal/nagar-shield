@@ -1,6 +1,6 @@
-import { Directory, File, Paths } from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { AppError, type MediaType } from '@nagar-shield/shared';
+import { Directory, File, Paths } from 'expo-file-system'
+import * as ImageManipulator from 'expo-image-manipulator'
+import { AppError, type MediaType } from '@nagar-shield/shared'
 import {
   exceedsFileCap,
   exceedsVideoCap,
@@ -10,7 +10,7 @@ import {
   isAllowedVideoType,
   resizeTarget,
   type PreparedMedia,
-} from './mediaPipeline';
+} from './mediaPipeline'
 
 /**
  * The device-side media preparation.
@@ -22,26 +22,26 @@ import {
  */
 
 export interface PickedAsset {
-  uri: string;
-  mimeType: string | null;
-  fileName: string | null;
-  fileSize: number | null;
-  width: number | null;
-  height: number | null;
-  duration: number | null;
+  uri: string
+  mimeType: string | null
+  fileName: string | null
+  fileSize: number | null
+  width: number | null
+  height: number | null
+  duration: number | null
 }
 
 /** The directory the sanitised media drafts live in. */
 function draftDirectory(): Directory {
-  return new Directory(Paths.cache, 'nagar-shield-media');
+  return new Directory(Paths.cache, 'nagar-shield-media')
 }
 
 function ensureDraftDirectory(): Directory {
-  const directory = draftDirectory();
+  const directory = draftDirectory()
   if (!directory.exists) {
-    directory.create({ intermediates: true });
+    directory.create({ intermediates: true })
   }
-  return directory;
+  return directory
 }
 
 /**
@@ -52,32 +52,32 @@ function ensureDraftDirectory(): Directory {
  */
 export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
   if (!isAllowedImageType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA');
+    throw new AppError('UNSUPPORTED_MEDIA')
   }
 
-  const width = asset.width ?? MEDIA_DEFAULT_DIMENSION;
-  const height = asset.height ?? MEDIA_DEFAULT_DIMENSION;
-  const target = resizeTarget(width, height);
+  const width = asset.width ?? MEDIA_DEFAULT_DIMENSION
+  const height = asset.height ?? MEDIA_DEFAULT_DIMENSION
+  const target = resizeTarget(width, height)
 
-  const context = ImageManipulator.ImageManipulator.manipulate(asset.uri);
-  context.resize({ width: target.width, height: target.height });
-  const rendered = await context.renderAsync();
+  const context = ImageManipulator.ImageManipulator.manipulate(asset.uri)
+  context.resize({ width: target.width, height: target.height })
+  const rendered = await context.renderAsync()
   // `renderAsync` resolves with a native image reference; `saveAsync` writes
   // the re-encoded JPEG into the cache directory and returns its URI. The
   // re-encode is what strips the EXIF block (and the embedded GPS with it).
   const image = await rendered.saveAsync({
     compress: 0.85,
     format: ImageManipulator.SaveFormat.JPEG,
-  });
+  })
 
-  const file = new File(ensureDraftDirectory(), `photo-${Date.now()}.jpg`);
-  const source = new File(image.uri);
-  await source.copy(file, { overwrite: true });
+  const file = new File(ensureDraftDirectory(), `photo-${Date.now()}.jpg`)
+  const source = new File(image.uri)
+  await source.copy(file, { overwrite: true })
 
-  const info = file.info();
+  const info = file.info()
 
   if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE');
+    throw new AppError('MEDIA_TOO_LARGE')
   }
 
   return {
@@ -89,7 +89,7 @@ export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
     height: target.height,
     contentType: 'image/jpeg',
     extension: 'jpg',
-  };
+  }
 }
 
 /**
@@ -102,25 +102,28 @@ export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
  */
 export async function prepareVideo(asset: PickedAsset): Promise<PreparedMedia> {
   if (!isAllowedVideoType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA');
+    throw new AppError('UNSUPPORTED_MEDIA')
   }
 
   if (exceedsVideoCap(asset.duration)) {
-    throw new AppError('MEDIA_TOO_LARGE', { maxSeconds: 30 });
+    throw new AppError('MEDIA_TOO_LARGE', { maxSeconds: 30 })
   }
 
-  const width = asset.width ?? MEDIA_DEFAULT_DIMENSION;
-  const height = asset.height ?? MEDIA_DEFAULT_DIMENSION;
-  const target = resizeTarget(width, height);
+  const width = asset.width ?? MEDIA_DEFAULT_DIMENSION
+  const height = asset.height ?? MEDIA_DEFAULT_DIMENSION
+  const target = resizeTarget(width, height)
 
-  const file = new File(ensureDraftDirectory(), `video-${Date.now()}.${extensionFor(asset.mimeType, 'video')}`);
-  const source = new File(asset.uri);
-  await source.copy(file, { overwrite: true });
+  const file = new File(
+    ensureDraftDirectory(),
+    `video-${Date.now()}.${extensionFor(asset.mimeType, 'video')}`,
+  )
+  const source = new File(asset.uri)
+  await source.copy(file, { overwrite: true })
 
-  const info = file.info();
+  const info = file.info()
 
   if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE');
+    throw new AppError('MEDIA_TOO_LARGE')
   }
 
   return {
@@ -132,7 +135,7 @@ export async function prepareVideo(asset: PickedAsset): Promise<PreparedMedia> {
     height: target.height,
     contentType: asset.mimeType ?? 'video/mp4',
     extension: extensionFor(asset.mimeType, 'video'),
-  };
+  }
 }
 
 /**
@@ -143,22 +146,22 @@ export async function prepareVideo(asset: PickedAsset): Promise<PreparedMedia> {
  */
 export async function prepareFile(asset: PickedAsset): Promise<PreparedMedia> {
   if (!isAllowedFileType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA');
+    throw new AppError('UNSUPPORTED_MEDIA')
   }
 
   if (asset.fileSize !== null && exceedsFileCap(asset.fileSize)) {
-    throw new AppError('MEDIA_TOO_LARGE');
+    throw new AppError('MEDIA_TOO_LARGE')
   }
 
-  const extension = extensionFor(asset.mimeType, 'file');
-  const file = new File(ensureDraftDirectory(), `file-${Date.now()}.${extension}`);
-  const source = new File(asset.uri);
-  await source.copy(file, { overwrite: true });
+  const extension = extensionFor(asset.mimeType, 'file')
+  const file = new File(ensureDraftDirectory(), `file-${Date.now()}.${extension}`)
+  const source = new File(asset.uri)
+  await source.copy(file, { overwrite: true })
 
-  const info = file.info();
+  const info = file.info()
 
   if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE');
+    throw new AppError('MEDIA_TOO_LARGE')
   }
 
   return {
@@ -170,8 +173,8 @@ export async function prepareFile(asset: PickedAsset): Promise<PreparedMedia> {
     height: null,
     contentType: asset.mimeType ?? 'application/pdf',
     extension,
-  };
+  }
 }
 
 /** The fallback dimension when the picker reports no geometry. */
-const MEDIA_DEFAULT_DIMENSION = 1080;
+const MEDIA_DEFAULT_DIMENSION = 1080

@@ -1,5 +1,5 @@
-import { ModeratorGate } from '@/app/moderator-gate';
-import { QueueClient } from '@/app/queue/queue-client';
+import { ModeratorGate } from '@/app/moderator-gate'
+import { QueueClient } from '@/app/queue/queue-client'
 
 /**
  * The moderation queue route.
@@ -16,5 +16,5 @@ export default function QueuePage() {
     <ModeratorGate>
       <QueueClient />
     </ModeratorGate>
-  );
+  )
 }

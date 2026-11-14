@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Button, InputField, Toggle } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
-import { logIn } from '@/shared/auth/authService';
-import { markPasswordSignIn } from '@/shared/auth/useBiometricGate';
-import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Button, InputField, Toggle } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
+import { logIn } from '@/shared/auth/authService'
+import { markPasswordSignIn } from '@/shared/auth/useBiometricGate'
+import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 11 — Login.
@@ -24,25 +24,25 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * prototype's own input and toggle styles.
  */
 export default function LoginScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
 
-  const canSubmit = identifier.trim().length > 0 && password.length > 0 && !submitting;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0 && !submitting
 
   const onSubmit = async () => {
-    setSubmitting(true);
-    setFormError(undefined);
-    setErrors({});
+    setSubmitting(true)
+    setFormError(undefined)
+    setErrors({})
     try {
-      await logIn({ identifier, password, rememberMe });
+      await logIn({ identifier, password, rememberMe })
 
       // The user just proved who they are with a password. Two things
       // follow from that:
@@ -51,20 +51,20 @@ export default function LoginScreen() {
       //     fingerprint right after a password would be theatre;
       //   * the biometric failure count is cleared — the failures that led
       //     here must not follow the user to the next session.
-      await markPasswordSignIn();
-      await resetBiometricFailures();
-      await clearLocalBiometricState();
+      await markPasswordSignIn()
+      await resetBiometricFailures()
+      await clearLocalBiometricState()
 
-      router.replace('/(app)/home');
+      router.replace('/(app)/home')
     } catch (error) {
-      const appError = error instanceof AppError ? error : fromSupabaseError(error);
+      const appError = error instanceof AppError ? error : fromSupabaseError(error)
       setErrors({
         password: errorCopy(t, appError.code),
-      });
-      setFormError(errorCopy(t, appError.code));
-      setSubmitting(false);
+      })
+      setFormError(errorCopy(t, appError.code))
+      setSubmitting(false)
     }
-  };
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -159,7 +159,9 @@ export default function LoginScreen() {
         />
 
         <View style={styles.footerRow}>
-          <Text style={[styles.footerText, { color: theme.colors.ink[600] }]}>{t('auth.noAccount')}</Text>
+          <Text style={[styles.footerText, { color: theme.colors.ink[600] }]}>
+            {t('auth.noAccount')}
+          </Text>
           <Text
             accessibilityRole="button"
             onPress={() => router.push('/(auth)/register')}
@@ -170,7 +172,7 @@ export default function LoginScreen() {
         </View>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -257,4 +259,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-});
+})

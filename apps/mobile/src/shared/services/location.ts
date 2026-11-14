@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import * as Location from 'expo-location';
+import { useCallback, useEffect, useState } from 'react'
+import * as Location from 'expo-location'
 
 /**
  * The single foreground GPS fix.
@@ -10,9 +10,9 @@ import * as Location from 'expo-location';
  * location fix at all (FR-PERMS-2).
  */
 export interface Fix {
-  lat: number;
-  lng: number;
-  accuracyM: number | null;
+  lat: number
+  lng: number
+  accuracyM: number | null
 }
 
 export type FixState =
@@ -20,11 +20,11 @@ export type FixState =
   | { status: 'loading' }
   | { status: 'ready'; fix: Fix }
   | { status: 'denied' }
-  | { status: 'unavailable' };
+  | { status: 'unavailable' }
 
 export interface UseCurrentFixOptions {
   /** Requests the fix as soon as the hook mounts. */
-  enabled?: boolean;
+  enabled?: boolean
 }
 
 /**
@@ -34,40 +34,40 @@ export interface UseCurrentFixOptions {
  * degrades to a manual origin and never blocks the user.
  */
 export function useCurrentFix(options: UseCurrentFixOptions = {}): {
-  state: FixState;
-  refresh: () => void;
+  state: FixState
+  refresh: () => void
 } {
-  const enabled = options.enabled ?? true;
-  const [state, setState] = useState<FixState>({ status: 'idle' });
-  const [nonce, setNonce] = useState(0);
+  const enabled = options.enabled ?? true
+  const [state, setState] = useState<FixState>({ status: 'idle' })
+  const [nonce, setNonce] = useState(0)
 
   const refresh = useCallback(() => {
-    setNonce((current) => current + 1);
-  }, []);
+    setNonce((current) => current + 1)
+  }, [])
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return
 
-    let cancelled = false;
+    let cancelled = false
 
     const resolve = async () => {
-      setState({ status: 'loading' });
+      setState({ status: 'loading' })
 
       try {
-        const permission = await Location.requestForegroundPermissionsAsync();
+        const permission = await Location.requestForegroundPermissionsAsync()
 
-        if (cancelled) return;
+        if (cancelled) return
 
         if (permission.status !== Location.PermissionStatus.GRANTED) {
-          setState({ status: 'denied' });
-          return;
+          setState({ status: 'denied' })
+          return
         }
 
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
-        });
+        })
 
-        if (cancelled) return;
+        if (cancelled) return
 
         setState({
           status: 'ready',
@@ -76,20 +76,20 @@ export function useCurrentFix(options: UseCurrentFixOptions = {}): {
             lng: position.coords.longitude,
             accuracyM: position.coords.accuracy ?? null,
           },
-        });
+        })
       } catch {
-        if (!cancelled) setState({ status: 'unavailable' });
+        if (!cancelled) setState({ status: 'unavailable' })
       }
-    };
+    }
 
-    void resolve();
+    void resolve()
 
     return () => {
-      cancelled = true;
-    };
-  }, [enabled, nonce]);
+      cancelled = true
+    }
+  }, [enabled, nonce])
 
-  return { state, refresh };
+  return { state, refresh }
 }
 
 /**
@@ -102,12 +102,12 @@ export const DHAKA_FALLBACK_ORIGIN: Fix = {
   lat: 23.7806,
   lng: 90.4066,
   accuracyM: null,
-};
+}
 
 /** The origin to use for a given fix state. */
 export function resolveOrigin(state: FixState): { origin: Fix; isFallback: boolean } {
   if (state.status === 'ready') {
-    return { origin: state.fix, isFallback: false };
+    return { origin: state.fix, isFallback: false }
   }
-  return { origin: DHAKA_FALLBACK_ORIGIN, isFallback: true };
+  return { origin: DHAKA_FALLBACK_ORIGIN, isFallback: true }
 }

@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 /**
  * The configuration-error screen.
@@ -21,8 +21,8 @@ import { Icon } from './Icon';
  * something they cannot act on.
  */
 export function ConfigErrorView() {
-  const theme = useTheme();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const { t } = useTranslation()
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -68,7 +68,7 @@ export function ConfigErrorView() {
         {t('config.detail')}
       </Text>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -84,4 +84,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

@@ -1,4 +1,4 @@
-import { REPORT_CATEGORIES } from '../enums';
+import { REPORT_CATEGORIES } from '../enums'
 import type {
   AreaHierarchy,
   EmergencyContact,
@@ -8,7 +8,7 @@ import type {
   PublicReport,
   ReportFlag,
   Station,
-} from '../types';
+} from '../types'
 
 /**
  * Deterministic factories for fixtures and tests.
@@ -31,15 +31,15 @@ import type {
  */
 
 /** A fixed seed keeps generated fixtures stable across runs. */
-let counter = 0;
+let counter = 0
 
 function nextId(prefix: string): string {
-  counter += 1;
-  return `${prefix}-${String(counter).padStart(6, '0')}`;
+  counter += 1
+  return `${prefix}-${String(counter).padStart(6, '0')}`
 }
 
 export function resetFactoryCounter(): void {
-  counter = 0;
+  counter = 0
 }
 
 /** The area hierarchy every Bangladesh fixture sits inside. */
@@ -49,7 +49,7 @@ export const buildAreaHierarchy = (overrides: Partial<AreaHierarchy> = {}): Area
   thana: 'Mirpur',
   neighborhood: 'Kazipara',
   ...overrides,
-});
+})
 
 /**
  * A report as the public feed sees it.
@@ -69,7 +69,7 @@ export const buildPublicReport = (overrides: Partial<PublicReport> = {}): Public
   hasMedia: true,
   mediaCount: 1,
   ...overrides,
-});
+})
 
 /**
  * A report as the **author** sees it — it carries `authorId`, which the
@@ -89,7 +89,7 @@ export const buildOwnedReport = (overrides: Partial<OwnedReport> = {}): OwnedRep
   createdAt: new Date('2026-11-03T18:00:00.000Z').toISOString(),
   media: [],
   ...overrides,
-});
+})
 
 /** A flag against a report — the moderation queue's input. */
 export const buildReportFlag = (overrides: Partial<ReportFlag> = {}): ReportFlag => ({
@@ -99,7 +99,7 @@ export const buildReportFlag = (overrides: Partial<ReportFlag> = {}): ReportFlag
   reason: 'misinformation',
   createdAt: new Date('2026-11-03T18:00:00.000Z').toISOString(),
   ...overrides,
-});
+})
 
 export const buildProfile = (overrides: Partial<Profile> = {}): Profile => ({
   id: nextId('user'),
@@ -114,9 +114,11 @@ export const buildProfile = (overrides: Partial<Profile> = {}): Profile => ({
   deletedAt: null,
   createdAt: new Date('2026-11-01T00:00:00.000Z').toISOString(),
   ...overrides,
-});
+})
 
-export const buildEmergencyContact = (overrides: Partial<EmergencyContact> = {}): EmergencyContact => ({
+export const buildEmergencyContact = (
+  overrides: Partial<EmergencyContact> = {},
+): EmergencyContact => ({
   id: nextId('contact'),
   userId: nextId('user'),
   name: 'Fixture Contact',
@@ -126,7 +128,7 @@ export const buildEmergencyContact = (overrides: Partial<EmergencyContact> = {})
   sortOrder: 0,
   createdAt: new Date('2026-11-01T00:00:00.000Z').toISOString(),
   ...overrides,
-});
+})
 
 export const buildStation = (overrides: Partial<Station> = {}): Station => ({
   id: nextId('station'),
@@ -143,7 +145,7 @@ export const buildStation = (overrides: Partial<Station> = {}): Station => ({
   address: 'Mirpur, Dhaka',
   distanceKm: 1.2,
   ...overrides,
-});
+})
 
 export const buildHotline = (overrides: Partial<Hotline> = {}): Hotline => ({
   id: nextId('hotline'),
@@ -154,4 +156,4 @@ export const buildHotline = (overrides: Partial<Hotline> = {}): Hotline => ({
   description: '24/7 support for women and children',
   sortOrder: 0,
   ...overrides,
-});
+})

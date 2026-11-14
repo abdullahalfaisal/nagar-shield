@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 
 /**
  * The no-chart rule, enforced over the source tree.
@@ -38,13 +38,13 @@ import { join, relative, sep } from 'node:path';
  */
 
 /** The directories the scan reads. */
-const SCAN_ROOTS = ['app', 'src'];
+const SCAN_ROOTS = ['app', 'src']
 
 /** The source extensions the scan reads. */
-const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
+const SOURCE_EXTENSIONS = ['.ts', '.tsx']
 
 /** The directories the scan never descends into. */
-const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', '.expo', 'coverage']);
+const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'build', '.expo', 'coverage'])
 
 /**
  * The banned dependency names.
@@ -70,7 +70,7 @@ const BANNED_DEPENDENCIES = [
   'react-native-gifted-charts',
   'react-native-linear-gradient-chart',
   '@react-native-community/charts',
-];
+]
 
 /**
  * The banned identifiers, matched against **code only**.
@@ -83,26 +83,31 @@ const BANNED_DEPENDENCIES = [
 const BANNED_IDENTIFIERS: Array<{ pattern: RegExp; rule: string }> = [
   // A chart component, by name.
   {
-    pattern: /\b(BarChart|LineChart|PieChart|DonutChart|AreaChart|RadarChart|ScatterChart|Sparkline|Heatmap)\b/,
+    pattern:
+      /\b(BarChart|LineChart|PieChart|DonutChart|AreaChart|RadarChart|ScatterChart|Sparkline|Heatmap)\b/,
     rule: 'a chart component',
   },
   // A percentage, a rate, a share, a trend, as an identifier.
   {
-    pattern: /\b(percentage|percent|sharePercent|trendLine|trend|hotspot|hotSpot|clusterRanking|riskScore|dangerIndex)\b/,
+    pattern:
+      /\b(percentage|percent|sharePercent|trendLine|trend|hotspot|hotSpot|clusterRanking|riskScore|dangerIndex)\b/,
     rule: 'a statistic derived from the counts',
   },
   // SVG primitives — the only way a bar or a line gets drawn in React Native.
-  { pattern: /<\s*(Rect|Polyline|Polygon|Line|Circle)\b/, rule: 'drawn geometry (an SVG chart primitive)' },
-];
+  {
+    pattern: /<\s*(Rect|Polyline|Polygon|Line|Circle)\b/,
+    rule: 'drawn geometry (an SVG chart primitive)',
+  },
+]
 
 /** The package manifest. */
-const PACKAGE_JSON = join(__dirname, '..', '..', 'package.json');
+const PACKAGE_JSON = join(__dirname, '..', '..', 'package.json')
 
 interface SourceFile {
   /** The path relative to the app root, with forward slashes. */
-  path: string;
+  path: string
   /** The file's text, with comments and string literals removed. */
-  code: string;
+  code: string
 }
 
 /**
@@ -113,202 +118,207 @@ interface SourceFile {
  * ever stated in words must not read as a rule violation.
  */
 function stripProse(source: string): string {
-  let result = '';
-  let index = 0;
+  let result = ''
+  let index = 0
 
   while (index < source.length) {
-    const char = source[index] as string;
-    const next = source[index + 1];
+    const char = source[index] as string
+    const next = source[index + 1]
 
     // A line comment.
     if (char === '/' && next === '/') {
-      const end = source.indexOf('\n', index);
-      index = end === -1 ? source.length : end;
-      continue;
+      const end = source.indexOf('\n', index)
+      index = end === -1 ? source.length : end
+      continue
     }
 
     // A block comment.
     if (char === '/' && next === '*') {
-      const end = source.indexOf('*/', index + 2);
-      index = end === -1 ? source.length : end + 2;
-      result += ' ';
-      continue;
+      const end = source.indexOf('*/', index + 2)
+      index = end === -1 ? source.length : end + 2
+      result += ' '
+      continue
     }
 
     // A string literal — single, double, or template.
     if (char === "'" || char === '"' || char === '`') {
-      const quote = char;
-      index += 1;
+      const quote = char
+      index += 1
       while (index < source.length) {
-        const current = source[index] as string;
+        const current = source[index] as string
         if (current === '\\') {
-          index += 2;
-          continue;
+          index += 2
+          continue
         }
         if (current === quote) {
-          index += 1;
-          break;
+          index += 1
+          break
         }
-        index += 1;
+        index += 1
       }
-      result += ' ';
-      continue;
+      result += ' '
+      continue
     }
 
-    result += char;
-    index += 1;
+    result += char
+    index += 1
   }
 
-  return result;
+  return result
 }
 
 /** Every source file under the given roots. */
 function collectSourceFiles(): SourceFile[] {
-  const appRoot = join(__dirname, '..', '..');
-  const files: SourceFile[] = [];
+  const appRoot = join(__dirname, '..', '..')
+  const files: SourceFile[] = []
 
   const walk = (directory: string) => {
-    let entries: string[];
+    let entries: string[]
     try {
-      entries = readdirSync(directory);
+      entries = readdirSync(directory)
     } catch {
-      return;
+      return
     }
 
     for (const entry of entries) {
-      if (IGNORED_DIRECTORIES.has(entry)) continue;
+      if (IGNORED_DIRECTORIES.has(entry)) continue
 
-      const absolute = join(directory, entry);
-      let stats;
+      const absolute = join(directory, entry)
+      let stats
       try {
-        stats = statSync(absolute);
+        stats = statSync(absolute)
       } catch {
-        continue;
+        continue
       }
 
       if (stats.isDirectory()) {
-        walk(absolute);
-        continue;
+        walk(absolute)
+        continue
       }
 
-      const path = relative(appRoot, absolute).split(sep).join('/');
-      if (!SOURCE_EXTENSIONS.some((extension) => path.endsWith(extension))) continue;
+      const path = relative(appRoot, absolute).split(sep).join('/')
+      if (!SOURCE_EXTENSIONS.some((extension) => path.endsWith(extension))) continue
       // The test files themselves are the rule, not the code under the rule.
-      if (path.includes('.test.ts')) continue;
+      if (path.includes('.test.ts')) continue
 
-      files.push({ path, code: stripProse(readFileSync(absolute, 'utf8')) });
+      files.push({ path, code: stripProse(readFileSync(absolute, 'utf8')) })
     }
-  };
-
-  for (const root of SCAN_ROOTS) {
-    walk(join(appRoot, root));
   }
 
-  return files;
+  for (const root of SCAN_ROOTS) {
+    walk(join(appRoot, root))
+  }
+
+  return files
 }
 
-const sourceFiles = collectSourceFiles();
+const sourceFiles = collectSourceFiles()
 
 describe('the app ships no chart code', () => {
   it('reads a non-trivial number of source files — the scan is not vacuous', () => {
     // A scan that found nothing because it walked the wrong directories would
     // pass every assertion below while protecting nothing.
-    expect(sourceFiles.length).toBeGreaterThan(20);
-  });
+    expect(sourceFiles.length).toBeGreaterThan(20)
+  })
 
   it('carries no charting library in the dependency tree', () => {
     const manifest = JSON.parse(readFileSync(PACKAGE_JSON, 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
     const declared = Object.keys({
       ...(manifest.dependencies ?? {}),
       ...(manifest.devDependencies ?? {}),
-    });
+    })
 
-    const present = declared.filter((name) => BANNED_DEPENDENCIES.includes(name));
+    const present = declared.filter((name) => BANNED_DEPENDENCIES.includes(name))
 
-    expect(present).toEqual([]);
-  });
+    expect(present).toEqual([])
+  })
 
   it('names no chart component, in any file', () => {
-    const offenders: string[] = [];
+    const offenders: string[] = []
 
     for (const file of sourceFiles) {
       for (const { pattern, rule } of BANNED_IDENTIFIERS) {
-        const match = file.code.match(pattern);
-        if (!match) continue;
-        offenders.push(`${file.path} — ${rule}: "${match[0]}"`);
+        const match = file.code.match(pattern)
+        if (!match) continue
+        offenders.push(`${file.path} — ${rule}: "${match[0]}"`)
       }
     }
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('draws no geometry — no SVG primitive appears in any file', () => {
     const offenders = sourceFiles
       .filter((file) => /<\s*(Rect|Polyline|Polygon|Line|Circle)\b/.test(file.code))
-      .map((file) => file.path);
+      .map((file) => file.path)
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('has no chart screen — the prototype Charts screen is never built', () => {
     // The prototype's Charts screen. A file named after it, or a route to it,
     // is the regression this scan exists to catch.
-    const offenders: string[] = [];
+    const offenders: string[] = []
 
     for (const file of sourceFiles) {
       if (file.path.toLowerCase().includes('chart')) {
-        offenders.push(`${file.path} — a file named after a chart`);
-        continue;
+        offenders.push(`${file.path} — a file named after a chart`)
+        continue
       }
       if (/['"`]\/[^'"`]*chart[^'"`]*['"`]/.test(file.code)) {
-        offenders.push(`${file.path} — a route to a chart`);
+        offenders.push(`${file.path} — a route to a chart`)
       }
     }
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('has no chart library import, even a local one', () => {
     const offenders = sourceFiles
-      .filter((file) => /from\s+['"][^'"]*(chart|graph|plotly|victory|d3)[^'"]*['"]/.test(file.code))
-      .map((file) => file.path);
+      .filter((file) =>
+        /from\s+['"][^'"]*(chart|graph|plotly|victory|d3)[^'"]*['"]/.test(file.code),
+      )
+      .map((file) => file.path)
 
-    expect(offenders).toEqual([]);
-  });
-});
+    expect(offenders).toEqual([])
+  })
+})
 
 describe('the distribution is a list of counts', () => {
   it('renders the counts through CountRow — a text label and a number', () => {
     const listRowGroup = readFileSync(
       join(__dirname, '..', 'shared', 'ui', 'ListRowGroup.tsx'),
       'utf8',
-    );
+    )
 
     // The count row is a label plus a number in a pill. There is no width
     // computed from the count, which is what a bar would need.
-    expect(listRowGroup).toContain('export function CountRow');
-    expect(stripProse(listRowGroup)).not.toMatch(/width:\s*[^,}]*count/i);
-  });
+    expect(listRowGroup).toContain('export function CountRow')
+    expect(stripProse(listRowGroup)).not.toMatch(/width:\s*[^,}]*count/i)
+  })
 
   it('renders no percentage, rate, or trend in the History screen', () => {
-    const historyScreen = readFileSync(join(__dirname, '..', '..', 'app', '(app)', 'history.tsx'), 'utf8');
-    const code = stripProse(historyScreen);
+    const historyScreen = readFileSync(
+      join(__dirname, '..', '..', 'app', '(app)', 'history.tsx'),
+      'utf8',
+    )
+    const code = stripProse(historyScreen)
 
-    expect(code).not.toMatch(/\bpercentage\b/i);
-    expect(code).not.toMatch(/\bpercent\b/i);
-    expect(code).not.toMatch(/\btrend\b/i);
-    expect(code).not.toMatch(/\bshare\b/i);
-    expect(code).not.toMatch(/\brate\b/i);
-  });
+    expect(code).not.toMatch(/\bpercentage\b/i)
+    expect(code).not.toMatch(/\bpercent\b/i)
+    expect(code).not.toMatch(/\btrend\b/i)
+    expect(code).not.toMatch(/\bshare\b/i)
+    expect(code).not.toMatch(/\brate\b/i)
+  })
 
   it('states the rule in the UI, in words — the ban is visible to the user', () => {
     // The prototype's own copy survives into the shipped app: the distribution
     // tab says plainly that Nagar Shield does not show crime statistics.
-    const en = readFileSync(join(__dirname, '..', 'shared', 'i18n', 'en.ts'), 'utf8');
+    const en = readFileSync(join(__dirname, '..', 'shared', 'i18n', 'en.ts'), 'utf8')
 
-    expect(en).toMatch(/do not show crime statistics/i);
-  });
-});
+    expect(en).toMatch(/do not show crime statistics/i)
+  })
+})

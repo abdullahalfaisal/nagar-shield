@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 
 /**
  * The no-bulk-action rule.
@@ -34,13 +34,13 @@ import { join, relative, sep } from 'node:path';
  */
 
 /** The directories the scan reads. */
-const SCAN_ROOTS = ['app', 'lib'];
+const SCAN_ROOTS = ['app', 'lib']
 
 /** The source extensions the scan reads. */
-const SOURCE_EXTENSIONS = ['.ts', '.tsx'];
+const SOURCE_EXTENSIONS = ['.ts', '.tsx']
 
 /** The directories the scan never descends into. */
-const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage']);
+const IGNORED_DIRECTORIES = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage'])
 
 /**
  * The banned identifiers.
@@ -55,14 +55,17 @@ const BANNED_IDENTIFIERS: Array<{ pattern: RegExp; rule: string }> = [
     rule: 'a bulk action',
   },
   { pattern: /\bbulk\w*/i, rule: 'a bulk action' },
-  { pattern: /\b(restoreAll|removeAll|bulkRestore|bulkRemove|selectAll|toggleAll)\b/, rule: 'a bulk action' },
+  {
+    pattern: /\b(restoreAll|removeAll|bulkRestore|bulkRemove|selectAll|toggleAll)\b/,
+    rule: 'a bulk action',
+  },
   { pattern: /\bmultiSelect\b/, rule: 'a multi-select' },
   // A checkbox in a moderation list is the selection affordance of a bulk
   // action. The console has no other use for one.
   { pattern: /type\s*=\s*['"]checkbox['"]/, rule: 'a selection affordance' },
   // A shared note across reports.
   { pattern: /\bsharedNote\b/, rule: 'a shared note across reports' },
-];
+]
 
 /**
  * Removes comments and string literals from a source file.
@@ -72,132 +75,135 @@ const BANNED_IDENTIFIERS: Array<{ pattern: RegExp; rule: string }> = [
  * would fail on the rule itself.
  */
 function stripProse(source: string): string {
-  let result = '';
-  let index = 0;
+  let result = ''
+  let index = 0
 
   while (index < source.length) {
-    const char = source[index] as string;
-    const next = source[index + 1];
+    const char = source[index] as string
+    const next = source[index + 1]
 
     if (char === '/' && next === '/') {
-      const end = source.indexOf('\n', index);
-      index = end === -1 ? source.length : end;
-      continue;
+      const end = source.indexOf('\n', index)
+      index = end === -1 ? source.length : end
+      continue
     }
 
     if (char === '/' && next === '*') {
-      const end = source.indexOf('*/', index + 2);
-      index = end === -1 ? source.length : end + 2;
-      result += ' ';
-      continue;
+      const end = source.indexOf('*/', index + 2)
+      index = end === -1 ? source.length : end + 2
+      result += ' '
+      continue
     }
 
     if (char === "'" || char === '"' || char === '`') {
-      const quote = char;
-      index += 1;
+      const quote = char
+      index += 1
       while (index < source.length) {
-        const current = source[index] as string;
+        const current = source[index] as string
         if (current === '\\') {
-          index += 2;
-          continue;
+          index += 2
+          continue
         }
         if (current === quote) {
-          index += 1;
-          break;
+          index += 1
+          break
         }
-        index += 1;
+        index += 1
       }
-      result += ' ';
-      continue;
+      result += ' '
+      continue
     }
 
-    result += char;
-    index += 1;
+    result += char
+    index += 1
   }
 
-  return result;
+  return result
 }
 
 interface SourceFile {
-  path: string;
-  code: string;
+  path: string
+  code: string
 }
 
 function collectSourceFiles(): SourceFile[] {
-  const adminRoot = join(__dirname, '..');
-  const files: SourceFile[] = [];
+  const adminRoot = join(__dirname, '..')
+  const files: SourceFile[] = []
 
   const walk = (directory: string) => {
-    let entries: string[];
+    let entries: string[]
     try {
-      entries = readdirSync(directory);
+      entries = readdirSync(directory)
     } catch {
-      return;
+      return
     }
 
     for (const entry of entries) {
-      if (IGNORED_DIRECTORIES.has(entry)) continue;
+      if (IGNORED_DIRECTORIES.has(entry)) continue
 
-      const absolute = join(directory, entry);
-      let stats;
+      const absolute = join(directory, entry)
+      let stats
       try {
-        stats = statSync(absolute);
+        stats = statSync(absolute)
       } catch {
-        continue;
+        continue
       }
 
       if (stats.isDirectory()) {
-        walk(absolute);
-        continue;
+        walk(absolute)
+        continue
       }
 
-      const path = relative(adminRoot, absolute).split(sep).join('/');
-      if (!SOURCE_EXTENSIONS.some((extension) => path.endsWith(extension))) continue;
-      if (path.includes('.test.ts')) continue;
+      const path = relative(adminRoot, absolute).split(sep).join('/')
+      if (!SOURCE_EXTENSIONS.some((extension) => path.endsWith(extension))) continue
+      if (path.includes('.test.ts')) continue
 
-      files.push({ path, code: stripProse(readFileSync(absolute, 'utf8')) });
+      files.push({ path, code: stripProse(readFileSync(absolute, 'utf8')) })
     }
-  };
-
-  for (const root of SCAN_ROOTS) {
-    walk(join(adminRoot, root));
   }
 
-  return files;
+  for (const root of SCAN_ROOTS) {
+    walk(join(adminRoot, root))
+  }
+
+  return files
 }
 
-const sourceFiles = collectSourceFiles();
+const sourceFiles = collectSourceFiles()
 
 describe('the console has no bulk action', () => {
   it('reads a non-trivial number of source files — the scan is not vacuous', () => {
-    expect(sourceFiles.length).toBeGreaterThan(3);
-  });
+    expect(sourceFiles.length).toBeGreaterThan(3)
+  })
 
   it('names no bulk action, in any file', () => {
-    const offenders: string[] = [];
+    const offenders: string[] = []
 
     for (const file of sourceFiles) {
       for (const { pattern, rule } of BANNED_IDENTIFIERS) {
-        const match = file.code.match(pattern);
-        if (!match) continue;
-        offenders.push(`${file.path} — ${rule}: "${match[0]}"`);
+        const match = file.code.match(pattern)
+        if (!match) continue
+        offenders.push(`${file.path} — ${rule}: "${match[0]}"`)
       }
     }
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('offers no multi-select affordance in the queue', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8')
 
-    expect(stripProse(queue)).not.toMatch(/type\s*=\s*['"]checkbox['"]/);
-    expect(stripProse(queue)).not.toMatch(/\bselectedIds\b/);
-    expect(stripProse(queue)).not.toMatch(/\btoggleSelect\b/);
-  });
+    expect(stripProse(queue)).not.toMatch(/type\s*=\s*['"]checkbox['"]/)
+    expect(stripProse(queue)).not.toMatch(/\bselectedIds\b/)
+    expect(stripProse(queue)).not.toMatch(/\btoggleSelect\b/)
+  })
 
   it('decides one report at a time, through the per-report decision', () => {
-    const decision = readFileSync(join(__dirname, '..', 'app', 'queue', '[reportId]', 'report-detail-client.tsx'), 'utf8');
-    const code = stripProse(decision);
+    const decision = readFileSync(
+      join(__dirname, '..', 'app', 'queue', '[reportId]', 'report-detail-client.tsx'),
+      'utf8',
+    )
+    const code = stripProse(decision)
 
     // The per-report decision is the only decision path. It writes one row.
     //
@@ -206,38 +212,38 @@ describe('the console has no bulk action', () => {
     // calls the **single-report** mutation. The shape of that mutation's
     // variables is what carries the "one row" guarantee — there is no
     // `reportIds` and no `ids`.
-    expect(code).toContain('useSubmitDecision');
-    expect(code).not.toMatch(/\b(reportIds|ids)\s*:/);
-  });
+    expect(code).toContain('useSubmitDecision')
+    expect(code).not.toMatch(/\b(reportIds|ids)\s*:/)
+  })
 
   it('offers no bulk-shaped write anywhere in the query layer', () => {
     // The same guarantee, checked where the write actually happens now.
-    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8');
-    const code = stripProse(queries);
+    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8')
+    const code = stripProse(queries)
 
-    expect(code).toContain('submitDecision');
-    expect(code).not.toMatch(/\b(reportIds|ids)\s*:/);
+    expect(code).toContain('submitDecision')
+    expect(code).not.toMatch(/\b(reportIds|ids)\s*:/)
     // One decision, one report id. The mutation's variables are the
     // single-report shape.
-    expect(code).toMatch(/reportId\s*:/);
-  });
-});
+    expect(code).toMatch(/reportId\s*:/)
+  })
+})
 
 describe('the author-auto-hide group is a slice, not a second queue', () => {
   it('filters the rows already on screen, and issues no second request', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
-    const code = stripProse(queue);
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8')
+    const code = stripProse(queue)
 
     // The queue page issues **no** fetch of its own. The read lives in the
     // query hook (`useModerationQueue`), and the page narrows the rows it
     // already has. A call site here would be a second read.
-    expect(code).not.toContain('fetchModerationQueue');
+    expect(code).not.toContain('fetchModerationQueue')
     // The page reads through the hook, and slices the accumulated pages.
-    expect(code).toContain('useModerationQueue');
-    expect(code).toContain('flatMap');
+    expect(code).toContain('useModerationQueue')
+    expect(code).toContain('flatMap')
     // The group never reaches the server as a parameter.
-    expect(code).not.toMatch(/group\s*:/);
-  });
+    expect(code).not.toMatch(/group\s*:/)
+  })
 
   it('keeps the group out of the query key, so the server is never asked to filter by it', () => {
     // The invariant the old call-site count was a proxy for. It now lives in
@@ -247,18 +253,18 @@ describe('the author-auto-hide group is a slice, not a second queue', () => {
     // If the group entered the key, the server would be asked to filter by
     // it, the console would issue a second read for the same data, and the
     // group would become a server-side concept it is not.
-    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8');
-    const code = stripProse(queries);
+    const queries = readFileSync(join(__dirname, '..', 'lib', 'queries.ts'), 'utf8')
+    const code = stripProse(queries)
 
-    expect(code).toContain('fetchModerationQueue');
-    expect(code).not.toMatch(/group\s*:/);
-    expect(code).not.toContain('author_auto_hide');
-  });
+    expect(code).toContain('fetchModerationQueue')
+    expect(code).not.toMatch(/group\s*:/)
+    expect(code).not.toContain('author_auto_hide')
+  })
 
   it('writes nothing on a read — no decision call sits in the queue list', () => {
-    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8');
+    const queue = readFileSync(join(__dirname, '..', 'app', 'queue', 'queue-client.tsx'), 'utf8')
 
     // The decision lives on the per-report detail route. The list is a read.
-    expect(stripProse(queue)).not.toContain('moderation_decide');
-  });
-});
+    expect(stripProse(queue)).not.toContain('moderation_decide')
+  })
+})

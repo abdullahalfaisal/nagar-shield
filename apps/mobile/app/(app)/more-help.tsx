@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { HOTLINES, type HotlineEntry } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Icon, ListRow, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui';
-import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
-import { formatVerifiedStamp, isVerificationStale } from '@/shared/utils/verifiedStamp';
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { HOTLINES, type HotlineEntry } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Icon, ListRow, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui'
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
+import { formatVerifiedStamp, isVerificationStale } from '@/shared/utils/verifiedStamp'
 
 /**
  * The hotline list.
@@ -30,22 +30,22 @@ import { formatVerifiedStamp, isVerificationStale } from '@/shared/utils/verifie
  *     verification rather than hidden.
  */
 export default function MoreHelpScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
-  const [reporting, setReporting] = useState<HotlineEntry | null>(null);
+  const [reporting, setReporting] = useState<HotlineEntry | null>(null)
 
   // The same degraded-mode flow every help entry point uses.
-  const degradedHelp = useDegradedHelp();
+  const degradedHelp = useDegradedHelp()
 
   // The bundled list is already sorted by `sortOrder` by the shared package;
   // the filter keeps only the **active** entries, so a retired row never
   // reaches the screen.
-  const hotlines = useMemo(() => HOTLINES.filter((hotline) => hotline.isActive), []);
+  const hotlines = useMemo(() => HOTLINES.filter((hotline) => hotline.isActive), [])
 
   const displayName = (hotline: HotlineEntry) =>
-    i18n.language === 'bn' ? (hotline.nameBn ?? hotline.name) : hotline.name;
+    i18n.language === 'bn' ? (hotline.nameBn ?? hotline.name) : hotline.name
 
   return (
     <Screen
@@ -55,8 +55,8 @@ export default function MoreHelpScreen() {
     >
       <View style={styles.list}>
         {hotlines.map((hotline) => {
-          const stale = isVerificationStale(hotline.lastVerifiedAt);
-          const label = displayName(hotline);
+          const stale = isVerificationStale(hotline.lastVerifiedAt)
+          const label = displayName(hotline)
 
           return (
             <View key={hotline.id} style={styles.row}>
@@ -71,7 +71,7 @@ export default function MoreHelpScreen() {
                   number: hotline.phone,
                 })}
                 onPress={() => {
-                  void degradedHelp.dial(hotline.phone);
+                  void degradedHelp.dial(hotline.phone)
                 }}
                 trailing={
                   <View style={styles.trailing}>
@@ -100,7 +100,7 @@ export default function MoreHelpScreen() {
                 </Text>
               </Pressable>
             </View>
-          );
+          )
         })}
       </View>
 
@@ -122,7 +122,7 @@ export default function MoreHelpScreen() {
         entryName={reporting ? displayName(reporting) : undefined}
       />
     </Screen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -156,4 +156,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-});
+})

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import * as Network from 'expo-network';
-import { AppState, type AppStateStatus } from 'react-native';
-import { drainQueue, type DrainResult } from './queueDrain';
-import { queueSize, savedOnDeviceItems } from './uploadQueue';
+import { useCallback, useEffect, useRef, useState } from 'react'
+import * as Network from 'expo-network'
+import { AppState, type AppStateStatus } from 'react-native'
+import { drainQueue, type DrainResult } from './queueDrain'
+import { queueSize, savedOnDeviceItems } from './uploadQueue'
 
 /**
  * The drain trigger.
@@ -24,57 +24,57 @@ import { queueSize, savedOnDeviceItems } from './uploadQueue';
 
 export interface QueueState {
   /** The number of items still waiting to be sent. */
-  pending: number;
+  pending: number
   /** The number of items that have exhausted their attempt budget. */
-  savedOnDevice: number;
+  savedOnDevice: number
   /** `true` while a drain is running. */
-  isDraining: boolean;
+  isDraining: boolean
   /** The last drain's outcome, or `null` if none has run. */
-  lastResult: DrainResult | null;
+  lastResult: DrainResult | null
   /** Runs a drain now. */
-  drain: () => Promise<void>;
+  drain: () => Promise<void>
 }
 
 export function useQueueDrain(): QueueState {
-  const [pending, setPending] = useState(0);
-  const [savedOnDevice, setSavedOnDevice] = useState(0);
-  const [isDraining, setIsDraining] = useState(false);
-  const [lastResult, setLastResult] = useState<DrainResult | null>(null);
+  const [pending, setPending] = useState(0)
+  const [savedOnDevice, setSavedOnDevice] = useState(0)
+  const [isDraining, setIsDraining] = useState(false)
+  const [lastResult, setLastResult] = useState<DrainResult | null>(null)
 
   // The in-flight guard. A ref, not a state — a state update would not be
   // visible to the second trigger before the re-render, so two events in the
   // same tick could both start a drain.
-  const draining = useRef(false);
+  const draining = useRef(false)
 
   const refreshCounts = useCallback(async () => {
-    const [waiting, retained] = await Promise.all([queueSize(), savedOnDeviceItems()]);
-    setPending(waiting);
-    setSavedOnDevice(retained.length);
-  }, []);
+    const [waiting, retained] = await Promise.all([queueSize(), savedOnDeviceItems()])
+    setPending(waiting)
+    setSavedOnDevice(retained.length)
+  }, [])
 
   const drain = useCallback(async () => {
-    if (draining.current) return;
-    draining.current = true;
-    setIsDraining(true);
+    if (draining.current) return
+    draining.current = true
+    setIsDraining(true)
 
     try {
-      const result = await drainQueue();
-      setLastResult(result);
+      const result = await drainQueue()
+      setLastResult(result)
     } catch {
       // The drain itself failed. The queue is untouched — the items are still
       // on the device, and the next trigger tries again.
     } finally {
-      draining.current = false;
-      setIsDraining(false);
-      await refreshCounts();
+      draining.current = false
+      setIsDraining(false)
+      await refreshCounts()
     }
-  }, [refreshCounts]);
+  }, [refreshCounts])
 
   // The counts are read on mount so a screen opened with a queue already
   // present shows the "saved on device" state immediately.
   useEffect(() => {
-    void refreshCounts();
-  }, [refreshCounts]);
+    void refreshCounts()
+  }, [refreshCounts])
 
   // --- Connectivity regain --------------------------------------------------
   //
@@ -83,30 +83,30 @@ export function useQueueDrain(): QueueState {
   // drain itself decides whether the device can actually reach the network —
   // a failed attempt is retried with backoff rather than dropped.
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     const subscription = Network.addNetworkStateListener((state) => {
-      if (cancelled) return;
-      if (!state.isInternetReachable && !state.isConnected) return;
+      if (cancelled) return
+      if (!state.isInternetReachable && !state.isConnected) return
 
-      void drain();
-    });
+      void drain()
+    })
 
     return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, [drain]);
+      cancelled = true
+      subscription.remove()
+    }
+  }, [drain])
 
   // --- App foreground -------------------------------------------------------
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (next !== 'active') return;
-      void drain();
-    });
+      if (next !== 'active') return
+      void drain()
+    })
 
-    return () => subscription.remove();
-  }, [drain]);
+    return () => subscription.remove()
+  }, [drain])
 
-  return { pending, savedOnDevice, isDraining, lastResult, drain };
+  return { pending, savedOnDevice, isDraining, lastResult, drain }
 }

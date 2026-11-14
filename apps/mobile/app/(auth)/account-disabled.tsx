@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Button, WizardScreen } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
-import { softDeleteAccount } from '@/shared/api/account';
-import { logOut } from '@/shared/auth/authService';
+import { useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Button, WizardScreen } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
+import { softDeleteAccount } from '@/shared/api/account'
+import { logOut } from '@/shared/auth/authService'
 
 /**
  * Screen — Account Disabled.
@@ -35,36 +35,36 @@ import { logOut } from '@/shared/auth/authService';
  * account is a moderator's decision, made in the admin console.
  */
 export default function AccountDisabledScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>()
 
   const onDelete = async () => {
-    setBusy(true);
-    setError(undefined);
+    setBusy(true)
+    setError(undefined)
     try {
-      await softDeleteAccount();
-      await logOut();
-      router.replace('/(auth)/welcome');
+      await softDeleteAccount()
+      await logOut()
+      router.replace('/(auth)/welcome')
     } catch {
-      setError(t('errors.internal'));
-      setBusy(false);
+      setError(t('errors.internal'))
+      setBusy(false)
     }
-  };
+  }
 
   const onSignOut = async () => {
-    setBusy(true);
+    setBusy(true)
     try {
-      await logOut();
-      router.replace('/(auth)/welcome');
+      await logOut()
+      router.replace('/(auth)/welcome')
     } catch {
-      setError(t('errors.internal'));
-      setBusy(false);
+      setError(t('errors.internal'))
+      setBusy(false)
     }
-  };
+  }
 
   return (
     <WizardScreen
@@ -129,7 +129,7 @@ export default function AccountDisabledScreen() {
         <Text style={[styles.error, { color: theme.palette.red[600] }]}>{error}</Text>
       ) : null}
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -183,4 +183,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-});
+})

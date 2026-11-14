@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import type { ReportCategory } from '@nagar-shield/shared';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { toAppError } from '@/lib/api';
-import { decisionErrorMessage, useReportDetail, useSubmitDecision } from '@/lib/queries';
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import type { ReportCategory } from '@nagar-shield/shared'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { toAppError } from '@/lib/api'
+import { decisionErrorMessage, useReportDetail, useSubmitDecision } from '@/lib/queries'
 import {
   formatAreaLine,
   formatCategoryAccent,
@@ -14,9 +14,9 @@ import {
   formatFlagReason,
   formatTimestamp,
   isAuthorAutoHide,
-} from '@/lib/format';
-import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell';
-import { MediaPreview } from './media-preview';
+} from '@/lib/format'
+import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell'
+import { MediaPreview } from './media-preview'
 
 /**
  * The report review detail — the wide two-column desktop view.
@@ -30,32 +30,32 @@ import { MediaPreview } from './media-preview';
  */
 
 export function ReportDetailClient() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
-  const router = useRouter();
-  const params = useParams<{ reportId: string }>();
-  const reportId = params.reportId;
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
+  const router = useRouter()
+  const params = useParams<{ reportId: string }>()
+  const reportId = params.reportId
 
-  const detailQuery = useReportDetail(reportId);
-  const { data: detail, error: queryError, isLoading } = detailQuery;
+  const detailQuery = useReportDetail(reportId)
+  const { data: detail, error: queryError, isLoading } = detailQuery
 
   // An expired session is a redirect, not a message.
   useEffect(() => {
-    if (!queryError) return;
+    if (!queryError) return
     if (toAppError(queryError).code === 'AUTH_REQUIRED') {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [queryError, router]);
+  }, [queryError, router])
 
   const error = queryError
     ? (() => {
-        const appError = toAppError(queryError);
+        const appError = toAppError(queryError)
         return appError.code === 'FORBIDDEN'
           ? copy.errorForbidden
           : appError.code === 'NOT_FOUND'
             ? copy.errorNotFound
-            : copy.errorGeneric;
+            : copy.errorGeneric
       })()
-    : null;
+    : null
 
   return (
     <AdminShell active="queue">
@@ -152,9 +152,7 @@ export function ReportDetailClient() {
                       <ul className="stackGapSm" style={{ listStyle: 'none' }}>
                         {detail.flags.map((flag) => (
                           <li key={flag.id}>
-                            <span className="chip chipMuted">
-                              {formatFlagReason(flag.reason)}
-                            </span>
+                            <span className="chip chipMuted">{formatFlagReason(flag.reason)}</span>
                             <p className="muted" style={{ marginTop: 4 }}>
                               {copy.detailFlagReporter}: {flag.flaggerId}
                             </p>
@@ -183,7 +181,9 @@ export function ReportDetailClient() {
 
                         <h3 className="fieldLabel">{copy.detailUploaderState}</h3>
                         <p className="fieldValue">
-                          {detail.uploader.disabledAt ? copy.detailStateDisabled : copy.detailStateActive}
+                          {detail.uploader.disabledAt
+                            ? copy.detailStateDisabled
+                            : copy.detailStateActive}
                         </p>
                       </>
                     ) : (
@@ -204,7 +204,9 @@ export function ReportDetailClient() {
                     {detail.priorActions.map((action) => (
                       <li key={action.id} className="stackGapSm">
                         <span className="chip">{formatDecisionLabel(action.decision)}</span>
-                        <p style={{ fontSize: 13, color: 'var(--ink-800)', whiteSpace: 'pre-wrap' }}>
+                        <p
+                          style={{ fontSize: 13, color: 'var(--ink-800)', whiteSpace: 'pre-wrap' }}
+                        >
                           {action.note}
                         </p>
                         <p className="muted">{formatTimestamp(action.createdAt)}</p>
@@ -218,7 +220,7 @@ export function ReportDetailClient() {
         </div>
       </div>
     </AdminShell>
-  );
+  )
 }
 
 /**
@@ -234,17 +236,17 @@ export function ReportDetailClient() {
  * on what was stored.
  */
 function DecisionPanel({ reportId }: { reportId: string }) {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
-  const [decision, setDecision] = useState<'restore' | 'remove'>('restore');
-  const [note, setNote] = useState('');
-  const [noteError, setNoteError] = useState<string | null>(null);
+  const [decision, setDecision] = useState<'restore' | 'remove'>('restore')
+  const [note, setNote] = useState('')
+  const [noteError, setNoteError] = useState<string | null>(null)
 
-  const submit = useSubmitDecision();
-  const submitting = submit.isPending;
+  const submit = useSubmitDecision()
+  const submitting = submit.isPending
 
-  const trimmedNote = note.trim();
-  const canSubmit = trimmedNote.length > 0 && !submitting;
+  const trimmedNote = note.trim()
+  const canSubmit = trimmedNote.length > 0 && !submitting
 
   // A `VALIDATION_FAILED` belongs to the **note field**, not the banner: a
   // blank note is a field problem, and the field is where the moderator is
@@ -252,25 +254,25 @@ function DecisionPanel({ reportId }: { reportId: string }) {
   const bannerError =
     submit.error && toAppError(submit.error).code !== 'VALIDATION_FAILED'
       ? decisionErrorMessage(toAppError(submit.error).code)
-      : null;
+      : null
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    submit.reset();
-    setNoteError(null);
+    event.preventDefault()
+    submit.reset()
+    setNoteError(null)
 
     if (trimmedNote.length === 0) {
-      setNoteError(copy.decisionNoteRequired);
-      return;
+      setNoteError(copy.decisionNoteRequired)
+      return
     }
 
     try {
-      await submit.mutateAsync({ reportId, decision, note: trimmedNote });
-      setNote('');
+      await submit.mutateAsync({ reportId, decision, note: trimmedNote })
+      setNote('')
     } catch (caught) {
-      const appError = toAppError(caught);
+      const appError = toAppError(caught)
       if (appError.code === 'VALIDATION_FAILED') {
-        setNoteError(copy.decisionNoteRequired);
+        setNoteError(copy.decisionNoteRequired)
       }
     }
   }
@@ -344,5 +346,5 @@ function DecisionPanel({ reportId }: { reportId: string }) {
         </button>
       </form>
     </section>
-  );
+  )
 }

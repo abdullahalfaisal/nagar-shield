@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen';
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen'
 
 /**
  * Screen 6 — S-04b, Contact 2 of 3.
@@ -10,8 +10,8 @@ import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen';
  * and the hero copy changes.
  */
 export default function WizardContact2Screen() {
-  const router = useRouter();
-  const { t } = useTranslation();
+  const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <ContactCaptureScreen
@@ -24,5 +24,5 @@ export default function WizardContact2Screen() {
       onBack={() => router.back()}
       onComplete={() => router.push('/(auth)/contact-3')}
     />
-  );
+  )
 }

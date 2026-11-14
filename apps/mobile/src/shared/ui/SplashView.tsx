@@ -1,13 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../theme';
+import { StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useTheme } from '../theme'
 
 /**
  * The prototype's Splash (screen 0) — a branded hold shown while the session
  * and fonts resolve.
  */
 export function SplashView({ message }: { message?: string }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.container}>
@@ -20,9 +20,11 @@ export function SplashView({ message }: { message?: string }) {
         <Text style={styles.brand}>নগর শিল্ড</Text>
         <Text style={styles.brandEn}>NAGAR SHIELD</Text>
       </LinearGradient>
-      {message ? <Text style={[styles.message, { color: theme.colors.ink[500] }]}>{message}</Text> : null}
+      {message ? (
+        <Text style={[styles.message, { color: theme.colors.ink[500] }]}>{message}</Text>
+      ) : null}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -54,4 +56,4 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 13,
   },
-});
+})

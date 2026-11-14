@@ -1,10 +1,10 @@
-'use client';
+'use client'
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { getBrowserClient } from '@/lib/supabase/client';
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { getBrowserClient } from '@/lib/supabase/client'
 
 /**
  * The admin shell — the rail plus the page.
@@ -17,23 +17,23 @@ import { getBrowserClient } from '@/lib/supabase/client';
  */
 
 interface AdminShellProps {
-  children: React.ReactNode;
-  active: 'queue' | 'users' | 'audit';
+  children: React.ReactNode
+  active: 'queue' | 'users' | 'audit'
 }
 
 export function AdminShell({ children, active }: AdminShellProps) {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
-  const router = useRouter();
-  const [signingOut, setSigningOut] = useState(false);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
+  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
 
   const signOut = useCallback(async () => {
-    setSigningOut(true);
+    setSigningOut(true)
     try {
-      await getBrowserClient().auth.signOut();
+      await getBrowserClient().auth.signOut()
     } finally {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [router]);
+  }, [router])
 
   return (
     <div className="shell">
@@ -77,7 +77,7 @@ export function AdminShell({ children, active }: AdminShellProps) {
 
       <main className="main">{children}</main>
     </div>
-  );
+  )
 }
 
 /**
@@ -91,7 +91,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle: strin
       <h1 className="pageTitle">{title}</h1>
       <p className="pageSubtitle">{subtitle}</p>
     </header>
-  );
+  )
 }
 
 /**
@@ -101,12 +101,12 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle: strin
  * string. The raw driver message never reaches the screen.
  */
 export function ErrorBanner({ message }: { message: string | null }) {
-  if (!message) return null;
+  if (!message) return null
   return (
     <div className="banner bannerDanger" role="alert">
       {message}
     </div>
-  );
+  )
 }
 
 /**
@@ -121,7 +121,7 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
       <h2 className="emptyTitle">{title}</h2>
       <p className="emptyBody">{body}</p>
     </div>
-  );
+  )
 }
 
 /**
@@ -137,7 +137,7 @@ export function SkeletonList({ count = 4 }: { count?: number }) {
         <div key={index} className="skeleton" />
       ))}
     </div>
-  );
+  )
 }
 
 /**
@@ -149,8 +149,8 @@ export function SkeletonList({ count = 4 }: { count?: number }) {
  */
 export function useConsoleTheme(): void {
   useEffect(() => {
-    const stored = window.localStorage.getItem('nagar-shield.admin.theme');
-    const theme = stored === 'light' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-  }, []);
+    const stored = window.localStorage.getItem('nagar-shield.admin.theme')
+    const theme = stored === 'light' ? 'light' : 'dark'
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [])
 }

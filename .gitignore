@@ -33,6 +33,11 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
+# EAS build artefacts and the local credentials directory. `eas.json` itself
+# is committed — the *profiles* are the contract — but the per-project
+# credentials and the build output are not.
+.eas/
+
 # Local scratch — captured console output, one-off notes, ad-hoc probes.
 # The real harnesses live in tools/ and are tracked deliberately.
 tmp-*

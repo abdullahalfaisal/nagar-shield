@@ -76,6 +76,16 @@ jobs:
 
       - run: pnpm lint
 
+      # The formatting contract. ESLint owns the *semantic* rules and
+      # Prettier owns the *formatting*, and the two must not disagree — so
+      # the formatting check is a separate signal, not folded into ESLint.
+      #
+      # `.prettierignore` says which files Prettier does **not** own: the
+      # generated artefacts and the vendored Edge Functions mirror are owned
+      # by their generators, and the specification trees are prose.
+      - name: the formatting contract holds
+        run: pnpm format:check
+
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest

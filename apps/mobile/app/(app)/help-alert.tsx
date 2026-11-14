@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Icon } from '@/shared/ui/Icon';
-import { ManualDialGuidance } from '@/shared/ui/ManualDialGuidance';
-import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet';
-import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
-import { useContacts } from '@/shared/api/contacts';
-import { toBengaliDigits } from '@/shared/utils/relativeTime';
+import { useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Icon } from '@/shared/ui/Icon'
+import { ManualDialGuidance } from '@/shared/ui/ManualDialGuidance'
+import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet'
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
+import { useContacts } from '@/shared/api/contacts'
+import { toBengaliDigits } from '@/shared/utils/relativeTime'
 
 /**
  * Screen 18 — Help Alert.
@@ -29,24 +29,24 @@ import { toBengaliDigits } from '@/shared/utils/relativeTime';
  * The app never places a call and never observes call state (C-1).
  */
 export default function HelpAlertScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
+  const insets = useSafeAreaInsets()
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false)
 
-  const { data: contacts } = useContacts();
-  const contactCount = useMemo(() => contacts?.length ?? 0, [contacts]);
+  const { data: contacts } = useContacts()
+  const contactCount = useMemo(() => contacts?.length ?? 0, [contacts])
 
   // The degraded-mode flow. The dial path is client-only — the number is
   // bundled and the intent goes straight to the OS — so a phone with no
   // signal, no location, and battery saver on still reaches help.
-  const degradedHelp = useDegradedHelp();
+  const degradedHelp = useDegradedHelp()
 
   const dial = async (number: string) => {
-    await degradedHelp.dial(number);
-  };
+    await degradedHelp.dial(number)
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -169,10 +169,10 @@ export default function HelpAlertScreen() {
           same sheet. */}
       <MoreHelpSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
     </View>
-  );
+  )
 }
 
-type TileVariant = 'police' | 'medical' | 'fire' | 'personal';
+type TileVariant = 'police' | 'medical' | 'fire' | 'personal'
 
 function HelpTile({
   variant,
@@ -182,28 +182,28 @@ function HelpTile({
   number,
   onPress,
 }: {
-  variant: TileVariant;
-  title: string;
-  subtitle: string;
-  english: string;
-  number: string;
-  onPress: () => void;
+  variant: TileVariant
+  title: string
+  subtitle: string
+  english: string
+  number: string
+  onPress: () => void
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   const gradients: Record<TileVariant, readonly [string, string, ...string[]]> = {
     police: theme.gradients.hero,
     medical: theme.gradients.emergency,
     fire: theme.gradients.amber,
     personal: theme.gradients.green,
-  };
+  }
 
   const icons: Record<TileVariant, string> = {
     police: 'local_police',
     medical: 'local_hospital',
     fire: 'local_fire_department',
     personal: 'groups_2',
-  };
+  }
 
   const shadowColor =
     variant === 'police'
@@ -212,7 +212,7 @@ function HelpTile({
         ? '#DC2626'
         : variant === 'fire'
           ? '#D97706'
-          : '#059669';
+          : '#059669'
 
   return (
     <Pressable
@@ -259,7 +259,7 @@ function HelpTile({
         </View>
       </LinearGradient>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -397,4 +397,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
   },
-});
+})

@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AppError } from '@nagar-shield/shared';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { getBrowserClient } from '@/lib/supabase/client';
-import { AccessOnlyState } from '@/app/access-only-state';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { AppError } from '@nagar-shield/shared'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { getBrowserClient } from '@/lib/supabase/client'
+import { AccessOnlyState } from '@/app/access-only-state'
 
 /**
  * The moderator sign-in.
@@ -21,45 +21,45 @@ import { AccessOnlyState } from '@/app/access-only-state';
  */
 
 export default function LoginPage() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
-  const router = useRouter();
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
+  const router = useRouter()
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [accessOnly, setAccessOnly] = useState(false);
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [accessOnly, setAccessOnly] = useState(false)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
+    event.preventDefault()
+    setError(null)
+    setSubmitting(true)
 
     try {
-      const client = getBrowserClient();
+      const client = getBrowserClient()
       const { error: signInError } = await client.auth.signInWithPassword({
         email: email.trim(),
         password,
-      });
+      })
 
       if (signInError) {
-        setError(copy.errorAuthRequired);
-        return;
+        setError(copy.errorAuthRequired)
+        return
       }
 
-      const { data: sessionData } = await client.auth.getSession();
-      const userId = sessionData.session?.user.id;
+      const { data: sessionData } = await client.auth.getSession()
+      const userId = sessionData.session?.user.id
 
       if (!userId) {
-        setError(copy.errorAuthRequired);
-        return;
+        setError(copy.errorAuthRequired)
+        return
       }
 
       const { data: profile } = await client
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .maybeSingle();
+        .maybeSingle()
 
       if (!profile || profile.role !== 'moderator') {
         // The citizen is signed in but has no moderation access. The console
@@ -69,27 +69,27 @@ export default function LoginPage() {
         // The state is **rendered here**, not routed to: routing to the queue
         // would land the citizen on a screen that fails with FORBIDDEN and
         // shows a generic error, which says nothing about why.
-        setAccessOnly(true);
-        return;
+        setAccessOnly(true)
+        return
       }
 
-      router.replace('/queue');
+      router.replace('/queue')
     } catch (caught) {
-      const code = caught instanceof AppError ? caught.code : 'INTERNAL';
+      const code = caught instanceof AppError ? caught.code : 'INTERNAL'
       setError(
         code === 'AUTH_REQUIRED'
           ? copy.errorAuthRequired
           : code === 'VALIDATION_FAILED'
             ? copy.errorValidation
             : copy.errorGeneric,
-      );
+      )
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
   }
 
   if (accessOnly) {
-    return <AccessOnlyState />;
+    return <AccessOnlyState />
   }
 
   return (
@@ -150,5 +150,5 @@ export default function LoginPage() {
         </form>
       </div>
     </main>
-  );
+  )
 }

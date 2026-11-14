@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../theme';
+import { StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useTheme } from '../theme'
 
-export type ContactGroupTone = 'family' | 'friend' | 'colleague' | 'other';
+export type ContactGroupTone = 'family' | 'friend' | 'colleague' | 'other'
 
 /**
  * `.contact-avatar` — a 44 dp circle carrying the first letter of the contact's
@@ -19,28 +19,22 @@ export function ContactAvatar({
   group = 'other',
   size = 44,
 }: {
-  name: string;
-  group?: ContactGroupTone;
-  size?: number;
+  name: string
+  group?: ContactGroupTone
+  size?: number
 }) {
-  const theme = useTheme();
-  const glyph = name.trim().charAt(0) || '?';
+  const theme = useTheme()
+  const glyph = name.trim().charAt(0) || '?'
 
-  const colors = avatarGradient(group, theme);
-  const style = { width: size, height: size, borderRadius: size / 2 };
+  const colors = avatarGradient(group, theme)
+  const style = { width: size, height: size, borderRadius: size / 2 }
 
   if (!colors) {
     return (
-      <View
-        style={[
-          styles.avatar,
-          style,
-          { backgroundColor: theme.colors.ink[400] },
-        ]}
-      >
+      <View style={[styles.avatar, style, { backgroundColor: theme.colors.ink[400] }]}>
         <Text style={[styles.glyph, { fontSize: size * 0.34 }]}>{glyph}</Text>
       </View>
-    );
+    )
   }
 
   return (
@@ -52,7 +46,7 @@ export function ContactAvatar({
     >
       <Text style={[styles.glyph, { fontSize: size * 0.34 }]}>{glyph}</Text>
     </LinearGradient>
-  );
+  )
 }
 
 function avatarGradient(
@@ -61,13 +55,13 @@ function avatarGradient(
 ): [string, string] | null {
   switch (group) {
     case 'family':
-      return ['#F472B6', '#EC4899'];
+      return ['#F472B6', '#EC4899']
     case 'friend':
-      return [theme.palette.violet[500], theme.palette.violet[400]];
+      return [theme.palette.violet[500], theme.palette.violet[400]]
     case 'colleague':
-      return [theme.palette.green[500], theme.palette.green[600]];
+      return [theme.palette.green[500], theme.palette.green[600]]
     default:
-      return null;
+      return null
   }
 }
 
@@ -76,14 +70,8 @@ function avatarGradient(
  * family → #FCE7F3 / #BE185D, friend → violet-100 / violet-700,
  * colleague → green-100 / green-600.
  */
-export function RelationshipPill({
-  group,
-  label,
-}: {
-  group: ContactGroupTone;
-  label: string;
-}) {
-  const theme = useTheme();
+export function RelationshipPill({ group, label }: { group: ContactGroupTone; label: string }) {
+  const theme = useTheme()
 
   const { bg, fg } =
     group === 'family'
@@ -92,13 +80,13 @@ export function RelationshipPill({
         ? { bg: theme.palette.violet[100], fg: theme.palette.violet[700] }
         : group === 'colleague'
           ? { bg: theme.palette.green[100], fg: theme.palette.green[600] }
-          : { bg: theme.colors.ink[100], fg: theme.colors.ink[700] };
+          : { bg: theme.colors.ink[100], fg: theme.colors.ink[700] }
 
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <Text style={[styles.pillText, { color: fg }]}>{label}</Text>
     </View>
-  );
+  )
 }
 
 /**
@@ -113,25 +101,22 @@ export function PrimaryStar({
   onPress,
   accessibilityLabel,
 }: {
-  isPrimary: boolean;
-  onPress?: () => void;
-  accessibilityLabel?: string;
+  isPrimary: boolean
+  onPress?: () => void
+  accessibilityLabel?: string
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
   const star = (
     <Text
       accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={[
-        styles.star,
-        { color: isPrimary ? theme.palette.amber[600] : theme.colors.ink[300] },
-      ]}
+      style={[styles.star, { color: isPrimary ? theme.palette.amber[600] : theme.colors.ink[300] }]}
     >
       ★
     </Text>
-  );
-  return star;
+  )
+  return star
 }
 
 const styles = StyleSheet.create({
@@ -158,4 +143,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginLeft: 4,
   },
-});
+})

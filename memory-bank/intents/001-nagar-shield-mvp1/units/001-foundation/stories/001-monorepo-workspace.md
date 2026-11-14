@@ -2,11 +2,11 @@
 id: 001-monorepo-workspace
 unit: 001-foundation
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 001-monorepo-workspace
@@ -80,23 +80,57 @@ implemented: partial
 
 ## Implementation
 
-**The pnpm workspace, the TypeScript configuration, and the lint/type/test wiring all ship and work. The story is not `complete` because several of its acceptance criteria name a guard that was never built.**
+**The workspace, the TypeScript contract, the lint/format/type/test wiring, and the README all ship, and every acceptance criterion is now backed by a guard that fails when the thing it guards breaks.**
 
 ### What ships
 
-- The workspace is declared in the root `package.json` (`"workspaces": ["apps/mobile", "apps/admin", "packages/shared"]`) with `packageManager: "pnpm@9.15.0"` and `engines.node: ">=18"`. `pnpm -r typecheck`, `pnpm -r lint`, and `pnpm -r --if-present test` all fan out across the three workspaces.
-- The root `package.json` carries the full gate chain in `verify`: typecheck, lint, test, `data:check`, `shared:check`, `story:index:check`, `db:test`, `db:smoke`, `alert:check`, `maestro:check`, `fn:typecheck`.
-- `pnpm-lock.yaml` is committed, and every CI job installs with `pnpm install --frozen-lockfile`.
-- ESLint flat config runs across all three workspaces; `pnpm lint` is clean.
+- The workspace is declared in the root `package.json` (`"workspaces": ["apps/mobile", "apps/admin", "packages/shared"]`) **and** in `pnpm-workspace.yaml` as the globs `'apps/*'` and `'packages/*'` — the globs are what pick up a new workspace folder with no manifest edit, which is what the story's edge-case table names.
+- The root manifest is `private: true` with `packageManager: "pnpm@9.15.0"` and `engines.node: ">=18"`. All five scripts the story names are defined — `dev`, `build`, `lint`, `typecheck`, `test` — and each delegates to the per-package scripts. `lint`, `typecheck`, and `test` fan out with `pnpm -r`; `dev` and `build` cannot (several packages would start a dev server at once), so they delegate through `pnpm --filter` to the package that owns the script.
+- `tsconfig.base.json` carries the shared compiler contract — `strict: true`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `forceConsistentCasingInFileNames`, `isolatedModules` — and the `@shared/*` alias. All three workspaces extend it. `apps/mobile` also extends `expo/tsconfig.base`, because the Expo preset owns the React Native lib and JSX settings.
+- The ESLint flat config runs across all three workspaces and carries the one-way dependency rule as a `no-restricted-imports` pattern on `packages/shared/src/**/*.ts`. It also carries `consistent-type-imports` as an error, per the Technical Notes.
+- Prettier is committed as `.prettierrc.json` with the settings the story names (no semicolons, single quotes, trailing commas, print width 100, 2-space indent). `.prettierignore` says which files Prettier does **not** own: the generated artefacts and the vendored Edge Functions mirror belong to their generators, and the specification trees are prose.
+- `README.md` documents the prerequisites, the workspace tree, the one-way dependency rule, how to run each app, and **every** root script.
+- `pnpm-lock.yaml` is committed; every CI job installs with `pnpm install --frozen-lockfile`.
 
-### The gaps
+### The guards
 
-- **No root-level `tsconfig.base.json` contract test.** The shared TypeScript configuration is applied by each workspace's own `tsconfig.json`, and `pnpm typecheck` passes — but there is no test that asserts the three workspaces still extend the same base with the same strictness flags. A workspace could quietly relax `strict` and the gate would still be green.
-- **The lockfile is not checked for drift against the workspace manifests outside CI.** `--frozen-lockfile` fails the CI job, but a local `pnpm install` can silently update `pnpm-lock.yaml`, and nothing in the local gate catches a committed lockfile that has drifted from a manifest.
-- **The story's acceptance criteria are about the *configuration* being right; several of them are satisfied by reading the files rather than by an assertion that would fail if the configuration regressed.** Nothing enforces `strict: true` across the workspaces, the `node` engine floor, or the `packageManager` pin.
+`packages/shared/src/workspace.test.ts` — 33 tests that assert the configuration rather than merely reading it. Each guard was proved to **fail** when the thing it guards was broken, then restored.
 
-### What closing this needs
+| Guard | What it catches |
+|---|---|
+| `pnpm-workspace.yaml` carries both globs | A workspace folder added without a manifest edit stops being picked up |
+| `strict: true` in the base, and no workspace turns it off | A workspace quietly opting out of the compiler contract |
+| The base carries the five named flags | A flag dropped from the shared contract |
+| The base's `@shared/*` maps to `./packages/shared/src/*` | The alias pointing somewhere else |
+| Every workspace extends the base | A workspace drifting onto its own compiler settings |
+| Every workspace's alias lands on the same directory | The alias resolving to two different modules |
+| **The alias resolves in every workspace** — a probe file is written and `tsc --noEmit` is run in each | The editor resolving an alias the compiler does not |
+| **The Jest mapping agrees with TypeScript's** — the admin's mapping is read from its config, the mobile's from the resolved `jest-expo` preset, and the two are compared | The story's own edge case: an alias that resolves in the editor and fails under Jest |
+| **The ESLint boundary fires** — a probe importing `apps/*` is written and ESLint is run on it | A config that carries the rule but does not report anything |
+| `pnpm install --frozen-lockfile` exits 0 | A committed lockfile that has drifted from a manifest |
+| The `packageManager` pin and the `engines.node` floor | An accidental Node or pnpm bump |
+| Every root script is defined and delegates | A script that duplicates a package's logic |
+| The README documents **every** root script | A script added to the manifest and forgotten in the README |
+| The Prettier settings are the ones the story names | A formatting setting drifting |
+| **Every workspace source file matches Prettier** | A file that does not match the formatting contract |
 
-1. A test that reads all three `tsconfig.json` files and asserts they share one base with `strict: true` — the guard that would catch a workspace quietly opting out of strictness.
-2. A check that the committed `pnpm-lock.yaml` is in sync with the manifests, runnable locally as well as in CI.
-3. An assertion on the `engines.node` floor and the `packageManager` pin, so a Node or pnpm version bump is a deliberate edit rather than an accident.
+`packages/shared/src/ci-order.test.ts` additionally asserts that the CI workflow runs `pnpm format:check`, so the formatting contract is checked by CI and not only locally.
+
+### The causal checks
+
+Each guard was proved to fail when the thing it guards was broken, then restored:
+
+- `strict: false` in `apps/admin/tsconfig.json` → *"apps/admin does not turn strict off"* fails.
+- `strict: false` in `tsconfig.base.json` → *"turns strict on"* fails.
+- The base's `@shared/*` pointing at `./packages/shared/WRONG/*` → both *"resolves the shared alias to packages/shared/src"* and *"resolves the alias to the same directory in every workspace"* fail.
+- A dependency added to `packages/shared/package.json` without a lockfile update → *"is in sync with the manifests"* fails.
+- A mis-formatted line appended to `packages/shared/src/enums/index.ts` → *"has every workspace source file matching the Prettier configuration"* fails, naming the file.
+- A probe importing `apps/*` → *"reports an apps/* import as a lint error"* fails.
+
+### What the work changed beyond the guards
+
+- **233 source files were reformatted** to the Prettier contract. The codebase carried semicolons while `.prettierrc.json` said `semi: false` — the config was right and the code was wrong. The shared package was reformatted first and the Edge Functions mirror regenerated, so the byte-for-byte mirror check still passes.
+- **Three `consistent-type-imports` violations** in the mobile app were fixed properly rather than suppressed: `supabase.test.ts` and `StationMap.tsx` now import their modules as **types** (the values are still loaded lazily at runtime, which is the point of both), and `errorCopy.ts` uses `import type`.
+- **`apps/admin/tsconfig.json` did not extend the shared base at all.** It now does, and `apps/mobile` extends both `expo/tsconfig.base` and the repository base.
+- **The `@shared/*` alias was dead** — nothing imported it; the apps used `@nagar-shield/shared`. The alias is now declared in the base and in every workspace, and the guard proves it resolves in all three.
+- **`pnpm verify` now runs `pnpm format:check`**, and CI runs it too.

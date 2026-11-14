@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
+import { useCallback, useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
 import {
   BottomSheet,
   Button,
@@ -14,17 +14,21 @@ import {
   Screen,
   StatusBanner,
   Toggle,
-} from '@/shared/ui';
-import { useContacts } from '@/shared/api/contacts';
-import { formatAddressLine, formatCoordinates, useReverseGeocode } from '@/shared/api/geocode';
-import { takeLocationFix, parseManualCoordinates, type FixOutcome } from '@/shared/services/locationFix';
+} from '@/shared/ui'
+import { useContacts } from '@/shared/api/contacts'
+import { formatAddressLine, formatCoordinates, useReverseGeocode } from '@/shared/api/geocode'
+import {
+  takeLocationFix,
+  parseManualCoordinates,
+  type FixOutcome,
+} from '@/shared/services/locationFix'
 import {
   selectExplicitRecipients,
   selectPrimaryRecipients,
   shareLocation,
   type ShareResult,
-} from '@/shared/services/shareLocation';
-import type { SharePosition } from '@/shared/api/locationShares';
+} from '@/shared/services/shareLocation'
+import type { SharePosition } from '@/shared/api/locationShares'
 
 /**
  * Screen 19 — Location Sharing.
@@ -47,42 +51,39 @@ import type { SharePosition } from '@/shared/api/locationShares';
  * entry and share-without-location — are always reachable (FR-PERMS-2).
  */
 export default function LocationSharingScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const { data: contacts } = useContacts();
-  const contactList = useMemo(() => contacts ?? [], [contacts]);
+  const { data: contacts } = useContacts()
+  const contactList = useMemo(() => contacts ?? [], [contacts])
 
   // The fix is taken **just-in-time** — from the CTA handler, never from a
   // mount effect. Until it is taken, the card renders in its degraded state.
-  const [fix, setFix] = useState<SharePosition | null>(null);
-  const [fixState, setFixState] = useState<'idle' | 'acquiring'>('idle');
+  const [fix, setFix] = useState<SharePosition | null>(null)
+  const [fixState, setFixState] = useState<'idle' | 'acquiring'>('idle')
 
   const { data: geocode, isLoading: geocoding } = useReverseGeocode(
     fix?.lat ?? null,
     fix?.lng ?? null,
     fix?.accuracyM ?? null,
-  );
+  )
 
   // The toggle's **ON default is kept** — it is the panic-friendly default.
-  const [shareWithAll, setShareWithAll] = useState(true);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [shareWithAll, setShareWithAll] = useState(true)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
 
   // The manual coordinate entry.
-  const [manualVisible, setManualVisible] = useState(false);
-  const [manualLat, setManualLat] = useState('');
-  const [manualLng, setManualLng] = useState('');
-  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualVisible, setManualVisible] = useState(false)
+  const [manualLat, setManualLat] = useState('')
+  const [manualLng, setManualLng] = useState('')
+  const [manualError, setManualError] = useState<string | null>(null)
 
   // The post-share confirmation.
-  const [result, setResult] = useState<ShareResult | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ShareResult | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const primaries = useMemo(
-    () => selectPrimaryRecipients(contactList),
-    [contactList],
-  );
+  const primaries = useMemo(() => selectPrimaryRecipients(contactList), [contactList])
 
   // The toggle's **default selector**: it selects every primary, and the
   // per-contact checkboxes stay authoritative at confirm time. A primary the
@@ -93,7 +94,7 @@ export default function LocationSharingScreen() {
         .filter(([, isSelected]) => !isSelected)
         .map(([id]) => id),
     [selected],
-  );
+  )
 
   const recipients = useMemo(
     () =>
@@ -106,20 +107,19 @@ export default function LocationSharingScreen() {
               .map(([id]) => id),
           ),
     [contactList, shareWithAll, deselectedIds, selected],
-  );
+  )
 
-  const selectedCount = Object.values(selected).filter(Boolean).length;
-  const hasRecipient = shareWithAll ? recipients.length > 0 : selectedCount > 0;
+  const selectedCount = Object.values(selected).filter(Boolean).length
+  const hasRecipient = shareWithAll ? recipients.length > 0 : selectedCount > 0
 
-  const toggle = (id: string) =>
-    setSelected((current) => ({ ...current, [id]: !current[id] }));
+  const toggle = (id: string) => setSelected((current) => ({ ...current, [id]: !current[id] }))
 
   /** The address card's coordinate line. */
   const coordsLine = fix
     ? formatCoordinates(fix.lat as number, fix.lng as number)
-    : t('location.coordsUnavailable');
+    : t('location.coordsUnavailable')
 
-  const addressLine = geocode ? formatAddressLine(geocode) : '';
+  const addressLine = geocode ? formatAddressLine(geocode) : ''
 
   /**
    * Takes the fix, just-in-time.
@@ -129,18 +129,18 @@ export default function LocationSharingScreen() {
    * screen fully rendered with both fallbacks available.
    */
   const acquireFix = useCallback(async (): Promise<FixOutcome> => {
-    setFixState('acquiring');
-    const outcome = await takeLocationFix();
+    setFixState('acquiring')
+    const outcome = await takeLocationFix()
 
     if (outcome.status === 'ready') {
-      setFix({ lat: outcome.lat, lng: outcome.lng, accuracyM: outcome.accuracyM });
-      setFixState('idle');
+      setFix({ lat: outcome.lat, lng: outcome.lng, accuracyM: outcome.accuracyM })
+      setFixState('idle')
     } else {
-      setFixState('idle');
+      setFixState('idle')
     }
 
-    return outcome;
-  }, []);
+    return outcome
+  }, [])
 
   /**
    * The share.
@@ -149,21 +149,21 @@ export default function LocationSharingScreen() {
    * failed write are all reported, never thrown.
    */
   const onShare = useCallback(async () => {
-    if (busy) return;
-    setBusy(true);
+    if (busy) return
+    setBusy(true)
 
     // The clock starts at the confirm tap.
-    const startedAt = Date.now();
+    const startedAt = Date.now()
 
-    let position: SharePosition | null = fix;
+    let position: SharePosition | null = fix
 
     if (!position) {
       // No fix yet — take one, just-in-time. A refusal is not an error: the
       // share continues without a location.
-      const outcome = await acquireFix();
+      const outcome = await acquireFix()
 
       if (outcome.status === 'ready') {
-        position = { lat: outcome.lat, lng: outcome.lng, accuracyM: outcome.accuracyM };
+        position = { lat: outcome.lat, lng: outcome.lng, accuracyM: outcome.accuracyM }
       }
     }
 
@@ -173,25 +173,25 @@ export default function LocationSharingScreen() {
       withoutLocationNote: t('location.shareWithoutLocationNote'),
       startedAt,
       locale: 'bn',
-    });
+    })
 
-    setResult(shareResult);
-    setBusy(false);
-  }, [acquireFix, busy, fix, recipients, t]);
+    setResult(shareResult)
+    setBusy(false)
+  }, [acquireFix, busy, fix, recipients, t])
 
   /** Saves the manual coordinate entry. */
   const onSaveManual = useCallback(() => {
-    const parsed = parseManualCoordinates(manualLat, manualLng);
+    const parsed = parseManualCoordinates(manualLat, manualLng)
 
     if (!parsed.ok) {
-      setManualError(t('location.manualErrorInvalid'));
-      return;
+      setManualError(t('location.manualErrorInvalid'))
+      return
     }
 
-    setManualError(null);
-    setFix({ lat: parsed.lat, lng: parsed.lng, accuracyM: null });
-    setManualVisible(false);
-  }, [manualLat, manualLng, t]);
+    setManualError(null)
+    setFix({ lat: parsed.lat, lng: parsed.lng, accuracyM: null })
+    setManualVisible(false)
+  }, [manualLat, manualLng, t])
 
   return (
     <Screen
@@ -282,8 +282,8 @@ export default function LocationSharingScreen() {
               variant="ghost"
               size="md"
               onPress={() => {
-                setFix(null);
-                void onShare();
+                setFix(null)
+                void onShare()
               }}
             />
           </View>
@@ -441,7 +441,7 @@ export default function LocationSharingScreen() {
         />
       </BottomSheet>
     </Screen>
-  );
+  )
 }
 
 /**
@@ -453,11 +453,11 @@ function Checkbox({
   onPress,
   accessibilityLabel,
 }: {
-  checked: boolean;
-  onPress: () => void;
-  accessibilityLabel: string;
+  checked: boolean
+  onPress: () => void
+  accessibilityLabel: string
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -479,7 +479,7 @@ function Checkbox({
         {checked ? <View style={styles.checkboxTick} /> : null}
       </View>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -690,4 +690,4 @@ const styles = StyleSheet.create({
   manualGap: {
     height: 12,
   },
-});
+})

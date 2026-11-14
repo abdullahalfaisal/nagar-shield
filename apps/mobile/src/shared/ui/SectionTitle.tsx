@@ -1,10 +1,10 @@
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { useTheme } from '../theme';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { useTheme } from '../theme'
 
 interface SectionTitleProps {
-  title: string;
-  actionLabel?: string;
-  onActionPress?: () => void;
+  title: string
+  actionLabel?: string
+  onActionPress?: () => void
 }
 
 /**
@@ -12,7 +12,7 @@ interface SectionTitleProps {
  * The optional trailing link is the prototype's `→`-style affordance.
  */
 export function SectionTitle({ title, actionLabel, onActionPress }: SectionTitleProps) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <View style={[styles.row, { paddingHorizontal: 20, marginTop: 16, marginBottom: 12 }]}>
       <Text
@@ -39,7 +39,7 @@ export function SectionTitle({ title, actionLabel, onActionPress }: SectionTitle
         </Text>
       ) : null}
     </View>
-  );
+  )
 }
 
 /**
@@ -47,7 +47,7 @@ export function SectionTitle({ title, actionLabel, onActionPress }: SectionTitle
  * React Native has no CSS grid, so this lays the cards out with flex.
  */
 export function QuickActionGrid({ children }: { children: React.ReactNode }) {
-  return <View style={styles.grid}>{children}</View>;
+  return <View style={styles.grid}>{children}</View>
 }
 
 export function ActionCard({
@@ -58,15 +58,15 @@ export function ActionCard({
   onPress,
   style,
 }: {
-  icon: string;
-  label: string;
-  sub?: string;
-  tone?: 'purple' | 'red' | 'green' | 'amber' | 'sky';
-  onPress?: () => void;
-  style?: ViewStyle;
+  icon: string
+  label: string
+  sub?: string
+  tone?: 'purple' | 'red' | 'green' | 'amber' | 'sky'
+  onPress?: () => void
+  style?: ViewStyle
 }) {
-  const theme = useTheme();
-  const { bg, fg } = actionTone(tone, theme);
+  const theme = useTheme()
+  const { bg, fg } = actionTone(tone, theme)
 
   return (
     <Pressable
@@ -117,21 +117,21 @@ export function ActionCard({
         </Text>
       ) : null}
     </Pressable>
-  );
+  )
 }
 
 function actionTone(tone: string, theme: ReturnType<typeof useTheme>) {
   switch (tone) {
     case 'red':
-      return { bg: theme.palette.red[100], fg: theme.palette.red[600] };
+      return { bg: theme.palette.red[100], fg: theme.palette.red[600] }
     case 'green':
-      return { bg: theme.palette.green[100], fg: theme.palette.green[700] };
+      return { bg: theme.palette.green[100], fg: theme.palette.green[700] }
     case 'amber':
-      return { bg: theme.palette.amber[100], fg: theme.palette.amber[600] };
+      return { bg: theme.palette.amber[100], fg: theme.palette.amber[600] }
     case 'sky':
-      return { bg: theme.palette.sky[100], fg: theme.palette.sky[600] };
+      return { bg: theme.palette.sky[100], fg: theme.palette.sky[600] }
     default:
-      return { bg: theme.palette.violet[100], fg: theme.palette.violet[700] };
+      return { bg: theme.palette.violet[100], fg: theme.palette.violet[700] }
   }
 }
 
@@ -162,4 +162,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-});
+})

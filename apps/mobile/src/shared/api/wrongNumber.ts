@@ -1,7 +1,7 @@
-import { useMutation } from '@tanstack/react-query';
-import { AppError, wrongNumberReportSchema } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { useMutation } from '@tanstack/react-query'
+import { AppError, wrongNumberReportSchema } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The wrong-number report write path.
@@ -17,26 +17,26 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * identity. The database enforces this too — migration 031 makes the column
  * nullable and the insert policy accepts a null reporter.
  */
-export type WrongNumberEntryType = 'station' | 'hotline';
+export type WrongNumberEntryType = 'station' | 'hotline'
 
 export async function reportWrongNumber(input: {
-  entryType: WrongNumberEntryType;
-  entryId: string;
-  reason: string;
+  entryType: WrongNumberEntryType
+  entryId: string
+  reason: string
   /** The citizen's free text. Optional — stored as `null` when absent. */
-  details?: string;
+  details?: string
 }): Promise<void> {
-  const parsed = wrongNumberReportSchema.safeParse(input);
+  const parsed = wrongNumberReportSchema.safeParse(input)
 
   if (!parsed.success) {
-    throw new AppError('VALIDATION_FAILED', { field: 'reason' });
+    throw new AppError('VALIDATION_FAILED', { field: 'reason' })
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await supabase.auth.getSession()
   // The column is nullable — a signed-out reporter files the row with no
   // identity attached. The RLS policy accepts either the caller's own id or
   // a null reporter, and never a reporter id belonging to somebody else.
-  const reporterId = sessionData.session?.user.id ?? null;
+  const reporterId = sessionData.session?.user.id ?? null
 
   const { error } = await supabase.from('wrong_number_reports').insert({
     reporter_id: reporterId,
@@ -47,13 +47,13 @@ export async function reportWrongNumber(input: {
     // own words; concatenating them here would make the two inseparable.
     reason: parsed.data.reason,
     details: parsed.data.details ?? null,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 }
 
 export function useReportWrongNumber() {
   return useMutation({
     mutationFn: reportWrongNumber,
-  });
+  })
 }

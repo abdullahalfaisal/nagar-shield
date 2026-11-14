@@ -21,21 +21,21 @@
  * processed row now carries `purged_at`.
  */
 
-import { MEDIA_RETENTION_DAYS } from '@shared/jobs/index.ts';
-import { errorResponse, successResponse } from '../_shared/http.ts';
-import { logEvent } from '../_shared/logger.ts';
-import { requireServiceRole, CallerError } from '../_shared/auth.ts';
-import { closeJobRun, newRequestId, recordJobRun } from '../_shared/job-runner.ts';
-import { createServiceClient } from '../_shared/supabase.ts';
+import { MEDIA_RETENTION_DAYS } from '@shared/jobs/index.ts'
+import { errorResponse, successResponse } from '../_shared/http.ts'
+import { logEvent } from '../_shared/logger.ts'
+import { requireServiceRole, CallerError } from '../_shared/auth.ts'
+import { closeJobRun, newRequestId, recordJobRun } from '../_shared/job-runner.ts'
+import { createServiceClient } from '../_shared/supabase.ts'
 
-const BUCKET_ID = 'report-media';
-const DEFAULT_BATCH_SIZE = 100;
-const MAX_BATCHES = 20;
+const BUCKET_ID = 'report-media'
+const DEFAULT_BATCH_SIZE = 100
+const MAX_BATCHES = 20
 
 interface PurgeCandidate {
-  id: string;
-  storage_path: string;
-  byte_size: number;
+  id: string
+  storage_path: string
+  byte_size: number
 }
 
 /** The worklist query — a single indexed range scan, no stored queue. */
@@ -47,7 +47,7 @@ const CANDIDATE_QUERY = `
     and (rm.created_at < now() - interval '90 days' or r.deleted_at is not null)
   order by rm.created_at asc
   limit $1;
-`;
+`
 
 async function readCandidates(
   client: ReturnType<typeof createServiceClient>,
@@ -55,73 +55,73 @@ async function readCandidates(
 ): Promise<PurgeCandidate[]> {
   const { data, error } = await client.rpc('job_purge_media_candidates', {
     p_batch_size: batchSize,
-  });
+  })
 
-  if (error) throw error;
+  if (error) throw error
 
   // The RPC returns the candidate set. The raw table is never selected
   // directly so the candidate definition lives in exactly one place.
-  return (data ?? []) as PurgeCandidate[];
+  return (data ?? []) as PurgeCandidate[]
 }
 
 Deno.serve(async (request) => {
-  const requestId = newRequestId();
+  const requestId = newRequestId()
 
   try {
-    requireServiceRole(request);
+    requireServiceRole(request)
   } catch (error) {
     if (error instanceof CallerError) {
-      return errorResponse(error.code === 'INTERNAL' ? 'INTERNAL' : 'FORBIDDEN');
+      return errorResponse(error.code === 'INTERNAL' ? 'INTERNAL' : 'FORBIDDEN')
     }
-    return errorResponse('INTERNAL');
+    return errorResponse('INTERNAL')
   }
 
-  const serviceClient = createServiceClient();
+  const serviceClient = createServiceClient()
 
-  let dryRun = false;
+  let dryRun = false
   try {
-    const body = (await request.json().catch(() => ({}))) as { dry_run?: unknown };
-    dryRun = body.dry_run === true;
+    const body = (await request.json().catch(() => ({}))) as { dry_run?: unknown }
+    dryRun = body.dry_run === true
   } catch {
-    dryRun = false;
+    dryRun = false
   }
 
-  const runId = await recordJobRun(serviceClient, 'purge_media');
+  const runId = await recordJobRun(serviceClient, 'purge_media')
   if (!runId) {
     logEvent('error', {
       requestId,
       jobName: 'purge_media',
       action: 'job_run_open_failed',
-    });
-    return errorResponse('INTERNAL');
+    })
+    return errorResponse('INTERNAL')
   }
 
-  let itemsProcessed = 0;
-  let itemsFailed = 0;
-  let bytesReclaimed = 0;
+  let itemsProcessed = 0
+  let itemsFailed = 0
+  let bytesReclaimed = 0
 
   try {
     for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
-      const candidates = await readCandidates(serviceClient, DEFAULT_BATCH_SIZE);
-      if (candidates.length === 0) break;
+      const candidates = await readCandidates(serviceClient, DEFAULT_BATCH_SIZE)
+      if (candidates.length === 0) break
 
       for (const candidate of candidates) {
         if (dryRun) {
           // The dry run reports the worklist and touches nothing.
-          itemsProcessed += 1;
-          bytesReclaimed += Number(candidate.byte_size ?? 0);
-          continue;
+          itemsProcessed += 1
+          bytesReclaimed += Number(candidate.byte_size ?? 0)
+          continue
         }
 
         try {
           // (1) The object first.
           const { error: removeError } = await serviceClient.storage
             .from(BUCKET_ID)
-            .remove([candidate.storage_path]);
+            .remove([candidate.storage_path])
 
           if (removeError && !isMissingObject(removeError)) {
-            itemsFailed += 1;
-            continue;
+            itemsFailed += 1
+            continue
           }
 
           // (2) The flag second. A crash between the two leaves exactly one
@@ -129,21 +129,21 @@ Deno.serve(async (request) => {
           const { error: flagError } = await serviceClient
             .from('report_media')
             .update({ purged_at: new Date().toISOString() })
-            .eq('id', candidate.id);
+            .eq('id', candidate.id)
 
           if (flagError) {
-            itemsFailed += 1;
-            continue;
+            itemsFailed += 1
+            continue
           }
 
-          itemsProcessed += 1;
-          bytesReclaimed += Number(candidate.byte_size ?? 0);
+          itemsProcessed += 1
+          bytesReclaimed += Number(candidate.byte_size ?? 0)
         } catch {
-          itemsFailed += 1;
+          itemsFailed += 1
         }
       }
 
-      if (candidates.length < DEFAULT_BATCH_SIZE) break;
+      if (candidates.length < DEFAULT_BATCH_SIZE) break
     }
 
     // The row is closed on **every** invocation, dry run included. A dry run
@@ -154,7 +154,7 @@ Deno.serve(async (request) => {
       itemsProcessed,
       itemsFailed,
       bytesReclaimed,
-    });
+    })
 
     logEvent('info', {
       requestId,
@@ -163,7 +163,7 @@ Deno.serve(async (request) => {
       itemsProcessed,
       itemsFailed,
       bytesReclaimed,
-    });
+    })
 
     return successResponse({
       job_name: 'purge_media',
@@ -172,16 +172,16 @@ Deno.serve(async (request) => {
       bytes_reclaimed: bytesReclaimed,
       dry_run: dryRun,
       retention_days: MEDIA_RETENTION_DAYS,
-    });
+    })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Unknown purge failure';
+    const detail = error instanceof Error ? error.message : 'Unknown purge failure'
 
     await closeJobRun(serviceClient, runId, 'failed', {
       itemsProcessed,
       itemsFailed,
       bytesReclaimed,
       errorDetail: detail,
-    });
+    })
 
     logEvent('error', {
       requestId,
@@ -189,11 +189,11 @@ Deno.serve(async (request) => {
       action: 'failed',
       itemsProcessed,
       itemsFailed,
-    });
+    })
 
-    return errorResponse('INTERNAL', undefined, { error_detail: detail });
+    return errorResponse('INTERNAL', undefined, { error_detail: detail })
   }
-});
+})
 
 /**
  * A missing Storage object is a **no-op success**, not a failure.
@@ -203,9 +203,6 @@ Deno.serve(async (request) => {
  * removed it. The retry must converge, not loop.
  */
 function isMissingObject(error: { message?: string; statusCode?: number }): boolean {
-  const message = error.message ?? '';
-  return (
-    error.statusCode === 404 ||
-    /not found|does not exist|no such file/i.test(message)
-  );
+  const message = error.message ?? ''
+  return error.statusCode === 404 || /not found|does not exist|no such file/i.test(message)
 }

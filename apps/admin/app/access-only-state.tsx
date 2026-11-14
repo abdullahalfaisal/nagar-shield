@@ -1,4 +1,4 @@
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
 
 /**
  * The "moderator access only" state.
@@ -22,7 +22,7 @@ import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
  * bundle. The gate renders this on the server, before any console code runs.
  */
 export function AccessOnlyState() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
   return (
     <main className="main">
@@ -33,5 +33,5 @@ export function AccessOnlyState() {
         </div>
       </div>
     </main>
-  );
+  )
 }

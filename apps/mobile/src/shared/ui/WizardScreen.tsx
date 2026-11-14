@@ -1,20 +1,20 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface WizardScreenProps {
-  children: React.ReactNode;
+  children: React.ReactNode
   /** 1-based step index. `0` hides the progress bar (Welcome / Done). */
-  step?: number;
-  totalSteps?: number;
-  eyebrow?: string;
-  title?: React.ReactNode;
-  subtitle?: string;
+  step?: number
+  totalSteps?: number
+  eyebrow?: string
+  title?: React.ReactNode
+  subtitle?: string
   /** Sticky footer content — the primary CTA and escape links. */
-  footer?: React.ReactNode;
-  scroll?: boolean;
+  footer?: React.ReactNode
+  scroll?: boolean
 }
 
 /**
@@ -32,14 +32,10 @@ export function WizardScreen({
   footer,
   scroll = false,
 }: WizardScreenProps) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
+  const theme = useTheme()
+  const insets = useSafeAreaInsets()
 
-  const body = (
-    <View style={styles.body}>
-      {children}
-    </View>
-  );
+  const body = <View style={styles.body}>{children}</View>
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -91,17 +87,13 @@ export function WizardScreen({
         </View>
       ) : null}
 
-      {scroll ? (
-        <View style={styles.scrollBody}>{body}</View>
-      ) : (
-        body
-      )}
+      {scroll ? <View style={styles.scrollBody}>{body}</View> : body}
 
       {footer ? (
         <View style={[styles.sticky, { paddingBottom: 22 + insets.bottom }]}>{footer}</View>
       ) : null}
     </View>
-  );
+  )
 }
 
 /**
@@ -112,11 +104,11 @@ export function WizardBadge({
   icon = 'shield',
   tone = 'primary',
 }: {
-  icon?: string;
-  tone?: 'primary' | 'success';
+  icon?: string
+  tone?: 'primary' | 'success'
 }) {
-  const theme = useTheme();
-  const colors = tone === 'success' ? theme.gradients.success : theme.gradients.primary;
+  const theme = useTheme()
+  const colors = tone === 'success' ? theme.gradients.success : theme.gradients.primary
 
   return (
     <LinearGradient
@@ -136,12 +128,12 @@ export function WizardBadge({
     >
       <Icon name={icon} size={42} color="#FFFFFF" filled />
     </LinearGradient>
-  );
+  )
 }
 
 /** `.wizard-sticky .escape` — the muted text action under the primary CTA. */
 export function EscapeLink({ label, onPress }: { label: string; onPress?: () => void }) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <Text
       accessibilityRole="button"
@@ -150,7 +142,7 @@ export function EscapeLink({ label, onPress }: { label: string; onPress?: () => 
     >
       {label}
     </Text>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -239,4 +231,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     paddingVertical: 8,
   },
-});
+})

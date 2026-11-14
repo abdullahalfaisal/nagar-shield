@@ -12,14 +12,14 @@
  */
 
 export interface LogFields {
-  requestId: string;
-  jobName?: string;
-  action?: string;
-  itemsProcessed?: number;
-  itemsFailed?: number;
-  bytesReclaimed?: number;
-  durationMs?: number;
-  [key: string]: unknown;
+  requestId: string
+  jobName?: string
+  action?: string
+  itemsProcessed?: number
+  itemsFailed?: number
+  bytesReclaimed?: number
+  durationMs?: number
+  [key: string]: unknown
 }
 
 /** The keys that must never reach a log line. */
@@ -44,7 +44,7 @@ const FORBIDDEN_KEYS = new Set([
   'userId',
   'author_id',
   'authorId',
-]);
+])
 
 /**
  * Removes the forbidden fields from a log payload.
@@ -53,17 +53,17 @@ const FORBIDDEN_KEYS = new Set([
  * reader can still tell that the field was present.
  */
 export function scrubLogFields(fields: LogFields): Record<string, unknown> {
-  const scrubbed: Record<string, unknown> = {};
+  const scrubbed: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(fields)) {
     if (FORBIDDEN_KEYS.has(key)) {
-      scrubbed[key] = '[redacted]';
-      continue;
+      scrubbed[key] = '[redacted]'
+      continue
     }
-    scrubbed[key] = value;
+    scrubbed[key] = value
   }
 
-  return scrubbed;
+  return scrubbed
 }
 
 export function logEvent(level: 'info' | 'warn' | 'error', fields: LogFields): void {
@@ -71,16 +71,16 @@ export function logEvent(level: 'info' | 'warn' | 'error', fields: LogFields): v
     level,
     timestamp: new Date().toISOString(),
     ...scrubLogFields(fields),
-  };
+  }
 
-  const line = JSON.stringify(payload);
+  const line = JSON.stringify(payload)
   if (level === 'error') {
-    console.error(line);
-    return;
+    console.error(line)
+    return
   }
   if (level === 'warn') {
-    console.warn(line);
-    return;
+    console.warn(line)
+    return
   }
-  console.info(line);
+  console.info(line)
 }

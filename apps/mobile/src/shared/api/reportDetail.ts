@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import {
   AppError,
   reportCategorySchema,
@@ -8,9 +8,9 @@ import {
   type PublicVisibility,
   type ReportCategory,
   type ReportMedia,
-} from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+} from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The author's own report, and the category edit.
@@ -51,42 +51,42 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * accept it.
  */
 
-const REPORT_DETAIL_KEY = ['report-detail'] as const;
+const REPORT_DETAIL_KEY = ['report-detail'] as const
 
 interface ReportRow {
-  id: string;
-  author_id: string;
-  public_visibility: PublicVisibility;
-  category: ReportCategory | null;
-  description: string | null;
-  lat: number;
-  lng: number;
-  area_hierarchy: Partial<AreaHierarchy> | null;
-  captured_at: string;
-  moderation_status: ModerationStatus;
-  created_at: string;
+  id: string
+  author_id: string
+  public_visibility: PublicVisibility
+  category: ReportCategory | null
+  description: string | null
+  lat: number
+  lng: number
+  area_hierarchy: Partial<AreaHierarchy> | null
+  captured_at: string
+  moderation_status: ModerationStatus
+  created_at: string
 }
 
 interface ReportMediaRow {
-  id: string;
-  report_id: string;
-  storage_path: string;
-  media_type: ReportMedia['mediaType'];
-  byte_size: number;
-  duration_seconds: number | null;
-  width: number | null;
-  height: number | null;
-  created_at: string;
+  id: string
+  report_id: string
+  storage_path: string
+  media_type: ReportMedia['mediaType']
+  byte_size: number
+  duration_seconds: number | null
+  width: number | null
+  height: number | null
+  created_at: string
 }
 
 function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | null {
-  if (!raw) return null;
+  if (!raw) return null
   return {
     division: raw.division ?? '',
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
-  };
+  }
 }
 
 function toMedia(row: ReportMediaRow): ReportMedia {
@@ -100,7 +100,7 @@ function toMedia(row: ReportMediaRow): ReportMedia {
     width: row.width,
     height: row.height,
     createdAt: row.created_at,
-  };
+  }
 }
 
 /**
@@ -118,23 +118,25 @@ export async function fetchOwnedReport(reportId: string): Promise<OwnedReport | 
       'id, author_id, public_visibility, category, description, lat, lng, area_hierarchy, captured_at, moderation_status, created_at',
     )
     .eq('id', reportId)
-    .maybeSingle();
+    .maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
-  if (!data) return null;
+  if (error) throw fromSupabaseError(error)
+  if (!data) return null
 
-  const row = data as unknown as ReportRow;
+  const row = data as unknown as ReportRow
 
   // The media are a second query because the `report_media` rows live in
   // their own table with their own policy — the same policy shape as every
   // other owner-scoped table in the schema.
   const { data: mediaData, error: mediaError } = await supabase
     .from('report_media')
-    .select('id, report_id, storage_path, media_type, byte_size, duration_seconds, width, height, created_at')
+    .select(
+      'id, report_id, storage_path, media_type, byte_size, duration_seconds, width, height, created_at',
+    )
     .eq('report_id', reportId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
 
-  if (mediaError) throw fromSupabaseError(mediaError);
+  if (mediaError) throw fromSupabaseError(mediaError)
 
   return {
     id: row.id,
@@ -149,7 +151,7 @@ export async function fetchOwnedReport(reportId: string): Promise<OwnedReport | 
     moderationStatus: row.moderation_status,
     createdAt: row.created_at,
     media: (mediaData ?? []).map((m) => toMedia(m as unknown as ReportMediaRow)),
-  };
+  }
 }
 
 /**
@@ -165,7 +167,7 @@ export function useOwnedReport(
     queryKey: [...REPORT_DETAIL_KEY, reportId],
     queryFn: () => (reportId ? fetchOwnedReport(reportId) : Promise.resolve(null)),
     enabled: Boolean(reportId),
-  });
+  })
 }
 
 /**
@@ -191,20 +193,20 @@ export async function updateCategory(
   reportId: string,
   category: ReportCategory,
 ): Promise<ReportCategory> {
-  const parsed = reportCategorySchema.safeParse(category);
+  const parsed = reportCategorySchema.safeParse(category)
 
   if (!parsed.success) {
-    throw new AppError('VALIDATION_FAILED', { field: 'category' });
+    throw new AppError('VALIDATION_FAILED', { field: 'category' })
   }
 
   const { error } = await supabase.rpc('update_category', {
     p_report_id: reportId,
     p_category: parsed.data,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  return parsed.data;
+  return parsed.data
 }
 
 /**
@@ -215,11 +217,11 @@ export async function updateCategory(
  * client is never the authority on what is stored.
  */
 export function useInvalidateReport(): (reportId: string) => Promise<void> {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return async (reportId: string) => {
-    await queryClient.invalidateQueries({ queryKey: [...REPORT_DETAIL_KEY, reportId] });
-  };
+    await queryClient.invalidateQueries({ queryKey: [...REPORT_DETAIL_KEY, reportId] })
+  }
 }
 
 /**
@@ -235,9 +237,9 @@ export function useInvalidateReport(): (reportId: string) => Promise<void> {
 export async function signMediaUrl(storagePath: string): Promise<string | null> {
   const { data, error } = await supabase.storage
     .from('report-media')
-    .createSignedUrl(storagePath, 60 * 10);
+    .createSignedUrl(storagePath, 60 * 10)
 
-  if (error) return null;
+  if (error) return null
 
-  return data?.signedUrl ?? null;
+  return data?.signedUrl ?? null
 }

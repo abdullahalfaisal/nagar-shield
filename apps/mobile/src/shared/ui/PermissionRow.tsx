@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../theme';
-import { Button } from './Button';
-import { recoverPermission } from '../services/permissionRecovery';
-import type { PermissionName, PermissionState } from '../services/permissions';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
+import { Button } from './Button'
+import { recoverPermission } from '../services/permissionRecovery'
+import type { PermissionName, PermissionState } from '../services/permissions'
 
 /**
  * One permission row in the Settings screen.
@@ -22,28 +22,28 @@ import type { PermissionName, PermissionState } from '../services/permissions';
  * label always matches the action.
  */
 interface PermissionRowProps {
-  name: PermissionName;
-  state: PermissionState;
+  name: PermissionName
+  state: PermissionState
   /** What the permission would unlock. */
-  unlocks: string;
+  unlocks: string
   /** Called after a prompt-based recovery, so the list can re-read. */
-  onChanged: () => void;
+  onChanged: () => void
 }
 
 export function PermissionRow({ name, state, unlocks, onChanged }: PermissionRowProps) {
-  const theme = useTheme();
-  const { t } = useTranslation();
-  const [working, setWorking] = useState(false);
+  const theme = useTheme()
+  const { t } = useTranslation()
+  const [working, setWorking] = useState(false)
 
-  const denied = state === 'denied';
-  const granted = state === 'granted';
+  const denied = state === 'denied'
+  const granted = state === 'granted'
 
   const onPress = async () => {
-    if (working) return;
-    setWorking(true);
+    if (working) return
+    setWorking(true)
 
     try {
-      await recoverPermission(name, state);
+      await recoverPermission(name, state)
 
       // Both branches re-read the permission state.
       //
@@ -52,11 +52,11 @@ export function PermissionRow({ name, state, unlocks, onChanged }: PermissionRow
       // was opened and the user has to flip the switch themselves, and the
       // app has no way of knowing whether they did. Re-reading is the honest
       // thing to do — it reports what the OS says, not what the app hopes.
-      onChanged();
+      onChanged()
     } finally {
-      setWorking(false);
+      setWorking(false)
     }
-  };
+  }
 
   return (
     <View style={styles.row}>
@@ -119,20 +119,20 @@ export function PermissionRow({ name, state, unlocks, onChanged }: PermissionRow
         />
       )}
     </View>
-  );
+  )
 }
 
 /** The permission's name, in the user's language. */
 function titleFor(name: PermissionName, t: (key: string) => string): string {
   switch (name) {
     case 'camera':
-      return t('permissions.camera');
+      return t('permissions.camera')
     case 'microphone':
-      return t('permissions.microphone');
+      return t('permissions.microphone')
     case 'mediaLibrary':
-      return t('permissions.mediaLibrary');
+      return t('permissions.mediaLibrary')
     case 'location':
-      return t('permissions.location');
+      return t('permissions.location')
   }
 }
 
@@ -140,11 +140,11 @@ function titleFor(name: PermissionName, t: (key: string) => string): string {
 function stateLabel(state: PermissionState, t: (key: string) => string): string {
   switch (state) {
     case 'granted':
-      return t('permissions.granted');
+      return t('permissions.granted')
     case 'denied':
-      return t('permissions.denied');
+      return t('permissions.denied')
     case 'undetermined':
-      return t('permissions.notDetermined');
+      return t('permissions.notDetermined')
   }
 }
 
@@ -184,4 +184,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
-});
+})

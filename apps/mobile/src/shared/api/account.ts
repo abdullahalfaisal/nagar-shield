@@ -1,6 +1,6 @@
-import { AppError } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { AppError } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The account lifecycle — soft delete and restore.
@@ -20,9 +20,9 @@ import { fromSupabaseError } from '@/shared/api/errors';
 
 export interface AccountDeletionResult {
   /** The moment the account was soft-deleted. */
-  deletedAt: string;
+  deletedAt: string
   /** The last moment the account can be recovered. */
-  recoverableUntil: string;
+  recoverableUntil: string
 }
 
 /**
@@ -33,14 +33,14 @@ export interface AccountDeletionResult {
  * account returns the original timestamp rather than moving the window.
  */
 export async function softDeleteAccount(): Promise<AccountDeletionResult> {
-  const { data, error } = await supabase.rpc('soft_delete_account');
+  const { data, error } = await supabase.rpc('soft_delete_account')
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  const result = (data ?? {}) as { deleted_at?: string; recoverable_until?: string };
+  const result = (data ?? {}) as { deleted_at?: string; recoverable_until?: string }
 
   if (!result.deleted_at) {
-    throw new AppError('INTERNAL');
+    throw new AppError('INTERNAL')
   }
 
   return {
@@ -48,7 +48,7 @@ export async function softDeleteAccount(): Promise<AccountDeletionResult> {
     recoverableUntil:
       result.recoverable_until ??
       new Date(new Date(result.deleted_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  };
+  }
 }
 
 /**
@@ -58,13 +58,13 @@ export async function softDeleteAccount(): Promise<AccountDeletionResult> {
  * is not deleted.
  */
 export async function restoreAccount(): Promise<void> {
-  const { error } = await supabase.rpc('restore_account');
+  const { error } = await supabase.rpc('restore_account')
 
   if (error) {
     // The RPC raises `CONFLICT` (23505) when the account is not deleted.
     if (error.code === '23505') {
-      throw new AppError('CONFLICT');
+      throw new AppError('CONFLICT')
     }
-    throw fromSupabaseError(error);
+    throw fromSupabaseError(error)
   }
 }

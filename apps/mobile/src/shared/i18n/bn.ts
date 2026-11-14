@@ -279,8 +279,7 @@ export const bn = {
     manualLatLabel: 'অক্ষাংশ (Latitude)',
     manualLngLabel: 'দ্রাঘিমাংশ (Longitude)',
     manualSave: 'এই অবস্থান ব্যবহার করুন',
-    manualErrorInvalid:
-      'অক্ষাংশ -৯০ থেকে ৯০ এবং দ্রাঘিমাংশ -১৮০ থেকে ১৮০ এর মধ্যে লিখুন।',
+    manualErrorInvalid: 'অক্ষাংশ -৯০ থেকে ৯০ এবং দ্রাঘিমাংশ -১৮০ থেকে ১৮০ এর মধ্যে লিখুন।',
     manualSaved: 'অবস্থান সেট হয়েছে',
     // The share-without-location path.
     shareWithoutLocation: 'লোকেশন ছাড়াই শেয়ার করুন',
@@ -395,7 +394,8 @@ export const bn = {
     // fault, not a user error — the copy says so plainly, and it does not
     // blame the person holding the phone.
     title: 'অ্যাপটি ঠিকভাবে সেট হয়নি',
-    message: 'এই বিল্ডে সার্ভারের সেটিংস নেই, তাই সেবার সাথে যোগাযোগ করা যাচ্ছে না। অ্যাপটি আপডেট করুন।',
+    message:
+      'এই বিল্ডে সার্ভারের সেটিংস নেই, তাই সেবার সাথে যোগাযোগ করা যাচ্ছে না। অ্যাপটি আপডেট করুন।',
     detail: 'এটি বারবার দেখা গেলে অ্যাপটি পুনরায় ইনস্টল বা আপডেট করতে হবে।',
   },
   disabled: {
@@ -404,14 +404,16 @@ export const bn = {
     // embeds the moderator's reason, the disabling timestamp, or any
     // identifier — and it points the user at the support path.
     message: 'আপনার অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে। সাপোর্টে যোগাযোগ করুন।',
-    subtitle: 'এই অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে, তাই এখন আর রিপোর্ট পাঠানো বা অবস্থান শেয়ার করা যাবে না।',
+    subtitle:
+      'এই অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে, তাই এখন আর রিপোর্ট পাঠানো বা অবস্থান শেয়ার করা যাবে না।',
     whatYouCanDo: 'যা করতে পারেন',
     deleteTitle: 'অ্যাকাউন্ট মুছে ফেলুন',
     deleteBody: 'আপনার তথ্য ৩০ দিন থাকবে, এরপর স্থায়ীভাবে মুছে যাবে।',
     signOut: 'সাইন আউট',
     support: 'এটি ভুল হলে সাপোর্টে যোগাযোগ করুন।',
     deletedTitle: 'অ্যাকাউন্ট মুছে ফেলা হয়েছে',
-    deletedBody: 'আপনার অ্যাকাউন্ট মুছে ফেলা হয়েছে। ৩০ দিনের মধ্যে আবার সাইন ইন করলে তা ফিরে আসবে।',
+    deletedBody:
+      'আপনার অ্যাকাউন্ট মুছে ফেলা হয়েছে। ৩০ দিনের মধ্যে আবার সাইন ইন করলে তা ফিরে আসবে।',
     restore: 'আমার অ্যাকাউন্ট ফিরিয়ে আনুন',
   },
   settings: {
@@ -438,9 +440,11 @@ export const bn = {
     shareApp: 'অ্যাপটি শেয়ার করুন',
     deleteAccount: 'অ্যাকাউন্ট মুছে ফেলুন',
     deleteWarning: 'অ্যাকাউন্ট মুছলে ৩০ দিন আপনার তথ্য থাকবে, এরপর স্থায়ীভাবে মুছে যাবে।',
-    deleteBody: 'অ্যাকাউন্ট মুছে ফেললে সাইন আউট হয়ে যাবে। ৩০ দিনের মধ্যে আবার সাইন ইন করলে অ্যাকাউন্টটি ফিরে আসবে — তারপর এটি স্থায়ীভাবে মুছে যাবে।',
+    deleteBody:
+      'অ্যাকাউন্ট মুছে ফেললে সাইন আউট হয়ে যাবে। ৩০ দিনের মধ্যে আবার সাইন ইন করলে অ্যাকাউন্টটি ফিরে আসবে — তারপর এটি স্থায়ীভাবে মুছে যাবে।',
     deleteConfirm: 'মুছে ফেলুন',
-    discardQueueWarning: 'এই ফোনে {{count}}টি অপাঠানো রিপোর্ট সংরক্ষিত আছে। সাইন আউট করলে সেগুলো মুছে যাবে।',
+    discardQueueWarning:
+      'এই ফোনে {{count}}টি অপাঠানো রিপোর্ট সংরক্ষিত আছে। সাইন আউট করলে সেগুলো মুছে যাবে।',
     version: 'সংস্করণ',
   },
   permissions: {
@@ -526,13 +530,11 @@ export const bn = {
     step2Eyebrow: 'সেটআপ · ৪ ধাপ',
     step2Title: 'আরেকজন যোগাযোগ যোগ করুন',
     step2Highlight: 'দ্বিতীয় যোগাযোগ',
-    step2Subtitle:
-      'আরেকজন। তিনজন সর্বনিম্ন — তবে সেটআপ শেষ হওয়ার পর যত খুশি যোগ করতে পারেন।',
+    step2Subtitle: 'আরেকজন। তিনজন সর্বনিম্ন — তবে সেটআপ শেষ হওয়ার পর যত খুশি যোগ করতে পারেন।',
     step3Eyebrow: 'সেটআপ · ৪ ধাপ',
     step3Title: 'আরেকজন যোগাযোগ',
     step3Highlight: 'যোগাযোগ',
-    step3Subtitle:
-      'এরপর লোকেশনের অনুমতি — এটিই নগর শিল্ড খোলার আগের শেষ ধাপ।',
+    step3Subtitle: 'এরপর লোকেশনের অনুমতি — এটিই নগর শিল্ড খোলার আগের শেষ ধাপ।',
     nameLabel: 'যোগাযোগের নাম',
     phoneLabel: 'তার মোবাইল (০১XXXXXXXXX)',
     slotTitle: 'যোগাযোগ {{number}}',
@@ -588,6 +590,6 @@ export const bn = {
     detectionUnavailable:
       'এই ফোন অ্যাপকে জানায় না ব্যাটারি সেভার চালু আছে কি না। ডায়ালার না খুললে নিজে থেকেও নম্বরে কল করুন।',
   },
-};
+}
 
-export type TranslationSchema = typeof bn;
+export type TranslationSchema = typeof bn

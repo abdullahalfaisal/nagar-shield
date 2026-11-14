@@ -1,7 +1,7 @@
-import { AppError, signupSchema } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { clearQueue } from '@/shared/services/uploadQueue';
+import { AppError, signupSchema } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { clearQueue } from '@/shared/services/uploadQueue'
 
 /**
  * Authentication operations.
@@ -16,16 +16,16 @@ import { clearQueue } from '@/shared/services/uploadQueue';
  */
 
 export interface SignupParams {
-  email: string;
-  password: string;
-  phone: string;
-  fullName?: string;
+  email: string
+  password: string
+  phone: string
+  fullName?: string
 }
 
 export interface LoginParams {
-  identifier: string;
-  password: string;
-  rememberMe: boolean;
+  identifier: string
+  password: string
+  rememberMe: boolean
 }
 
 /**
@@ -47,31 +47,31 @@ export interface LoginParams {
  * not a secret.
  */
 async function resolveEmail(identifier: string): Promise<string> {
-  const trimmed = identifier.trim();
+  const trimmed = identifier.trim()
 
   if (trimmed.includes('@')) {
-    return trimmed.toLowerCase();
+    return trimmed.toLowerCase()
   }
 
   const { data, error } = await supabase.rpc('resolve_login_identifier', {
     p_identifier: trimmed,
-  });
+  })
 
   if (error) {
     // The RPC raises `AUTH_REQUIRED` for an unknown identifier. Surface it as
     // the same generic failure a wrong password produces.
     if (error.code === '42501' || error.code === 'P0002') {
-      throw new AppError('AUTH_REQUIRED');
+      throw new AppError('AUTH_REQUIRED')
     }
-    throw fromSupabaseError(error);
+    throw fromSupabaseError(error)
   }
 
-  const email = (data as { email?: string } | null)?.email;
+  const email = (data as { email?: string } | null)?.email
   if (!email) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
-  return email;
+  return email
 }
 
 export async function signUp({ email, password, phone, fullName }: SignupParams): Promise<string> {
@@ -84,10 +84,10 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
     password,
     phone,
     fullName: fullName ?? undefined,
-  });
+  })
 
   if (!parsed.success) {
-    throw new AppError('VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED')
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -97,7 +97,7 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
       data: { phone: parsed.data.phone, full_name: parsed.data.fullName ?? null },
       emailRedirectTo: 'nagarshield://auth/callback',
     },
-  });
+  })
 
   if (error) {
     // A **duplicate phone** is a field validation failure, not a state
@@ -117,17 +117,17 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
     // "profiles_phone_key"`), not in `detail` — `detail` carries the values.
     // The Supabase client surfaces both, so the message is checked first and
     // the detail second.
-    const message = error.message ?? '';
-    const details = (error as { details?: string }).details ?? '';
+    const message = error.message ?? ''
+    const details = (error as { details?: string }).details ?? ''
 
     if (/profiles_phone_key/i.test(message) || /profiles_phone_key/i.test(details)) {
-      throw new AppError('VALIDATION_FAILED', { field: 'phone' });
+      throw new AppError('VALIDATION_FAILED', { field: 'phone' })
     }
 
     if (/already registered|already exists/i.test(error.message)) {
-      throw new AppError('CONFLICT');
+      throw new AppError('CONFLICT')
     }
-    throw fromSupabaseError(error);
+    throw fromSupabaseError(error)
   }
 
   // The profile row is created by a trigger on `auth.users`; nothing to do
@@ -142,32 +142,32 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
   // and this id is the only handle on the new account until they do. It is
   // still the right id to return: the account exists either way.
   if (!data.user) {
-    throw new AppError('INTERNAL');
+    throw new AppError('INTERNAL')
   }
 
-  return data.user.id;
+  return data.user.id
 }
 
 export async function logIn({ identifier, password, rememberMe }: LoginParams): Promise<void> {
-  const email = await resolveEmail(identifier);
+  const email = await resolveEmail(identifier)
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
-  });
+  })
 
   if (error) {
     if (/invalid login credentials/i.test(error.message)) {
-      throw new AppError('AUTH_REQUIRED');
+      throw new AppError('AUTH_REQUIRED')
     }
-    throw fromSupabaseError(error);
+    throw fromSupabaseError(error)
   }
 
   if (rememberMe) {
     // FR-AUTH-2 — extend the session window to 30 days.
     // Supabase rotates the refresh token on demand; `refreshSession` with the
     // stored refresh token keeps the session alive for the full window.
-    const { error: extendError } = await supabase.auth.refreshSession();
+    const { error: extendError } = await supabase.auth.refreshSession()
     if (extendError) {
       // Not fatal — the user is signed in; the session simply uses the
       // default lifetime.
@@ -186,12 +186,12 @@ export async function logIn({ identifier, password, rememberMe }: LoginParams): 
  * know about.
  */
 export async function logOut(): Promise<{ discardedUploads: number }> {
-  const discardedUploads = await clearQueue();
+  const discardedUploads = await clearQueue()
 
-  const { error } = await supabase.auth.signOut();
-  if (error) throw fromSupabaseError(error);
+  const { error } = await supabase.auth.signOut()
+  if (error) throw fromSupabaseError(error)
 
-  return { discardedUploads };
+  return { discardedUploads }
 }
 
 /**
@@ -211,15 +211,11 @@ export async function logOut(): Promise<{ discardedUploads: number }> {
  * validation failure rather than an internal error so the user can retry.
  */
 export async function loadProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
-  if (!data) throw new AppError('NOT_FOUND');
-  return data;
+  if (error) throw fromSupabaseError(error)
+  if (!data) throw new AppError('NOT_FOUND')
+  return data
 }
 
 /**
@@ -228,20 +224,20 @@ export async function loadProfile(userId: string) {
  * `expo-local-authentication` in the UI layer before this is called.
  */
 export async function refreshSession(): Promise<void> {
-  const { error } = await supabase.auth.refreshSession();
-  if (error) throw fromSupabaseError(error);
+  const { error } = await supabase.auth.refreshSession()
+  if (error) throw fromSupabaseError(error)
 }
 
 /**
  * W-2 — SMS OTP. **Feature-flagged off for MVP Phase 1.**
  * Kept wired so the flag can be enabled without touching the identity model.
  */
-export const SMS_OTP_ENABLED = false;
+export const SMS_OTP_ENABLED = false
 
 export async function sendPhoneOtp(phone: string): Promise<void> {
   if (!SMS_OTP_ENABLED) {
-    throw new AppError('FORBIDDEN', { feature: 'sms_otp', flag: 'SMS_OTP_ENABLED' });
+    throw new AppError('FORBIDDEN', { feature: 'sms_otp', flag: 'SMS_OTP_ENABLED' })
   }
-  const { error } = await supabase.auth.signInWithOtp({ phone });
-  if (error) throw fromSupabaseError(error);
+  const { error } = await supabase.auth.signInWithOtp({ phone })
+  if (error) throw fromSupabaseError(error)
 }

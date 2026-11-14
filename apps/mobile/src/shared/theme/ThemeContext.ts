@@ -1,14 +1,14 @@
-import { createContext, useContext } from 'react';
-import type { Theme } from './tokens';
+import { createContext, useContext } from 'react'
+import type { Theme } from './tokens'
 
-export const ThemeContext = createContext<Theme | null>(null);
+export const ThemeContext = createContext<Theme | null>(null)
 
 export interface ThemeControls {
-  setTheme: (name: 'light' | 'dark') => void;
-  toggleTheme: () => void;
+  setTheme: (name: 'light' | 'dark') => void
+  toggleTheme: () => void
 }
 
-export const ThemeControlsContext = createContext<ThemeControls | null>(null);
+export const ThemeControlsContext = createContext<ThemeControls | null>(null)
 
 /**
  * Access the active theme. Throws when used outside `ThemeProvider` so a
@@ -16,18 +16,18 @@ export const ThemeControlsContext = createContext<ThemeControls | null>(null);
  * rendering unstyled.
  */
 export function useTheme(): Theme {
-  const theme = useContext(ThemeContext);
+  const theme = useContext(ThemeContext)
   if (!theme) {
-    throw new Error('useTheme must be used inside a <ThemeProvider>');
+    throw new Error('useTheme must be used inside a <ThemeProvider>')
   }
-  return theme;
+  return theme
 }
 
 /** Access the theme controls (set / toggle). */
 export function useThemeControls(): ThemeControls {
-  const controls = useContext(ThemeControlsContext);
+  const controls = useContext(ThemeControlsContext)
   if (!controls) {
-    throw new Error('useThemeControls must be used inside a <ThemeProvider>');
+    throw new Error('useThemeControls must be used inside a <ThemeProvider>')
   }
-  return controls;
+  return controls
 }

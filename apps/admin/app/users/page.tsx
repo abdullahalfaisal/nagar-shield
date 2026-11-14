@@ -1,5 +1,5 @@
-import { ModeratorGate } from '@/app/moderator-gate';
-import { UsersClient } from '@/app/users/users-client';
+import { ModeratorGate } from '@/app/moderator-gate'
+import { UsersClient } from '@/app/users/users-client'
 
 /**
  * The account lookup route.
@@ -15,5 +15,5 @@ export default function UsersPage() {
     <ModeratorGate>
       <UsersClient />
     </ModeratorGate>
-  );
+  )
 }

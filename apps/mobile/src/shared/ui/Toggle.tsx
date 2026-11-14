@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useTheme } from '../theme';
+import { useState } from 'react'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { useTheme } from '../theme'
 
 interface ToggleProps {
-  value: boolean;
-  onValueChange: (next: boolean) => void;
-  accessibilityLabel?: string;
-  disabled?: boolean;
+  value: boolean
+  onValueChange: (next: boolean) => void
+  accessibilityLabel?: string
+  disabled?: boolean
 }
 
 /**
@@ -16,9 +16,14 @@ interface ToggleProps {
  * The visual track is 44 dp wide, but the tap target is padded to 48 dp to
  * satisfy FR-UX-4 (Material 48 dp minimum).
  */
-export function Toggle({ value, onValueChange, accessibilityLabel, disabled = false }: ToggleProps) {
-  const theme = useTheme();
-  const [pressed, setPressed] = useState(false);
+export function Toggle({
+  value,
+  onValueChange,
+  accessibilityLabel,
+  disabled = false,
+}: ToggleProps) {
+  const theme = useTheme()
+  const [pressed, setPressed] = useState(false)
 
   return (
     <Pressable
@@ -56,7 +61,7 @@ export function Toggle({ value, onValueChange, accessibilityLabel, disabled = fa
         />
       </View>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -80,4 +85,4 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 2,
   },
-});
+})

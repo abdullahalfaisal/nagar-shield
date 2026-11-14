@@ -1,11 +1,11 @@
-import { Children, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Children, type ReactNode } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface ListRowGroupProps {
-  header?: string;
-  children: ReactNode;
+  header?: string
+  children: ReactNode
 }
 
 /**
@@ -15,8 +15,8 @@ interface ListRowGroupProps {
  * The More Options screen and the History distribution list share this shape.
  */
 export function ListRowGroup({ header, children }: ListRowGroupProps) {
-  const theme = useTheme();
-  const rows = Children.toArray(children);
+  const theme = useTheme()
+  const rows = Children.toArray(children)
 
   return (
     <View
@@ -40,21 +40,19 @@ export function ListRowGroup({ header, children }: ListRowGroupProps) {
         <View
           key={index}
           style={
-            index > 0
-              ? { borderTopWidth: 1, borderTopColor: theme.colors.ink[100] }
-              : undefined
+            index > 0 ? { borderTopWidth: 1, borderTopColor: theme.colors.ink[100] } : undefined
           }
         >
           {row}
         </View>
       ))}
     </View>
-  );
+  )
 }
 
 /** A simple text row used by the distribution counts list. */
 export function CountRow({ label, count }: { label: string; count: number }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.countRow}>
@@ -71,12 +69,12 @@ export function CountRow({ label, count }: { label: string; count: number }) {
         </Text>
       </View>
     </View>
-  );
+  )
 }
 
 /** The "map view" link under the History segmented tabs. */
 export function MapViewLink({ label, onPress }: { label: string; onPress: () => void }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <Pressable
@@ -88,7 +86,7 @@ export function MapViewLink({ label, onPress }: { label: string; onPress: () => 
       <Icon name="map" size={18} color={theme.palette.violet[700]} />
       <Text style={[styles.mapLinkText, { color: theme.palette.violet[700] }]}>{label}</Text>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -141,4 +139,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-});
+})

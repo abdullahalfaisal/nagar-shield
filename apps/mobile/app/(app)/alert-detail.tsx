@@ -1,19 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import {
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
   REPORT_CATEGORY_LABELS,
-} from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar, Button, EmptyState, FlagSheet, Icon } from '@/shared/ui';
-import {
-  signAlertMediaUrls,
-  usePublicAlertDetail,
-} from '@/shared/api/alertDetail';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
+} from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar, Button, EmptyState, FlagSheet, Icon } from '@/shared/ui'
+import { signAlertMediaUrls, usePublicAlertDetail } from '@/shared/api/alertDetail'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * The **public** alert detail.
@@ -52,53 +49,53 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
  * (C-6).
  */
 export default function AlertDetailScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const params = useLocalSearchParams<{ id?: string }>();
-  const reportId = params.id;
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
+  const params = useLocalSearchParams<{ id?: string }>()
+  const reportId = params.id
 
-  const { data: alert, isLoading } = usePublicAlertDetail(reportId);
+  const { data: alert, isLoading } = usePublicAlertDetail(reportId)
 
-  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
-  const [flagOpen, setFlagOpen] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({})
+  const [flagOpen, setFlagOpen] = useState(false)
 
   // The signed URLs are fetched once the media rows are known. The bucket is
   // private, so a URL is needed to render the image — and it is fetched on
   // demand, never stored.
   useEffect(() => {
-    let active = true;
+    let active = true
 
     if (!alert || alert.media.length === 0) {
-      setMediaUrls({});
-      return;
+      setMediaUrls({})
+      return
     }
 
     void signAlertMediaUrls(alert.media).then((urls) => {
-      if (!active) return;
-      setMediaUrls(urls);
-    });
+      if (!active) return
+      setMediaUrls(urls)
+    })
 
     return () => {
-      active = false;
-    };
-  }, [alert]);
+      active = false
+    }
+  }, [alert])
 
-  const category = alert?.category ?? null;
-  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null;
-  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400];
+  const category = alert?.category ?? null
+  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
+  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
   const areaLine = useMemo(() => {
-    const area = alert?.areaHierarchy;
-    if (!area) return null;
-    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division;
-    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division;
-    if (!english) return null;
-    return english === bangla ? english : `${english} · ${bangla}`;
-  }, [alert]);
+    const area = alert?.areaHierarchy
+    if (!area) return null
+    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division
+    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division
+    if (!english) return null
+    return english === bangla ? english : `${english} · ${bangla}`
+  }, [alert])
 
-  const relativeTime = alert ? formatRelativeTimeForLocale(alert.capturedAt, i18n.language) : '';
-  const absoluteTime = alert ? new Date(alert.capturedAt).toLocaleString(i18n.language) : '';
+  const relativeTime = alert ? formatRelativeTimeForLocale(alert.capturedAt, i18n.language) : ''
+  const absoluteTime = alert ? new Date(alert.capturedAt).toLocaleString(i18n.language) : ''
 
   // A report that does not resolve — because it never existed, because it was
   // removed by moderation, or because it was soft-deleted — renders the "no
@@ -107,10 +104,12 @@ export default function AlertDetailScreen() {
   // which reports were hidden.
   if (isLoading) {
     return (
-      <View style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}>
+      <View
+        style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}
+      >
         <ActivityIndicator color={theme.palette.violet[600]} />
       </View>
-    );
+    )
   }
 
   if (!alert) {
@@ -125,7 +124,7 @@ export default function AlertDetailScreen() {
           />
         </View>
       </View>
-    );
+    )
   }
 
   return (
@@ -142,7 +141,7 @@ export default function AlertDetailScreen() {
         {alert.media.length > 0 ? (
           <View style={styles.mediaStrip}>
             {alert.media.map((media) => {
-              const url = mediaUrls[media.storagePath];
+              const url = mediaUrls[media.storagePath]
               return (
                 <View
                   key={media.id}
@@ -155,7 +154,7 @@ export default function AlertDetailScreen() {
                     <Icon name="image" size={28} color={theme.colors.ink[400]} />
                   )}
                 </View>
-              );
+              )
             })}
           </View>
         ) : null}
@@ -200,19 +199,11 @@ export default function AlertDetailScreen() {
             time. Both times are shown — the relative one is how fresh the
             report is, the absolute one places the event precisely. */}
         <View style={[styles.card, { backgroundColor: theme.colors.surface.white }]}>
-          <FactRow
-            icon="location_on"
-            label={t('alerts.locationLabel')}
-            value={areaLine ?? '—'}
-          />
+          <FactRow icon="location_on" label={t('alerts.locationLabel')} value={areaLine ?? '—'} />
           <View style={[styles.hairline, { backgroundColor: theme.colors.ink[100] }]} />
           <FactRow icon="schedule" label={t('alerts.capturedAtLabel')} value={relativeTime} />
           <View style={[styles.hairline, { backgroundColor: theme.colors.ink[100] }]} />
-          <FactRow
-            icon="event"
-            label={t('alerts.absoluteTimeLabel')}
-            value={absoluteTime}
-          />
+          <FactRow icon="event" label={t('alerts.absoluteTimeLabel')} value={absoluteTime} />
         </View>
 
         {/* The flag action — the same shared sheet the feed card opens. */}
@@ -239,16 +230,16 @@ export default function AlertDetailScreen() {
           // A flag that crosses the 3-flag threshold hides the report. The
           // detail then shows its "no longer available" state — the same
           // state a removed report shows.
-          setFlagOpen(false);
+          setFlagOpen(false)
         }}
       />
     </View>
-  );
+  )
 }
 
 /** One label/value pair — the area, the relative time, the absolute time. */
 function FactRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.factRow}>
@@ -260,7 +251,7 @@ function FactRow({ icon, label, value }: { icon: string; label: string; value: s
         <Text style={[styles.factValue, { color: theme.colors.ink[950] }]}>{value}</Text>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -367,4 +358,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingTop: 14,
   },
-});
+})

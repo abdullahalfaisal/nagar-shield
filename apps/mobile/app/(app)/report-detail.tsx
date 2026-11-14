@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import {
   REPORT_CATEGORIES,
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
   REPORT_CATEGORY_LABELS,
   type ReportCategory,
-} from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar } from '@/shared/ui/AppBar';
-import { BottomSheet } from '@/shared/ui/BottomSheet';
-import { Icon } from '@/shared/ui/Icon';
-import { useAuthSession } from '@/shared/auth/useAuthSession';
-import { signMediaUrl, updateCategory, useInvalidateReport, useOwnedReport } from '@/shared/api/reportDetail';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
+} from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar } from '@/shared/ui/AppBar'
+import { BottomSheet } from '@/shared/ui/BottomSheet'
+import { Icon } from '@/shared/ui/Icon'
+import { useAuthSession } from '@/shared/auth/useAuthSession'
+import {
+  signMediaUrl,
+  updateCategory,
+  useInvalidateReport,
+  useOwnedReport,
+} from '@/shared/api/reportDetail'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * The author's own report — the Report detail screen.
@@ -55,88 +68,88 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
  * refused with `FORBIDDEN` by the database.
  */
 export default function ReportDetailScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const params = useLocalSearchParams<{ reportId?: string }>();
-  const reportId = params.reportId;
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
+  const params = useLocalSearchParams<{ reportId?: string }>()
+  const reportId = params.reportId
 
-  const { session } = useAuthSession();
-  const { data: report, isLoading, error } = useOwnedReport(reportId);
-  const invalidate = useInvalidateReport();
+  const { session } = useAuthSession()
+  const { data: report, isLoading, error } = useOwnedReport(reportId)
+  const invalidate = useInvalidateReport()
 
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({})
 
   // The author may edit their own report's category. The comparison is
   // against the row's own `author_id`, not against "the session exists" —
   // the read is already scoped by RLS, so a report the caller does not own
   // does not resolve at all.
-  const isAuthor = Boolean(session && report && report.authorId === session.user.id);
+  const isAuthor = Boolean(session && report && report.authorId === session.user.id)
 
   // The signed URLs are fetched once the media rows are known. The bucket is
   // private, so a URL is needed to render the image — and it is fetched on
   // demand, never stored.
   useEffect(() => {
-    let active = true;
+    let active = true
 
     if (!report || report.media.length === 0) {
-      setMediaUrls({});
-      return;
+      setMediaUrls({})
+      return
     }
 
     void Promise.all(
       report.media.map(async (media) => {
-        const url = await signMediaUrl(media.storagePath);
-        return [media.storagePath, url] as const;
+        const url = await signMediaUrl(media.storagePath)
+        return [media.storagePath, url] as const
       }),
     ).then((pairs) => {
-      if (!active) return;
-      setMediaUrls(Object.fromEntries(pairs.filter(([, url]) => Boolean(url))) as Record<string, string>);
-    });
+      if (!active) return
+      setMediaUrls(
+        Object.fromEntries(pairs.filter(([, url]) => Boolean(url))) as Record<string, string>,
+      )
+    })
 
     return () => {
-      active = false;
-    };
-  }, [report]);
+      active = false
+    }
+  }, [report])
 
-  const category = report?.category ?? null;
-  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null;
-  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400];
+  const category = report?.category ?? null
+  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
+  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
   const areaLine = useMemo(() => {
-    const area = report?.areaHierarchy;
-    if (!area) return null;
-    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division;
-    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division;
-    if (!english) return null;
-    return english === bangla ? english : `${english} · ${bangla}`;
-  }, [report]);
+    const area = report?.areaHierarchy
+    if (!area) return null
+    const english = area.neighborhood ?? area.thana ?? area.city ?? area.division
+    const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division
+    if (!english) return null
+    return english === bangla ? english : `${english} · ${bangla}`
+  }, [report])
 
-  const capturedAt = report
-    ? formatRelativeTimeForLocale(report.capturedAt, i18n.language)
-    : '';
+  const capturedAt = report ? formatRelativeTimeForLocale(report.capturedAt, i18n.language) : ''
 
   const choose = async (next: ReportCategory) => {
-    if (!reportId || pending) return;
+    if (!reportId || pending) return
 
-    setPending(true);
-    setSaveError(null);
+    setPending(true)
+    setSaveError(null)
 
     try {
-      await updateCategory(reportId, next);
-      await invalidate(reportId);
-      setSheetOpen(false);
+      await updateCategory(reportId, next)
+      await invalidate(reportId)
+      setSheetOpen(false)
     } catch (caught) {
       // The row keeps its previous category — the save is pessimistic, so the
       // user is never shown a category the database rejected.
-      setSaveError(caught instanceof Error ? caught.message : String(caught));
+      setSaveError(caught instanceof Error ? caught.message : String(caught))
     } finally {
-      setPending(false);
+      setPending(false)
     }
-  };
+  }
 
   // The screen renders the report only when there is one. A report that does
   // not resolve — because it does not exist, or because it is not the
@@ -144,10 +157,12 @@ export default function ReportDetailScreen() {
   // this session.
   if (isLoading) {
     return (
-      <View style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}>
+      <View
+        style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}
+      >
         <ActivityIndicator color={theme.palette.violet[600]} />
       </View>
-    );
+    )
   }
 
   if (error || !report) {
@@ -160,7 +175,7 @@ export default function ReportDetailScreen() {
           </Text>
         </View>
       </View>
-    );
+    )
   }
 
   return (
@@ -178,7 +193,7 @@ export default function ReportDetailScreen() {
         {report.media.length > 0 ? (
           <View style={styles.mediaStrip}>
             {report.media.map((media) => {
-              const url = mediaUrls[media.storagePath];
+              const url = mediaUrls[media.storagePath]
               return (
                 <View
                   key={media.id}
@@ -190,7 +205,7 @@ export default function ReportDetailScreen() {
                     <Icon name="image" size={28} color={theme.colors.ink[400]} />
                   )}
                 </View>
-              );
+              )
             })}
           </View>
         ) : null}
@@ -204,17 +219,9 @@ export default function ReportDetailScreen() {
 
         {/* The facts: the resolved area and the capture time. */}
         <View style={[styles.card, { backgroundColor: theme.colors.surface.white }]}>
-          <FactRow
-            icon="location_on"
-            label={t('alerts.locationLabel')}
-            value={areaLine ?? '—'}
-          />
+          <FactRow icon="location_on" label={t('alerts.locationLabel')} value={areaLine ?? '—'} />
           <View style={[styles.hairline, { backgroundColor: theme.colors.ink[100] }]} />
-          <FactRow
-            icon="schedule"
-            label={t('alerts.capturedAtLabel')}
-            value={capturedAt}
-          />
+          <FactRow icon="schedule" label={t('alerts.capturedAtLabel')} value={capturedAt} />
         </View>
 
         {/* The category row — the ONLY editable field. */}
@@ -288,8 +295,8 @@ export default function ReportDetailScreen() {
       >
         <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
           {REPORT_CATEGORIES.map((value) => {
-            const label = REPORT_CATEGORY_LABELS[value];
-            const selected = category === value;
+            const label = REPORT_CATEGORY_LABELS[value]
+            const selected = category === value
 
             return (
               <Pressable
@@ -338,17 +345,17 @@ export default function ReportDetailScreen() {
                   <Icon name="check" size={20} color={theme.palette.violet[700]} />
                 ) : null}
               </Pressable>
-            );
+            )
           })}
         </ScrollView>
       </BottomSheet>
     </View>
-  );
+  )
 }
 
 /** One label/value pair — the area, the capture time. */
 function FactRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.factRow}>
@@ -360,7 +367,7 @@ function FactRow({ icon, label, value }: { icon: string; label: string; value: s
         <Text style={[styles.factValue, { color: theme.colors.ink[950] }]}>{value}</Text>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -508,4 +515,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-});
+})

@@ -3,7 +3,7 @@ import {
   HISTORY_DEFAULT_WINDOW_HOURS,
   REPORT_CATEGORIES,
   type ReportCategory,
-} from '@nagar-shield/shared';
+} from '@nagar-shield/shared'
 
 /**
  * The History filter state — one object, one source of truth.
@@ -26,11 +26,11 @@ import {
 /** One History filter set. */
 export interface HistoryFilters {
   /** The radius in kilometres — the wire unit of `history_nearby`'s `radius_km`. */
-  radiusKm: number;
+  radiusKm: number
   /** The window in hours — the wire unit of `history_nearby`'s `window_hours`. */
-  windowHours: number;
+  windowHours: number
   /** `null` means "no category filter", which is **not** the same as `'other'`. */
-  category: ReportCategory | null;
+  category: ReportCategory | null
 }
 
 /**
@@ -43,13 +43,13 @@ export const DEFAULT_HISTORY_FILTERS: HistoryFilters = {
   radiusKm: HISTORY_DEFAULT_RADIUS_KM,
   windowHours: HISTORY_DEFAULT_WINDOW_HOURS,
   category: null,
-};
+}
 
 /** The radius options — 500 m, 1 km, 2 km, 5 km. */
-export const HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5] as const;
+export const HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5] as const
 
 /** The window options — 1 h, 24 h, 7 d, 30 d. */
-export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const;
+export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const
 
 /**
  * The category options — the fixed 11-value enum.
@@ -58,11 +58,11 @@ export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const;
  * detail. A second list is how two screens start disagreeing about what
  * "accident" means.
  */
-export const HISTORY_CATEGORY_OPTIONS = REPORT_CATEGORIES;
+export const HISTORY_CATEGORY_OPTIONS = REPORT_CATEGORIES
 
 /** Restores the defaults. The reset action, and the cold-launch state. */
 export function resetHistoryFilters(): HistoryFilters {
-  return { ...DEFAULT_HISTORY_FILTERS };
+  return { ...DEFAULT_HISTORY_FILTERS }
 }
 
 /**
@@ -73,11 +73,7 @@ export function resetHistoryFilters(): HistoryFilters {
  * without re-querying, and the result set is identical").
  */
 export function historyFiltersEqual(a: HistoryFilters, b: HistoryFilters): boolean {
-  return (
-    a.radiusKm === b.radiusKm &&
-    a.windowHours === b.windowHours &&
-    a.category === b.category
-  );
+  return a.radiusKm === b.radiusKm && a.windowHours === b.windowHours && a.category === b.category
 }
 
 /**
@@ -92,11 +88,11 @@ export function historyQueryKey(
   origin: { lat: number; lng: number },
   filters: HistoryFilters,
 ): {
-  lat: number;
-  lng: number;
-  radiusKm: number;
-  windowHours: number;
-  category: ReportCategory | null;
+  lat: number
+  lng: number
+  radiusKm: number
+  windowHours: number
+  category: ReportCategory | null
 } {
   return {
     lat: origin.lat,
@@ -104,5 +100,5 @@ export function historyQueryKey(
     radiusKm: filters.radiusKm,
     windowHours: filters.windowHours,
     category: filters.category,
-  };
+  }
 }

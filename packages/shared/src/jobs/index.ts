@@ -12,22 +12,22 @@
  */
 
 /** FR-DATA-4 — report media is hard-deleted after 90 days. */
-export const MEDIA_RETENTION_DAYS = 90;
+export const MEDIA_RETENTION_DAYS = 90
 
 /** FR-DATA-6 — a deleted account's PII is purged after the 30-day window. */
-export const ACCOUNT_RECOVERY_WINDOW_DAYS = 30;
+export const ACCOUNT_RECOVERY_WINDOW_DAYS = 30
 
 /** The geocode cache TTL. A cache miss costs one re-resolve, never a failure. */
-export const GEOCODE_CACHE_TTL_DAYS = 90;
+export const GEOCODE_CACHE_TTL_DAYS = 90
 
 /** The prefix every purged-account placeholder carries. */
-export const TOMBSTONE_PREFIX = 'purged-';
+export const TOMBSTONE_PREFIX = 'purged-'
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 /** The age of a timestamp in days, measured from `now`. */
 export function ageInDays(timestamp: Date, now: Date = new Date()): number {
-  return (now.getTime() - timestamp.getTime()) / MS_PER_DAY;
+  return (now.getTime() - timestamp.getTime()) / MS_PER_DAY
 }
 
 /**
@@ -41,16 +41,13 @@ export function isMediaPurgeCandidate(
   reportDeletedAt: Date | null,
   now: Date = new Date(),
 ): boolean {
-  if (reportDeletedAt) return true;
-  return ageInDays(createdAt, now) >= MEDIA_RETENTION_DAYS;
+  if (reportDeletedAt) return true
+  return ageInDays(createdAt, now) >= MEDIA_RETENTION_DAYS
 }
 
 /** True when the geocode cache row has outlived its TTL. */
-export function isGeocodeCacheEvictionCandidate(
-  createdAt: Date,
-  now: Date = new Date(),
-): boolean {
-  return ageInDays(createdAt, now) >= GEOCODE_CACHE_TTL_DAYS;
+export function isGeocodeCacheEvictionCandidate(createdAt: Date, now: Date = new Date()): boolean {
+  return ageInDays(createdAt, now) >= GEOCODE_CACHE_TTL_DAYS
 }
 
 /**
@@ -65,8 +62,8 @@ export function isAccountPurgeCandidate(
   piiPurgedAt: Date | null,
   now: Date = new Date(),
 ): boolean {
-  if (piiPurgedAt) return false;
-  return ageInDays(deletedAt, now) >= ACCOUNT_RECOVERY_WINDOW_DAYS;
+  if (piiPurgedAt) return false
+  return ageInDays(deletedAt, now) >= ACCOUNT_RECOVERY_WINDOW_DAYS
 }
 
 /**
@@ -83,20 +80,18 @@ export function isAccountPurgeCandidate(
  * holding.
  */
 export function buildTombstoneValues(userId: string): { phone: string; email: string } {
-  const token = tombstoneToken(userId);
+  const token = tombstoneToken(userId)
 
   return {
     phone: `${TOMBSTONE_PREFIX}${token}`,
     email: `${TOMBSTONE_PREFIX}${token}`,
-  };
+  }
 }
 
 /** True when a profile row carries the tombstone placeholders. */
 export function isTombstoneProfile(phone: string | null, email: string | null): boolean {
-  if (!phone || !email) return false;
-  return (
-    phone.startsWith(TOMBSTONE_PREFIX) && email.startsWith(TOMBSTONE_PREFIX) && phone === email
-  );
+  if (!phone || !email) return false
+  return phone.startsWith(TOMBSTONE_PREFIX) && email.startsWith(TOMBSTONE_PREFIX) && phone === email
 }
 
 /**
@@ -107,17 +102,17 @@ export function isTombstoneProfile(phone: string | null, email: string | null): 
  * never be mistaken for a dialable number or a reachable mailbox.
  */
 export function tombstoneToken(value: string): string {
-  const high = fnv1a(value, 2166136261);
-  const low = fnv1a(value, 0x9e3779b9);
-  let combined = (BigInt(high) << 32n) | BigInt(low);
+  const high = fnv1a(value, 2166136261)
+  const low = fnv1a(value, 0x9e3779b9)
+  let combined = (BigInt(high) << 32n) | BigInt(low)
 
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
-  let token = '';
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz'
+  let token = ''
   for (let index = 0; index < 12; index += 1) {
-    token += alphabet[Number(combined % 26n)];
-    combined /= 26n;
+    token += alphabet[Number(combined % 26n)]
+    combined /= 26n
   }
-  return token;
+  return token
 }
 
 /**
@@ -127,15 +122,15 @@ export function tombstoneToken(value: string): string {
  * never for authentication.
  */
 export function hashUserId(value: string): string {
-  return fnv1a(value, 2166136261).toString(16).padStart(8, '0');
+  return fnv1a(value, 2166136261).toString(16).padStart(8, '0')
 }
 
 /** The FNV-1a 32-bit digest of a string. */
 function fnv1a(value: string, seed: number): number {
-  let hash = seed >>> 0;
+  let hash = seed >>> 0
   for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
   }
-  return hash >>> 0;
+  return hash >>> 0
 }

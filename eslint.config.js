@@ -50,10 +50,45 @@ module.exports = [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+      // A type-only import written as a value import pulls the module into
+      // the runtime bundle for no reason, and `import type` is erased by
+      // the compiler — which is what keeps the shared package importable
+      // from an Edge Function.
+      '@typescript-eslint/consistent-type-imports': 'error',
       // A floating promise in an async handler is a silent failure.
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'smart'],
       'prefer-const': 'error',
+    },
+  },
+  {
+    // The one-way dependency rule, enforced mechanically.
+    //
+    // `packages/shared` must not import from `apps/*`. The dependency is
+    // one-way by design: the shared package is the contract, and the apps
+    // consume it. An import the other way creates a cycle, and it is
+    // worse than a cycle in the workspace — the Edge Functions mirror
+    // copies `packages/shared/src` but **not** `apps/`, so the import
+    // resolves in the workspace and fails only inside the container.
+    //
+    // The story requires **both** signals: this rule and a unit test in
+    // `packages/shared` that scans its own source. Either failing is
+    // enough to fail the build.
+    files: ['packages/shared/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/apps/*', '../../apps/*', '../../../apps/*'],
+              message:
+                'packages/shared must not import from apps/*. The dependency is one-way — ' +
+                'the shared package owns the contract and the apps consume it.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

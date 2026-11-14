@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { redirect } from 'next/navigation'
 
 /**
  * The console's entry point.
@@ -7,5 +7,5 @@ import { redirect } from 'next/navigation';
  * reports waiting for review.
  */
 export default function IndexPage() {
-  redirect('/queue');
+  redirect('/queue')
 }

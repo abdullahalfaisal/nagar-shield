@@ -1,5 +1,5 @@
-import { bn } from './bn';
-import { en } from './en';
+import { bn } from './bn'
+import { en } from './en'
 
 /**
  * The degraded-mode copy audit.
@@ -42,7 +42,7 @@ const FORBIDDEN_CLAIMS: RegExp[] = [
   /help (is |has been )?(on the way|coming|dispatched|sent)/i,
   /(police|ambulance|fire|medical|authority|authorities) (have |has |was |were )?(been )?(notified|contacted|dispatched|alerted|informed)/i,
   /no (signal|service).{0,40}(call failed|could not connect)/i,
-];
+]
 
 /** The keys the degraded-mode surfaces use. */
 const DEGRADATION_KEYS = [
@@ -52,16 +52,14 @@ const DEGRADATION_KEYS = [
   'batterySaverWarning',
   'offlineNotice',
   'detectionUnavailable',
-] as const;
+] as const
 
 /** Every string in a bundle, flattened. */
 function allStrings(value: unknown, path: string[] = []): Array<{ path: string; text: string }> {
-  if (typeof value === 'string') return [{ path: path.join('.'), text: value }];
-  if (typeof value !== 'object' || value === null) return [];
+  if (typeof value === 'string') return [{ path: path.join('.'), text: value }]
+  if (typeof value !== 'object' || value === null) return []
 
-  return Object.entries(value).flatMap(([key, nested]) =>
-    allStrings(nested, [...path, key]),
-  );
+  return Object.entries(value).flatMap(([key, nested]) => allStrings(nested, [...path, key]))
 }
 
 describe.each([
@@ -71,48 +69,47 @@ describe.each([
   it('claims no call, dispatch, or notification', () => {
     const offenders = allStrings(bundle).filter((entry) =>
       FORBIDDEN_CLAIMS.some((pattern) => pattern.test(entry.text)),
-    );
+    )
 
-    expect(offenders).toEqual([]);
-  });
+    expect(offenders).toEqual([])
+  })
 
   it('carries every degraded-mode string', () => {
-    const degradation = (bundle as Record<string, Record<string, string> | undefined>)
-      .degradation;
+    const degradation = (bundle as Record<string, Record<string, string> | undefined>).degradation
 
-    expect(degradation).toBeDefined();
+    expect(degradation).toBeDefined()
     for (const key of DEGRADATION_KEYS) {
-      expect(typeof degradation?.[key]).toBe('string');
-      expect(degradation?.[key]?.length ?? 0).toBeGreaterThan(0);
+      expect(typeof degradation?.[key]).toBe('string')
+      expect(degradation?.[key]?.length ?? 0).toBeGreaterThan(0)
     }
-  });
-});
+  })
+})
 
 describe('the degraded-mode copy', () => {
   it('says the dialler may be suppressed, never that it was', () => {
     // The app cannot know what the OEM dialler did after the intent fired.
     // "May be suppressed" is true; "was suppressed" would be a guess.
-    expect(en.degradation.batterySaverWarning).toMatch(/may/i);
-    expect(en.degradation.batterySaverWarning).not.toMatch(/\bwas suppressed\b/i);
-  });
+    expect(en.degradation.batterySaverWarning).toMatch(/may/i)
+    expect(en.degradation.batterySaverWarning).not.toMatch(/\bwas suppressed\b/i)
+  })
 
   it('says the dialler may be suppressed in Bangla too', () => {
     // "পারে" is the permissive form — "may". The Bangla copy carries the
     // same claim strength as the English, not a stronger one.
-    expect(bn.degradation.batterySaverWarning).toContain('পারে');
-  });
+    expect(bn.degradation.batterySaverWarning).toContain('পারে')
+  })
 
   it('never says a call failed', () => {
     // The offline notice says what to do, not what went wrong. "The call
     // failed" would be a claim about a call the app never made.
-    expect(en.degradation.offlineNotice).not.toMatch(/fail/i);
-    expect(bn.degradation.offlineNotice).not.toMatch(/ব্যর্থ/i);
-  });
+    expect(en.degradation.offlineNotice).not.toMatch(/fail/i)
+    expect(bn.degradation.offlineNotice).not.toMatch(/ব্যর্থ/i)
+  })
 
   it('ships the static copy for the unavailable detection', () => {
     // FR-PERMS-3: the absence of the detection must be visible, not a
     // silent no-op.
-    expect(en.degradation.detectionUnavailable.length).toBeGreaterThan(0);
-    expect(bn.degradation.detectionUnavailable.length).toBeGreaterThan(0);
-  });
-});
+    expect(en.degradation.detectionUnavailable.length).toBeGreaterThan(0)
+    expect(bn.degradation.detectionUnavailable.length).toBeGreaterThan(0)
+  })
+})

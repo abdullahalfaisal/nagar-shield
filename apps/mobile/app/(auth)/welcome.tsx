@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Button, WizardBadge, WizardScreen } from '@/shared/ui';
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Button, WizardBadge, WizardScreen } from '@/shared/ui'
 
 /**
  * Screen 1 — S-00 Welcome.
@@ -13,9 +13,9 @@ import { Button, WizardBadge, WizardScreen } from '@/shared/ui';
  * CTAs are ported 1:1.
  */
 export default function WelcomeScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <WizardScreen
@@ -68,13 +68,13 @@ export default function WelcomeScreen() {
             {t('home.helpSubtitle')}
           </Text>
           <Text style={[styles.list, { color: theme.colors.ink[700] }]}>
-            {t('auth.phoneLabel')} · {t('auth.alternatePhoneTitle')} ·{' '}
-            {t('more.emergencyContacts')} · {t('capture.locationOn')}
+            {t('auth.phoneLabel')} · {t('auth.alternatePhoneTitle')} · {t('more.emergencyContacts')}{' '}
+            · {t('capture.locationOn')}
           </Text>
         </View>
       </View>
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -140,4 +140,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-});
+})

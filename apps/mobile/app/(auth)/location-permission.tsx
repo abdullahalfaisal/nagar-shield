@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import * as Location from 'expo-location';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/shared/theme';
-import { Button, EscapeLink, Icon, WizardScreen } from '@/shared/ui';
+import { useCallback, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import * as Location from 'expo-location'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useTheme } from '@/shared/theme'
+import { Button, EscapeLink, Icon, WizardScreen } from '@/shared/ui'
 
 /**
  * Screen 8 — S-05 Location.
@@ -23,27 +23,27 @@ import { Button, EscapeLink, Icon, WizardScreen } from '@/shared/ui';
  * permission can be granted later from Settings.
  */
 export default function LocationPermissionScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [requesting, setRequesting] = useState(false);
+  const [requesting, setRequesting] = useState(false)
 
   const onAllow = useCallback(async () => {
-    setRequesting(true);
+    setRequesting(true)
     try {
-      await Location.requestForegroundPermissionsAsync();
+      await Location.requestForegroundPermissionsAsync()
     } catch {
       // A permission request that fails outright is treated as a denial. The
       // user is not blocked and the wizard continues.
     }
-    setRequesting(false);
-    router.replace('/(app)/home');
-  }, [router]);
+    setRequesting(false)
+    router.replace('/(app)/home')
+  }, [router])
 
   const onSkip = useCallback(() => {
-    router.replace('/(app)/home');
-  }, [router]);
+    router.replace('/(app)/home')
+  }, [router])
 
   return (
     <WizardScreen
@@ -52,9 +52,8 @@ export default function LocationPermissionScreen() {
       eyebrow={t('wizardLocation.eyebrow')}
       title={
         <>
-          {t('wizardLocation.title')} <Text style={{ color: theme.palette.violet[700] }}>
-            {t('wizardLocation.highlight')}
-          </Text>
+          {t('wizardLocation.title')}{' '}
+          <Text style={{ color: theme.palette.violet[700] }}>{t('wizardLocation.highlight')}</Text>
         </>
       }
       subtitle={t('wizardLocation.subtitle')}
@@ -82,12 +81,8 @@ export default function LocationPermissionScreen() {
           },
         ]}
       >
-        <View
-          style={[styles.ring, styles.ringLarge, { borderColor: theme.palette.violet[300] }]}
-        />
-        <View
-          style={[styles.ring, styles.ringSmall, { borderColor: theme.palette.violet[300] }]}
-        />
+        <View style={[styles.ring, styles.ringLarge, { borderColor: theme.palette.violet[300] }]} />
+        <View style={[styles.ring, styles.ringSmall, { borderColor: theme.palette.violet[300] }]} />
         <LinearGradient
           colors={theme.gradients.primary}
           start={{ x: 0, y: 0 }}
@@ -112,7 +107,7 @@ export default function LocationPermissionScreen() {
         </Text>
       </View>
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -160,4 +155,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-});
+})

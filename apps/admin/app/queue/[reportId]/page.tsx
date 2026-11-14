@@ -1,5 +1,5 @@
-import { ModeratorGate } from '@/app/moderator-gate';
-import { ReportDetailClient } from '@/app/queue/[reportId]/report-detail-client';
+import { ModeratorGate } from '@/app/moderator-gate'
+import { ReportDetailClient } from '@/app/queue/[reportId]/report-detail-client'
 
 /**
  * The report review detail route.
@@ -16,5 +16,5 @@ export default function ReportDetailPage() {
     <ModeratorGate>
       <ReportDetailClient />
     </ModeratorGate>
-  );
+  )
 }

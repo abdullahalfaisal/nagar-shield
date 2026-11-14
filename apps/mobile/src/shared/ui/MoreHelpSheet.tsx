@@ -1,11 +1,11 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
-import { MORE_HELP_ROWS } from '@nagar-shield/shared';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
-import { ManualDialGuidance } from './ManualDialGuidance';
-import { useDegradedHelp } from '../services/useDegradedHelp';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useRouter } from 'expo-router'
+import { MORE_HELP_ROWS } from '@nagar-shield/shared'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
+import { ManualDialGuidance } from './ManualDialGuidance'
+import { useDegradedHelp } from '../services/useDegradedHelp'
 
 /**
  * The More Help sheet.
@@ -34,54 +34,50 @@ import { useDegradedHelp } from '../services/useDegradedHelp';
  */
 
 /** The prototype's four hotline rows, in the prototype's order. */
-const PROTOTYPE_HOTLINE_IDS = MORE_HELP_ROWS.map((row) => row.id);
+const PROTOTYPE_HOTLINE_IDS = MORE_HELP_ROWS.map((row) => row.id)
 
 interface MoreHelpSheetProps {
-  visible: boolean;
-  onClose: () => void;
+  visible: boolean
+  onClose: () => void
   /** Called instead of the default navigation when a row is tapped. */
-  onOpenHotlineList?: () => void;
+  onOpenHotlineList?: () => void
 }
 
-export function MoreHelpSheet({
-  visible,
-  onClose,
-  onOpenHotlineList,
-}: MoreHelpSheetProps) {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+export function MoreHelpSheet({ visible, onClose, onOpenHotlineList }: MoreHelpSheetProps) {
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
   // The same degraded-mode flow the help cards use. The hotline rows dial
   // through the same door, so they get the same guidance.
-  const degradedHelp = useDegradedHelp();
+  const degradedHelp = useDegradedHelp()
 
-  if (!visible) return null;
+  if (!visible) return null
 
   const dial = async (phone: string) => {
     // The dial path is client-only: the OS dialler is pre-filled and the app
     // never places a call (C-1).
-    await degradedHelp.dial(phone);
-  };
+    await degradedHelp.dial(phone)
+  }
 
   const openHotlineList = () => {
-    onClose();
+    onClose()
     if (onOpenHotlineList) {
-      onOpenHotlineList();
-      return;
+      onOpenHotlineList()
+      return
     }
-    router.push('/(app)/more-help');
-  };
+    router.push('/(app)/more-help')
+  }
 
   const openThanaLine = () => {
-    onClose();
-    router.push('/(app)/thana-line');
-  };
+    onClose()
+    router.push('/(app)/thana-line')
+  }
 
   const openStationMap = () => {
-    onClose();
-    router.push('/(app)/station-map');
-  };
+    onClose()
+    router.push('/(app)/station-map')
+  }
 
   return (
     <View style={styles.scrim}>
@@ -116,8 +112,8 @@ export function MoreHelpSheet({
               The row's call icon dials the number; the row itself opens the
               hotline list, which carries the full curated set. */}
           {PROTOTYPE_HOTLINE_IDS.map((id) => {
-            const row = MORE_HELP_ROWS.find((entry) => entry.id === id);
-            if (!row) return null;
+            const row = MORE_HELP_ROWS.find((entry) => entry.id === id)
+            if (!row) return null
 
             return (
               <SheetRow
@@ -127,7 +123,7 @@ export function MoreHelpSheet({
                 onPress={() => dial(row.phone)}
                 onOpenList={openHotlineList}
               />
-            );
+            )
           })}
 
           <SheetRow
@@ -159,8 +155,8 @@ export function MoreHelpSheet({
           accessibilityRole="button"
           accessibilityLabel={t('help.wrongNumber')}
           onPress={() => {
-            onClose();
-            router.push('/(app)/more-help');
+            onClose()
+            router.push('/(app)/more-help')
           }}
           style={[styles.wrongNumber, { color: theme.palette.violet[700] }]}
         >
@@ -179,7 +175,7 @@ export function MoreHelpSheet({
         </Pressable>
       </View>
     </View>
-  );
+  )
 }
 
 /**
@@ -196,7 +192,7 @@ const HOTLINE_LABEL_KEYS: Record<string, string> = {
   'hl-disaster': 'help.disaster',
   'hl-ambulance': 'help.ambulance',
   'hl-electricity': 'help.electricity',
-};
+}
 
 /** One sheet row — the prototype's `.help-row`. */
 function SheetRow({
@@ -208,12 +204,12 @@ function SheetRow({
   onPress,
   onOpenList,
 }: {
-  title: string;
-  subtitle?: string;
-  number?: string;
-  note?: string;
-  icon?: string;
-  onPress: () => void;
+  title: string
+  subtitle?: string
+  number?: string
+  note?: string
+  icon?: string
+  onPress: () => void
   /**
    * When set, the row's trailing icon opens this surface instead of firing
    * the call. The prototype's hotline rows carry a `call` icon; tapping the
@@ -221,9 +217,9 @@ function SheetRow({
    * separate targets because the story says the row opens its category's own
    * surface **and** the call affordance prefills the dialer.
    */
-  onOpenList?: () => void;
+  onOpenList?: () => void
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={[styles.row, { backgroundColor: theme.colors.ink[50] }]}>
@@ -236,14 +232,14 @@ function SheetRow({
         <View style={styles.rowText}>
           <Text style={[styles.rowTitle, { color: theme.colors.ink[950] }]}>{title}</Text>
           {number ? (
-          <Text style={[styles.rowNumber, { color: theme.colors.ink[500] }]}>{number}</Text>
-        ) : null}
-        {subtitle ? (
-          <Text style={[styles.rowNumber, { color: theme.colors.ink[500] }]}>{subtitle}</Text>
-        ) : null}
-        {note ? (
-          <Text style={[styles.rowNote, { color: theme.colors.ink[400] }]}>{note}</Text>
-        ) : null}
+            <Text style={[styles.rowNumber, { color: theme.colors.ink[500] }]}>{number}</Text>
+          ) : null}
+          {subtitle ? (
+            <Text style={[styles.rowNumber, { color: theme.colors.ink[500] }]}>{subtitle}</Text>
+          ) : null}
+          {note ? (
+            <Text style={[styles.rowNote, { color: theme.colors.ink[400] }]}>{note}</Text>
+          ) : null}
         </View>
       </Pressable>
 
@@ -258,7 +254,7 @@ function SheetRow({
         <Icon name={icon} size={20} color={theme.palette.violet[700]} />
       </Pressable>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -358,4 +354,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 15,
   },
-});
+})

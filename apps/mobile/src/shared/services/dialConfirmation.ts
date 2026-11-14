@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { openDialer } from './dialer';
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppState } from 'react-native'
+import { openDialer } from './dialer'
 
 /**
  * The dial confirmation and telemetry.
@@ -15,26 +15,26 @@ import { openDialer } from './dialer';
  */
 
 /** The surfaces FR-HELP-8 names — the median is taken over these three. */
-export type HelpSurface = 'police' | 'medical' | 'fire' | 'personal';
+export type HelpSurface = 'police' | 'medical' | 'fire' | 'personal'
 
 export interface DialConfirmation {
   /** The exact number the dialer will receive. */
-  number: string;
+  number: string
   /** The surface the user tapped. */
-  surface: HelpSurface;
+  surface: HelpSurface
   /** The measured app-open → dialer time in milliseconds. */
-  elapsedMs: number;
+  elapsedMs: number
 }
 
 export interface UseDialConfirmationResult {
   /** The pending confirmation, or `null` when no sheet is open. */
-  pending: DialConfirmation | null;
+  pending: DialConfirmation | null
   /** Opens the confirmation sheet for a number. */
-  request: (surface: HelpSurface, number: string) => void;
+  request: (surface: HelpSurface, number: string) => void
   /** Fires the dialer intent and records the measurement. */
-  confirm: () => Promise<boolean>;
+  confirm: () => Promise<boolean>
   /** Dismisses the sheet without dialling. */
-  cancel: () => void;
+  cancel: () => void
 }
 
 /**
@@ -43,16 +43,16 @@ export interface UseDialConfirmationResult {
  * The clock starts when the app process reports its first render — the root
  * layout's first commit. The value is captured once per process.
  */
-let appOpenAt = Date.now();
+let appOpenAt = Date.now()
 
 /** Records the app-open moment. Called by the root layout on first render. */
 export function markAppOpen(): void {
-  appOpenAt = Date.now();
+  appOpenAt = Date.now()
 }
 
 /** The current app-open timestamp. */
 export function appOpenTimestamp(): number {
-  return appOpenAt;
+  return appOpenAt
 }
 
 /**
@@ -62,61 +62,57 @@ export function appOpenTimestamp(): number {
  * intent goes straight to the OS.
  */
 export function useDialConfirmation(): UseDialConfirmationResult {
-  const [pending, setPending] = useState<DialConfirmation | null>(null);
-  const pendingRef = useRef<DialConfirmation | null>(null);
+  const [pending, setPending] = useState<DialConfirmation | null>(null)
+  const pendingRef = useRef<DialConfirmation | null>(null)
 
   const request = useCallback((surface: HelpSurface, number: string) => {
     const confirmation: DialConfirmation = {
       number,
       surface,
       elapsedMs: Math.max(0, Date.now() - appOpenAt),
-    };
-    pendingRef.current = confirmation;
-    setPending(confirmation);
-  }, []);
+    }
+    pendingRef.current = confirmation
+    setPending(confirmation)
+  }, [])
 
   const cancel = useCallback(() => {
-    pendingRef.current = null;
-    setPending(null);
-  }, []);
+    pendingRef.current = null
+    setPending(null)
+  }, [])
 
   const confirm = useCallback(async () => {
-    const confirmation = pendingRef.current;
-    if (!confirmation) return false;
+    const confirmation = pendingRef.current
+    if (!confirmation) return false
 
-    const elapsedMs = Math.max(0, Date.now() - appOpenAt);
-    recordDialTelemetry(confirmation.surface, confirmation.number, elapsedMs);
+    const elapsedMs = Math.max(0, Date.now() - appOpenAt)
+    recordDialTelemetry(confirmation.surface, confirmation.number, elapsedMs)
 
-    const opened = await openDialer(confirmation.number);
+    const opened = await openDialer(confirmation.number)
 
-    pendingRef.current = null;
-    setPending(null);
+    pendingRef.current = null
+    setPending(null)
 
-    return opened;
-  }, []);
+    return opened
+  }, [])
 
-  return { pending, request, confirm, cancel };
+  return { pending, request, confirm, cancel }
 }
 
 /** The recorded dial measurements. Kept in memory for the session. */
-const dialMeasurements: Array<{ surface: HelpSurface; number: string; elapsedMs: number }> = [];
+const dialMeasurements: Array<{ surface: HelpSurface; number: string; elapsedMs: number }> = []
 
 /** Records one dial measurement. */
-export function recordDialTelemetry(
-  surface: HelpSurface,
-  number: string,
-  elapsedMs: number,
-): void {
-  dialMeasurements.push({ surface, number, elapsedMs });
+export function recordDialTelemetry(surface: HelpSurface, number: string, elapsedMs: number): void {
+  dialMeasurements.push({ surface, number, elapsedMs })
 }
 
 /** Every dial measurement taken this session. */
 export function dialMeasurementsSnapshot(): ReadonlyArray<{
-  surface: HelpSurface;
-  number: string;
-  elapsedMs: number;
+  surface: HelpSurface
+  number: string
+  elapsedMs: number
 }> {
-  return dialMeasurements;
+  return dialMeasurements
 }
 
 /**
@@ -129,19 +125,19 @@ export function medianDialMs(): number | null {
   const samples = dialMeasurements
     .filter((entry) => entry.surface !== 'personal')
     .map((entry) => entry.elapsedMs)
-    .sort((a, b) => a - b);
+    .sort((a, b) => a - b)
 
-  if (samples.length === 0) return null;
+  if (samples.length === 0) return null
 
-  const middle = Math.floor(samples.length / 2);
+  const middle = Math.floor(samples.length / 2)
 
   if (samples.length % 2 === 1) {
-    return samples[middle] ?? null;
+    return samples[middle] ?? null
   }
 
-  const low = samples[middle - 1] ?? 0;
-  const high = samples[middle] ?? 0;
-  return Math.round((low + high) / 2);
+  const low = samples[middle - 1] ?? 0
+  const high = samples[middle] ?? 0
+  return Math.round((low + high) / 2)
 }
 
 /**
@@ -150,7 +146,7 @@ export function medianDialMs(): number | null {
  * Exported for the test suite — a measurement window must start clean.
  */
 export function resetDialMeasurements(): void {
-  dialMeasurements.length = 0;
+  dialMeasurements.length = 0
 }
 
 /**
@@ -160,15 +156,15 @@ export function resetDialMeasurements(): void {
  * contact" affordance may appear.
  */
 export function useAppIsForeground(): boolean {
-  const [isForeground, setIsForeground] = useState(AppState.currentState === 'active');
+  const [isForeground, setIsForeground] = useState(AppState.currentState === 'active')
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      setIsForeground(state === 'active');
-    });
+      setIsForeground(state === 'active')
+    })
 
-    return () => subscription.remove();
-  }, []);
+    return () => subscription.remove()
+  }, [])
 
-  return isForeground;
+  return isForeground
 }

@@ -1,0 +1,45 @@
+# What Prettier does **not** own.
+#
+# The story's criterion is about *source files in any workspace*: "Given any
+# source file in any workspace, When I run `prettier --check`, Then every file
+# matches the Prettier configuration." Everything below is either
+# generated, vendored, or not source — and formatting it would either be
+# meaningless or actively harmful.
+#
+# The two rules that matter:
+#
+#   * A **generated** file is owned by its generator. Reformatting it by hand
+#     would make the next regeneration produce a diff, and the mirror check
+#     (`node tools/mirror-shared-to-functions.cjs --check`) compares bytes.
+#   * A **vendored** file is owned by its source. `supabase/functions/_shared/vendor/`
+#     is a byte-for-byte mirror of `packages/shared/src/`, with a banner
+#     prepended, so Prettier will always disagree with it.
+#
+# The workspaces themselves are NOT ignored. That is the point of the check.
+
+# Dependencies and build output.
+node_modules/
+dist/
+.next/
+.expo/
+coverage/
+*.tsbuildinfo
+
+# Generated artefacts.
+supabase/functions/_shared/vendor/
+supabase/seed.sql
+
+# Lockfiles and other machine-written files.
+pnpm-lock.yaml
+
+# The specification trees — prose and design documents, not source.
+memory-bank/
+.specsmd/
+.specsmd-src/
+docs/
+prd.md
+ARCHITECTURE.md
+
+# Editor and OS noise.
+.DS_Store
+*.log

@@ -1,5 +1,5 @@
-import * as LocalAuthentication from 'expo-local-authentication';
-import { runBiometricPrompt } from '@/shared/auth/biometricService';
+import * as LocalAuthentication from 'expo-local-authentication'
+import { runBiometricPrompt } from '@/shared/auth/biometricService'
 
 /**
  * The outcome classification is the part of the biometric gate that has to
@@ -22,7 +22,7 @@ jest.mock('expo-local-authentication', () => ({
   supportedAuthenticationTypesAsync: jest.fn(),
   authenticateAsync: jest.fn(),
   AuthenticationType: { FINGERPRINT: 1, FACIAL_RECOGNITION: 2, IRIS: 3 },
-}));
+}))
 
 // The service imports the Supabase client for the accounting RPC, and the
 // client pulls in AsyncStorage and SecureStore — native modules that need
@@ -36,69 +36,69 @@ jest.mock('@/shared/api/supabase', () => ({
     setItem: jest.fn().mockResolvedValue(undefined),
     removeItem: jest.fn().mockResolvedValue(undefined),
   },
-}));
+}))
 
-const mocked = LocalAuthentication as jest.Mocked<typeof LocalAuthentication>;
+const mocked = LocalAuthentication as jest.Mocked<typeof LocalAuthentication>
 
 function authResult(result: { success: boolean; error?: string }) {
-  mocked.authenticateAsync.mockResolvedValue(result as never);
+  mocked.authenticateAsync.mockResolvedValue(result as never)
 }
 
 describe('runBiometricPrompt', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
   it('reports a successful match', async () => {
-    authResult({ success: true });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('success');
-  });
+    authResult({ success: true })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('success')
+  })
 
   it('counts a user cancellation as a failure', async () => {
-    authResult({ success: false, error: 'user_cancel' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'user_cancel' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('counts an app cancellation as a failure', async () => {
-    authResult({ success: false, error: 'app_cancel' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'app_cancel' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('counts a system cancellation as a failure', async () => {
-    authResult({ success: false, error: 'system_cancel' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'system_cancel' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('counts a device-credential fallback as a failure', async () => {
     // The gate disables the device fallback so a PIN cannot stand in for
     // the biometric. If the OS offers one anyway, it is not a biometric
     // match.
-    authResult({ success: false, error: 'user_fallback' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'user_fallback' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('does not count a device with nothing enrolled', async () => {
-    authResult({ success: false, error: 'not_enrolled' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('unavailable');
-  });
+    authResult({ success: false, error: 'not_enrolled' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('unavailable')
+  })
 
   it('does not count an unavailable biometric sensor', async () => {
-    authResult({ success: false, error: 'not_available' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('unavailable');
-  });
+    authResult({ success: false, error: 'not_available' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('unavailable')
+  })
 
   it('counts a lockout as a failure', async () => {
-    authResult({ success: false, error: 'lockout' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'lockout' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('counts an authentication failure as a failure', async () => {
-    authResult({ success: false, error: 'authentication_failed' });
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
+    authResult({ success: false, error: 'authentication_failed' })
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
 
   it('treats a thrown error as a failure rather than crashing', async () => {
-    mocked.authenticateAsync.mockRejectedValue(new Error('module exploded') as never);
-    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed');
-  });
-});
+    mocked.authenticateAsync.mockRejectedValue(new Error('module exploded') as never)
+    await expect(runBiometricPrompt('Unlock')).resolves.toBe('failed')
+  })
+})

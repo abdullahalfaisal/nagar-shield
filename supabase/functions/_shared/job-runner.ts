@@ -11,8 +11,8 @@
  * nothing about media, accounts, or the geocode cache.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { hashUserId } from '@shared/jobs/index.ts';
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { hashUserId } from '@shared/jobs/index.ts'
 
 /** The closed vocabulary of `job_runs.job_name`. */
 export const JOB_NAMES = [
@@ -20,17 +20,17 @@ export const JOB_NAMES = [
   'cleanup_geocode_cache',
   'purge_deleted_accounts',
   'keep_project_awake',
-] as const;
+] as const
 
-export type JobName = (typeof JOB_NAMES)[number];
+export type JobName = (typeof JOB_NAMES)[number]
 
-export type JobStatus = 'running' | 'succeeded' | 'failed';
+export type JobStatus = 'running' | 'succeeded' | 'failed'
 
 export interface JobRunCounts {
-  itemsProcessed?: number;
-  itemsFailed?: number;
-  bytesReclaimed?: number;
-  errorDetail?: string | null;
+  itemsProcessed?: number
+  itemsFailed?: number
+  bytesReclaimed?: number
+  errorDetail?: string | null
 }
 
 /**
@@ -48,10 +48,10 @@ export async function recordJobRun(
     .from('job_runs')
     .insert({ job_name: jobName, status: 'running' })
     .select('id')
-    .maybeSingle();
+    .maybeSingle()
 
-  if (error || !data) return null;
-  return (data as { id: string }).id;
+  if (error || !data) return null
+  return (data as { id: string }).id
 }
 
 /**
@@ -73,14 +73,14 @@ export async function closeJobRun(
     bytes_reclaimed: counts.bytesReclaimed ?? 0,
     finished_at: new Date().toISOString(),
     error_detail: status === 'failed' ? (counts.errorDetail ?? 'Job failed') : null,
-  };
+  }
 
-  await client.from('job_runs').update(patch).eq('id', runId);
+  await client.from('job_runs').update(patch).eq('id', runId)
 }
 
 /** A fresh request id for one invocation. */
 export function newRequestId(): string {
-  return crypto.randomUUID();
+  return crypto.randomUUID()
 }
 
-export { hashUserId };
+export { hashUserId }

@@ -28,17 +28,17 @@
  * Usage: node tools/probe-report-category.cjs
  */
 
-'use strict';
+'use strict'
 
-const { execFileSync } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { execFileSync } = require('node:child_process')
+const { randomUUID } = require('node:crypto')
 
-const API_URL = 'http://127.0.0.1:54321';
-const DEV_PASSWORD = 'nagar-local-dev';
+const API_URL = 'http://127.0.0.1:54321'
+const DEV_PASSWORD = 'nagar-local-dev'
 
 /** The two seeded citizens. Their uuids are FIXED by the seed migration. */
-const AUTHOR = { email: 'citizen@nagar.local', id: '11111111-1111-1111-1111-1111111111a1' };
-const OTHER = { email: 'citizen2@nagar.local', id: '11111111-1111-1111-1111-1111111111a3' };
+const AUTHOR = { email: 'citizen@nagar.local', id: '11111111-1111-1111-1111-1111111111a1' }
+const OTHER = { email: 'citizen2@nagar.local', id: '11111111-1111-1111-1111-1111111111a3' }
 
 /** The fixed 11-value vocabulary, in the order the story lists them. */
 const THE_ELEVEN = [
@@ -53,27 +53,27 @@ const THE_ELEVEN = [
   'vandalism',
   'suspicious',
   'other',
-];
+]
 
 function localEnv() {
   const output = execFileSync('npx', ['supabase', 'status', '-o', 'env'], {
     encoding: 'utf8',
     shell: true,
-  });
+  })
   const read = (key) => {
-    const match = output.match(new RegExp(`${key}="([^"]+)"`));
-    return match ? match[1] : '';
-  };
-  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') };
+    const match = output.match(new RegExp(`${key}="([^"]+)"`))
+    return match ? match[1] : ''
+  }
+  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') }
 }
 
-const { anonKey, serviceRoleKey } = localEnv();
+const { anonKey, serviceRoleKey } = localEnv()
 
-const results = [];
+const results = []
 
 function record(name, passed, detail = '') {
-  results.push({ name, passed, detail });
-  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
+  results.push({ name, passed, detail })
+  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
 async function signIn(email) {
@@ -81,18 +81,18 @@ async function signIn(email) {
     method: 'POST',
     headers: { apikey: anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: DEV_PASSWORD }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return { status: response.status, token: body.access_token, body };
+  })
+  const body = await response.json().catch(() => ({}))
+  return { status: response.status, token: body.access_token, body }
 }
 
 /** A PostgREST read of the reports table, as the signed-in user. */
 async function readReports(token, query = '') {
   const response = await fetch(`${API_URL}/rest/v1/reports${query}`, {
     headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-  });
-  const body = await response.json().catch(() => []);
-  return { status: response.status, rows: Array.isArray(body) ? body : [] };
+  })
+  const body = await response.json().catch(() => [])
+  return { status: response.status, rows: Array.isArray(body) ? body : [] }
 }
 
 /** A PostgREST call of the `update_category` RPC. */
@@ -105,15 +105,15 @@ async function callUpdateCategory(token, reportId, category) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ p_report_id: reportId, p_category: category }),
-  });
-  const text = await response.text();
-  let parsed = null;
+  })
+  const text = await response.text()
+  let parsed = null
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text)
   } catch {
-    parsed = null;
+    parsed = null
   }
-  return { status: response.status, text, body: parsed };
+  return { status: response.status, text, body: parsed }
 }
 
 /** The `history_nearby` read model — the author's own History. */
@@ -131,9 +131,9 @@ async function callHistoryNearby(token, lat, lng) {
       p_radius_km: 50,
       p_window_hours: 24 * 30,
     }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return { status: response.status, body };
+  })
+  const body = await response.json().catch(() => ({}))
+  return { status: response.status, body }
 }
 
 /**
@@ -171,15 +171,15 @@ async function createReport(reportId, authorId) {
         neighborhood: null,
       },
     }),
-  });
-  const text = await response.text();
-  let parsed = null;
+  })
+  const text = await response.text()
+  let parsed = null
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text)
   } catch {
-    parsed = null;
+    parsed = null
   }
-  return { status: response.status, text, row: Array.isArray(parsed) ? parsed[0] : parsed };
+  return { status: response.status, text, row: Array.isArray(parsed) ? parsed[0] : parsed }
 }
 
 /** Removes the probe rows, using the service role so nothing is scoped away. */
@@ -187,145 +187,137 @@ async function cleanupProbeRows() {
   await fetch(`${API_URL}/rest/v1/reports?id=like.probe-*`, {
     method: 'DELETE',
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-  });
+  })
   await fetch(`${API_URL}/rest/v1/reports?description=eq.probe-report`, {
     method: 'DELETE',
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-  });
+  })
 }
 
 async function main() {
-  await cleanupProbeRows();
+  await cleanupProbeRows()
 
-  const signInAuthor = await signIn(AUTHOR.email);
-  const signInOther = await signIn(OTHER.email);
+  const signInAuthor = await signIn(AUTHOR.email)
+  const signInOther = await signIn(OTHER.email)
 
   if (signInAuthor.status !== 200 || !signInAuthor.token) {
-    console.log(`SKIP: cannot sign in as ${AUTHOR.email} (HTTP ${signInAuthor.status})`);
-    process.exitCode = 0;
-    return;
+    console.log(`SKIP: cannot sign in as ${AUTHOR.email} (HTTP ${signInAuthor.status})`)
+    process.exitCode = 0
+    return
   }
   if (signInOther.status !== 200 || !signInOther.token) {
-    console.log(`SKIP: cannot sign in as ${OTHER.email} (HTTP ${signInOther.status})`);
-    process.exitCode = 0;
-    return;
+    console.log(`SKIP: cannot sign in as ${OTHER.email} (HTTP ${signInOther.status})`)
+    process.exitCode = 0
+    return
   }
 
-  const token = signInAuthor.token;
-  const otherToken = signInOther.token;
+  const token = signInAuthor.token
+  const otherToken = signInOther.token
 
   // A report id that is recognisable as a probe row, so cleanup can find it.
-  const reportId = randomUUID();
+  const reportId = randomUUID()
 
   // --- (0) The report starts with NO category -----------------------------
 
-  const created = await createReport(reportId, AUTHOR.id);
+  const created = await createReport(reportId, AUTHOR.id)
   record(
     'the probe report row is created',
     created.status === 200 || created.status === 201,
     `HTTP ${created.status}`,
-  );
+  )
 
-  const initial = await readReports(token, `?id=eq.${reportId}&select=id,category,author_id`);
+  const initial = await readReports(token, `?id=eq.${reportId}&select=id,category,author_id`)
   record(
     'the author can read their own report',
     initial.rows.length === 1,
     `rows=${initial.rows.length}`,
-  );
+  )
   record(
     "the report's category starts NULL — a report with no category is valid",
     initial.rows[0]?.category === null || initial.rows[0]?.category === undefined,
     `category=${initial.rows[0]?.category}`,
-  );
+  )
 
   // --- (1) The author sets a category -------------------------------------
 
-  const set = await callUpdateCategory(token, reportId, 'theft');
-  record(
-    'the author can set a category',
-    set.status === 200,
-    `HTTP ${set.status}`,
-  );
+  const set = await callUpdateCategory(token, reportId, 'theft')
+  record('the author can set a category', set.status === 200, `HTTP ${set.status}`)
 
-  const afterSet = await readReports(token, `?id=eq.${reportId}&select=id,category`);
+  const afterSet = await readReports(token, `?id=eq.${reportId}&select=id,category`)
   record(
     'the stored category equals the selected value',
     afterSet.rows[0]?.category === 'theft',
     `category=${afterSet.rows[0]?.category}`,
-  );
+  )
 
   // --- (2) The author changes it — the old value is replaced ---------------
 
-  const changed = await callUpdateCategory(token, reportId, 'fire');
+  const changed = await callUpdateCategory(token, reportId, 'fire')
   record(
     'the author can change an already-set category',
     changed.status === 200,
     `HTTP ${changed.status}`,
-  );
+  )
 
-  const afterChange = await readReports(token, `?id=eq.${reportId}&select=id,category`);
+  const afterChange = await readReports(token, `?id=eq.${reportId}&select=id,category`)
   record(
     'the stored category is replaced with the new value',
     afterChange.rows[0]?.category === 'fire',
     `category=${afterChange.rows[0]?.category}`,
-  );
+  )
   record(
-    "the previous value is not retained anywhere on the row",
+    'the previous value is not retained anywhere on the row',
     !/theft/i.test(JSON.stringify(afterChange.rows[0] ?? {})),
     JSON.stringify(afterChange.rows[0] ?? {}),
-  );
+  )
 
   // --- (3) The non-author is refused (AC #6) --------------------------------
 
-  const otherBefore = await readReports(otherToken, `?id=eq.${reportId}&select=id,category`);
+  const otherBefore = await readReports(otherToken, `?id=eq.${reportId}&select=id,category`)
   record(
     "a non-author cannot even read the author's report",
     otherBefore.status === 200 && otherBefore.rows.length === 0,
     `HTTP ${otherBefore.status} rows=${otherBefore.rows.length}`,
-  );
+  )
 
-  const otherWrite = await callUpdateCategory(otherToken, reportId, 'fraud');
+  const otherWrite = await callUpdateCategory(otherToken, reportId, 'fraud')
   record(
     "a non-author's category update is refused with FORBIDDEN",
     otherWrite.status >= 400 && otherWrite.status < 500,
     `HTTP ${otherWrite.status}`,
-  );
+  )
 
-  const afterOther = await readReports(token, `?id=eq.${reportId}&select=id,category`);
+  const afterOther = await readReports(token, `?id=eq.${reportId}&select=id,category`)
   record(
     "the stored category is unchanged after the non-author's attempt",
     afterOther.rows[0]?.category === 'fire',
     `category=${afterOther.rows[0]?.category}`,
-  );
+  )
 
   // --- (4) A value outside the fixed 11 is refused (AC #7) ------------------
 
-  const bogus = await callUpdateCategory(token, reportId, 'not-a-category');
+  const bogus = await callUpdateCategory(token, reportId, 'not-a-category')
   record(
     'a value outside the fixed 11 is refused',
     bogus.status >= 400 && bogus.status < 500,
     `HTTP ${bogus.status}`,
-  );
+  )
 
-  const afterBogus = await readReports(token, `?id=eq.${reportId}&select=id,category`);
+  const afterBogus = await readReports(token, `?id=eq.${reportId}&select=id,category`)
   record(
     'the refused value wrote no row',
     afterBogus.rows[0]?.category === 'fire',
     `category=${afterBogus.rows[0]?.category}`,
-  );
+  )
 
   // --- (5) Every one of the 11 values is accepted --------------------------
 
-  const rejected = [];
+  const rejected = []
   for (const value of THE_ELEVEN) {
-    const attempt = await callUpdateCategory(token, reportId, value);
-    if (attempt.status !== 200) rejected.push(`${value}(HTTP ${attempt.status})`);
+    const attempt = await callUpdateCategory(token, reportId, value)
+    if (attempt.status !== 200) rejected.push(`${value}(HTTP ${attempt.status})`)
   }
-  record(
-    'all 11 of the fixed values are accepted',
-    rejected.length === 0,
-    rejected.join(','),
-  );
+  record('all 11 of the fixed values are accepted', rejected.length === 0, rejected.join(','))
 
   // --- (6) Only the category is editable (AC #10) ---------------------------
 
@@ -341,12 +333,12 @@ async function main() {
       Prefer: 'return=representation',
     },
     body: JSON.stringify({ description: 'probe-edited' }),
-  });
+  })
   record(
-    "the description is not editable after submit",
+    'the description is not editable after submit',
     editDescription.status >= 400 && editDescription.status < 500,
     `HTTP ${editDescription.status}`,
-  );
+  )
 
   const editVisibility = await fetch(`${API_URL}/rest/v1/reports?id=eq.${reportId}`, {
     method: 'PATCH',
@@ -357,35 +349,35 @@ async function main() {
       Prefer: 'return=representation',
     },
     body: JSON.stringify({ public_visibility: 'identified' }),
-  });
+  })
   record(
     'the visibility is not editable after submit',
     editVisibility.status >= 400 && editVisibility.status < 500,
     `HTTP ${editVisibility.status}`,
-  );
+  )
 
   const afterEdits = await readReports(
     token,
     `?id=eq.${reportId}&select=id,description,public_visibility`,
-  );
+  )
   record(
     'the refused edits left the row untouched',
     afterEdits.rows[0]?.description === 'probe-report' &&
       afterEdits.rows[0]?.public_visibility === 'anonymous',
     `description=${afterEdits.rows[0]?.description} visibility=${afterEdits.rows[0]?.public_visibility}`,
-  );
+  )
 
   // --- (7) The report is in the author's own History immediately (AC #8) ----
 
-  const history = await callHistoryNearby(token, 23.8103, 90.4125);
-  const historyItems = Array.isArray(history.body?.items) ? history.body.items : [];
-  const ownItem = historyItems.find((item) => item.id === reportId);
+  const history = await callHistoryNearby(token, 23.8103, 90.4125)
+  const historyItems = Array.isArray(history.body?.items) ? history.body.items : []
+  const ownItem = historyItems.find((item) => item.id === reportId)
 
   record(
     "the report is present in the author's own History immediately",
     Boolean(ownItem),
     `items=${historyItems.length}`,
-  );
+  )
   // The `history_nearby` projection does not carry `moderation_status` at
   // all — it **filters** to `moderation_status in ('visible','restored')`. So
   // the row's presence in the projection IS the guarantee: a report that was
@@ -396,47 +388,47 @@ async function main() {
     "the report is in History as the caller's own row — no pending-review gate",
     ownItem?.is_own === true,
     `is_own=${ownItem?.is_own}`,
-  );
+  )
 
   // The public projection must not leak the author. The History item is the
   // author's own, so it may carry the flag — but `author_id` must never
   // appear on the public feed.
-  const hasAuthorId = Object.prototype.hasOwnProperty.call(ownItem ?? {}, 'author_id');
+  const hasAuthorId = Object.prototype.hasOwnProperty.call(ownItem ?? {}, 'author_id')
   record(
     'the History projection does not carry author_id',
     !hasAuthorId,
     `keys=${Object.keys(ownItem ?? {}).join(',')}`,
-  );
+  )
 
   // --- (8) The category is read-only for a non-author (AC #9) ----------------
 
-  const otherRead = await readReports(otherToken, `?id=eq.${reportId}&select=id,category`);
+  const otherRead = await readReports(otherToken, `?id=eq.${reportId}&select=id,category`)
   record(
-    "a non-author sees no category row to edit (no row resolves)",
+    'a non-author sees no category row to edit (no row resolves)',
     otherRead.rows.length === 0,
     `rows=${otherRead.rows.length}`,
-  );
+  )
 
-  await cleanupProbeRows();
+  await cleanupProbeRows()
 
   // The cleanup must actually have removed the row.
-  const afterCleanup = await readReports(token, `?id=eq.${reportId}&select=id`);
+  const afterCleanup = await readReports(token, `?id=eq.${reportId}&select=id`)
   record(
     'the probe cleans up after itself',
     afterCleanup.rows.length === 0,
     `rows=${afterCleanup.rows.length}`,
-  );
+  )
 
-  finish();
+  finish()
 }
 
 function finish() {
-  const failed = results.filter((r) => !r.passed);
-  console.log(`\n${results.length - failed.length}/${results.length} report-category probes passed`);
-  process.exitCode = failed.length === 0 ? 0 : 1;
+  const failed = results.filter((r) => !r.passed)
+  console.log(`\n${results.length - failed.length}/${results.length} report-category probes passed`)
+  process.exitCode = failed.length === 0 ? 0 : 1
 }
 
 main().catch((error) => {
-  console.error('ERROR', error);
-  process.exitCode = 2;
-});
+  console.error('ERROR', error)
+  process.exitCode = 2
+})

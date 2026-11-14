@@ -1,14 +1,14 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface CardProps {
-  children: React.ReactNode;
-  style?: object;
+  children: React.ReactNode
+  style?: object
   /** `raised` uses `--shadow-card`; `flat` uses a hairline border only. */
-  elevation?: 'raised' | 'flat';
-  padded?: boolean;
+  elevation?: 'raised' | 'flat'
+  padded?: boolean
 }
 
 /**
@@ -17,7 +17,7 @@ interface CardProps {
  * `--shadow-card` combination.
  */
 export function Card({ children, style, elevation = 'raised', padded = true }: CardProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View
@@ -41,7 +41,7 @@ export function Card({ children, style, elevation = 'raised', padded = true }: C
     >
       {children}
     </View>
-  );
+  )
 }
 
 /**
@@ -56,22 +56,26 @@ export function Card({ children, style, elevation = 'raised', padded = true }: C
  *   Personal→ `#059669 → #10B981`(green)
  */
 export const HELP_CARD_VARIANTS = {
-  police: { gradient: ['#4C2BB5', '#7C3AED', '#A78BFA'] as const, icon: 'local_police', number: '999' },
+  police: {
+    gradient: ['#4C2BB5', '#7C3AED', '#A78BFA'] as const,
+    icon: 'local_police',
+    number: '999',
+  },
   medical: { gradient: ['#E94B45', '#F87171'] as const, icon: 'medical_services', number: '999' },
   fire: { gradient: ['#D97706', '#F59E0B'] as const, icon: 'local_fire_department', number: '102' },
   personal: { gradient: ['#059669', '#10B981'] as const, icon: 'contact_phone', number: null },
-} as const;
+} as const
 
-export type HelpCardVariant = keyof typeof HELP_CARD_VARIANTS;
+export type HelpCardVariant = keyof typeof HELP_CARD_VARIANTS
 
 interface HelpCardProps {
-  variant: HelpCardVariant;
-  title: string;
-  subtitle: string;
-  englishLabel: string;
-  number?: string | null;
-  onPress: () => void;
-  disabled?: boolean;
+  variant: HelpCardVariant
+  title: string
+  subtitle: string
+  englishLabel: string
+  number?: string | null
+  onPress: () => void
+  disabled?: boolean
 }
 
 export function HelpCard({
@@ -83,8 +87,8 @@ export function HelpCard({
   onPress,
   disabled = false,
 }: HelpCardProps) {
-  const spec = HELP_CARD_VARIANTS[variant];
-  const shownNumber = number ?? spec.number;
+  const spec = HELP_CARD_VARIANTS[variant]
+  const shownNumber = number ?? spec.number
 
   return (
     <Pressable
@@ -93,10 +97,7 @@ export function HelpCard({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.helpCard,
-        { opacity: disabled ? 0.5 : pressed ? 0.92 : 1 },
-      ]}
+      style={({ pressed }) => [styles.helpCard, { opacity: disabled ? 0.5 : pressed ? 0.92 : 1 }]}
     >
       <LinearGradient
         colors={[...spec.gradient]}
@@ -128,7 +129,7 @@ export function HelpCard({
         </View>
       </LinearGradient>
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -191,4 +192,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 14,
   },
-});
+})

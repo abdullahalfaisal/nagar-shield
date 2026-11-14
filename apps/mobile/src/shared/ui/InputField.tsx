@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from 'react'
 import {
   StyleSheet,
   Text,
@@ -6,27 +6,27 @@ import {
   View,
   type KeyboardTypeOptions,
   type TextInputProps,
-} from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+} from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface InputFieldProps {
-  label: string;
-  value: string;
-  onChangeText: (next: string) => void;
-  placeholder?: string;
-  helper?: string;
-  error?: string;
-  icon?: string;
-  secureTextEntry?: boolean;
-  keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: TextInputProps['autoCapitalize'];
-  autoComplete?: TextInputProps['autoComplete'];
-  textContentType?: TextInputProps['textContentType'];
-  editable?: boolean;
-  onSubmitEditing?: () => void;
-  returnKeyType?: TextInputProps['returnKeyType'];
-  testID?: string;
+  label: string
+  value: string
+  onChangeText: (next: string) => void
+  placeholder?: string
+  helper?: string
+  error?: string
+  icon?: string
+  secureTextEntry?: boolean
+  keyboardType?: KeyboardTypeOptions
+  autoCapitalize?: TextInputProps['autoCapitalize']
+  autoComplete?: TextInputProps['autoComplete']
+  textContentType?: TextInputProps['textContentType']
+  editable?: boolean
+  onSubmitEditing?: () => void
+  returnKeyType?: TextInputProps['returnKeyType']
+  testID?: string
 }
 
 /**
@@ -55,15 +55,15 @@ export function InputField({
   returnKeyType,
   testID,
 }: InputFieldProps) {
-  const theme = useTheme();
-  const [focused, setFocused] = useState(false);
+  const theme = useTheme()
+  const [focused, setFocused] = useState(false)
 
-  const floated = focused || value.length > 0;
+  const floated = focused || value.length > 0
   const borderColor = error
     ? theme.palette.red[600]
     : focused
       ? theme.palette.violet[500]
-      : theme.colors.surface.outline;
+      : theme.colors.surface.outline
 
   return (
     <View style={styles.wrapper}>
@@ -133,7 +133,9 @@ export function InputField({
                   : theme.colors.ink[500],
               fontSize: floated ? 11 : 15,
               backgroundColor: theme.colors.surface.white,
-              fontWeight: floated ? theme.typography.weight.semibold : theme.typography.weight.regular,
+              fontWeight: floated
+                ? theme.typography.weight.semibold
+                : theme.typography.weight.regular,
               paddingHorizontal: 4,
             },
           ]}
@@ -148,7 +150,7 @@ export function InputField({
         <Text style={[styles.helper, { color: theme.colors.ink[500] }]}>{helper}</Text>
       ) : null}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -179,4 +181,4 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingLeft: 4,
   },
-});
+})

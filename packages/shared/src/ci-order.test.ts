@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-import { load } from 'js-yaml';
+import { load } from 'js-yaml'
 
 /**
  * The CI job graph.
@@ -22,77 +22,77 @@ import { load } from 'js-yaml';
  * rules.
  */
 
-const WORKFLOW_PATH = join(__dirname, '..', '..', '..', '.github', 'workflows', 'ci.yml');
+const WORKFLOW_PATH = join(__dirname, '..', '..', '..', '.github', 'workflows', 'ci.yml')
 
 interface WorkflowJob {
-  needs?: string | string[];
-  steps?: { run?: string }[];
+  needs?: string | string[]
+  steps?: { run?: string }[]
 }
 
 interface Workflow {
-  jobs: Record<string, WorkflowJob>;
+  jobs: Record<string, WorkflowJob>
 }
 
 const workflow = (): Workflow => {
-  const parsed = load(readFileSync(WORKFLOW_PATH, 'utf8')) as Workflow | null;
-  if (!parsed?.jobs) throw new Error(`Could not read the job graph from ${WORKFLOW_PATH}`);
-  return parsed;
-};
+  const parsed = load(readFileSync(WORKFLOW_PATH, 'utf8')) as Workflow | null
+  if (!parsed?.jobs) throw new Error(`Could not read the job graph from ${WORKFLOW_PATH}`)
+  return parsed
+}
 
 /** The names of the jobs that run a package's test suite. */
 const testJobs = (jobs: Record<string, WorkflowJob>): string[] =>
   Object.keys(jobs).filter((name) => {
-    const runs = jobs[name]?.steps?.map((step) => step.run ?? '') ?? [];
-    return runs.some((run) => /pnpm\s+--filter\s+@nagar-shield\/\S+\s+test/.test(run));
-  });
+    const runs = jobs[name]?.steps?.map((step) => step.run ?? '') ?? []
+    return runs.some((run) => /pnpm\s+--filter\s+@nagar-shield\/\S+\s+test/.test(run))
+  })
 
 /** The package a test job runs. */
 const testedPackage = (job: WorkflowJob | undefined): string | undefined => {
-  const run = job?.steps?.map((step) => step.run ?? '').join('\n') ?? '';
-  return /@nagar-shield\/([\w-]+)\s+test/.exec(run)?.[1];
-};
+  const run = job?.steps?.map((step) => step.run ?? '').join('\n') ?? ''
+  return /@nagar-shield\/([\w-]+)\s+test/.exec(run)?.[1]
+}
 
 describe('the CI job graph', () => {
   it('reads the workflow', () => {
-    expect(Object.keys(workflow().jobs).length).toBeGreaterThan(0);
-  });
+    expect(Object.keys(workflow().jobs).length).toBeGreaterThan(0)
+  })
 
   it('runs the shared suite in a test job', () => {
-    const jobs = workflow().jobs;
-    const shared = testJobs(jobs).filter((name) => testedPackage(jobs[name]) === 'shared');
+    const jobs = workflow().jobs
+    const shared = testJobs(jobs).filter((name) => testedPackage(jobs[name]) === 'shared')
 
-    expect(shared).toEqual(['shared-test']);
-  });
+    expect(shared).toEqual(['shared-test'])
+  })
 
   it('runs the shared suite before the mobile and admin suites', () => {
-    const jobs = workflow().jobs;
-    const order = testJobs(jobs);
+    const jobs = workflow().jobs
+    const order = testJobs(jobs)
 
-    const sharedAt = order.indexOf('shared-test');
-    const mobileAt = order.indexOf('unit-test-mobile');
-    const adminAt = order.indexOf('unit-test-admin');
+    const sharedAt = order.indexOf('shared-test')
+    const mobileAt = order.indexOf('unit-test-mobile')
+    const adminAt = order.indexOf('unit-test-admin')
 
-    expect(sharedAt).toBeGreaterThanOrEqual(0);
-    expect(mobileAt).toBeGreaterThanOrEqual(0);
-    expect(adminAt).toBeGreaterThanOrEqual(0);
+    expect(sharedAt).toBeGreaterThanOrEqual(0)
+    expect(mobileAt).toBeGreaterThanOrEqual(0)
+    expect(adminAt).toBeGreaterThanOrEqual(0)
 
-    expect(sharedAt).toBeLessThan(mobileAt);
-    expect(sharedAt).toBeLessThan(adminAt);
-  });
+    expect(sharedAt).toBeLessThan(mobileAt)
+    expect(sharedAt).toBeLessThan(adminAt)
+  })
 
   it('gates the mobile and admin suites on the shared suite', () => {
     // The order of the `jobs:` block is a *presentation* order. The `needs:`
     // edge is the one GitHub actually honours — without it the three jobs
     // run in parallel and the shared contract is no longer the first signal.
-    const jobs = workflow().jobs;
+    const jobs = workflow().jobs
 
     for (const consumer of ['unit-test-mobile', 'unit-test-admin', 'unit-test-functions']) {
-      const needs = jobs[consumer]?.needs;
-      const list = Array.isArray(needs) ? needs : needs ? [needs] : [];
+      const needs = jobs[consumer]?.needs
+      const list = Array.isArray(needs) ? needs : needs ? [needs] : []
 
-      expect(list).toContain('shared-test');
+      expect(list).toContain('shared-test')
     }
-  });
+  })
 
   it('runs every test job in the repository', () => {
     // A package that adds a test script but no CI job would silently stop
@@ -101,8 +101,20 @@ describe('the CI job graph', () => {
       Object.values(workflow().jobs)
         .map(testedPackage)
         .filter((name): name is string => Boolean(name)),
-    );
+    )
 
-    expect(packages).toEqual(new Set(['shared', 'mobile', 'admin']));
-  });
-});
+    expect(packages).toEqual(new Set(['shared', 'mobile', 'admin']))
+  })
+
+  it('checks the formatting contract in CI', () => {
+    // The story's Technical Notes: "Prettier config is committed as
+    // `.prettierrc` ... and is checked in CI via `prettier --check`". The
+    // check has to be in the **workflow**, not only in the local `verify`
+    // script — a local script that CI does not run is a script nobody runs.
+    const runs = Object.values(workflow().jobs)
+      .flatMap((job) => job.steps ?? [])
+      .map((step) => step.run ?? '')
+
+    expect(runs.some((run) => /pnpm\s+format:check/.test(run))).toBe(true)
+  })
+})

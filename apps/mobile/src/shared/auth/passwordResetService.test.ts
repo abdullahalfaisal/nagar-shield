@@ -1,4 +1,4 @@
-import { AppError } from '@nagar-shield/shared';
+import { AppError } from '@nagar-shield/shared'
 import {
   clearPendingReset,
   isRateLimited,
@@ -7,7 +7,7 @@ import {
   readRetryAfterSeconds,
   stagePasswordReset,
   takePendingReset,
-} from '@/shared/auth/passwordResetService';
+} from '@/shared/auth/passwordResetService'
 
 /**
  * The password-reset service's pure logic.
@@ -34,108 +34,108 @@ import {
 jest.mock('@/shared/services/submitCapture', () => ({
   supabaseUrl: () => 'http://127.0.0.1:54321',
   supabaseAnonKey: () => 'anon-key',
-}));
+}))
 
 describe('the in-memory hand-off', () => {
   beforeEach(() => {
-    clearPendingReset();
-  });
+    clearPendingReset()
+  })
 
   it('carries the identifier and the code between the two screens', () => {
-    stagePasswordReset('01711000040', '152124');
+    stagePasswordReset('01711000040', '152124')
 
-    const staged = peekPendingReset();
+    const staged = peekPendingReset()
 
-    expect(staged?.identifier).toBe('01711000040');
-    expect(staged?.code).toBe('152124');
-  });
+    expect(staged?.identifier).toBe('01711000040')
+    expect(staged?.code).toBe('152124')
+  })
 
   it('trims the identifier', () => {
-    stagePasswordReset('  01711000040  ', '152124');
+    stagePasswordReset('  01711000040  ', '152124')
 
-    expect(peekPendingReset()?.identifier).toBe('01711000040');
-  });
+    expect(peekPendingReset()?.identifier).toBe('01711000040')
+  })
 
   it('keeps the code as a string — 000123 is not 123', () => {
-    stagePasswordReset('01711000040', '000123');
+    stagePasswordReset('01711000040', '000123')
 
-    expect(peekPendingReset()?.code).toBe('000123');
-  });
+    expect(peekPendingReset()?.code).toBe('000123')
+  })
 
   it('peeking does not consume the hand-off', () => {
-    stagePasswordReset('01711000040', '152124');
+    stagePasswordReset('01711000040', '152124')
 
-    peekPendingReset();
-    peekPendingReset();
+    peekPendingReset()
+    peekPendingReset()
 
-    expect(takePendingReset()?.code).toBe('152124');
-  });
+    expect(takePendingReset()?.code).toBe('152124')
+  })
 
   it('taking clears it, so a second pass cannot replay the code', () => {
-    stagePasswordReset('01711000040', '152124');
+    stagePasswordReset('01711000040', '152124')
 
-    const first = takePendingReset();
-    const second = takePendingReset();
+    const first = takePendingReset()
+    const second = takePendingReset()
 
-    expect(first?.code).toBe('152124');
-    expect(second).toBeNull();
-  });
+    expect(first?.code).toBe('152124')
+    expect(second).toBeNull()
+  })
 
   it('the newest challenge replaces the older one', () => {
-    stagePasswordReset('01711000040', '111111');
-    stagePasswordReset('01711000040', '222222');
+    stagePasswordReset('01711000040', '111111')
+    stagePasswordReset('01711000040', '222222')
 
-    expect(takePendingReset()?.code).toBe('222222');
-  });
+    expect(takePendingReset()?.code).toBe('222222')
+  })
 
   it('clearing discards it', () => {
-    stagePasswordReset('01711000040', '152124');
+    stagePasswordReset('01711000040', '152124')
 
-    clearPendingReset();
+    clearPendingReset()
 
-    expect(takePendingReset()).toBeNull();
-  });
+    expect(takePendingReset()).toBeNull()
+  })
 
   it('nothing is staged before the first request', () => {
-    expect(peekPendingReset()).toBeNull();
-    expect(takePendingReset()).toBeNull();
-  });
-});
+    expect(peekPendingReset()).toBeNull()
+    expect(takePendingReset()).toBeNull()
+  })
+})
 
 describe('the error-detail readers', () => {
   it('reads the remaining cooldown from the server', () => {
-    const error = new AppError('OTP_RATE_LIMIT', { retry_after_sec: 1800 });
+    const error = new AppError('OTP_RATE_LIMIT', { retry_after_sec: 1800 })
 
-    expect(readRetryAfterSeconds(error)).toBe(1800);
-  });
+    expect(readRetryAfterSeconds(error)).toBe(1800)
+  })
 
   it('reads the remaining attempts from the server', () => {
-    const error = new AppError('VALIDATION_FAILED', { attempts_remaining: 2 });
+    const error = new AppError('VALIDATION_FAILED', { attempts_remaining: 2 })
 
-    expect(readAttemptsRemaining(error)).toBe(2);
-  });
+    expect(readAttemptsRemaining(error)).toBe(2)
+  })
 
   it('returns undefined rather than guessing when the server did not say', () => {
-    const error = new AppError('VALIDATION_FAILED');
+    const error = new AppError('VALIDATION_FAILED')
 
-    expect(readRetryAfterSeconds(error)).toBeUndefined();
-    expect(readAttemptsRemaining(error)).toBeUndefined();
-  });
+    expect(readRetryAfterSeconds(error)).toBeUndefined()
+    expect(readAttemptsRemaining(error)).toBeUndefined()
+  })
 
   it('ignores a non-numeric detail', () => {
-    const error = new AppError('OTP_RATE_LIMIT', { retry_after_sec: 'soon' });
+    const error = new AppError('OTP_RATE_LIMIT', { retry_after_sec: 'soon' })
 
-    expect(readRetryAfterSeconds(error)).toBeUndefined();
-  });
+    expect(readRetryAfterSeconds(error)).toBeUndefined()
+  })
 
   it('ignores a detail that is not an error at all', () => {
-    expect(readRetryAfterSeconds(new Error('boom'))).toBeUndefined();
-    expect(readAttemptsRemaining(null)).toBeUndefined();
-  });
+    expect(readRetryAfterSeconds(new Error('boom'))).toBeUndefined()
+    expect(readAttemptsRemaining(null)).toBeUndefined()
+  })
 
   it('recognises the cooldown', () => {
-    expect(isRateLimited(new AppError('OTP_RATE_LIMIT'))).toBe(true);
-    expect(isRateLimited(new AppError('VALIDATION_FAILED'))).toBe(false);
-    expect(isRateLimited(new Error('boom'))).toBe(false);
-  });
-});
+    expect(isRateLimited(new AppError('OTP_RATE_LIMIT'))).toBe(true)
+    expect(isRateLimited(new AppError('VALIDATION_FAILED'))).toBe(false)
+    expect(isRateLimited(new Error('boom'))).toBe(false)
+  })
+})

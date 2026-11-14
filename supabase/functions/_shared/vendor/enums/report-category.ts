@@ -23,11 +23,11 @@ export const REPORT_CATEGORIES = [
   'vandalism',
   'suspicious',
   'other',
-] as const;
+] as const
 
-export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number]
 
-export const REPORT_CATEGORY_SET: ReadonlySet<string> = new Set(REPORT_CATEGORIES);
+export const REPORT_CATEGORY_SET: ReadonlySet<string> = new Set(REPORT_CATEGORIES)
 
 /**
  * The exported parser for `ReportCategory`.
@@ -42,9 +42,9 @@ export const REPORT_CATEGORY_SET: ReadonlySet<string> = new Set(REPORT_CATEGORIE
  */
 export function parseReportCategory(value: unknown): ReportCategory {
   if (typeof value !== 'string' || !REPORT_CATEGORY_SET.has(value)) {
-    throw new Error(`Not a report category: ${String(value)}`);
+    throw new Error(`Not a report category: ${String(value)}`)
   }
-  return value as ReportCategory;
+  return value as ReportCategory
 }
 
 /**
@@ -64,7 +64,7 @@ export const REPORT_CATEGORY_LABELS: Record<ReportCategory, { en: string; bn: st
   vandalism: { en: 'Vandalism', bn: 'ভাঙচোরা' },
   suspicious: { en: 'Suspicious', bn: 'সন্দেহজনক' },
   other: { en: 'Other', bn: 'অন্যান্য' },
-};
+}
 
 /** Material Symbols icon used for each category in the Alerts feed. */
 export const REPORT_CATEGORY_ICONS: Record<ReportCategory, string> = {
@@ -79,7 +79,7 @@ export const REPORT_CATEGORY_ICONS: Record<ReportCategory, string> = {
   vandalism: 'hammer',
   suspicious: 'visibility',
   other: 'help',
-};
+}
 
 /**
  * Left-border accent colour per category on the Alerts feed card.
@@ -97,4 +97,4 @@ export const REPORT_CATEGORY_ACCENTS: Record<ReportCategory, string> = {
   vandalism: '#4E342E',
   suspicious: '#546E7A',
   other: '#6B6B85',
-};
+}

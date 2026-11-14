@@ -1,13 +1,13 @@
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { REPORT_CATEGORY_LABELS, type ReportCategory } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { EmptyState, ListRow, Screen, StationMap, type StationMarker } from '@/shared/ui';
-import { useHistory } from '@/shared/api/history';
-import { DHAKA_FALLBACK_ORIGIN } from '@/shared/services/location';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
+import { useMemo } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { REPORT_CATEGORY_LABELS, type ReportCategory } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { EmptyState, ListRow, Screen, StationMap, type StationMarker } from '@/shared/ui'
+import { useHistory } from '@/shared/api/history'
+import { DHAKA_FALLBACK_ORIGIN } from '@/shared/services/location'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * The History map.
@@ -32,36 +32,36 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
  *     never built.
  */
 export default function HistoryMapScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
   const params = useLocalSearchParams<{
-    lat?: string;
-    lng?: string;
-    radiusKm?: string;
-    windowHours?: string;
-    category?: string;
-  }>();
+    lat?: string
+    lng?: string
+    radiusKm?: string
+    windowHours?: string
+    category?: string
+  }>()
 
   // The filter set arrives from the History screen. The map renders the
   // reports inside the **current** filter — never a separate, wider set.
-  const radiusKm = Number(params.radiusKm ?? 1);
-  const windowHours = Number(params.windowHours ?? 24);
-  const category = (params.category || null) as ReportCategory | null;
+  const radiusKm = Number(params.radiusKm ?? 1)
+  const windowHours = Number(params.windowHours ?? 24)
+  const category = (params.category || null) as ReportCategory | null
 
   // The origin. The map opens on the caller's position when there is one, and
   // on the default Dhaka-metro centre when there is not — the map is never
   // blank and never crashes on a denied permission.
   const origin = useMemo(() => {
-    const lat = Number(params.lat);
-    const lng = Number(params.lng);
+    const lat = Number(params.lat)
+    const lng = Number(params.lng)
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return { lat: DHAKA_FALLBACK_ORIGIN.lat, lng: DHAKA_FALLBACK_ORIGIN.lng, isFallback: true };
+      return { lat: DHAKA_FALLBACK_ORIGIN.lat, lng: DHAKA_FALLBACK_ORIGIN.lng, isFallback: true }
     }
-    return { lat, lng, isFallback: false };
-  }, [params.lat, params.lng]);
+    return { lat, lng, isFallback: false }
+  }, [params.lat, params.lng])
 
   const { data, isLoading } = useHistory({
     lat: origin.lat,
@@ -70,9 +70,9 @@ export default function HistoryMapScreen() {
     windowHours,
     category,
     limit: 50,
-  });
+  })
 
-  const reports = useMemo(() => data?.items ?? [], [data]);
+  const reports = useMemo(() => data?.items ?? [], [data])
 
   const markers = useMemo<StationMarker[]>(
     () =>
@@ -92,7 +92,7 @@ export default function HistoryMapScreen() {
             router.push({ pathname: '/(app)/alert-detail', params: { id: report.id } }),
         })),
     [reports, router, i18n.language, t],
-  );
+  )
 
   return (
     <Screen
@@ -143,7 +143,7 @@ export default function HistoryMapScreen() {
         </View>
       </StationMap>
     </Screen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -163,4 +163,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 16,
   },
-});
+})

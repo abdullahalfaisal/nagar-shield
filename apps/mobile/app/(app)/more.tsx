@@ -1,9 +1,9 @@
-import { Children, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Icon, ListRow, Screen } from '@/shared/ui';
+import { Children, type ReactNode } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Icon, ListRow, Screen } from '@/shared/ui'
 
 /**
  * Screen 15 — More Options.
@@ -15,9 +15,9 @@ import { Icon, ListRow, Screen } from '@/shared/ui';
  * shows a real count when there is one, and omits the badge otherwise.
  */
 export default function MoreOptionsScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <Screen title={t('more.title')} onBack={() => router.back()} scroll>
@@ -78,22 +78,16 @@ export default function MoreOptionsScreen() {
         {t('more.logout')}
       </Text>
     </Screen>
-  );
+  )
 }
 
 /**
  * `.list-section` — a white card with a hairline border, an uppercase header
  * and the rows clipped to its rounded corners.
  */
-export function ListSection({
-  header,
-  children,
-}: {
-  header: string;
-  children: ReactNode;
-}) {
-  const theme = useTheme();
-  const rows = Children.toArray(children);
+export function ListSection({ header, children }: { header: string; children: ReactNode }) {
+  const theme = useTheme()
+  const rows = Children.toArray(children)
 
   return (
     <View
@@ -115,16 +109,14 @@ export function ListSection({
         <View
           key={index}
           style={
-            index > 0
-              ? { borderTopWidth: 1, borderTopColor: theme.colors.ink[100] }
-              : undefined
+            index > 0 ? { borderTopWidth: 1, borderTopColor: theme.colors.ink[100] } : undefined
           }
         >
           {row}
         </View>
       ))}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -159,4 +151,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-});
+})

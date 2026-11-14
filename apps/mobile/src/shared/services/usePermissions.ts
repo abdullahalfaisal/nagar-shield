@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { useCallback, useEffect, useState } from 'react'
+import { AppState, type AppStateStatus } from 'react-native'
 import {
   RESTRICTED_PERMISSIONS,
   entryPointAvailability,
   readPermissions,
   type EntryPointAvailability,
   type PermissionSnapshot,
-} from './permissions';
+} from './permissions'
 
 /**
  * The live permission state.
@@ -22,46 +22,46 @@ import {
  */
 export interface UsePermissionsResult {
   /** The four permissions' states. `null` until the first read lands. */
-  permissions: PermissionSnapshot | null;
+  permissions: PermissionSnapshot | null
   /** Which entry points the Capture screen may offer. */
-  availability: EntryPointAvailability;
+  availability: EntryPointAvailability
   /** Re-reads the permissions now. */
-  refresh: () => void;
+  refresh: () => void
 }
 
 export function usePermissions(): UsePermissionsResult {
-  const [permissions, setPermissions] = useState<PermissionSnapshot | null>(null);
-  const [nonce, setNonce] = useState(0);
+  const [permissions, setPermissions] = useState<PermissionSnapshot | null>(null)
+  const [nonce, setNonce] = useState(0)
 
   const refresh = useCallback(() => {
-    setNonce((current) => current + 1);
-  }, []);
+    setNonce((current) => current + 1)
+  }, [])
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     const read = async () => {
-      const snapshot = await readPermissions();
-      if (!cancelled) setPermissions(snapshot);
-    };
+      const snapshot = await readPermissions()
+      if (!cancelled) setPermissions(snapshot)
+    }
 
-    void read();
+    void read()
 
     return () => {
-      cancelled = true;
-    };
-  }, [nonce]);
+      cancelled = true
+    }
+  }, [nonce])
 
   // A revocation while the app was backgrounded has to be picked up. The
   // screen is re-read on every foreground, not only on mount.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (next !== 'active') return;
-      refresh();
-    });
+      if (next !== 'active') return
+      refresh()
+    })
 
-    return () => subscription.remove();
-  }, [refresh]);
+    return () => subscription.remove()
+  }, [refresh])
 
   return {
     permissions,
@@ -70,5 +70,5 @@ export function usePermissions(): UsePermissionsResult {
     // into view and then out is worse than one that arrives a moment late.
     availability: entryPointAvailability(permissions ?? RESTRICTED_PERMISSIONS),
     refresh,
-  };
+  }
 }

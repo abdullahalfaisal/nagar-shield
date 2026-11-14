@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { REPORT_CATEGORY_LABELS } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { BottomSheet, Button, CheckRow, ChoiceChip } from '@/shared/ui';
+import { useEffect, useState } from 'react'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { REPORT_CATEGORY_LABELS } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { BottomSheet, Button, CheckRow, ChoiceChip } from '@/shared/ui'
 import {
   HISTORY_CATEGORY_OPTIONS,
   HISTORY_RADIUS_OPTIONS,
   HISTORY_WINDOW_OPTIONS,
   resetHistoryFilters,
   type HistoryFilters,
-} from '@/shared/services/historyFilters';
+} from '@/shared/services/historyFilters'
 
 /**
  * The History filter sheet.
@@ -30,12 +30,12 @@ import {
  *     category — the same values a cold launch uses (AC #7).
  */
 interface HistoryFilterSheetProps {
-  visible: boolean;
+  visible: boolean
   /** The **applied** filters — the sheet's starting point. */
-  filters: HistoryFilters;
-  onClose: () => void;
+  filters: HistoryFilters
+  onClose: () => void
   /** Called on confirm with the committed draft. */
-  onApply: (filters: HistoryFilters) => void;
+  onApply: (filters: HistoryFilters) => void
 }
 
 export function HistoryFilterSheet({
@@ -44,30 +44,30 @@ export function HistoryFilterSheet({
   onClose,
   onApply,
 }: HistoryFilterSheetProps) {
-  const theme = useTheme();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const { t } = useTranslation()
 
-  const [draft, setDraft] = useState<HistoryFilters>(filters);
+  const [draft, setDraft] = useState<HistoryFilters>(filters)
 
   // Re-seed the draft whenever the sheet opens, so a cancelled sheet leaves no
   // residue in the next one.
   useEffect(() => {
-    if (visible) setDraft(filters);
-  }, [visible, filters]);
+    if (visible) setDraft(filters)
+  }, [visible, filters])
 
   const cancel = () => {
-    setDraft(filters);
-    onClose();
-  };
+    setDraft(filters)
+    onClose()
+  }
 
   const reset = () => {
-    setDraft(resetHistoryFilters());
-  };
+    setDraft(resetHistoryFilters())
+  }
 
   const apply = () => {
-    onApply(draft);
-    onClose();
-  };
+    onApply(draft)
+    onClose()
+  }
 
   return (
     <BottomSheet
@@ -137,17 +137,12 @@ export function HistoryFilterSheet({
           ))}
         </View>
 
-        <Button
-          label={t('history.apply')}
-          variant="primary"
-          onPress={apply}
-          style={styles.apply}
-        />
+        <Button label={t('history.apply')} variant="primary" onPress={apply} style={styles.apply} />
         <Button label={t('history.reset')} variant="ghost" onPress={reset} style={styles.reset} />
         <Button label={t('common.cancel')} variant="ghost" onPress={cancel} style={styles.cancel} />
       </ScrollView>
     </BottomSheet>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -183,4 +178,4 @@ const styles = StyleSheet.create({
   cancel: {
     marginTop: 0,
   },
-});
+})

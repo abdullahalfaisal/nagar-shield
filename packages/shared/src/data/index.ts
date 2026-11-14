@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import stationsPayload from './stations.json';
-import hotlinesPayload from './hotlines.json';
+import { z } from 'zod'
+import stationsPayload from './stations.json'
+import hotlinesPayload from './hotlines.json'
 
 /**
  * The curated reference data.
@@ -25,7 +25,7 @@ export const stationEntrySchema = z.object({
   lng: z.number(),
   address: z.string().nullable(),
   isActive: z.boolean(),
-});
+})
 
 export const hotlineEntrySchema = z.object({
   id: z.string().min(1),
@@ -37,39 +37,39 @@ export const hotlineEntrySchema = z.object({
   sortOrder: z.number(),
   isActive: z.boolean(),
   lastVerifiedAt: z.string(),
-});
+})
 
-export type StationEntry = z.infer<typeof stationEntrySchema>;
-export type HotlineEntry = z.infer<typeof hotlineEntrySchema>;
+export type StationEntry = z.infer<typeof stationEntrySchema>
+export type HotlineEntry = z.infer<typeof hotlineEntrySchema>
 
 const stationsPayloadSchema = z.object({
   version: z.string(),
   lastVerifiedAt: z.string(),
   stations: z.array(stationEntrySchema),
-});
+})
 
 const hotlinesPayloadSchema = z.object({
   version: z.string(),
   lastVerifiedAt: z.string(),
   hotlines: z.array(hotlineEntrySchema),
-});
+})
 
 /**
  * The payload is validated at module load. A malformed dataset must fail the
  * build, not surface as a runtime error on a user's phone.
  */
-const parsedStations = stationsPayloadSchema.parse(stationsPayload);
-const parsedHotlines = hotlinesPayloadSchema.parse(hotlinesPayload);
+const parsedStations = stationsPayloadSchema.parse(stationsPayload)
+const parsedHotlines = hotlinesPayloadSchema.parse(hotlinesPayload)
 
-export const REFERENCE_DATA_VERSION = parsedStations.version;
+export const REFERENCE_DATA_VERSION = parsedStations.version
 
 export const STATIONS: readonly StationEntry[] = Object.freeze(
   parsedStations.stations.filter((station) => station.isActive),
-);
+)
 
 export const HOTLINES: readonly HotlineEntry[] = Object.freeze(
   [...parsedHotlines.hotlines].sort((a, b) => a.sortOrder - b.sortOrder),
-);
+)
 
 /**
  * The emergency numbers rendered on the Help Alert cards.
@@ -86,13 +86,13 @@ export const EMERGENCY_NUMBERS = {
   police: '999',
   medical: '999',
   fire: '102',
-} as const;
+} as const
 
 /**
  * The FR-SEEK-3 fallback: with no police station inside the radius the call
  * routes to 999.
  */
-export const SEEK_FALLBACK_NUMBER = '999';
+export const SEEK_FALLBACK_NUMBER = '999'
 
 /**
  * The prototype's More Help sheet — six rows, 1:1. The sheet is a flat list,
@@ -104,16 +104,16 @@ export const MORE_HELP_ROWS = [
   { id: 'hl-disaster', phone: '333' },
   { id: 'hl-ambulance', phone: '999' },
   { id: 'hl-electricity', phone: '16116' },
-] as const;
+] as const
 
 /** Looks a station up by its curated slug. */
 export function findStation(id: string): StationEntry | undefined {
-  return STATIONS.find((station) => station.id === id);
+  return STATIONS.find((station) => station.id === id)
 }
 
 /** Looks a hotline up by its curated slug. */
 export function findHotline(id: string): HotlineEntry | undefined {
-  return HOTLINES.find((hotline) => hotline.id === id);
+  return HOTLINES.find((hotline) => hotline.id === id)
 }
 
 /**
@@ -123,21 +123,14 @@ export function findHotline(id: string): HotlineEntry | undefined {
  * server-side by the `nearest_thana` RPC — this copy exists so the offline
  * path can rank stations without a network call.
  */
-export function distanceKm(
-  fromLat: number,
-  fromLng: number,
-  toLat: number,
-  toLng: number,
-): number {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-  const dLat = toRadians(toLat - fromLat);
-  const dLng = toRadians(toLng - fromLng);
+export function distanceKm(fromLat: number, fromLng: number, toLat: number, toLng: number): number {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180
+  const dLat = toRadians(toLat - fromLat)
+  const dLng = toRadians(toLng - fromLng)
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(fromLat)) *
-      Math.cos(toRadians(toLat)) *
-      Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 /** The active stations within `radiusKm` of a coordinate, nearest first. */
@@ -151,5 +144,5 @@ export function stationsWithin(
     distanceKm: distanceKm(lat, lng, station.lat, station.lng),
   }))
     .filter((station) => station.distanceKm <= radiusKm)
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+    .sort((a, b) => a.distanceKm - b.distanceKm)
 }

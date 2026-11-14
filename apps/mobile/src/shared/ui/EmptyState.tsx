@@ -1,13 +1,13 @@
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface EmptyStateProps {
-  icon: string;
-  title: string;
-  description?: string;
-  action?: { label: string; onPress: () => void };
-  style?: ViewStyle;
+  icon: string
+  title: string
+  description?: string
+  action?: { label: string; onPress: () => void }
+  style?: ViewStyle
 }
 
 /**
@@ -16,7 +16,7 @@ interface EmptyStateProps {
  * Emergency Contacts (no contacts saved).
  */
 export function EmptyState({ icon, title, description, action, style }: EmptyStateProps) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <View style={[styles.container, style]}>
       <View style={[styles.iconTile, { backgroundColor: theme.colors.ink[100] }]}>
@@ -62,7 +62,7 @@ export function EmptyState({ icon, title, description, action, style }: EmptySta
         </Text>
       ) : null}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -78,4 +78,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

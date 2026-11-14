@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { SEEK_FALLBACK_NUMBER } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Button, Icon, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui';
-import { useNearestThana } from '@/shared/api/stations';
-import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
-import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { SEEK_FALLBACK_NUMBER } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Button, Icon, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui'
+import { useNearestThana } from '@/shared/api/stations'
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
+import { resolveOrigin, useCurrentFix } from '@/shared/services/location'
 
 /**
  * The thana line.
@@ -30,42 +30,39 @@ import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
  *     app never ranks the dataset itself.
  */
 export default function ThanaLineScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
   // The fix is requested **just-in-time** — when the thana line opens. It is
   // never requested at app open and never on the panic path.
-  const { state } = useCurrentFix();
-  const { origin, isFallback } = useMemo(() => resolveOrigin(state), [state]);
+  const { state } = useCurrentFix()
+  const { origin, isFallback } = useMemo(() => resolveOrigin(state), [state])
 
-  const { data, isLoading, error } = useNearestThana(origin.lat, origin.lng, 10);
+  const { data, isLoading, error } = useNearestThana(origin.lat, origin.lng, 10)
 
-  const [reporting, setReporting] = useState(false);
+  const [reporting, setReporting] = useState(false)
 
   // The degraded-mode flow. The thana line's dial target is decided
   // server-side, but the dial itself is client-only and degrades the same
   // way every other help entry point does.
-  const degradedHelp = useDegradedHelp();
+  const degradedHelp = useDegradedHelp()
 
   // The RPC's answer, rendered as-is. `fallback` true means the rule fired
   // and the target is 999.
-  const fallback = data?.fallback ?? false;
-  const station = fallback || data === undefined ? null : data;
-  const target = station?.phone ?? SEEK_FALLBACK_NUMBER;
+  const fallback = data?.fallback ?? false
+  const station = fallback || data === undefined ? null : data
+  const target = station?.phone ?? SEEK_FALLBACK_NUMBER
 
   const stationName =
     station === null
       ? null
       : i18n.language === 'bn'
         ? (station.nameBn ?? station.name ?? '')
-        : (station.name ?? '');
+        : (station.name ?? '')
 
   return (
-    <Screen
-      title={t('help.thanaTitle')}
-      onBack={() => router.back()}
-    >
+    <Screen title={t('help.thanaTitle')} onBack={() => router.back()}>
       {isLoading ? (
         <View style={styles.block}>
           <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
@@ -124,17 +121,13 @@ export default function ThanaLineScreen() {
 
       {station && stationName ? (
         <View style={styles.block}>
-          <Text style={[styles.stationName, { color: theme.colors.ink[950] }]}>
-            {stationName}
-          </Text>
+          <Text style={[styles.stationName, { color: theme.colors.ink[950] }]}>{stationName}</Text>
           {station.distanceKm !== null ? (
             <Text style={[styles.distance, { color: theme.colors.ink[500] }]}>
               {t('help.thanaDistance', { distance: station.distanceKm })}
             </Text>
           ) : null}
-          <Text style={[styles.number, { color: theme.palette.violet[700] }]}>
-            {station.phone}
-          </Text>
+          <Text style={[styles.number, { color: theme.palette.violet[700] }]}>{station.phone}</Text>
         </View>
       ) : null}
 
@@ -147,13 +140,16 @@ export default function ThanaLineScreen() {
       <Button
         label={`${t('help.callNow')} · ${target}`}
         onPress={() => {
-          void degradedHelp.dial(target);
+          void degradedHelp.dial(target)
         }}
         style={styles.call}
         accessibilityLabel={
           stationName
             ? t('help.thanaCallLabel', { name: stationName })
-            : t('help.hotlineCallLabel', { name: SEEK_FALLBACK_NUMBER, number: SEEK_FALLBACK_NUMBER })
+            : t('help.hotlineCallLabel', {
+                name: SEEK_FALLBACK_NUMBER,
+                number: SEEK_FALLBACK_NUMBER,
+              })
         }
       />
 
@@ -191,7 +187,7 @@ export default function ThanaLineScreen() {
         entryName={stationName ?? undefined}
       />
     </Screen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -261,4 +257,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-});
+})

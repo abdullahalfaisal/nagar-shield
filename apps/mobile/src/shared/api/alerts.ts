@@ -2,17 +2,17 @@ import {
   useInfiniteQuery,
   type UseInfiniteQueryResult,
   type InfiniteData,
-} from '@tanstack/react-query';
-import { ALERTS_REFRESH_INTERVAL_MS } from '@nagar-shield/shared';
+} from '@tanstack/react-query'
+import { ALERTS_REFRESH_INTERVAL_MS } from '@nagar-shield/shared'
 import type {
   AreaFilter,
   AreaHierarchy,
   Paginated,
   PublicReport,
   ReportCategory,
-} from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+} from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The public Alerts feed.
@@ -26,7 +26,7 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * the projection level, not nulled.
  */
 export interface AlertsQuery extends AreaFilter {
-  limit?: number;
+  limit?: number
 }
 
 /**
@@ -37,33 +37,33 @@ export interface AlertsQuery extends AreaFilter {
  * key would make every page its own query, and the feed would reset to page
  * one on every request.
  */
-export type AlertsFilter = AreaFilter;
+export type AlertsFilter = AreaFilter
 
 /** The shape the RPC returns for one feed row. */
 interface FeedRow {
-  id: string;
-  category: ReportCategory | null;
-  description: string | null;
-  area_hierarchy: Partial<AreaHierarchy> | null;
-  captured_at: string;
-  author_display_name: string | null;
-  has_media: boolean;
-  media_count: number;
+  id: string
+  category: ReportCategory | null
+  description: string | null
+  area_hierarchy: Partial<AreaHierarchy> | null
+  captured_at: string
+  author_display_name: string | null
+  has_media: boolean
+  media_count: number
 }
 
 interface FeedEnvelope {
-  items: FeedRow[];
-  next_cursor: string | null;
+  items: FeedRow[]
+  next_cursor: string | null
 }
 
 function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | null {
-  if (!raw) return null;
+  if (!raw) return null
   return {
     division: raw.division ?? '',
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
-  };
+  }
 }
 
 function toPublicReport(row: FeedRow): PublicReport {
@@ -79,7 +79,7 @@ function toPublicReport(row: FeedRow): PublicReport {
     authorDisplayName: row.author_display_name ?? null,
     hasMedia: row.has_media,
     mediaCount: row.media_count,
-  };
+  }
 }
 
 export async function fetchAlerts(
@@ -93,18 +93,18 @@ export async function fetchAlerts(
     p_neighborhood: query.neighborhood ?? null,
     p_cursor: cursor,
     p_limit: query.limit ?? 20,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  const envelope = (data ?? { items: [], next_cursor: null }) as unknown as FeedEnvelope;
-  const items = (envelope.items ?? []).map(toPublicReport);
+  const envelope = (data ?? { items: [], next_cursor: null }) as unknown as FeedEnvelope
+  const items = (envelope.items ?? []).map(toPublicReport)
 
-  return { items, nextCursor: envelope.next_cursor ?? null };
+  return { items, nextCursor: envelope.next_cursor ?? null }
 }
 
 /** The accumulated feed: every page, in order, flattened. */
-export type AlertsFeedData = InfiniteData<Paginated<PublicReport>, string | null>;
+export type AlertsFeedData = InfiniteData<Paginated<PublicReport>, string | null>
 
 /**
  * The Alerts feed query.
@@ -133,7 +133,7 @@ export function useAlerts(
     // Auto-refresh every 60 s in the foreground (FR-ALERTS-2).
     refetchInterval: ALERTS_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
-  });
+  })
 }
 
 /**
@@ -144,6 +144,6 @@ export function useAlerts(
  * lives here and is the shape the screens consume.
  */
 export function alertsItems(data: AlertsFeedData | undefined): PublicReport[] {
-  if (!data) return [];
-  return data.pages.flatMap((page) => page.items);
+  if (!data) return []
+  return data.pages.flatMap((page) => page.items)
 }

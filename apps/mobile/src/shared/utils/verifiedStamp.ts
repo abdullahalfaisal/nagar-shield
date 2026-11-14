@@ -13,10 +13,10 @@
  */
 
 /** How long a verification stamp stays fresh — one quarter. */
-export const VERIFICATION_FRESH_DAYS = 92;
+export const VERIFICATION_FRESH_DAYS = 92
 
 /** The most recent verification stamp in the shipped dataset. */
-const REFERENCE_STAMP = '2026-10-15T00:00:00Z';
+const REFERENCE_STAMP = '2026-10-15T00:00:00Z'
 
 /**
  * Whether a stamp is due for re-verification.
@@ -37,13 +37,13 @@ export function isVerificationStale(
   lastVerifiedAt: string,
   referenceStamp: string = REFERENCE_STAMP,
 ): boolean {
-  const stamp = Date.parse(lastVerifiedAt);
-  const reference = Date.parse(referenceStamp);
+  const stamp = Date.parse(lastVerifiedAt)
+  const reference = Date.parse(referenceStamp)
 
-  if (Number.isNaN(stamp) || Number.isNaN(reference)) return false;
+  if (Number.isNaN(stamp) || Number.isNaN(reference)) return false
 
-  const ageDays = (reference - stamp) / (1000 * 60 * 60 * 24);
-  return ageDays > VERIFICATION_FRESH_DAYS;
+  const ageDays = (reference - stamp) / (1000 * 60 * 60 * 24)
+  return ageDays > VERIFICATION_FRESH_DAYS
 }
 
 /**
@@ -53,31 +53,28 @@ export function isVerificationStale(
  * interface, an English one otherwise. The year is included because a number
  * verified a year ago reads very differently from one verified last month.
  */
-export function formatVerifiedStamp(
-  lastVerifiedAt: string,
-  language: string,
-): string {
-  const parsed = Date.parse(lastVerifiedAt);
-  if (Number.isNaN(parsed)) return lastVerifiedAt;
+export function formatVerifiedStamp(lastVerifiedAt: string, language: string): string {
+  const parsed = Date.parse(lastVerifiedAt)
+  if (Number.isNaN(parsed)) return lastVerifiedAt
 
-  const date = new Date(parsed);
+  const date = new Date(parsed)
 
   if (language === 'bn') {
     return `${toBengaliDigits(date.getDate())}/${toBengaliDigits(
       date.getMonth() + 1,
-    )}/${toBengaliDigits(date.getFullYear())}`;
+    )}/${toBengaliDigits(date.getFullYear())}`
   }
 
-  const month = MONTH_NAMES[date.getMonth()];
-  return `${month} ${date.getFullYear()}`;
+  const month = MONTH_NAMES[date.getMonth()]
+  return `${month} ${date.getFullYear()}`
 }
 
 /** The Bangla digits, in order. */
-const BENGALI_DIGITS = '০১২৩৪৫৬৭৮৯';
+const BENGALI_DIGITS = '০১২৩৪৫৬৭৮৯'
 
 /** Rewrites a number's digits as Bangla numerals. */
 function toBengaliDigits(value: number): string {
-  return String(value).replace(/\d/g, (d) => BENGALI_DIGITS[Number(d)] ?? d);
+  return String(value).replace(/\d/g, (d) => BENGALI_DIGITS[Number(d)] ?? d)
 }
 
 /** The short English month names, spelled out so the format never depends on
@@ -95,4 +92,4 @@ const MONTH_NAMES = [
   'Oct',
   'Nov',
   'Dec',
-] as const;
+] as const

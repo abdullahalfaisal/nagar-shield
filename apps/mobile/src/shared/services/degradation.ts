@@ -1,4 +1,4 @@
-import * as Network from 'expo-network';
+import * as Network from 'expo-network'
 
 /**
  * The degraded-mode signals.
@@ -49,7 +49,7 @@ import * as Network from 'expo-network';
  * The type keeps `'available'` in the vocabulary on purpose — when the native
  * module lands, this becomes a real reading rather than a new concept.
  */
-export type PowerSaveCapability = 'available' | 'unavailable';
+export type PowerSaveCapability = 'available' | 'unavailable'
 
 /**
  * The power-save detection capability of **this** build.
@@ -58,7 +58,7 @@ export type PowerSaveCapability = 'available' | 'unavailable';
  * visible in one place and in one grep. A reviewer who wants to know whether
  * the battery warning is live reads this line.
  */
-export const BATTERY_SAVER_DETECTION: PowerSaveCapability = 'unavailable';
+export const BATTERY_SAVER_DETECTION: PowerSaveCapability = 'unavailable'
 
 /**
  * Whether power saving is on.
@@ -66,18 +66,18 @@ export const BATTERY_SAVER_DETECTION: PowerSaveCapability = 'unavailable';
  * `'unknown'` when the capability is unavailable or the read failed. The
  * warning renders on `'unknown'` too — see `powerSaveWarningIsUseful`.
  */
-export type PowerSaveState = 'on' | 'off' | 'unknown';
+export type PowerSaveState = 'on' | 'off' | 'unknown'
 
 /** The degraded-mode signals, as one snapshot. */
 export interface DegradedState {
   /** Whether the app can detect power-save mode on this build. */
-  powerSaveCapability: PowerSaveCapability;
+  powerSaveCapability: PowerSaveCapability
   /** Whether power saving is on. `'unknown'` when it cannot be read. */
-  powerSave: PowerSaveState;
+  powerSave: PowerSaveState
   /** Whether the device has a usable network connection. */
-  isOffline: boolean;
+  isOffline: boolean
   /** Whether the location permission is denied. */
-  isLocationDenied: boolean;
+  isLocationDenied: boolean
 }
 
 /**
@@ -94,7 +94,7 @@ export const UNKNOWN_DEGRADED_STATE: DegradedState = {
   powerSave: 'unknown',
   isOffline: false,
   isLocationDenied: false,
-};
+}
 
 /**
  * Whether the battery-saver warning should be shown at all.
@@ -109,7 +109,7 @@ export const UNKNOWN_DEGRADED_STATE: DegradedState = {
  * Then the warning would be noise.
  */
 export function powerSaveWarningIsUseful(state: DegradedState): boolean {
-  return state.powerSave !== 'off';
+  return state.powerSave !== 'off'
 }
 
 /**
@@ -130,8 +130,8 @@ export function powerSaveWarningIsUseful(state: DegradedState): boolean {
  * told the number to dial, which is the guidance the story names.
  */
 export function needsManualDialGuidance(state: DegradedState, dialerOpened: boolean): boolean {
-  if (!dialerOpened) return true;
-  return state.isOffline || powerSaveWarningIsUseful(state);
+  if (!dialerOpened) return true
+  return state.isOffline || powerSaveWarningIsUseful(state)
 }
 
 /**
@@ -143,10 +143,10 @@ export function needsManualDialGuidance(state: DegradedState, dialerOpened: bool
  * same would suppress a warning the user needs.
  */
 export async function readPowerSaveState(): Promise<PowerSaveState> {
-  if (BATTERY_SAVER_DETECTION !== 'available') return 'unknown';
+  if (BATTERY_SAVER_DETECTION !== 'available') return 'unknown'
   // The native module would be read here. Until it exists, the state is
   // unknown — and the code above has already said so.
-  return 'unknown';
+  return 'unknown'
 }
 
 /**
@@ -158,10 +158,10 @@ export async function readPowerSaveState(): Promise<PowerSaveState> {
  */
 export async function readIsOffline(): Promise<boolean> {
   try {
-    const state = await Network.getNetworkStateAsync();
-    return state?.isInternetReachable === false || state?.isConnected === false;
+    const state = await Network.getNetworkStateAsync()
+    return state?.isInternetReachable === false || state?.isConnected === false
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -173,13 +173,13 @@ export async function readIsOffline(): Promise<boolean> {
  * briefly show a warning it then had to take away.
  */
 export async function readDegradedState(): Promise<DegradedState> {
-  const [powerSave, isOffline] = await Promise.all([readPowerSaveState(), readIsOffline()]);
+  const [powerSave, isOffline] = await Promise.all([readPowerSaveState(), readIsOffline()])
   return {
     powerSaveCapability: BATTERY_SAVER_DETECTION,
     powerSave,
     isOffline,
     isLocationDenied: false,
-  };
+  }
 }
 
 /**
@@ -191,14 +191,14 @@ export async function readDegradedState(): Promise<DegradedState> {
  * digits to press.
  */
 export function manualDialGuidance(number: string): {
-  ascii: string;
-  bengali: string;
-  combined: string;
+  ascii: string
+  bengali: string
+  combined: string
 } {
-  const ascii = number.replace(/[^\d+]/g, '');
+  const ascii = number.replace(/[^\d+]/g, '')
   const bengali = ascii.replace(/[0-9]/g, (digit) => {
-    const bengaliDigits = '০১২৩৪৫৬৭৮৯';
-    return bengaliDigits[Number(digit)] ?? digit;
-  });
-  return { ascii, bengali, combined: `${bengali} · ${ascii}` };
+    const bengaliDigits = '০১২৩৪৫৬৭৮৯'
+    return bengaliDigits[Number(digit)] ?? digit
+  })
+  return { ascii, bengali, combined: `${bengali} · ${ascii}` }
 }

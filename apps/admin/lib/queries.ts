@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import {
   useInfiniteQuery,
@@ -9,7 +9,7 @@ import {
   type UseInfiniteQueryResult,
   type UseMutationResult,
   type UseQueryResult,
-} from '@tanstack/react-query';
+} from '@tanstack/react-query'
 import {
   disableAccount,
   fetchAuditTrail,
@@ -23,8 +23,8 @@ import {
   type AuditPage,
   type QueuePage,
   type ReportDetail,
-} from '@/lib/api';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
+} from '@/lib/api'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
 
 /**
  * The console's query layer.
@@ -61,22 +61,22 @@ import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
 // -----------------------------------------------------------------------------
 
 /** The shared root of every console query. */
-export const ADMIN_QUERY_ROOT = ['admin'] as const;
+export const ADMIN_QUERY_ROOT = ['admin'] as const
 
 /** The moderation queue. Carries no group — the group is a client-side slice. */
-export const QUEUE_QUERY_KEY = ['admin', 'queue'] as const;
+export const QUEUE_QUERY_KEY = ['admin', 'queue'] as const
 
 /** The report review detail. The report id is the last segment. */
-export const REPORT_DETAIL_QUERY_KEY = ['admin', 'report-detail'] as const;
+export const REPORT_DETAIL_QUERY_KEY = ['admin', 'report-detail'] as const
 
 /** The append-only audit trail. The decision filter is the last segment. */
-export const AUDIT_QUERY_KEY = ['admin', 'audit'] as const;
+export const AUDIT_QUERY_KEY = ['admin', 'audit'] as const
 
 /** The account lookup. */
-export const USERS_QUERY_KEY = ['admin', 'users'] as const;
+export const USERS_QUERY_KEY = ['admin', 'users'] as const
 
 /** The page size for both cursor-paginated feeds. */
-export const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20
 
 // -----------------------------------------------------------------------------
 // The reads
@@ -110,16 +110,16 @@ export function useModerationQueue(): UseInfiniteQueryResult<
         return await fetchModerationQueue(getBrowserClient(), {
           cursor: pageParam,
           limit: PAGE_SIZE,
-        });
+        })
       } catch (caught) {
         // `getBrowserClient` throws a plain Error when the env vars are
         // missing, so every throw is normalised to an AppError here and the
         // screen can switch on a stable code.
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-  });
+  })
 }
 
 /**
@@ -133,13 +133,13 @@ export function useReportDetail(reportId: string | undefined): UseQueryResult<Re
     queryKey: [...REPORT_DETAIL_QUERY_KEY, reportId],
     queryFn: async () => {
       try {
-        return await fetchReportDetail(getBrowserClient(), reportId as string);
+        return await fetchReportDetail(getBrowserClient(), reportId as string)
       } catch (caught) {
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     enabled: Boolean(reportId),
-  });
+  })
 }
 
 /**
@@ -164,13 +164,13 @@ export function useAuditTrail(
           cursor: pageParam,
           limit: PAGE_SIZE,
           decision: filter === 'all' ? null : filter,
-        });
+        })
       } catch (caught) {
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-  });
+  })
 }
 
 /**
@@ -187,13 +187,13 @@ export function useAccountSearch(query: string): UseQueryResult<AccountRow[], Er
     queryKey: [...USERS_QUERY_KEY, query],
     queryFn: async () => {
       try {
-        return await searchAccounts(getBrowserClient(), query);
+        return await searchAccounts(getBrowserClient(), query)
       } catch (caught) {
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     enabled: false,
-  });
+  })
 }
 
 // -----------------------------------------------------------------------------
@@ -215,24 +215,24 @@ export function useSubmitDecision(): UseMutationResult<
   Error,
   { reportId: string; decision: 'restore' | 'remove'; note: string }
 > {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (input) => {
       try {
-        await submitDecision(getBrowserClient(), input);
+        await submitDecision(getBrowserClient(), input)
       } catch (caught) {
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     onSuccess: async (_result, variables) => {
-      await queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY })
       await queryClient.invalidateQueries({
         queryKey: [...REPORT_DETAIL_QUERY_KEY, variables.reportId],
-      });
-      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY });
+      })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
     },
-  });
+  })
 }
 
 /**
@@ -246,21 +246,21 @@ export function useDisableAccount(): UseMutationResult<
   Error,
   { userId: string; note: string }
 > {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (input) => {
       try {
-        await disableAccount(getBrowserClient(), input);
+        await disableAccount(getBrowserClient(), input)
       } catch (caught) {
-        throw toAppError(caught);
+        throw toAppError(caught)
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
-      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
     },
-  });
+  })
 }
 
 // -----------------------------------------------------------------------------
@@ -275,21 +275,21 @@ export function useDisableAccount(): UseMutationResult<
  * moderator is looking. Every other code goes to the banner.
  */
 export function decisionErrorMessage(code: string): string {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
   switch (code) {
     case 'VALIDATION_FAILED':
-      return copy.decisionNoteRequired;
+      return copy.decisionNoteRequired
     case 'FORBIDDEN':
-      return copy.errorForbidden;
+      return copy.errorForbidden
     case 'CONFLICT':
-      return copy.errorConflict;
+      return copy.errorConflict
     case 'AUTH_DISABLED':
-      return copy.errorForbidden;
+      return copy.errorForbidden
     case 'AUTH_REQUIRED':
-      return copy.errorAuthRequired;
+      return copy.errorAuthRequired
     default:
-      return copy.errorGeneric;
+      return copy.errorGeneric
   }
 }
 
@@ -304,20 +304,20 @@ export function decisionErrorMessage(code: string): string {
  * submit button.
  */
 export function disableErrorMessage(code: string): string {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
   switch (code) {
     case 'VALIDATION_FAILED':
-      return copy.decisionNoteRequired;
+      return copy.decisionNoteRequired
     case 'FORBIDDEN':
-      return copy.usersDisableForbidden;
+      return copy.usersDisableForbidden
     case 'CONFLICT':
-      return copy.errorConflict;
+      return copy.errorConflict
     case 'AUTH_DISABLED':
-      return copy.errorForbidden;
+      return copy.errorForbidden
     case 'AUTH_REQUIRED':
-      return copy.errorAuthRequired;
+      return copy.errorAuthRequired
     default:
-      return copy.errorGeneric;
+      return copy.errorGeneric
   }
 }

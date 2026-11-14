@@ -23,19 +23,19 @@
 // is hoisted above a `jest.mock` that appears later in the file, so the
 // module under test would be bound to the real implementation and the mock
 // would never be applied — silently, with no error.
-const mockReplace = jest.fn();
+const mockReplace = jest.fn()
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
-}));
+}))
 
 jest.mock('@/lib/supabase/client', () => ({
   getBrowserClient: () => currentClient,
-}));
+}))
 
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import LoginPage from '@/app/login/page';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import LoginPage from '@/app/login/page'
 
 /**
  * The Supabase client's surface the login page uses.
@@ -45,16 +45,16 @@ import LoginPage from '@/app/login/page';
  */
 interface FakeClient {
   auth: {
-    signInWithPassword: jest.Mock;
-    getSession: jest.Mock;
-    signOut: jest.Mock;
-  };
-  from: jest.Mock;
+    signInWithPassword: jest.Mock
+    getSession: jest.Mock
+    signOut: jest.Mock
+  }
+  from: jest.Mock
 }
 
 function fakeClient(options: {
-  role: 'citizen' | 'moderator' | null;
-  signInError?: { message: string } | null;
+  role: 'citizen' | 'moderator' | null
+  signInError?: { message: string } | null
 }): FakeClient {
   const client: FakeClient = {
     auth: {
@@ -80,121 +80,121 @@ function fakeClient(options: {
         }),
       }),
     }),
-  };
+  }
 
-  return client;
+  return client
 }
 
-let currentClient: FakeClient = fakeClient({ role: 'citizen' });
+let currentClient: FakeClient = fakeClient({ role: 'citizen' })
 
-const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
 /** Fills in the sign-in form and submits it. */
 async function signIn(email = 'citizen@example.com', password = 'a-password') {
-  fireEvent.change(screen.getByLabelText(copy.loginEmail), { target: { value: email } });
-  fireEvent.change(screen.getByLabelText(copy.loginPassword), { target: { value: password } });
+  fireEvent.change(screen.getByLabelText(copy.loginEmail), { target: { value: email } })
+  fireEvent.change(screen.getByLabelText(copy.loginPassword), { target: { value: password } })
 
   // The submit handler is async — it awaits the sign-in, the session and the
   // profile before it settles. `act` lets React flush the state updates that
   // follow, so the assertions below see the settled screen rather than a
   // half-rendered one.
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: copy.loginSubmit }));
-  });
+    fireEvent.click(screen.getByRole('button', { name: copy.loginSubmit }))
+  })
 }
 
 beforeEach(() => {
-  jest.clearAllMocks();
-  currentClient = fakeClient({ role: 'citizen' });
-});
+  jest.clearAllMocks()
+  currentClient = fakeClient({ role: 'citizen' })
+})
 
 describe('the sign-in refuses a citizen the console', () => {
   it('shows the access-only state to a signed-in citizen', async () => {
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    expect(await screen.findByText(copy.accessOnlyTitle)).toBeInTheDocument();
-    expect(screen.getByText(copy.accessOnlyBody)).toBeInTheDocument();
-  });
+    expect(await screen.findByText(copy.accessOnlyTitle)).toBeInTheDocument()
+    expect(screen.getByText(copy.accessOnlyBody)).toBeInTheDocument()
+  })
 
   it('does not route the citizen to the console', async () => {
     // The route is the trap: a citizen landed on `/queue` sees a generic
     // `FORBIDDEN` banner, which describes a permission failure rather than
     // the truth — the account signed in fine and simply has no moderation
     // role.
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    await screen.findByText(copy.accessOnlyTitle);
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
+    await screen.findByText(copy.accessOnlyTitle)
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
 
   it('does not claim the sign-in failed', async () => {
     // The sign-in **succeeded**. The access-only state is not an error, so
     // the danger banner must not be on screen.
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    await screen.findByText(copy.accessOnlyTitle);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
+    await screen.findByText(copy.accessOnlyTitle)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 
   it('treats a profile with no role as no access', async () => {
     // A `profiles` row that is missing entirely is the same case: signed in,
     // no moderation role.
-    currentClient = fakeClient({ role: null });
+    currentClient = fakeClient({ role: null })
 
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    expect(await screen.findByText(copy.accessOnlyTitle)).toBeInTheDocument();
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-});
+    expect(await screen.findByText(copy.accessOnlyTitle)).toBeInTheDocument()
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
+})
 
 describe('the sign-in lets a moderator through', () => {
   it('routes a moderator to the queue', async () => {
-    currentClient = fakeClient({ role: 'moderator' });
+    currentClient = fakeClient({ role: 'moderator' })
 
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/queue'));
-    expect(screen.queryByText(copy.accessOnlyTitle)).not.toBeInTheDocument();
-  });
-});
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/queue'))
+    expect(screen.queryByText(copy.accessOnlyTitle)).not.toBeInTheDocument()
+  })
+})
 
 describe('the sign-in refuses bad credentials', () => {
   it('shows the sign-in error when the password is wrong', async () => {
-    currentClient = fakeClient({ role: 'citizen', signInError: { message: 'Invalid login' } });
+    currentClient = fakeClient({ role: 'citizen', signInError: { message: 'Invalid login' } })
 
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    expect(await screen.findByText(copy.errorAuthRequired)).toBeInTheDocument();
+    expect(await screen.findByText(copy.errorAuthRequired)).toBeInTheDocument()
     // A failed sign-in is not the access-only state — the account never got
     // in.
-    expect(screen.queryByText(copy.accessOnlyTitle)).not.toBeInTheDocument();
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
+    expect(screen.queryByText(copy.accessOnlyTitle)).not.toBeInTheDocument()
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
 
   it('never shows the raw driver message', async () => {
     currentClient = fakeClient({
       role: 'citizen',
       signInError: { message: 'Invalid login credentials for user x@y.com' },
-    });
+    })
 
-    render(<LoginPage />);
+    render(<LoginPage />)
 
-    await signIn();
+    await signIn()
 
-    expect(await screen.findByText(copy.errorAuthRequired)).toBeInTheDocument();
-    expect(screen.queryByText(/Invalid login credentials/)).not.toBeInTheDocument();
-  });
-});
+    expect(await screen.findByText(copy.errorAuthRequired)).toBeInTheDocument()
+    expect(screen.queryByText(/Invalid login credentials/)).not.toBeInTheDocument()
+  })
+})

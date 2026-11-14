@@ -15,11 +15,11 @@ export const FLAG_REASONS = [
   'duplicate',
   'off_topic',
   'other',
-] as const;
+] as const
 
-export type FlagReason = (typeof FLAG_REASONS)[number];
+export type FlagReason = (typeof FLAG_REASONS)[number]
 
-export const FLAG_REASON_SET: ReadonlySet<string> = new Set(FLAG_REASONS);
+export const FLAG_REASON_SET: ReadonlySet<string> = new Set(FLAG_REASONS)
 
 export const FLAG_REASON_LABELS: Record<FlagReason, { en: string; bn: string }> = {
   misinformation: { en: 'Misinformation', bn: 'ভুল তথ্য' },
@@ -27,4 +27,4 @@ export const FLAG_REASON_LABELS: Record<FlagReason, { en: string; bn: string }> 
   duplicate: { en: 'Duplicate', bn: 'ডুপ্লিকেট' },
   off_topic: { en: 'Off topic', bn: 'অপ্রাসঙ্গিক' },
   other: { en: 'Other', bn: 'অন্যান্য' },
-};
+}

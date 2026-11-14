@@ -3,7 +3,7 @@ import {
   MEDIA_MAX_FILE_BYTES,
   MEDIA_MAX_VIDEO_SECONDS,
   type MediaType,
-} from '@nagar-shield/shared';
+} from '@nagar-shield/shared'
 
 /**
  * The media pipeline — the device side of the capture write path.
@@ -22,31 +22,31 @@ import {
 
 export interface PreparedMedia {
   /** The local file URI of the sanitised asset. */
-  uri: string;
-  mediaType: MediaType;
-  byteSize: number;
-  durationSeconds: number | null;
-  width: number | null;
-  height: number | null;
+  uri: string
+  mediaType: MediaType
+  byteSize: number
+  durationSeconds: number | null
+  width: number | null
+  height: number | null
   /** The MIME type sent with the upload. */
-  contentType: string;
+  contentType: string
   /** The file extension used in the storage path. */
-  extension: string;
+  extension: string
 }
 
 /** The MIME types the file entry point accepts. */
-export const ALLOWED_FILE_TYPES = ['application/pdf', 'application/msword'] as const;
+export const ALLOWED_FILE_TYPES = ['application/pdf', 'application/msword'] as const
 
 /** The MIME types the photo / video entry points accept. */
-export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'] as const;
-export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/3gpp'] as const;
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'] as const
+export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/3gpp'] as const
 
 /** The caps, re-exported so the UI and the pipeline agree on one source. */
 export const MEDIA_CAPS = {
   maxDimension: MEDIA_MAX_DIMENSION,
   maxVideoSeconds: MEDIA_MAX_VIDEO_SECONDS,
   maxFileBytes: MEDIA_MAX_FILE_BYTES,
-} as const;
+} as const
 
 /**
  * The 1080p resize.
@@ -60,21 +60,21 @@ export function resizeTarget(
   maxDimension: number = MEDIA_MAX_DIMENSION,
 ): { width: number; height: number } {
   if (width <= 0 || height <= 0) {
-    return { width: maxDimension, height: maxDimension };
+    return { width: maxDimension, height: maxDimension }
   }
 
-  const longestEdge = Math.max(width, height);
+  const longestEdge = Math.max(width, height)
 
   if (longestEdge <= maxDimension) {
-    return { width, height };
+    return { width, height }
   }
 
-  const scale = maxDimension / longestEdge;
+  const scale = maxDimension / longestEdge
 
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
-  };
+  }
 }
 
 /**
@@ -84,54 +84,54 @@ export function resizeTarget(
  * whether the asset has to be trimmed before the upload.
  */
 export function exceedsVideoCap(durationSeconds: number | null): boolean {
-  if (durationSeconds === null) return false;
-  return durationSeconds > MEDIA_MAX_VIDEO_SECONDS;
+  if (durationSeconds === null) return false
+  return durationSeconds > MEDIA_MAX_VIDEO_SECONDS
 }
 
 /** Whether a file is within the 10 MB cap. */
 export function exceedsFileCap(byteSize: number): boolean {
-  return byteSize > MEDIA_MAX_FILE_BYTES;
+  return byteSize > MEDIA_MAX_FILE_BYTES
 }
 
 /** Whether a MIME type may be uploaded as a document. */
 export function isAllowedFileType(contentType: string | null): boolean {
-  if (!contentType) return false;
-  return (ALLOWED_FILE_TYPES as readonly string[]).includes(contentType);
+  if (!contentType) return false
+  return (ALLOWED_FILE_TYPES as readonly string[]).includes(contentType)
 }
 
 /** Whether a MIME type may be uploaded as a photo. */
 export function isAllowedImageType(contentType: string | null): boolean {
-  if (!contentType) return false;
-  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(contentType);
+  if (!contentType) return false
+  return (ALLOWED_IMAGE_TYPES as readonly string[]).includes(contentType)
 }
 
 /** Whether a MIME type may be uploaded as a video. */
 export function isAllowedVideoType(contentType: string | null): boolean {
-  if (!contentType) return false;
-  return (ALLOWED_VIDEO_TYPES as readonly string[]).includes(contentType);
+  if (!contentType) return false
+  return (ALLOWED_VIDEO_TYPES as readonly string[]).includes(contentType)
 }
 
 /** The storage file extension for a MIME type. */
 export function extensionFor(contentType: string | null, mediaType: MediaType): string {
   switch (contentType) {
     case 'application/pdf':
-      return 'pdf';
+      return 'pdf'
     case 'application/msword':
-      return 'doc';
+      return 'doc'
     case 'image/png':
-      return 'png';
+      return 'png'
     case 'image/heic':
-      return 'heic';
+      return 'heic'
     case 'image/webp':
-      return 'webp';
+      return 'webp'
     case 'video/quicktime':
-      return 'mov';
+      return 'mov'
     case 'video/3gpp':
-      return '3gp';
+      return '3gp'
     case 'video/mp4':
-      return 'mp4';
+      return 'mp4'
     default:
-      return mediaType === 'photo' ? 'jpg' : mediaType === 'video' ? 'mp4' : 'bin';
+      return mediaType === 'photo' ? 'jpg' : mediaType === 'video' ? 'mp4' : 'bin'
   }
 }
 
@@ -159,13 +159,13 @@ export function extensionFor(contentType: string | null, mediaType: MediaType): 
  * token to recover the id.
  */
 export function buildStoragePath(input: {
-  authorId: string;
-  clientRequestId: string;
-  fileName: string;
+  authorId: string
+  clientRequestId: string
+  fileName: string
   /** The hash of the uploader's id — the second path segment. */
-  authorToken: string;
+  authorToken: string
 }): string {
-  return `reports/${input.authorToken}/${input.clientRequestId}/${input.fileName}`;
+  return `reports/${input.authorToken}/${input.clientRequestId}/${input.fileName}`
 }
 
 /**
@@ -177,13 +177,16 @@ export function buildStoragePath(input: {
 export function newClientRequestId(): string {
   // `crypto.randomUUID` is available in Hermes via `expo-crypto`'s polyfill
   // and in every test environment Node runs.
-  const cryptoRef = globalThis.crypto as Crypto | undefined;
+  const cryptoRef = globalThis.crypto as Crypto | undefined
 
   if (cryptoRef && typeof cryptoRef.randomUUID === 'function') {
-    return cryptoRef.randomUUID();
+    return cryptoRef.randomUUID()
   }
 
   // A deterministic fallback — four random 32-bit blocks formatted as a uuid.
-  const hex = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0');
-  return `${hex()}-${hex().slice(0, 4)}-4${hex().slice(1, 4)}-a${hex().slice(1, 4)}-${hex()}${hex().slice(0, 4)}`;
+  const hex = () =>
+    Math.floor(Math.random() * 0x100000000)
+      .toString(16)
+      .padStart(8, '0')
+  return `${hex()}-${hex().slice(0, 4)}-4${hex().slice(1, 4)}-a${hex().slice(1, 4)}-${hex()}${hex().slice(0, 4)}`
 }

@@ -1,17 +1,17 @@
-import { type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { type ReactNode } from 'react'
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface BottomSheetProps {
-  visible: boolean;
-  title?: string;
-  helper?: string;
-  onClose: () => void;
-  children: ReactNode;
+  visible: boolean
+  title?: string
+  helper?: string
+  onClose: () => void
+  children: ReactNode
   /** Replaces the default close icon in the header. */
-  hideHeader?: boolean;
+  hideHeader?: boolean
 }
 
 /**
@@ -30,8 +30,8 @@ export function BottomSheet({
   children,
   hideHeader = false,
 }: BottomSheetProps) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
+  const theme = useTheme()
+  const insets = useSafeAreaInsets()
 
   return (
     <Modal
@@ -86,7 +86,7 @@ export function BottomSheet({
         </View>
       </View>
     </Modal>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -137,4 +137,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

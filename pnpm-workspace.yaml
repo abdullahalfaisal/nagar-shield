@@ -1,4 +1,12 @@
+# The workspace globs.
+#
+# The globs — not an explicit list — are what pick up a new workspace folder
+# with no manifest edit. The story's edge-case table says so directly: "A new
+# workspace is added under `apps/` or `packages/` → the `pnpm-workspace.yaml`
+# glob picks it up with no manifest edit."
+#
+# The root `package.json` also lists the three workspaces, because `pnpm -r`
+# reads the `workspaces` field rather than this file for its own recursion.
 packages:
-  - 'apps/mobile'
-  - 'apps/admin'
-  - 'packages/shared'
+  - 'apps/*'
+  - 'packages/*'

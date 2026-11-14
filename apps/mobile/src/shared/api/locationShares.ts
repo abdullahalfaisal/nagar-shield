@@ -1,6 +1,6 @@
-import { AppError } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { AppError } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The `location_shares` write path.
@@ -33,7 +33,7 @@ import { fromSupabaseError } from '@/shared/api/errors';
  */
 
 /** The channel a snapshot went out over. */
-export type LocationShareChannel = 'app' | 'os_share_sheet';
+export type LocationShareChannel = 'app' | 'os_share_sheet'
 
 /**
  * The position of a snapshot.
@@ -43,22 +43,22 @@ export type LocationShareChannel = 'app' | 'os_share_sheet';
  * the database refuses a half-written pair.
  */
 export interface SharePosition {
-  lat: number | null;
-  lng: number | null;
+  lat: number | null
+  lng: number | null
   /** The fix accuracy in metres, or `null` when there is no honest accuracy. */
-  accuracyM: number | null;
+  accuracyM: number | null
 }
 
 /** A row that has been written. */
 export interface LocationShareRow {
-  id: string;
-  recipientContactId: string | null;
-  lat: number | null;
-  lng: number | null;
-  accuracyM: number | null;
-  mode: 'snapshot';
-  shareChannel: LocationShareChannel;
-  sharedAt: string;
+  id: string
+  recipientContactId: string | null
+  lat: number | null
+  lng: number | null
+  accuracyM: number | null
+  mode: 'snapshot'
+  shareChannel: LocationShareChannel
+  sharedAt: string
 }
 
 function toRow(row: Record<string, unknown>): LocationShareRow {
@@ -71,7 +71,7 @@ function toRow(row: Record<string, unknown>): LocationShareRow {
     mode: 'snapshot',
     shareChannel: row.share_channel as LocationShareChannel,
     sharedAt: row.shared_at as string,
-  };
+  }
 }
 
 /**
@@ -89,29 +89,29 @@ function toRow(row: Record<string, unknown>): LocationShareRow {
  */
 export async function writeLocationShare(input: {
   /** The recipient's contact id, or `null` for an OS share-sheet recipient. */
-  recipientContactId: string | null;
+  recipientContactId: string | null
   /** The position, or a null position for a share without a location. */
-  position: SharePosition;
+  position: SharePosition
   /** Which channel was used. */
-  channel: LocationShareChannel;
+  channel: LocationShareChannel
 }): Promise<LocationShareRow> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user.id;
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user.id
 
   // The INSERT policy's `WITH CHECK` scopes the row to `auth.uid()`, and
   // `sender_id` is NOT NULL, so an anonymous write cannot land. The check
   // here turns that into a typed error rather than a raw database one.
   if (!userId) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
   // A half-written pair is refused by the database's CHECK, but the client
   // refuses it first — with a clear error rather than a constraint name.
-  const hasLat = input.position.lat !== null;
-  const hasLng = input.position.lng !== null;
+  const hasLat = input.position.lat !== null
+  const hasLng = input.position.lng !== null
 
   if (hasLat !== hasLng) {
-    throw new AppError('VALIDATION_FAILED', { field: 'lat' });
+    throw new AppError('VALIDATION_FAILED', { field: 'lat' })
   }
 
   const { data, error } = await supabase
@@ -130,11 +130,11 @@ export async function writeLocationShare(input: {
       share_channel: input.channel,
     })
     .select('*')
-    .single();
+    .single()
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  return toRow(data as Record<string, unknown>);
+  return toRow(data as Record<string, unknown>)
 }
 
 /**
@@ -151,12 +151,12 @@ export async function writeLocationShare(input: {
  */
 export async function writeLocationSharesForAppRecipients(input: {
   /** The recipient contact ids, one row each. */
-  recipientContactIds: string[];
+  recipientContactIds: string[]
   /** The position, shared by every recipient. */
-  position: SharePosition;
+  position: SharePosition
 }): Promise<{ written: LocationShareRow[]; failed: { contactId: string; error: AppError }[] }> {
-  const written: LocationShareRow[] = [];
-  const failed: { contactId: string; error: AppError }[] = [];
+  const written: LocationShareRow[] = []
+  const failed: { contactId: string; error: AppError }[] = []
 
   for (const contactId of input.recipientContactIds) {
     try {
@@ -164,17 +164,17 @@ export async function writeLocationSharesForAppRecipients(input: {
         recipientContactId: contactId,
         position: input.position,
         channel: 'app',
-      });
-      written.push(row);
+      })
+      written.push(row)
     } catch (error) {
       failed.push({
         contactId,
         error: error instanceof AppError ? error : new AppError('INTERNAL'),
-      });
+      })
     }
   }
 
-  return { written, failed };
+  return { written, failed }
 }
 
 /**
@@ -192,17 +192,17 @@ export async function writeLocationSharesForAppRecipients(input: {
  * "no confirmed app users", and every recipient goes down the OS path.
  */
 export async function resolveAppUserContactIds(contactIds: string[]): Promise<string[]> {
-  if (contactIds.length === 0) return [];
+  if (contactIds.length === 0) return []
 
   try {
     const { data, error } = await supabase.rpc('resolve_app_contacts', {
       p_contact_ids: contactIds,
-    });
+    })
 
-    if (error) return [];
+    if (error) return []
 
-    return (data ?? []) as string[];
+    return (data ?? []) as string[]
   } catch {
-    return [];
+    return []
   }
 }

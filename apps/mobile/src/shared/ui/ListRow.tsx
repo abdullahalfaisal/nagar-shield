@@ -1,23 +1,23 @@
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
-export type IconTone = 'purple' | 'red' | 'green' | 'amber' | 'sky' | 'gray';
+export type IconTone = 'purple' | 'red' | 'green' | 'amber' | 'sky' | 'gray'
 
 interface ListRowProps {
-  title: string;
-  subtitle?: string;
-  icon?: string;
-  tone?: IconTone;
-  onPress?: () => void;
+  title: string
+  subtitle?: string
+  icon?: string
+  tone?: IconTone
+  onPress?: () => void
   /** Trailing badge, e.g. the unread count on More Options. */
-  badge?: { text: string; background: string; color: string };
+  badge?: { text: string; background: string; color: string }
   /** Shows the `arrow_forward_ios` chevron. */
-  showArrow?: boolean;
+  showArrow?: boolean
   /** Custom trailing slot — a toggle, a switch, a badge. */
-  trailing?: React.ReactNode;
-  style?: ViewStyle;
-  accessibilityLabel?: string;
+  trailing?: React.ReactNode
+  style?: ViewStyle
+  accessibilityLabel?: string
 }
 
 /**
@@ -36,7 +36,7 @@ export function ListRow({
   style,
   accessibilityLabel,
 }: ListRowProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   const content = (
     <>
@@ -62,7 +62,11 @@ export function ListRow({
         {subtitle ? (
           <Text
             numberOfLines={1}
-            style={{ color: theme.colors.ink[500], fontSize: theme.typography.size.md, marginTop: 1 }}
+            style={{
+              color: theme.colors.ink[500],
+              fontSize: theme.typography.size.md,
+              marginTop: 1,
+            }}
           >
             {subtitle}
           </Text>
@@ -77,7 +81,9 @@ export function ListRow({
             paddingVertical: 2,
           }}
         >
-          <Text style={{ color: badge.color, fontSize: 11, fontWeight: theme.typography.weight.bold }}>
+          <Text
+            style={{ color: badge.color, fontSize: 11, fontWeight: theme.typography.weight.bold }}
+          >
             {badge.text}
           </Text>
         </View>
@@ -85,10 +91,10 @@ export function ListRow({
       {trailing}
       {showArrow ? <Icon name="arrow_forward_ios" size={18} color={theme.colors.ink[400]} /> : null}
     </>
-  );
+  )
 
   if (!onPress) {
-    return <View style={[styles.row, style]}>{content}</View>;
+    return <View style={[styles.row, style]}>{content}</View>
   }
 
   return (
@@ -96,44 +102,48 @@ export function ListRow({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.palette.violet[25] }, style]}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && { backgroundColor: theme.palette.violet[25] },
+        style,
+      ]}
     >
       {content}
     </Pressable>
-  );
+  )
 }
 
 function toneBg(tone: IconTone, theme: ReturnType<typeof useTheme>): string {
   switch (tone) {
     case 'purple':
-      return theme.palette.violet[100];
+      return theme.palette.violet[100]
     case 'red':
-      return theme.palette.red[100];
+      return theme.palette.red[100]
     case 'green':
-      return theme.palette.green[100];
+      return theme.palette.green[100]
     case 'amber':
-      return theme.palette.amber[100];
+      return theme.palette.amber[100]
     case 'sky':
-      return theme.palette.sky[100];
+      return theme.palette.sky[100]
     default:
-      return theme.colors.ink[100];
+      return theme.colors.ink[100]
   }
 }
 
 function toneFg(tone: IconTone, theme: ReturnType<typeof useTheme>): string {
   switch (tone) {
     case 'purple':
-      return theme.palette.violet[700];
+      return theme.palette.violet[700]
     case 'red':
-      return theme.palette.red[600];
+      return theme.palette.red[600]
     case 'green':
-      return theme.palette.green[700];
+      return theme.palette.green[700]
     case 'amber':
-      return theme.palette.amber[600];
+      return theme.palette.amber[600]
     case 'sky':
-      return theme.palette.sky[600];
+      return theme.palette.sky[600]
     default:
-      return theme.colors.ink[700];
+      return theme.colors.ink[700]
   }
 }
 
@@ -160,4 +170,4 @@ const styles = StyleSheet.create({
   title: {
     letterSpacing: -0.01,
   },
-});
+})

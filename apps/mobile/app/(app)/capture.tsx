@@ -1,23 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { CAPTURE_DESCRIPTION_MAX_LENGTH } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { BottomSheet, Button, Icon, StatusBanner, Toggle } from '@/shared/ui';
-import { useCurrentFix } from '@/shared/services/location';
-import { useReverseGeocode, formatAddressLine } from '@/shared/api/geocode';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { CAPTURE_DESCRIPTION_MAX_LENGTH } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { BottomSheet, Button, Icon, StatusBanner, Toggle } from '@/shared/ui'
+import { useCurrentFix } from '@/shared/services/location'
+import { useReverseGeocode, formatAddressLine } from '@/shared/api/geocode'
 import {
   capturePhoto,
   captureVideo,
   pickDocument,
   pickFromGallery,
-} from '@/shared/services/mediaSources';
-import { preparePickedMedia, useCaptureSubmit, type MediaKind } from '@/shared/services/captureFlow';
-import { useQueueDrain } from '@/shared/services/useQueueDrain';
-import { usePermissions } from '@/shared/services/usePermissions';
-import type { PreparedMedia } from '@/shared/services/mediaPipeline';
-import { toBengaliDigits } from '@/shared/utils/relativeTime';
+} from '@/shared/services/mediaSources'
+import { preparePickedMedia, useCaptureSubmit, type MediaKind } from '@/shared/services/captureFlow'
+import { useQueueDrain } from '@/shared/services/useQueueDrain'
+import { usePermissions } from '@/shared/services/usePermissions'
+import type { PreparedMedia } from '@/shared/services/mediaPipeline'
+import { toBengaliDigits } from '@/shared/utils/relativeTime'
 
 /**
  * Screen 17 — Capture (Report Crime).
@@ -50,71 +50,72 @@ import { toBengaliDigits } from '@/shared/utils/relativeTime';
  *     citizen's evidence is not acceptable.
  */
 export default function CaptureScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [anonymous, setAnonymous] = useState(true);
-  const [description, setDescription] = useState('');
-  const [media, setMedia] = useState<PreparedMedia | null>(null);
-  const [mediaKind, setMediaKind] = useState<MediaKind | null>(null);
+  const [anonymous, setAnonymous] = useState(true)
+  const [description, setDescription] = useState('')
+  const [media, setMedia] = useState<PreparedMedia | null>(null)
+  const [mediaKind, setMediaKind] = useState<MediaKind | null>(null)
 
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerKind, setPickerKind] = useState<MediaKind>('photo');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-  const [overflowed, setOverflowed] = useState(false);
-  const [manualArea, setManualArea] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerKind, setPickerKind] = useState<MediaKind>('photo')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
+  const [overflowed, setOverflowed] = useState(false)
+  const [manualArea, setManualArea] = useState('')
 
-  const { state: fixState } = useCurrentFix();
+  const { state: fixState } = useCurrentFix()
   const { data: geocode } = useReverseGeocode(
     fixState.status === 'ready' ? fixState.fix.lat : null,
     fixState.status === 'ready' ? fixState.fix.lng : null,
     fixState.status === 'ready' ? fixState.fix.accuracyM : null,
-  );
+  )
 
-  const { isSubmitting, error, submit } = useCaptureSubmit();
+  const { isSubmitting, error, submit } = useCaptureSubmit()
 
   // The drain is mounted on this screen so the queue actually empties. It
   // runs off the render path — the capture screen is never blocked by it.
-  const { pending, savedOnDevice } = useQueueDrain();
+  const { pending, savedOnDevice } = useQueueDrain()
 
   // The live permission state. It is read — never prompted for — and it is
   // re-read on every foreground, so a permission revoked while the app was
   // backgrounded is reflected the next time the screen renders.
-  const { permissions, availability } = usePermissions();
+  const { permissions, availability } = usePermissions()
 
-  const counter = useMemo(() => `${description.length} / ${CAPTURE_DESCRIPTION_MAX_LENGTH}`, [
-    description.length,
-  ]);
+  const counter = useMemo(
+    () => `${description.length} / ${CAPTURE_DESCRIPTION_MAX_LENGTH}`,
+    [description.length],
+  )
 
-  const canSubmit = media !== null && !isSubmitting;
+  const canSubmit = media !== null && !isSubmitting
 
   // The submit result is a one-shot signal — the screen navigates away on a
   // successful send and on a queued send.
   useEffect(() => {
-    if (!sent) return;
-    router.back();
-  }, [sent, router]);
+    if (!sent) return
+    router.back()
+  }, [sent, router])
 
   // The overflow warning. It is an alert rather than an inline banner because
   // the screen navigates away the moment the capture is queued — an inline
   // banner would be dismissed before it was ever read.
   useEffect(() => {
-    if (!overflowed) return;
+    if (!overflowed) return
 
-    Alert.alert(t('capture.queueOverflow'), t('capture.queueOverflowBody'));
-  }, [overflowed, t]);
+    Alert.alert(t('capture.queueOverflow'), t('capture.queueOverflowBody'))
+  }, [overflowed, t])
 
   const openPicker = useCallback((kind: MediaKind) => {
-    setPickerKind(kind);
-    setPickerOpen(true);
-  }, []);
+    setPickerKind(kind)
+    setPickerOpen(true)
+  }, [])
 
   const pick = useCallback(
     async (source: 'camera' | 'gallery' | 'file') => {
-      setPickerOpen(false);
-      setNotice(null);
+      setPickerOpen(false)
+      setNotice(null)
 
       try {
         const asset =
@@ -124,22 +125,22 @@ export default function CaptureScreen() {
               ? pickerKind === 'video'
                 ? await captureVideo()
                 : await capturePhoto()
-              : await pickFromGallery(pickerKind === 'video' ? ['videos'] : ['images']);
+              : await pickFromGallery(pickerKind === 'video' ? ['videos'] : ['images'])
 
-        if (!asset) return;
+        if (!asset) return
 
-        const prepared = await preparePickedMedia(pickerKind, asset);
-        setMedia(prepared);
-        setMediaKind(pickerKind);
+        const prepared = await preparePickedMedia(pickerKind, asset)
+        setMedia(prepared)
+        setMediaKind(pickerKind)
       } catch (caught) {
-        setNotice(mapMediaError(caught, t));
+        setNotice(mapMediaError(caught, t))
       }
     },
     [pickerKind, t],
-  );
+  )
 
   const onSubmit = useCallback(async () => {
-    if (!media) return;
+    if (!media) return
 
     const outcome = await submit({
       media,
@@ -153,31 +154,30 @@ export default function CaptureScreen() {
         // The server-resolved hierarchy stays authoritative.
         areaHint: manualArea.trim().length > 0 ? manualArea.trim() : null,
       },
-    });
+    })
 
     if (outcome.status === 'queued' && outcome.droppedOldest) {
       // The queue's 20-item bound evicted the oldest report. The warning has
       // to outlive the navigation — the screen leaves as soon as the capture
       // is queued — so it is an alert rather than an inline banner.
-      setOverflowed(true);
-      setSent(true);
-      return;
+      setOverflowed(true)
+      setSent(true)
+      return
     }
 
     if (outcome.status === 'sent' || outcome.status === 'queued') {
-      setSent(true);
+      setSent(true)
     }
-  }, [anonymous, description, fixState, manualArea, media, submit]);
+  }, [anonymous, description, fixState, manualArea, media, submit])
 
-  const addressLine = geocode ? formatAddressLine(geocode) : '';
-  const hasFix = fixState.status === 'ready';
+  const addressLine = geocode ? formatAddressLine(geocode) : ''
+  const hasFix = fixState.status === 'ready'
 
   // The manual-entry fallback shows when the location permission is not
   // granted — including while it is still undetermined, because the prompt
   // has not fired yet and the citizen should not be left waiting on a fix
   // they may never get.
-  const showManualLocation =
-    permissions !== null && permissions.location !== 'granted' && !hasFix;
+  const showManualLocation = permissions !== null && permissions.location !== 'granted' && !hasFix
 
   /**
    * Commits the manually-entered area.
@@ -188,9 +188,9 @@ export default function CaptureScreen() {
    * are still visible to whoever reads the report.
    */
   const onCommitManualArea = useCallback(() => {
-    setManualArea((current) => current.trim());
-    setNotice(null);
-  }, []);
+    setManualArea((current) => current.trim())
+    setNotice(null)
+  }, [])
 
   /**
    * Whether the camera row may be offered for a given kind.
@@ -200,12 +200,12 @@ export default function CaptureScreen() {
    */
   const canUseCameraFor = useCallback(
     (kind: MediaKind): boolean => {
-      if (!availability.canTakePhoto) return false;
-      if (kind === 'video') return availability.canRecordVideo;
-      return true;
+      if (!availability.canTakePhoto) return false
+      if (kind === 'video') return availability.canRecordVideo
+      return true
     },
     [availability.canRecordVideo, availability.canTakePhoto],
-  );
+  )
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.white }]}>
@@ -313,11 +313,7 @@ export default function CaptureScreen() {
           <UploadCard
             icon="photo_camera"
             title={t('capture.takePhoto')}
-            sub={
-              availability.canTakePhoto
-                ? t('capture.photoSub')
-                : t('capture.gallerySub')
-            }
+            sub={availability.canTakePhoto ? t('capture.photoSub') : t('capture.gallerySub')}
             selected={mediaKind === 'photo'}
             onPress={() => openPicker('photo')}
           />
@@ -396,7 +392,9 @@ export default function CaptureScreen() {
               {manualArea
                 ? t('capture.locationManualHint')
                 : hasFix && fixState.fix.accuracyM !== null
-                  ? t('capture.locationAccuracy', { accuracy: toBengaliDigits(String(Math.round(fixState.fix.accuracyM))) })
+                  ? t('capture.locationAccuracy', {
+                      accuracy: toBengaliDigits(String(Math.round(fixState.fix.accuracyM))),
+                    })
                   : t('capture.locationUnavailableSub')}
             </Text>
           </View>
@@ -489,20 +487,12 @@ export default function CaptureScreen() {
         />
       </View>
     </View>
-  );
+  )
 }
 
 /** One row of the media-source sheet. */
-function PickerRow({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: string;
-  label: string;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
+function PickerRow({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+  const theme = useTheme()
 
   return (
     <Pressable
@@ -515,28 +505,28 @@ function PickerRow({
       <Text style={[styles.pickerRowText, { color: theme.colors.ink[950] }]}>{label}</Text>
       <Icon name="chevron_right" size={20} color={theme.colors.ink[400]} />
     </Pressable>
-  );
+  )
 }
 
 /** Maps a media failure to a localized message. */
 function mapMediaError(error: unknown, t: (key: string) => string): string {
-  const code = (error as { code?: string } | null)?.code;
-  const permission = (error as { details?: { permission?: string } } | null)?.details?.permission;
+  const code = (error as { code?: string } | null)?.code
+  const permission = (error as { details?: { permission?: string } } | null)?.details?.permission
 
   switch (code) {
     case 'MEDIA_TOO_LARGE':
-      return t('capture.mediaTooLong');
+      return t('capture.mediaTooLong')
     case 'UNSUPPORTED_MEDIA':
-      return t('capture.unsupportedFile');
+      return t('capture.unsupportedFile')
     case 'FORBIDDEN':
       // The permission that was refused is named, so the citizen knows
       // which one to turn back on — the microphone and the camera are
       // different switches.
-      if (permission === 'microphone') return t('capture.micOnlyDenied');
-      if (permission === 'mediaLibrary') return t('capture.galleryDenied');
-      return t('capture.cameraDenied');
+      if (permission === 'microphone') return t('capture.micOnlyDenied')
+      if (permission === 'mediaLibrary') return t('capture.galleryDenied')
+      return t('capture.cameraDenied')
     default:
-      return t('capture.uploadFailed');
+      return t('capture.uploadFailed')
   }
 }
 
@@ -547,13 +537,13 @@ function UploadCard({
   selected,
   onPress,
 }: {
-  icon: string;
-  title: string;
-  sub: string;
-  selected: boolean;
-  onPress: () => void;
+  icon: string
+  title: string
+  sub: string
+  selected: boolean
+  onPress: () => void
 }) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <Pressable
       accessibilityRole="button"
@@ -578,7 +568,7 @@ function UploadCard({
       </View>
       <Icon name="arrow_forward_ios" size={18} color={theme.colors.ink[400]} />
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -776,4 +766,4 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-});
+})

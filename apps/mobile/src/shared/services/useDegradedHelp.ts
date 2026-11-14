@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react'
 import {
   readDegradedState,
   needsManualDialGuidance,
   powerSaveWarningIsUseful,
   UNKNOWN_DEGRADED_STATE,
   type DegradedState,
-} from './degradation';
-import { openDialer } from './dialer';
+} from './degradation'
+import { openDialer } from './dialer'
 
 /**
  * The degraded-mode help flow.
@@ -32,59 +32,58 @@ import { openDialer } from './dialer';
  */
 export interface UseDegradedHelpResult {
   /** The device state. The unknown state until the first read lands. */
-  degraded: DegradedState;
+  degraded: DegradedState
   /**
    * The number to show in the manual-dial guidance, or `null` when there is
    * nothing to guide the user towards.
    */
-  guidanceNumber: string | null;
+  guidanceNumber: string | null
   /** Whether the manual-dial guidance should be visible. */
-  showGuidance: boolean;
+  showGuidance: boolean
   /** Whether the battery-saver warning should appear alongside it. */
-  showPowerSaveWarning: boolean;
+  showPowerSaveWarning: boolean
   /** Whether the offline notice should appear alongside it. */
-  showOfflineNotice: boolean;
+  showOfflineNotice: boolean
   /**
    * Dials a number and updates the guidance.
    *
    * Returns whether the OS dialler was reached. A `false` return means the
    * guidance is now visible — never an unhandled error.
    */
-  dial: (number: string) => Promise<boolean>;
+  dial: (number: string) => Promise<boolean>
 }
 
 export function useDegradedHelp(): UseDegradedHelpResult {
-  const [degraded, setDegraded] = useState<DegradedState>(UNKNOWN_DEGRADED_STATE);
-  const [guidanceNumber, setGuidanceNumber] = useState<string | null>(null);
-  const [dialerOpened, setDialerOpened] = useState(true);
+  const [degraded, setDegraded] = useState<DegradedState>(UNKNOWN_DEGRADED_STATE)
+  const [guidanceNumber, setGuidanceNumber] = useState<string | null>(null)
+  const [dialerOpened, setDialerOpened] = useState(true)
 
   // The device state is read **once per mount** of the help surface, not
   // cached across sessions: the story requires the warning to reflect the
   // state at the moment the help action is opened.
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     void readDegradedState().then((state) => {
-      if (!cancelled) setDegraded(state);
-    });
+      if (!cancelled) setDegraded(state)
+    })
 
     return () => {
-      cancelled = true;
-    };
-  }, []);
+      cancelled = true
+    }
+  }, [])
 
   const dial = useCallback(async (number: string) => {
-    const opened = await openDialer(number);
-    setDialerOpened(opened);
+    const opened = await openDialer(number)
+    setDialerOpened(opened)
     // The guidance shows the number **always** once a dial has been
     // attempted, because the app cannot know whether the user actually
     // pressed call — and a number on screen costs nothing.
-    setGuidanceNumber(number);
-    return opened;
-  }, []);
+    setGuidanceNumber(number)
+    return opened
+  }, [])
 
-  const showGuidance =
-    guidanceNumber !== null && needsManualDialGuidance(degraded, dialerOpened);
+  const showGuidance = guidanceNumber !== null && needsManualDialGuidance(degraded, dialerOpened)
 
   return {
     degraded,
@@ -93,5 +92,5 @@ export function useDegradedHelp(): UseDegradedHelpResult {
     showPowerSaveWarning: showGuidance && powerSaveWarningIsUseful(degraded),
     showOfflineNotice: showGuidance && degraded.isOffline,
     dial,
-  };
+  }
 }

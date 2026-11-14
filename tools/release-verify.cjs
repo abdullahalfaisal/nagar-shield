@@ -24,22 +24,22 @@
  *   node tools/release-verify.cjs --env production --skip-migrations
  */
 
-'use strict';
+'use strict'
 
-const fs = require('node:fs');
-const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const fs = require('node:fs')
+const path = require('node:path')
+const { execFileSync } = require('node:child_process')
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..')
 
-const ENVIRONMENTS = ['local', 'staging', 'production'];
+const ENVIRONMENTS = ['local', 'staging', 'production']
 
 /** The API host each environment is expected to point at. */
 const EXPECTED_HOSTS = {
   local: '127.0.0.1',
   staging: '.supabase.co',
   production: '.supabase.co',
-};
+}
 
 /**
  * The EAS profile each environment builds with.
@@ -55,27 +55,27 @@ const PROFILE_NAMES = {
   local: 'dev',
   staging: 'preview',
   production: 'production',
-};
+}
 
-const results = [];
+const results = []
 
 function record(name, passed, detail = '') {
-  results.push({ name, passed, detail });
-  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
+  results.push({ name, passed, detail })
+  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
 function readFlag(name, fallback = null) {
-  const index = process.argv.indexOf(name);
-  if (index === -1) return fallback;
-  return process.argv[index + 1] ?? fallback;
+  const index = process.argv.indexOf(name)
+  if (index === -1) return fallback
+  return process.argv[index + 1] ?? fallback
 }
 
 function hasFlag(name) {
-  return process.argv.includes(name);
+  return process.argv.includes(name)
 }
 
 function relative(file) {
-  return path.relative(ROOT, file).replace(/\\/g, '/');
+  return path.relative(ROOT, file).replace(/\\/g, '/')
 }
 
 /**
@@ -89,26 +89,26 @@ function assertNoServiceRoleMaterial() {
   // profiles. It is invoked as a child process so its exit code **is** the
   // assertion — requiring it in-process would run its `main()` with this
   // script's arguments.
-  const targets = ['apps/mobile', 'apps/admin', 'packages/shared', 'eas.json'];
+  const targets = ['apps/mobile', 'apps/admin', 'packages/shared', 'eas.json']
 
   try {
     execFileSync('node', [path.join(__dirname, 'secret-scan.cjs'), ...targets], {
       encoding: 'utf8',
       stdio: 'pipe',
-    });
-    record('the artifact secret grep returns zero service-role matches', true);
+    })
+    record('the artifact secret grep returns zero service-role matches', true)
   } catch (error) {
-    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`
     const findings = output
       .split('\n')
       .filter((line) => line.includes('[') && !line.includes('scan —'))
       .slice(0, 5)
-      .join(' | ');
+      .join(' | ')
     record(
       'the artifact secret grep returns zero service-role matches',
       false,
       findings || 'the scan reported a finding',
-    );
+    )
   }
 }
 
@@ -120,15 +120,15 @@ function assertNoServiceRoleMaterial() {
  */
 function assertMigrationState(envName) {
   if (hasFlag('--skip-migrations')) {
-    record('the migration state matches the repo', true, 'skipped by flag');
-    return;
+    record('the migration state matches the repo', true, 'skipped by flag')
+    return
   }
 
-  const migrationsDir = path.join(ROOT, 'supabase', 'migrations');
+  const migrationsDir = path.join(ROOT, 'supabase', 'migrations')
   const repoMigrations = fs
     .readdirSync(migrationsDir)
     .filter((name) => name.endsWith('.sql'))
-    .sort();
+    .sort()
 
   try {
     const output = execFileSync(
@@ -144,24 +144,24 @@ function assertMigrationState(envName) {
         '-t',
         '-A',
         '-c',
-        "select version from supabase_migrations.schema_migrations order by version;",
+        'select version from supabase_migrations.schema_migrations order by version;',
       ],
       { encoding: 'utf8', stdio: 'pipe' },
-    );
+    )
 
     const applied = output
       .split('\n')
       .map((line) => line.trim())
-      .filter(Boolean);
+      .filter(Boolean)
 
-    const repoVersions = repoMigrations.map((name) => name.split('_')[0]);
+    const repoVersions = repoMigrations.map((name) => name.split('_')[0])
 
-    const missing = repoVersions.filter((version) => !applied.includes(version));
-    const extra = applied.filter((version) => !repoVersions.includes(version));
+    const missing = repoVersions.filter((version) => !applied.includes(version))
+    const extra = applied.filter((version) => !repoVersions.includes(version))
 
     if (missing.length === 0 && extra.length === 0) {
-      record('the migration state matches the repo', true, `${applied.length} migration(s)`);
-      return;
+      record('the migration state matches the repo', true, `${applied.length} migration(s)`)
+      return
     }
 
     const detail = [
@@ -169,14 +169,14 @@ function assertMigrationState(envName) {
       extra.length ? `not in the repo: ${extra.join(', ')}` : '',
     ]
       .filter(Boolean)
-      .join('; ');
-    record('the migration state matches the repo', false, detail);
+      .join('; ')
+    record('the migration state matches the repo', false, detail)
   } catch (error) {
     record(
       'the migration state matches the repo',
       false,
       `could not read the migration state (${envName}): ${error instanceof Error ? error.message : String(error)}`,
-    );
+    )
   }
 }
 
@@ -188,48 +188,48 @@ function assertMigrationState(envName) {
  * carry the production one.
  */
 function assertProfileEnvVars(envName) {
-  const easPath = path.join(ROOT, 'eas.json');
+  const easPath = path.join(ROOT, 'eas.json')
 
   if (!fs.existsSync(easPath)) {
-    record('the build env vars match the target environment', false, 'eas.json is missing');
-    return;
+    record('the build env vars match the target environment', false, 'eas.json is missing')
+    return
   }
 
-  let eas;
+  let eas
   try {
-    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'));
+    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'))
   } catch (error) {
     record(
       'the build env vars match the target environment',
       false,
       `eas.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return;
+    )
+    return
   }
 
-  const profiles = eas.build?.profiles ?? eas.build ?? {};
-  const profileName = PROFILE_NAMES[envName];
+  const profiles = eas.build?.profiles ?? eas.build ?? {}
+  const profileName = PROFILE_NAMES[envName]
 
-  const profile = profiles[profileName];
+  const profile = profiles[profileName]
   if (!profile) {
     record(
       'the build env vars match the target environment',
       false,
       `the ${profileName} profile is missing from eas.json`,
-    );
-    return;
+    )
+    return
   }
 
-  const env = profile.env ?? {};
-  const apiUrl = String(env.EXPO_PUBLIC_SUPABASE_URL ?? '');
+  const env = profile.env ?? {}
+  const apiUrl = String(env.EXPO_PUBLIC_SUPABASE_URL ?? '')
 
   if (!apiUrl) {
     record(
       'the build env vars match the target environment',
       false,
       `the ${profileName} profile has no EXPO_PUBLIC_SUPABASE_URL`,
-    );
-    return;
+    )
+    return
   }
 
   // An unresolved placeholder means the profile was never wired to a real
@@ -240,8 +240,8 @@ function assertProfileEnvVars(envName) {
       'the build env vars match the target environment',
       false,
       `the ${profileName} profile still carries an unresolved placeholder`,
-    );
-    return;
+    )
+    return
   }
 
   // The URL is not the only value that must be resolved. A profile whose URL
@@ -250,29 +250,29 @@ function assertProfileEnvVars(envName) {
   // through. Every env value in the profile is checked for a placeholder.
   const unresolved = Object.entries(env)
     .filter(([, value]) => String(value).includes('<'))
-    .map(([name]) => name);
+    .map(([name]) => name)
 
   if (unresolved.length > 0) {
     record(
       'the build env vars match the target environment',
       false,
       `the ${profileName} profile still carries an unresolved placeholder: ${unresolved.join(', ')}`,
-    );
-    return;
+    )
+    return
   }
 
-  const expectedHost = EXPECTED_HOSTS[envName];
-  const matches = apiUrl.includes(expectedHost);
+  const expectedHost = EXPECTED_HOSTS[envName]
+  const matches = apiUrl.includes(expectedHost)
 
   // The production profile must not point at a local host, and the local
   // profile must not point at a hosted project.
   const crossEnvironment =
     (envName === 'local' && apiUrl.includes('.supabase.co')) ||
-    (envName !== 'local' && apiUrl.includes('127.0.0.1'));
+    (envName !== 'local' && apiUrl.includes('127.0.0.1'))
 
   if (matches && !crossEnvironment) {
-    record('the build env vars match the target environment', true, profileName);
-    return;
+    record('the build env vars match the target environment', true, profileName)
+    return
   }
 
   record(
@@ -281,7 +281,7 @@ function assertProfileEnvVars(envName) {
     crossEnvironment
       ? `the ${profileName} profile points at another environment`
       : `the ${profileName} profile does not point at ${expectedHost}`,
-  );
+  )
 }
 
 /**
@@ -291,40 +291,44 @@ function assertProfileEnvVars(envName) {
  * feature-flagged **off**. A profile with the flag on would spend money.
  */
 function assertSmsOtpDisabled() {
-  const easPath = path.join(ROOT, 'eas.json');
+  const easPath = path.join(ROOT, 'eas.json')
 
   if (!fs.existsSync(easPath)) {
-    record('the SMS OTP feature flag is off in every profile', false, 'eas.json is missing');
-    return;
+    record('the SMS OTP feature flag is off in every profile', false, 'eas.json is missing')
+    return
   }
 
-  let eas;
+  let eas
   try {
-    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'));
+    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'))
   } catch {
-    record('the SMS OTP feature flag is off in every profile', false, 'eas.json is not valid JSON');
-    return;
+    record('the SMS OTP feature flag is off in every profile', false, 'eas.json is not valid JSON')
+    return
   }
 
-  const profiles = eas.build?.profiles ?? eas.build ?? {};
+  const profiles = eas.build?.profiles ?? eas.build ?? {}
 
   const offending = Object.entries(profiles)
     .filter(([, profile]) => {
-      const value = profile?.env?.EXPO_PUBLIC_SMS_OTP_ENABLED;
-      return value !== undefined && String(value).toLowerCase() !== 'false';
+      const value = profile?.env?.EXPO_PUBLIC_SMS_OTP_ENABLED
+      return value !== undefined && String(value).toLowerCase() !== 'false'
     })
-    .map(([name]) => name);
+    .map(([name]) => name)
 
   if (offending.length === 0) {
-    record('the SMS OTP feature flag is off in every profile', true, `${Object.keys(profiles).length} profile(s)`);
-    return;
+    record(
+      'the SMS OTP feature flag is off in every profile',
+      true,
+      `${Object.keys(profiles).length} profile(s)`,
+    )
+    return
   }
 
   record(
     'the SMS OTP feature flag is off in every profile',
     false,
     `enabled in: ${offending.join(', ')}`,
-  );
+  )
 }
 
 /**
@@ -335,53 +339,57 @@ function assertSmsOtpDisabled() {
  * out by a rotated certificate.
  */
 function assertCertPinning(envName) {
-  const easPath = path.join(ROOT, 'eas.json');
+  const easPath = path.join(ROOT, 'eas.json')
 
   if (!fs.existsSync(easPath)) {
-    record('the production artifact carries the cert-pinning config', false, 'eas.json is missing');
-    return;
+    record('the production artifact carries the cert-pinning config', false, 'eas.json is missing')
+    return
   }
 
-  let eas;
+  let eas
   try {
-    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'));
+    eas = JSON.parse(fs.readFileSync(easPath, 'utf8'))
   } catch {
-    record('the production artifact carries the cert-pinning config', false, 'eas.json is not valid JSON');
-    return;
+    record(
+      'the production artifact carries the cert-pinning config',
+      false,
+      'eas.json is not valid JSON',
+    )
+    return
   }
 
-  const profiles = eas.build?.profiles ?? eas.build ?? {};
+  const profiles = eas.build?.profiles ?? eas.build ?? {}
 
   if (envName !== 'production') {
     // The non-production profiles must **not** pin.
     const pinningProfiles = Object.entries(profiles)
       .filter(([name]) => name !== 'production')
       .filter(([, profile]) => Boolean(profile?.env?.EXPO_PUBLIC_CERT_PIN_PUBLIC_KEYS))
-      .map(([name]) => name);
+      .map(([name]) => name)
 
     if (pinningProfiles.length === 0) {
-      record('only the production profile pins the API host', true);
-      return;
+      record('only the production profile pins the API host', true)
+      return
     }
 
     record(
       'only the production profile pins the API host',
       false,
       `pinning is enabled in: ${pinningProfiles.join(', ')}`,
-    );
-    return;
+    )
+    return
   }
 
-  const production = profiles.production;
-  const pins = production?.env?.EXPO_PUBLIC_CERT_PIN_PUBLIC_KEYS;
+  const production = profiles.production
+  const pins = production?.env?.EXPO_PUBLIC_CERT_PIN_PUBLIC_KEYS
 
   if (!pins) {
     record(
       'the production artifact carries the cert-pinning config',
       false,
       'the production profile has no EXPO_PUBLIC_CERT_PIN_PUBLIC_KEYS',
-    );
-    return;
+    )
+    return
   }
 
   // An unresolved placeholder is not a pin. `<sha256-pin-set>` split on a
@@ -392,8 +400,8 @@ function assertCertPinning(envName) {
       'the production artifact carries the cert-pinning config',
       false,
       'the production profile still carries an unresolved pin-set placeholder',
-    );
-    return;
+    )
+    return
   }
 
   // A single digest with no backup is a permanent lockout risk — the
@@ -402,47 +410,53 @@ function assertCertPinning(envName) {
   const digests = String(pins)
     .split(',')
     .map((entry) => entry.trim())
-    .filter(Boolean);
+    .filter(Boolean)
 
   if (digests.length < 2) {
     record(
       'the production artifact carries the cert-pinning config',
       false,
       `the pin set carries ${digests.length} digest(s) and no backup pin`,
-    );
-    return;
+    )
+    return
   }
 
-  record('the production artifact carries the cert-pinning config', true, `${digests.length} pin(s)`);
+  record(
+    'the production artifact carries the cert-pinning config',
+    true,
+    `${digests.length} pin(s)`,
+  )
 }
 
 function main() {
-  const envName = readFlag('--env', 'local');
+  const envName = readFlag('--env', 'local')
 
   if (!ENVIRONMENTS.includes(envName)) {
-    console.error(`Unknown environment "${envName}". Use one of: ${ENVIRONMENTS.join(', ')}.`);
-    process.exit(1);
+    console.error(`Unknown environment "${envName}". Use one of: ${ENVIRONMENTS.join(', ')}.`)
+    process.exit(1)
   }
 
-  console.log(`Release verification — environment: ${envName}`);
-  console.log('');
+  console.log(`Release verification — environment: ${envName}`)
+  console.log('')
 
-  assertNoServiceRoleMaterial();
-  assertMigrationState(envName);
-  assertProfileEnvVars(envName);
-  assertSmsOtpDisabled();
-  assertCertPinning(envName);
+  assertNoServiceRoleMaterial()
+  assertMigrationState(envName)
+  assertProfileEnvVars(envName)
+  assertSmsOtpDisabled()
+  assertCertPinning(envName)
 
-  const failed = results.filter((result) => !result.passed);
+  const failed = results.filter((result) => !result.passed)
 
-  console.log('');
+  console.log('')
   if (failed.length === 0) {
-    console.log(`✓ all ${results.length} assertions passed — the ${envName} stage is verified`);
-    process.exit(0);
+    console.log(`✓ all ${results.length} assertions passed — the ${envName} stage is verified`)
+    process.exit(0)
   }
 
-  console.error(`✗ ${failed.length} of ${results.length} assertion(s) failed — the ${envName} stage is NOT verified`);
-  process.exit(1);
+  console.error(
+    `✗ ${failed.length} of ${results.length} assertion(s) failed — the ${envName} stage is NOT verified`,
+  )
+  process.exit(1)
 }
 
-main();
+main()

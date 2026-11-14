@@ -1,20 +1,20 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { useTheme } from '../theme';
-import { AppBar } from './AppBar';
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { useTheme } from '../theme'
+import { AppBar } from './AppBar'
 
 interface ScreenProps {
-  children: React.ReactNode;
+  children: React.ReactNode
   /** Renders the app bar above the content. */
-  title?: string;
-  subtitle?: string;
-  onBack?: () => void;
-  action?: { icon: string; onPress: () => void; accessibilityLabel: string; badge?: boolean };
-  scroll?: boolean;
+  title?: string
+  subtitle?: string
+  onBack?: () => void
+  action?: { icon: string; onPress: () => void; accessibilityLabel: string; badge?: boolean }
+  scroll?: boolean
   /** Sticky footer rendered above the safe-area inset. */
-  footer?: React.ReactNode;
-  background?: string;
+  footer?: React.ReactNode
+  background?: string
   /** Extra bottom padding so a sticky CTA never covers the last row. */
-  contentBottomPadding?: number;
+  contentBottomPadding?: number
 }
 
 /**
@@ -32,7 +32,7 @@ export function Screen({
   background,
   contentBottomPadding = 0,
 }: ScreenProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   const body = scroll ? (
     <ScrollView
@@ -45,17 +45,15 @@ export function Screen({
     </ScrollView>
   ) : (
     <View style={styles.flexBody}>{children}</View>
-  );
+  )
 
   return (
     <View style={[styles.root, { backgroundColor: background ?? theme.colors.surface.lavender }]}>
-      {title ? (
-        <AppBar title={title} subtitle={subtitle} onBack={onBack} action={action} />
-      ) : null}
+      {title ? <AppBar title={title} subtitle={subtitle} onBack={onBack} action={action} /> : null}
       {body}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -72,4 +70,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
   },
-});
+})

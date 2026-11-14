@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
-import { supabase } from '@/shared/api/supabase';
-import { loadAccountStatus } from '@/shared/api/profile';
+import { useCallback, useEffect, useState } from 'react'
+import { AppState, type AppStateStatus } from 'react-native'
+import { supabase } from '@/shared/api/supabase'
+import { loadAccountStatus } from '@/shared/api/profile'
 
 /**
  * The account's lifecycle status, as the app sees it.
@@ -24,14 +24,14 @@ import { loadAccountStatus } from '@/shared/api/profile';
  * worse than letting them try and see the database's refusal.
  */
 
-export type AccountStatus = 'unknown' | 'active' | 'disabled' | 'deleted';
+export type AccountStatus = 'unknown' | 'active' | 'disabled' | 'deleted'
 
 export interface AccountStatusState {
-  status: AccountStatus;
+  status: AccountStatus
   /** The moment the account was disabled, when it is known. */
-  disabledAt: string | null;
-  loading: boolean;
-  refresh: () => Promise<void>;
+  disabledAt: string | null
+  loading: boolean
+  refresh: () => Promise<void>
 }
 
 /**
@@ -41,61 +41,61 @@ export interface AccountStatusState {
  * check yet.
  */
 export function useAccountStatus(userId: string | undefined): AccountStatusState {
-  const [status, setStatus] = useState<AccountStatus>('unknown');
-  const [disabledAt, setDisabledAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<AccountStatus>('unknown')
+  const [disabledAt, setDisabledAt] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      setStatus('unknown');
-      setDisabledAt(null);
-      return;
+      setStatus('unknown')
+      setDisabledAt(null)
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      const account = await loadAccountStatus(userId);
-      setDisabledAt(account.disabledAt);
+      const account = await loadAccountStatus(userId)
+      setDisabledAt(account.disabledAt)
       if (account.disabled) {
-        setStatus('disabled');
+        setStatus('disabled')
       } else if (account.deleted) {
-        setStatus('deleted');
+        setStatus('deleted')
       } else {
-        setStatus('active');
+        setStatus('active')
       }
     } catch {
       // The check failed. The status stays as it was — an unknown status is
       // not a disable, and the database is the authority that refuses a
       // disabled account's writes anyway.
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [userId]);
+  }, [userId])
 
   // (1) The session appears, or the user id changes.
   useEffect(() => {
     if (!userId) {
-      setStatus('unknown');
-      setDisabledAt(null);
-      return;
+      setStatus('unknown')
+      setDisabledAt(null)
+      return
     }
-    void refresh();
-  }, [userId, refresh]);
+    void refresh()
+  }, [userId, refresh])
 
   // (2) The app returns to the foreground.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') {
-        void refresh();
+        void refresh()
       }
-    });
+    })
 
     return () => {
-      subscription.remove();
-    };
-  }, [refresh]);
+      subscription.remove()
+    }
+  }, [refresh])
 
-  return { status, disabledAt, loading, refresh };
+  return { status, disabledAt, loading, refresh }
 }
 
 /**
@@ -110,5 +110,5 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
  * will refuse.
  */
 export async function endDisabledSession(): Promise<void> {
-  await supabase.auth.signOut({ scope: 'local' });
+  await supabase.auth.signOut({ scope: 'local' })
 }

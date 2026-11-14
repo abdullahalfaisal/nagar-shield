@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack } from 'expo-router'
 
 /**
  * The auth group. Screens here are only reachable while signed out.
@@ -27,5 +27,5 @@ export default function AuthLayout() {
       <Stack.Screen name="account-deleted" options={{ animation: 'fade' }} />
       <Stack.Screen name="biometric-gate" options={{ animation: 'fade' }} />
     </Stack>
-  );
+  )
 }

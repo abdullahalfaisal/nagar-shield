@@ -1,8 +1,8 @@
-import * as Camera from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import * as Linking from 'expo-linking';
-import { toPermissionState, type PermissionName, type PermissionState } from './permissions';
+import * as Camera from 'expo-camera'
+import * as ImagePicker from 'expo-image-picker'
+import * as Location from 'expo-location'
+import * as Linking from 'expo-linking'
+import { toPermissionState, type PermissionName, type PermissionState } from './permissions'
 
 /**
  * The permission recovery path.
@@ -29,15 +29,15 @@ import { toPermissionState, type PermissionName, type PermissionState } from './
  * page, which is the only route back for a permission the OS has stopped
  * prompting for.
  */
-export type RecoveryAction = 'prompt' | 'settings';
+export type RecoveryAction = 'prompt' | 'settings'
 
 export interface RecoveryOutcome {
   /** The action that was taken. */
-  action: RecoveryAction;
+  action: RecoveryAction
   /** The permission's state after the action. */
-  state: PermissionState;
+  state: PermissionState
   /** `true` when the permission is now granted. */
-  granted: boolean;
+  granted: boolean
 }
 
 /**
@@ -52,25 +52,25 @@ export async function requestPermission(name: PermissionName): Promise<Permissio
   try {
     switch (name) {
       case 'camera': {
-        const response = await ImagePicker.requestCameraPermissionsAsync();
-        return toPermissionState(response.status);
+        const response = await ImagePicker.requestCameraPermissionsAsync()
+        return toPermissionState(response.status)
       }
       case 'microphone': {
-        const response = await Camera.Camera.requestMicrophonePermissionsAsync();
-        return toPermissionState(response.status);
+        const response = await Camera.Camera.requestMicrophonePermissionsAsync()
+        return toPermissionState(response.status)
       }
       case 'mediaLibrary': {
-        const response = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        return toPermissionState(response.status);
+        const response = await ImagePicker.requestMediaLibraryPermissionsAsync()
+        return toPermissionState(response.status)
       }
       case 'location': {
-        const response = await Location.requestForegroundPermissionsAsync();
-        return toPermissionState(response.status);
+        const response = await Location.requestForegroundPermissionsAsync()
+        return toPermissionState(response.status)
       }
     }
   } catch {
     // A failed request is a denied permission, not a crash.
-    return 'denied';
+    return 'denied'
   }
 }
 
@@ -83,7 +83,7 @@ export async function requestPermission(name: PermissionName): Promise<Permissio
  */
 export async function openSystemSettings(): Promise<void> {
   try {
-    await Linking.openSettings();
+    await Linking.openSettings()
   } catch {
     // The OS refused to open the settings page. There is nothing the app
     // can do about it, and a crash here would be worse than a dead button.
@@ -97,7 +97,7 @@ export async function openSystemSettings(): Promise<void> {
  * denied one cannot, so the app opens the settings page — and says so.
  */
 export function recoveryAction(state: PermissionState): RecoveryAction {
-  return state === 'denied' ? 'settings' : 'prompt';
+  return state === 'denied' ? 'settings' : 'prompt'
 }
 
 /**
@@ -121,10 +121,10 @@ export async function recoverPermission(
   state: PermissionState,
 ): Promise<RecoveryOutcome> {
   if (recoveryAction(state) === 'settings') {
-    await openSystemSettings();
-    return { action: 'settings', state, granted: false };
+    await openSystemSettings()
+    return { action: 'settings', state, granted: false }
   }
 
-  const next = await requestPermission(name);
-  return { action: 'prompt', state: next, granted: next === 'granted' };
+  const next = await requestPermission(name)
+  return { action: 'prompt', state: next, granted: next === 'granted' }
 }

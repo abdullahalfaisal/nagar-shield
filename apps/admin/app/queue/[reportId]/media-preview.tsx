@@ -1,10 +1,10 @@
-'use client';
+'use client'
 
-import { useCallback, useEffect, useState } from 'react';
-import { signMediaUrl } from '@/lib/api';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { getBrowserClient } from '@/lib/supabase/client';
-import type { QueueMedia } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react'
+import { signMediaUrl } from '@/lib/api'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { getBrowserClient } from '@/lib/supabase/client'
+import type { QueueMedia } from '@/lib/api'
 
 /**
  * The media preview.
@@ -31,38 +31,38 @@ import type { QueueMedia } from '@/lib/api';
  * placeholder instead of showing the browser's broken-image glyph.
  */
 export function MediaPreview({ media }: { media: QueueMedia }) {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [requesting, setRequesting] = useState(false);
+  const [url, setUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [requesting, setRequesting] = useState(false)
 
   const request = useCallback(async () => {
-    setRequesting(true);
-    const signed = await signMediaUrl(getBrowserClient(), media.storagePath);
-    setUrl(signed);
-    setFailed(signed === null);
-    setRequesting(false);
-  }, [media.storagePath]);
+    setRequesting(true)
+    const signed = await signMediaUrl(getBrowserClient(), media.storagePath)
+    setUrl(signed)
+    setFailed(signed === null)
+    setRequesting(false)
+  }, [media.storagePath])
 
   useEffect(() => {
-    let active = true;
+    let active = true
 
     // The effect body mirrors `request` but guards its own state writes: an
     // unmounted component must not set state.
     void (async () => {
-      const signed = await signMediaUrl(getBrowserClient(), media.storagePath);
-      if (!active) return;
-      setUrl(signed);
-      setFailed(signed === null);
-    })();
+      const signed = await signMediaUrl(getBrowserClient(), media.storagePath)
+      if (!active) return
+      setUrl(signed)
+      setFailed(signed === null)
+    })()
 
     return () => {
-      active = false;
-    };
-  }, [media.storagePath]);
+      active = false
+    }
+  }, [media.storagePath])
 
-  const available = url !== null && !failed;
+  const available = url !== null && !failed
 
   return (
     <div className="stackGapSm">
@@ -120,5 +120,5 @@ export function MediaPreview({ media }: { media: QueueMedia }) {
         {media.width && media.height ? ` · ${media.width}×${media.height}` : ''}
       </p>
     </div>
-  );
+  )
 }

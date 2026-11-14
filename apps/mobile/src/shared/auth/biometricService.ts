@@ -1,6 +1,6 @@
-import * as LocalAuthentication from 'expo-local-authentication';
-import { supabase, secureStore } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import * as LocalAuthentication from 'expo-local-authentication'
+import { supabase, secureStore } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The biometric re-auth gate (FR-AUTH-4, FR-AUTH-5).
@@ -23,17 +23,17 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * user can always get in with the password they already have.
  */
 
-export type BiometricFallback = 'password' | null;
+export type BiometricFallback = 'password' | null
 
 export interface BiometricAttemptResult {
   /** How many failures are recorded in the current 24-hour window. */
-  failCount: number;
+  failCount: number
   /** Whether biometric sign-in is still enabled for this account. */
-  biometricEnabled: boolean;
+  biometricEnabled: boolean
   /** `'password'` once the user must fall back to the password screen. */
-  fallback: BiometricFallback;
+  fallback: BiometricFallback
   /** When the 24-hour failure window closes. */
-  windowUntil: string | null;
+  windowUntil: string | null
 }
 
 /**
@@ -49,7 +49,7 @@ export interface BiometricAttemptResult {
  * `unavailable` is the one case that does **not** count: the device has no
  * enrolled biometrics, so the user never declined anything.
  */
-export type BiometricOutcome = 'success' | 'failed' | 'unavailable';
+export type BiometricOutcome = 'success' | 'failed' | 'unavailable'
 
 /**
  * Whether the device can do biometric authentication at all.
@@ -61,13 +61,13 @@ export type BiometricOutcome = 'success' | 'failed' | 'unavailable';
  */
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
-    const supported = await LocalAuthentication.hasHardwareAsync();
-    if (!supported) return false;
+    const supported = await LocalAuthentication.hasHardwareAsync()
+    if (!supported) return false
 
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    return enrolled;
+    const enrolled = await LocalAuthentication.isEnrolledAsync()
+    return enrolled
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -79,16 +79,16 @@ export async function isBiometricAvailable(): Promise<boolean> {
  */
 export async function getBiometricType(): Promise<'fingerprint' | 'facial' | null> {
   try {
-    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync()
     if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-      return 'facial';
+      return 'facial'
     }
     if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-      return 'fingerprint';
+      return 'fingerprint'
     }
-    return null;
+    return null
   } catch {
-    return null;
+    return null
   }
 }
 
@@ -106,25 +106,25 @@ export async function runBiometricPrompt(prompt: string): Promise<BiometricOutco
       // biometric itself is the whole check — a device credential fallback
       // here would silently bypass the thing the user opted into.
       disableDeviceFallback: true,
-    });
+    })
 
     if (result.success) {
-      return 'success';
+      return 'success'
     }
 
     // `not_enrolled` and `not_available` mean the device cannot do this at
     // all — the fallback path is the password screen, not a failure count.
     // The user did not decline anything; the sensor is simply not there.
     if (result.error === 'not_enrolled' || result.error === 'not_available') {
-      return 'unavailable';
+      return 'unavailable'
     }
 
     // Everything else — a failed match, a dismissal, a system takeover, a
     // device-credential fallback — is a failed attempt. The prompt is the
     // gate, and a gate a dismissal walks past for free is not a gate.
-    return 'failed';
+    return 'failed'
   } catch {
-    return 'failed';
+    return 'failed'
   }
 }
 
@@ -144,23 +144,23 @@ export async function runBiometricPrompt(prompt: string): Promise<BiometricOutco
 export async function recordBiometricAttempt(success: boolean): Promise<BiometricAttemptResult> {
   const { data, error } = await supabase.rpc('record_biometric_attempt', {
     p_success: success,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
   const result = (data ?? {}) as {
-    fail_count?: number;
-    biometric_enabled?: boolean;
-    fallback?: string | null;
-    window_until?: string | null;
-  };
+    fail_count?: number
+    biometric_enabled?: boolean
+    fallback?: string | null
+    window_until?: string | null
+  }
 
   return {
     failCount: result.fail_count ?? 0,
     biometricEnabled: result.biometric_enabled ?? true,
     fallback: result.fallback === 'password' ? 'password' : null,
     windowUntil: result.window_until ?? null,
-  };
+  }
 }
 
 /**
@@ -171,7 +171,7 @@ export async function recordBiometricAttempt(success: boolean): Promise<Biometri
  */
 export async function resetBiometricFailures(): Promise<void> {
   try {
-    await recordBiometricAttempt(true);
+    await recordBiometricAttempt(true)
   } catch {
     // The reset is a convenience. If it fails, the next biometric attempt
     // simply starts the count over.
@@ -193,13 +193,13 @@ export async function resetBiometricFailures(): Promise<void> {
  * gate degrade to the password screen when the server cannot be reached.
  */
 
-const FAIL_COUNT_KEY = 'nagar-shield.biometric-fail-count';
-const FAIL_WINDOW_KEY = 'nagar-shield.biometric-fail-until';
+const FAIL_COUNT_KEY = 'nagar-shield.biometric-fail-count'
+const FAIL_WINDOW_KEY = 'nagar-shield.biometric-fail-until'
 
 export interface LocalBiometricState {
-  failCount: number;
+  failCount: number
   /** When the current 24-hour window closes. */
-  windowUntil: string | null;
+  windowUntil: string | null
 }
 
 /**
@@ -210,11 +210,11 @@ export interface LocalBiometricState {
  */
 export async function mirrorBiometricState(result: BiometricAttemptResult): Promise<void> {
   try {
-    await secureStore.setItem(FAIL_COUNT_KEY, String(result.failCount));
+    await secureStore.setItem(FAIL_COUNT_KEY, String(result.failCount))
     if (result.windowUntil) {
-      await secureStore.setItem(FAIL_WINDOW_KEY, result.windowUntil);
+      await secureStore.setItem(FAIL_WINDOW_KEY, result.windowUntil)
     } else {
-      await secureStore.removeItem(FAIL_WINDOW_KEY);
+      await secureStore.removeItem(FAIL_WINDOW_KEY)
     }
   } catch {
     // The mirror is a cache. A failed write only costs the app its
@@ -230,22 +230,22 @@ export async function mirrorBiometricState(result: BiometricAttemptResult): Prom
  */
 export async function readLocalBiometricState(): Promise<LocalBiometricState> {
   try {
-    const rawCount = await secureStore.getItem(FAIL_COUNT_KEY);
-    const rawWindow = await secureStore.getItem(FAIL_WINDOW_KEY);
+    const rawCount = await secureStore.getItem(FAIL_COUNT_KEY)
+    const rawWindow = await secureStore.getItem(FAIL_WINDOW_KEY)
 
-    const failCount = Number.parseInt(rawCount ?? '0', 10);
+    const failCount = Number.parseInt(rawCount ?? '0', 10)
     if (!Number.isFinite(failCount) || failCount <= 0) {
-      return { failCount: 0, windowUntil: null };
+      return { failCount: 0, windowUntil: null }
     }
 
     if (rawWindow && new Date(rawWindow).getTime() <= Date.now()) {
       // The window closed. The failures no longer count.
-      return { failCount: 0, windowUntil: null };
+      return { failCount: 0, windowUntil: null }
     }
 
-    return { failCount, windowUntil: rawWindow };
+    return { failCount, windowUntil: rawWindow }
   } catch {
-    return { failCount: 0, windowUntil: null };
+    return { failCount: 0, windowUntil: null }
   }
 }
 
@@ -257,8 +257,8 @@ export async function readLocalBiometricState(): Promise<LocalBiometricState> {
  */
 export async function clearLocalBiometricState(): Promise<void> {
   try {
-    await secureStore.removeItem(FAIL_COUNT_KEY);
-    await secureStore.removeItem(FAIL_WINDOW_KEY);
+    await secureStore.removeItem(FAIL_COUNT_KEY)
+    await secureStore.removeItem(FAIL_WINDOW_KEY)
   } catch {
     // Nothing to do.
   }

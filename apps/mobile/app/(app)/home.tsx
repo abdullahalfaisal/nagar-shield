@@ -1,14 +1,21 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { ActionCard, AlertCard, AreaChipRow, EmptyState, QuickActionGrid, SectionTitle } from '@/shared/ui';
-import type { AreaChip } from '@/shared/ui/AreaChipRow';
-import { alertsItems, useAlerts } from '@/shared/api/alerts';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
-import { Icon } from '@/shared/ui/Icon';
-import { Screen } from '@/shared/ui/Screen';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import {
+  ActionCard,
+  AlertCard,
+  AreaChipRow,
+  EmptyState,
+  QuickActionGrid,
+  SectionTitle,
+} from '@/shared/ui'
+import type { AreaChip } from '@/shared/ui/AreaChipRow'
+import { alertsItems, useAlerts } from '@/shared/api/alerts'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
+import { Icon } from '@/shared/ui/Icon'
+import { Screen } from '@/shared/ui/Screen'
 
 /**
  * Screen 14 — Home (Dashboard).
@@ -27,39 +34,37 @@ import { Screen } from '@/shared/ui/Screen';
  * units 004 / 005 / 006 drop into the reserved slots below.
  */
 export default function HomeScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
-  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null });
+  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null })
 
-  const { data, isLoading } = useAlerts(chip.value ?? {});
+  const { data, isLoading } = useAlerts(chip.value ?? {})
 
   // The feed is cursor-paginated, so the rows are **every loaded page**
   // flattened — not the first page alone.
-  const items = alertsItems(data);
+  const items = alertsItems(data)
 
   const chips: AreaChip[] = [
     { id: 'all', label: 'All BD', value: null },
     { id: 'division', label: 'My division', value: { division: 'Dhaka' } },
     { id: 'city', label: 'My city', value: { division: 'Dhaka', city: 'Dhaka' } },
     { id: 'mirpur', label: 'Mirpur', value: { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' } },
-    { id: 'dhanmondi', label: 'Dhanmondi', value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' } },
-  ];
+    {
+      id: 'dhanmondi',
+      label: 'Dhanmondi',
+      value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' },
+    },
+  ]
 
   return (
-    <Screen
-      scroll
-      background={theme.colors.surface.lavender}
-      contentBottomPadding={60}
-    >
+    <Screen scroll background={theme.colors.surface.lavender} contentBottomPadding={60}>
       {/* Greeting block — the prototype's custom home app bar. */}
       <View style={styles.greetingBar}>
         <View style={styles.greetingText}>
           <View style={styles.hiRow}>
-            <Text style={[styles.hi, { color: theme.colors.ink[950] }]}>
-              {t('home.greeting')}
-            </Text>
+            <Text style={[styles.hi, { color: theme.colors.ink[950] }]}>{t('home.greeting')}</Text>
             <Icon name="wb_sunny" size={20} color={theme.palette.amber[600]} filled />
           </View>
           <Text style={[styles.date, { color: theme.colors.ink[500] }]}>
@@ -143,7 +148,9 @@ export default function HomeScreen() {
       <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
 
       {isLoading ? (
-        <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>{t('common.loading')}</Text>
+        <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+          {t('common.loading')}
+        </Text>
       ) : items.length > 0 ? (
         items.map((report) => (
           <AlertCard
@@ -163,12 +170,12 @@ export default function HomeScreen() {
         />
       )}
     </Screen>
-  );
+  )
 }
 
 /** The `more_horiz` action button with the red badge dot. */
 function PressableMore({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
+  const theme = useTheme()
   return (
     <View style={styles.moreWrap}>
       <Text
@@ -181,7 +188,7 @@ function PressableMore({ onPress }: { onPress: () => void }) {
       </Text>
       <View style={styles.badgeDot} />
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -273,4 +280,4 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     fontSize: 13,
   },
-});
+})

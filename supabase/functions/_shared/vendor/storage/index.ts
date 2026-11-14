@@ -44,11 +44,11 @@
  * without a crypto runtime. `sha256Hex` wraps it with the platform digest.
  */
 export function authorTokenFromDigest(digest: Uint8Array): string {
-  let token = '';
+  let token = ''
   for (let index = 0; index < digest.length; index += 1) {
-    token += (digest[index] ?? 0).toString(16).padStart(2, '0');
+    token += (digest[index] ?? 0).toString(16).padStart(2, '0')
   }
-  return token;
+  return token
 }
 
 /**
@@ -60,7 +60,7 @@ export function authorTokenFromDigest(digest: Uint8Array): string {
  * function bundle share one implementation.
  */
 export async function authorToken(userId: string): Promise<string> {
-  const bytes = new TextEncoder().encode(userId);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return authorTokenFromDigest(new Uint8Array(digest));
+  const bytes = new TextEncoder().encode(userId)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return authorTokenFromDigest(new Uint8Array(digest))
 }

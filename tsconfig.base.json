@@ -18,7 +18,10 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./packages/shared/src/*"]
+    }
   },
   "exclude": ["node_modules", "dist", ".next", ".expo"]
 }

@@ -3,7 +3,7 @@ id: 001-foundation
 unit: 001-foundation
 intent: 001-nagar-shield-mvp1
 type: simple-construction-bolt
-status: planned
+status: complete
 stories: [001-monorepo-workspace, 002-shared-contracts]
 created: 2026-11-04T00:00:00Z
 

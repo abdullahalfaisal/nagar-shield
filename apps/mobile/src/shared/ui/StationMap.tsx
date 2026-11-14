@@ -1,6 +1,9 @@
-import { type ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
+import { type ReactNode } from 'react'
+import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
+// The type only — the value is required lazily below, so that a missing
+// native module does not take the whole screen down.
+import type * as MapLibreModule from '@maplibre/maplibre-react-native'
 
 /**
  * The shared MapLibre wrapper.
@@ -14,32 +17,32 @@ import { useTheme } from '../theme';
  */
 interface StationMapProps {
   /** Map centre. */
-  center: { lat: number; lng: number };
-  zoom?: number;
+  center: { lat: number; lng: number }
+  zoom?: number
   /** One marker per entry. */
-  markers: StationMarker[];
+  markers: StationMarker[]
   /** Rendered under the map — the list of entries, used for the no-tiles fallback. */
-  children?: ReactNode;
+  children?: ReactNode
   /** Shows the OSM attribution. Mandatory whenever the map renders. */
-  attribution?: string;
+  attribution?: string
   /** The user's own position — drawn as a distinct "you are here" marker. */
-  userLocation?: { lat: number; lng: number } | null;
+  userLocation?: { lat: number; lng: number } | null
   /** Rendered over the canvas — the empty state, the offline notice. */
-  overlay?: ReactNode;
+  overlay?: ReactNode
   /**
    * Where the overlay sits on the canvas. `center` (the default) suits an
    * empty state; `top` pins a legend to the top-left so it does not cover
    * the markers.
    */
-  overlayAlign?: 'center' | 'top';
+  overlayAlign?: 'center' | 'top'
 }
 
 export interface StationMarker {
-  id: string;
-  lat: number;
-  lng: number;
-  title: string;
-  subtitle?: string;
+  id: string
+  lat: number
+  lng: number
+  title: string
+  subtitle?: string
   /**
    * The marker's pin colour.
    *
@@ -49,8 +52,8 @@ export interface StationMarker {
    * violet pin, because a report's category is already carried by the
    * marker *title*.
    */
-  color?: string;
-  onPress?: () => void;
+  color?: string
+  onPress?: () => void
 }
 
 /**
@@ -62,7 +65,7 @@ export interface StationMarker {
  * remains the complete view, and the map is the spatial overview
  * (`008-history-map`).
  */
-export const MAP_MARKER_CAP = 150;
+export const MAP_MARKER_CAP = 150
 
 /**
  * Caps the marker set, keeping the ones nearest the centre.
@@ -77,7 +80,7 @@ export function capMarkers(
   center: { lat: number; lng: number },
   cap: number = MAP_MARKER_CAP,
 ): StationMarker[] {
-  if (markers.length <= cap) return markers;
+  if (markers.length <= cap) return markers
 
   return [...markers]
     .map((marker) => ({
@@ -88,7 +91,7 @@ export function capMarkers(
     }))
     .sort((a, b) => a.distance - b.distance)
     .slice(0, cap)
-    .map((entry) => entry.marker);
+    .map((entry) => entry.marker)
 }
 
 /**
@@ -108,7 +111,7 @@ export function StationMap({
   overlay = null,
   overlayAlign = 'center',
 }: StationMapProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.root}>
@@ -130,7 +133,7 @@ export function StationMap({
       </View>
       {children ? <ScrollView style={styles.list}>{children}</ScrollView> : null}
     </View>
-  );
+  )
 }
 
 /**
@@ -146,16 +149,16 @@ function MapCanvas({
   markers,
   userLocation,
 }: {
-  center: { lat: number; lng: number };
-  zoom: number;
-  markers: StationMarker[];
-  userLocation: { lat: number; lng: number } | null;
+  center: { lat: number; lng: number }
+  zoom: number
+  markers: StationMarker[]
+  userLocation: { lat: number; lng: number } | null
 }) {
-  const theme = useTheme();
-  const MapLibre = requireMapLibre();
+  const theme = useTheme()
+  const MapLibre = requireMapLibre()
 
   if (!MapLibre) {
-    return <View style={styles.fallback} />;
+    return <View style={styles.fallback} />
   }
 
   return (
@@ -183,10 +186,7 @@ function MapCanvas({
           onPress={marker.onPress}
         >
           <View
-            style={[
-              styles.pin,
-              { backgroundColor: marker.color ?? theme.palette.violet[600] },
-            ]}
+            style={[styles.pin, { backgroundColor: marker.color ?? theme.palette.violet[600] }]}
           />
         </MapLibre.Marker>
       ))}
@@ -196,21 +196,23 @@ function MapCanvas({
         </MapLibre.Marker>
       ) : null}
     </MapLibre.Map>
-  );
+  )
 }
 
 /**
  * Loads `@maplibre/maplibre-react-native` without making it a hard import.
  *
  * The package needs a native module that is absent in Expo Go and in the Jest
- * environment, so a static import would take the whole screen down.
+ * environment, so a static import would take the whole screen down. The
+ * *type* is imported statically — that is erased at compile time and pulls
+ * nothing into the bundle — while the *value* is still required lazily.
  */
-function requireMapLibre(): typeof import('@maplibre/maplibre-react-native') | null {
+function requireMapLibre(): typeof MapLibreModule | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@maplibre/maplibre-react-native');
+    return require('@maplibre/maplibre-react-native')
   } catch {
-    return null;
+    return null
   }
 }
 
@@ -232,7 +234,7 @@ const OSM_RASTER_STYLE = {
       source: 'osm',
     },
   ],
-};
+}
 
 const styles = StyleSheet.create({
   root: {
@@ -302,4 +304,4 @@ const styles = StyleSheet.create({
   list: {
     maxHeight: 240,
   },
-});
+})

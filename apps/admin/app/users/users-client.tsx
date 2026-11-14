@@ -1,10 +1,10 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { toAppError, type AccountRow } from '@/lib/api';
-import { disableErrorMessage, useAccountSearch, useDisableAccount } from '@/lib/queries';
-import { AdminShell, EmptyState, ErrorBanner, PageHeader } from '@/app/admin-shell';
+import { useState } from 'react'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { toAppError, type AccountRow } from '@/lib/api'
+import { disableErrorMessage, useAccountSearch, useDisableAccount } from '@/lib/queries'
+import { AdminShell, EmptyState, ErrorBanner, PageHeader } from '@/app/admin-shell'
 
 /**
  * The account lookup and the disable action.
@@ -19,41 +19,41 @@ import { AdminShell, EmptyState, ErrorBanner, PageHeader } from '@/app/admin-she
  */
 
 export function UsersClient() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
-  const [query, setQuery] = useState('');
-  const [searched, setSearched] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('')
+  const [searched, setSearched] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // The search is an **explicit action**: the endpoint is an exact match on
   // a phone, an email or an id, so a query the moderator has not finished
   // typing would not match anyway. The query is `enabled: false` and is
   // fetched on submit.
-  const search = useAccountSearch(query);
+  const search = useAccountSearch(query)
 
   async function runSearch() {
-    setError(null);
+    setError(null)
 
     if (query.trim().length === 0) {
-      setSearched(true);
-      return;
+      setSearched(true)
+      return
     }
 
-    setSearching(true);
+    setSearching(true)
 
     try {
-      await search.refetch();
-      setSearched(true);
+      await search.refetch()
+      setSearched(true)
     } catch (caught) {
-      const appError = toAppError(caught);
-      setError(appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric);
+      const appError = toAppError(caught)
+      setError(appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric)
     } finally {
-      setSearching(false);
+      setSearching(false)
     }
   }
 
-  const accounts: AccountRow[] = search.data ?? [];
+  const accounts: AccountRow[] = search.data ?? []
 
   return (
     <AdminShell active="users">
@@ -67,8 +67,8 @@ export function UsersClient() {
             className="card row"
             style={{ padding: 16, gap: 12, alignItems: 'flex-end' }}
             onSubmit={(event) => {
-              event.preventDefault();
-              void runSearch();
+              event.preventDefault()
+              void runSearch()
             }}
           >
             <div style={{ flex: 1 }}>
@@ -99,7 +99,7 @@ export function UsersClient() {
         </div>
       </div>
     </AdminShell>
-  );
+  )
 }
 
 /**
@@ -115,34 +115,34 @@ export function UsersClient() {
  * reload callback.
  */
 function AccountCard({ account }: { account: AccountRow }) {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState('')
 
-  const disable = useDisableAccount();
-  const submitting = disable.isPending;
+  const disable = useDisableAccount()
+  const submitting = disable.isPending
 
-  const isModerator = account.role === 'moderator';
-  const isDisabled = Boolean(account.disabledAt);
-  const trimmedNote = note.trim();
+  const isModerator = account.role === 'moderator'
+  const isDisabled = Boolean(account.disabledAt)
+  const trimmedNote = note.trim()
 
   // The disable form has no separate field error, so every code — including
   // `VALIDATION_FAILED` — goes to the banner. `FORBIDDEN` here means *a
   // moderator cannot be disabled*, which is more specific than the generic
   // permission message.
-  const error = disable.error ? disableErrorMessage(toAppError(disable.error).code) : null;
+  const error = disable.error ? disableErrorMessage(toAppError(disable.error).code) : null
 
   async function handleDisable(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    disable.reset();
+    event.preventDefault()
+    disable.reset()
 
     if (trimmedNote.length === 0) {
-      return;
+      return
     }
 
     try {
-      await disable.mutateAsync({ userId: account.id, note: trimmedNote });
-      setNote('');
+      await disable.mutateAsync({ userId: account.id, note: trimmedNote })
+      setNote('')
     } catch {
       // The error is read from the mutation object and rendered above; the
       // catch exists so an unhandled rejection does not escape.
@@ -208,5 +208,5 @@ function AccountCard({ account }: { account: AccountRow }) {
         </form>
       )}
     </section>
-  );
+  )
 }

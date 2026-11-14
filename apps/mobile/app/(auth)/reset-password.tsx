@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError, passwordSchema } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar, Button, InputField } from '@/shared/ui';
-import { supabase } from '@/shared/api/supabase';
+import { useCallback, useMemo, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError, passwordSchema } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar, Button, InputField } from '@/shared/ui'
+import { supabase } from '@/shared/api/supabase'
 import {
   isRateLimited,
   readAttemptsRemaining,
@@ -13,8 +13,8 @@ import {
   stagePasswordReset,
   takePendingReset,
   verifyPasswordResetOtp,
-} from '@/shared/auth/passwordResetService';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+} from '@/shared/auth/passwordResetService'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 13c — the new-password step.
@@ -50,9 +50,9 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * branch in this screen that could show any.
  */
 export default function ResetPasswordScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
   // The code and the identifier are read from the in-memory hand-off, not
   // from the route params — a URL ends up in navigation state and in any
@@ -60,16 +60,16 @@ export default function ResetPasswordScreen() {
   //
   // `takePendingReset` clears the hand-off as it reads it, so a second pass
   // through this screen cannot replay the code.
-  const staged = useMemo(() => takePendingReset(), []);
+  const staged = useMemo(() => takePendingReset(), [])
 
-  const identifier = staged?.identifier ?? '';
-  const code = staged?.code ?? '';
+  const identifier = staged?.identifier ?? ''
+  const code = staged?.code ?? ''
 
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
 
   /**
    * Returns to the code step with the server's answer.
@@ -89,35 +89,35 @@ export default function ResetPasswordScreen() {
    */
   const backToCode = useCallback(
     (message: string, retryAfter?: number, attempts?: number) => {
-      setFormError(message);
-      stagePasswordReset(identifier, '');
+      setFormError(message)
+      stagePasswordReset(identifier, '')
       router.replace({
         pathname: '/(auth)/verify-otp',
         params: {
           ...(retryAfter !== undefined ? { retryAfter: String(retryAfter) } : {}),
           ...(attempts !== undefined ? { attemptsRemaining: String(attempts) } : {}),
         },
-      });
+      })
     },
     [identifier, router],
-  );
+  )
 
   const onSubmit = useCallback(async () => {
-    const parsed = passwordSchema.safeParse(newPassword);
+    const parsed = passwordSchema.safeParse(newPassword)
 
-    const nextErrors: Record<string, string> = {};
-    if (!parsed.success) nextErrors.newPassword = t('auth.passwordTooShort');
+    const nextErrors: Record<string, string> = {}
+    if (!parsed.success) nextErrors.newPassword = t('auth.passwordTooShort')
     if (newPassword !== confirmPassword) {
-      nextErrors.confirmPassword = t('auth.passwordsDoNotMatch');
+      nextErrors.confirmPassword = t('auth.passwordsDoNotMatch')
     }
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
 
-    setSubmitting(true);
-    setFormError(undefined);
+    setSubmitting(true)
+    setFormError(undefined)
 
     try {
-      const result = await verifyPasswordResetOtp(identifier, code, newPassword);
+      const result = await verifyPasswordResetOtp(identifier, code, newPassword)
 
       // The server applied the password and issued a session. The client
       // adopts it, so the user is signed in without a second credential
@@ -125,61 +125,56 @@ export default function ResetPasswordScreen() {
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: result.accessToken,
         refresh_token: result.refreshToken,
-      });
+      })
 
       if (sessionError) {
         // The password **was** changed — the server said so. The client
         // simply could not adopt the session. Sending the user to the login
         // screen is the honest outcome: they sign in with the new password
         // they just chose.
-        router.replace('/(auth)/login');
-        return;
+        router.replace('/(auth)/login')
+        return
       }
 
       // The password is changed and the session is adopted. The `(app)`
       // group has no index route of its own, so the replace names a concrete
       // screen — Home — rather than the group.
-      router.replace('/(app)/home');
+      router.replace('/(app)/home')
     } catch (error) {
-      const appError = error instanceof AppError ? error : null;
+      const appError = error instanceof AppError ? error : null
 
       if (isRateLimited(error)) {
-        const retryAfter = readRetryAfterSeconds(error);
+        const retryAfter = readRetryAfterSeconds(error)
         backToCode(
           retryAfter !== undefined
             ? t('auth.otpCooldown', { minutes: Math.ceil(retryAfter / 60) })
             : t('errors.otpRateLimit'),
           retryAfter,
-        );
-        return;
+        )
+        return
       }
 
       if (appError?.code === 'VALIDATION_FAILED') {
-        const remaining = readAttemptsRemaining(error);
+        const remaining = readAttemptsRemaining(error)
         backToCode(
           remaining !== undefined
             ? t('auth.otpWrongAttempts', { count: remaining })
             : t('auth.otpWrong'),
           undefined,
           remaining,
-        );
-        return;
+        )
+        return
       }
 
-      setFormError(
-        appError ? errorCopy(t, appError.code) : t('errors.internal'),
-      );
+      setFormError(appError ? errorCopy(t, appError.code) : t('errors.internal'))
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  }, [backToCode, code, confirmPassword, identifier, newPassword, router, t]);
+  }, [backToCode, code, confirmPassword, identifier, newPassword, router, t])
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-      <AppBar
-        title={t('auth.accountRecovery')}
-        onBack={() => router.back()}
-      />
+      <AppBar title={t('auth.accountRecovery')} onBack={() => router.back()} />
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
@@ -231,7 +226,7 @@ export default function ResetPasswordScreen() {
         />
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -262,4 +257,4 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: 20,
   },
-});
+})

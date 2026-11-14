@@ -13,20 +13,20 @@
  * Usage: node tools/smoke-functions.cjs
  */
 
-'use strict';
+'use strict'
 
-const { execFileSync } = require('node:child_process');
-const { createHash, randomUUID } = require('node:crypto');
+const { execFileSync } = require('node:child_process')
+const { createHash, randomUUID } = require('node:crypto')
 
-const API_URL = 'http://127.0.0.1:54321';
-const CONTAINER = 'supabase_db_nagar-shield';
+const API_URL = 'http://127.0.0.1:54321'
+const CONTAINER = 'supabase_db_nagar-shield'
 
-const DEV_PASSWORD = 'nagar-local-dev';
-const MODERATOR_EMAIL = 'mod@nagar.local';
-const CITIZEN_EMAIL = 'citizen@nagar.local';
-const CITIZEN2_EMAIL = 'citizen2@nagar.local';
-const CITIZEN_ID = '11111111-1111-1111-1111-1111111111a1';
-const MODERATOR_ID = '11111111-1111-1111-1111-1111111111a2';
+const DEV_PASSWORD = 'nagar-local-dev'
+const MODERATOR_EMAIL = 'mod@nagar.local'
+const CITIZEN_EMAIL = 'citizen@nagar.local'
+const CITIZEN2_EMAIL = 'citizen2@nagar.local'
+const CITIZEN_ID = '11111111-1111-1111-1111-1111111111a1'
+const MODERATOR_ID = '11111111-1111-1111-1111-1111111111a2'
 
 /**
  * The author token — the hex SHA-256 of the author's user id.
@@ -37,26 +37,26 @@ const MODERATOR_ID = '11111111-1111-1111-1111-1111111111a2';
  * the author's uuid (FR-DATA-3).
  */
 function authorToken(userId) {
-  return createHash('sha256').update(userId, 'utf8').digest('hex');
+  return createHash('sha256').update(userId, 'utf8').digest('hex')
 }
 
-const results = [];
+const results = []
 
 function record(name, passed, detail = '') {
-  results.push({ name, passed, detail });
-  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
+  results.push({ name, passed, detail })
+  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
 function localEnv() {
   const output = execFileSync('npx', ['supabase', 'status', '-o', 'env'], {
     encoding: 'utf8',
     shell: true,
-  });
+  })
   const read = (key) => {
-    const match = output.match(new RegExp(`${key}="([^"]+)"`));
-    return match ? match[1] : '';
-  };
-  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') };
+    const match = output.match(new RegExp(`${key}="([^"]+)"`))
+    return match ? match[1] : ''
+  }
+  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') }
 }
 
 /** Reads a scalar out of the local database as the table owner. */
@@ -65,8 +65,8 @@ function queryScalar(sql) {
     'docker',
     ['exec', CONTAINER, 'psql', '-U', 'postgres', '-d', 'postgres', '-t', '-A', '-c', sql],
     { encoding: 'utf8' },
-  );
-  return output.trim();
+  )
+  return output.trim()
 }
 
 async function signIn(email, password) {
@@ -74,9 +74,9 @@ async function signIn(email, password) {
     method: 'POST',
     headers: { apikey: localEnv().anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return body.access_token ?? null;
+  })
+  const body = await response.json().catch(() => ({}))
+  return body.access_token ?? null
 }
 
 async function callFunction(name, body, bearer) {
@@ -88,15 +88,15 @@ async function callFunction(name, body, bearer) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body ?? {}),
-  });
-  const text = await response.text();
-  let parsed = null;
+  })
+  const text = await response.text()
+  let parsed = null
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text)
   } catch {
-    parsed = { raw: text };
+    parsed = { raw: text }
   }
-  return { status: response.status, body: parsed, text };
+  return { status: response.status, body: parsed, text }
 }
 
 /** A PostgREST call of a database function, as the signed-in user. */
@@ -109,15 +109,15 @@ async function callRpc(name, body, bearer) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body ?? {}),
-  });
-  const text = await response.text();
-  let parsed = null;
+  })
+  const text = await response.text()
+  let parsed = null
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text)
   } catch {
-    parsed = { raw: text };
+    parsed = { raw: text }
   }
-  return { status: response.status, body: parsed, text };
+  return { status: response.status, body: parsed, text }
 }
 
 /**
@@ -128,7 +128,7 @@ async function callRpc(name, body, bearer) {
  * requires one, and the `profiles.phone` CHECK would reject a malformed one.
  */
 async function createThrowawayCitizen(email) {
-  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0')
   const response = await fetch(`${API_URL}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
@@ -142,130 +142,134 @@ async function createThrowawayCitizen(email) {
       email_confirm: true,
       user_metadata: { phone: `+88019${subscriber}` },
     }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return body.id ?? null;
+  })
+  const body = await response.json().catch(() => ({}))
+  return body.id ?? null
 }
 
 async function main() {
-  const { anonKey, serviceRoleKey } = localEnv();
+  const { anonKey, serviceRoleKey } = localEnv()
 
-  const moderatorToken = await signIn(MODERATOR_EMAIL, DEV_PASSWORD);
-  const citizenToken = await signIn(CITIZEN_EMAIL, DEV_PASSWORD);
+  const moderatorToken = await signIn(MODERATOR_EMAIL, DEV_PASSWORD)
+  const citizenToken = await signIn(CITIZEN_EMAIL, DEV_PASSWORD)
 
-  record('the moderator can sign in', Boolean(moderatorToken));
-  record('the citizen can sign in', Boolean(citizenToken));
+  record('the moderator can sign in', Boolean(moderatorToken))
+  record('the citizen can sign in', Boolean(citizenToken))
 
   // ---------------------------------------------------------------------
   // 1. The job endpoints are service-role only.
   // ---------------------------------------------------------------------
 
-  const anonPurge = await callFunction('purge-media', {}, anonKey);
+  const anonPurge = await callFunction('purge-media', {}, anonKey)
   record(
     'the media purge refuses an anon bearer',
     anonPurge.status === 401 || anonPurge.status === 403,
     `HTTP ${anonPurge.status}`,
-  );
+  )
 
-  const citizenPurge = await callFunction('purge-media', {}, citizenToken ?? '');
+  const citizenPurge = await callFunction('purge-media', {}, citizenToken ?? '')
   record(
     'the media purge refuses a citizen bearer',
     citizenPurge.status === 401 || citizenPurge.status === 403,
     `HTTP ${citizenPurge.status}`,
-  );
+  )
 
-  const anonCleanup = await callFunction('cleanup-geocode-cache', {}, anonKey);
+  const anonCleanup = await callFunction('cleanup-geocode-cache', {}, anonKey)
   record(
     'the cache cleanup refuses an anon bearer',
     anonCleanup.status === 401 || anonCleanup.status === 403,
     `HTTP ${anonCleanup.status}`,
-  );
+  )
 
-  const anonAccountPurge = await callFunction('purge-deleted-accounts', {}, anonKey);
+  const anonAccountPurge = await callFunction('purge-deleted-accounts', {}, anonKey)
   record(
     'the account purge refuses an anon bearer',
     anonAccountPurge.status === 401 || anonAccountPurge.status === 403,
     `HTTP ${anonAccountPurge.status}`,
-  );
+  )
 
-  const anonHeartbeat = await callFunction('keep-project-awake', {}, anonKey);
+  const anonHeartbeat = await callFunction('keep-project-awake', {}, anonKey)
   record(
     'the heartbeat refuses an anon bearer',
     anonHeartbeat.status === 401 || anonHeartbeat.status === 403,
     `HTTP ${anonHeartbeat.status}`,
-  );
+  )
 
   // ---------------------------------------------------------------------
   // 2. The job runs with the service-role bearer and writes one audit row.
   // ---------------------------------------------------------------------
 
-  const runsBefore = Number(queryScalar("select count(*) from public.job_runs;"));
-  const cleanup = await callFunction('cleanup-geocode-cache', {}, serviceRoleKey);
+  const runsBefore = Number(queryScalar('select count(*) from public.job_runs;'))
+  const cleanup = await callFunction('cleanup-geocode-cache', {}, serviceRoleKey)
   record(
     'the cache cleanup runs with the service-role bearer',
     cleanup.status === 200 && cleanup.body?.data?.job_name === 'cleanup_geocode_cache',
     `HTTP ${cleanup.status}`,
-  );
+  )
 
-  const runsAfter = Number(queryScalar("select count(*) from public.job_runs;"));
+  const runsAfter = Number(queryScalar('select count(*) from public.job_runs;'))
   record(
     'the job wrote exactly one job_runs row',
     runsAfter === runsBefore + 1,
     `${runsBefore} → ${runsAfter}`,
-  );
+  )
 
   const lastRun = queryScalar(
-    "select status from public.job_runs order by started_at desc limit 1;",
-  );
-  record('the job closed its run row as succeeded', lastRun === 'succeeded', lastRun);
+    'select status from public.job_runs order by started_at desc limit 1;',
+  )
+  record('the job closed its run row as succeeded', lastRun === 'succeeded', lastRun)
 
   // The heartbeat is the fourth job: it must answer, and it must write its own
   // audit row — a missing heartbeat row is the signal that the project would
   // have paused on inactivity.
   const heartbeatRunsBefore = Number(
     queryScalar("select count(*) from public.job_runs where job_name = 'keep_project_awake';"),
-  );
-  const heartbeat = await callFunction('keep-project-awake', {}, serviceRoleKey);
+  )
+  const heartbeat = await callFunction('keep-project-awake', {}, serviceRoleKey)
   const heartbeatRunsAfter = Number(
     queryScalar("select count(*) from public.job_runs where job_name = 'keep_project_awake';"),
-  );
+  )
 
   record(
     'the heartbeat runs with the service-role bearer',
     heartbeat.status === 200 && heartbeat.body?.data?.job_name === 'keep_project_awake',
     `HTTP ${heartbeat.status}`,
-  );
+  )
   record(
     'the heartbeat wrote its own audit row',
     heartbeatRunsAfter === heartbeatRunsBefore + 1,
     `${heartbeatRunsBefore} → ${heartbeatRunsAfter}`,
-  );
+  )
 
   // ---------------------------------------------------------------------
   // 3. The media purge's dry run deletes nothing.
   // ---------------------------------------------------------------------
 
-  const mediaBefore = queryScalar('select count(*) from public.report_media;');
-  const dryRun = await callFunction('purge-media', { dry_run: true }, serviceRoleKey);
-  const mediaAfter = queryScalar('select count(*) from public.report_media;');
+  const mediaBefore = queryScalar('select count(*) from public.report_media;')
+  const dryRun = await callFunction('purge-media', { dry_run: true }, serviceRoleKey)
+  const mediaAfter = queryScalar('select count(*) from public.report_media;')
 
   record(
     'the media purge answers a dry run',
     dryRun.status === 200 && dryRun.body?.data?.dry_run === true,
     `HTTP ${dryRun.status}`,
-  );
-  record('the dry run deleted nothing', mediaBefore === mediaAfter, `${mediaBefore} → ${mediaAfter}`);
+  )
+  record(
+    'the dry run deleted nothing',
+    mediaBefore === mediaAfter,
+    `${mediaBefore} → ${mediaAfter}`,
+  )
 
   // A dry run must close its own `job_runs` row. A row left `running` shows
   // up in the runbook's monitor stage as a job that died mid-flight.
   const staleRuns = queryScalar(
     "select count(*) from public.job_runs where status = 'running' and finished_at is null;",
-  );
+  )
   record(
     'the dry run closed its own audit row',
     Number(staleRuns) === 0,
     `${staleRuns} stale row(s)`,
-  );
+  )
 
   // ---------------------------------------------------------------------
   // 4. The moderator endpoints refuse a citizen.
@@ -279,34 +283,34 @@ async function main() {
       note: 'citizen attempt',
     },
     citizenToken ?? '',
-  );
+  )
   record(
     'a citizen cannot call moderation-decide',
     citizenDecide.status === 401 || citizenDecide.status === 403,
     `HTTP ${citizenDecide.status}`,
-  );
+  )
 
   const citizenDisable = await callFunction(
     'disable-user',
     { user_id: '11111111-1111-1111-1111-1111111111a3', note: 'citizen attempt' },
     citizenToken ?? '',
-  );
+  )
   record(
     'a citizen cannot call disable-user',
     citizenDisable.status === 401 || citizenDisable.status === 403,
     `HTTP ${citizenDisable.status}`,
-  );
+  )
 
   const anonDisable = await callFunction(
     'disable-user',
     { user_id: '11111111-1111-1111-1111-1111111111a3', note: 'anon attempt' },
     anonKey,
-  );
+  )
   record(
     'an anon cannot call disable-user',
     anonDisable.status === 401 || anonDisable.status === 403,
     `HTTP ${anonDisable.status}`,
-  );
+  )
 
   // ---------------------------------------------------------------------
   // 5. finalize_capture — idempotent, and the area is stored.
@@ -319,7 +323,7 @@ async function main() {
   // is behaving correctly. A fresh key per run keeps the idempotency check
   // honest (the retry below still uses the same key) and keeps the suite
   // re-runnable on a working database.
-  const clientRequestId = randomUUID();
+  const clientRequestId = randomUUID()
   const payload = {
     client_request_id: clientRequestId,
     // The path's second segment is the **author token** — the hex SHA-256 of
@@ -340,43 +344,43 @@ async function main() {
     description: 'edge function smoke test',
     public_visibility: 'anonymous',
     category: 'theft',
-  };
+  }
 
-  const first = await callFunction('finalize-capture', payload, citizenToken ?? '');
+  const first = await callFunction('finalize-capture', payload, citizenToken ?? '')
   record(
     'finalize-capture accepts a valid payload',
     first.status === 200 && Boolean(first.body?.data?.report_id),
     `HTTP ${first.status}`,
-  );
+  )
   record(
     'the response carries the area hierarchy and the moderation status',
     Boolean(first.body?.data?.area_hierarchy) && first.body?.data?.moderation_status === 'visible',
-  );
+  )
 
-  const second = await callFunction('finalize-capture', payload, citizenToken ?? '');
+  const second = await callFunction('finalize-capture', payload, citizenToken ?? '')
   record(
     'finalize-capture is idempotent',
     second.status === 200 && second.body?.data?.report_id === first.body?.data?.report_id,
     `${first.body?.data?.report_id} vs ${second.body?.data?.report_id}`,
-  );
+  )
 
   const reportRows = queryScalar(
     `select count(*) from public.reports where client_request_id = '${clientRequestId}';`,
-  );
-  record('the retried submit created exactly one report row', reportRows === '1', reportRows);
+  )
+  record('the retried submit created exactly one report row', reportRows === '1', reportRows)
 
   const mediaRows = queryScalar(
     `select count(*) from public.report_media rm
      join public.reports r on r.id = rm.report_id
      where r.client_request_id = '${clientRequestId}';`,
-  );
-  record('the retried submit created exactly one media row', mediaRows === '1', mediaRows);
+  )
+  record('the retried submit created exactly one media row', mediaRows === '1', mediaRows)
 
   const storedArea = queryScalar(
     `select r.area_hierarchy ->> 'division' from public.reports r
      where r.client_request_id = '${clientRequestId}';`,
-  );
-  record('the resolved area was stored on the report', storedArea === 'Dhaka', storedArea);
+  )
+  record('the resolved area was stored on the report', storedArea === 'Dhaka', storedArea)
 
   // A storage path that belongs to another user is refused.
   const foreignPath = await callFunction(
@@ -387,48 +391,52 @@ async function main() {
       storage_path: `reports/${authorToken('11111111-1111-1111-1111-1111111111a3')}/foreign.jpg`,
     },
     citizenToken ?? '',
-  );
+  )
   record(
     'a foreign storage path is refused',
     foreignPath.status === 403,
     `HTTP ${foreignPath.status}`,
-  );
+  )
 
   // An invalid payload is refused by the shared Zod schema.
   const invalid = await callFunction(
     'finalize-capture',
     { ...payload, client_request_id: 'not-a-uuid' },
     citizenToken ?? '',
-  );
+  )
   record(
     'an invalid payload is refused with VALIDATION_FAILED',
     invalid.status === 400 && invalid.body?.error?.code === 'VALIDATION_FAILED',
     `HTTP ${invalid.status} ${invalid.body?.error?.code ?? ''}`,
-  );
+  )
 
   // A description over the cap is refused.
   const tooLong = await callFunction(
     'finalize-capture',
-    { ...payload, client_request_id: '77777777-7777-4777-8777-777777777703', description: 'x'.repeat(141) },
+    {
+      ...payload,
+      client_request_id: '77777777-7777-4777-8777-777777777703',
+      description: 'x'.repeat(141),
+    },
     citizenToken ?? '',
-  );
-  record(
-    'a 141-character description is refused',
-    tooLong.status === 400,
-    `HTTP ${tooLong.status}`,
-  );
+  )
+  record('a 141-character description is refused', tooLong.status === 400, `HTTP ${tooLong.status}`)
 
   // A media file over the cap is refused.
   const tooLarge = await callFunction(
     'finalize-capture',
-    { ...payload, client_request_id: '77777777-7777-4777-8777-777777777704', byte_size: 20_000_000 },
+    {
+      ...payload,
+      client_request_id: '77777777-7777-4777-8777-777777777704',
+      byte_size: 20_000_000,
+    },
     citizenToken ?? '',
-  );
+  )
   record(
     'an oversized media file is refused with MEDIA_TOO_LARGE',
     tooLarge.status === 413 && tooLarge.body?.error?.code === 'MEDIA_TOO_LARGE',
     `HTTP ${tooLarge.status} ${tooLarge.body?.error?.code ?? ''}`,
-  );
+  )
 
   // ---------------------------------------------------------------------
   // 6. The moderator's decision lands in the append-only audit trail.
@@ -438,7 +446,7 @@ async function main() {
   // Picking "any visible report" instead would make the test consume the
   // seed data: the first run would remove the only visible report and every
   // later run would find nothing to moderate.
-  const targetReport = first.body?.data?.report_id ?? '';
+  const targetReport = first.body?.data?.report_id ?? ''
 
   if (targetReport) {
     // A moderator only ever sees the `hidden_pending_review` queue, and
@@ -452,13 +460,17 @@ async function main() {
     // threshold. The flags go through the real `flag_report` RPC as real
     // signed-in citizens — the transition is the product's own, not a
     // hand-written UPDATE that would bypass the rule it is meant to test.
-    const flaggerEmails = [CITIZEN2_EMAIL, MODERATOR_EMAIL, `smoke-flagger-${randomUUID()}@test.local`];
-    await createThrowawayCitizen(flaggerEmails[2]);
+    const flaggerEmails = [
+      CITIZEN2_EMAIL,
+      MODERATOR_EMAIL,
+      `smoke-flagger-${randomUUID()}@test.local`,
+    ]
+    await createThrowawayCitizen(flaggerEmails[2])
 
-    let flagged = 0;
+    let flagged = 0
     for (const email of flaggerEmails) {
-      const token = await signIn(email, DEV_PASSWORD);
-      if (!token) continue;
+      const token = await signIn(email, DEV_PASSWORD)
+      if (!token) continue
       // The flag's identity comes from the JWT, not from the caller — that is
       // the anti-impersonation rule, and it is why the three flags must be
       // three real sessions.
@@ -466,30 +478,26 @@ async function main() {
         'flag_report',
         { p_report_id: targetReport, p_reason: 'other' },
         token,
-      );
-      if (flag.status === 200) flagged += 1;
+      )
+      if (flag.status === 200) flagged += 1
     }
-    record('three distinct citizens flagged the report', flagged === 3, `${flagged} flag(s)`);
+    record('three distinct citizens flagged the report', flagged === 3, `${flagged} flag(s)`)
 
     const queuedStatus = queryScalar(
       `select moderation_status from public.reports where id = '${targetReport}';`,
-    );
+    )
     record(
       'the flagged report is in the moderator queue',
       queuedStatus === 'hidden_pending_review',
       queuedStatus,
-    );
+    )
 
     const decide = await callFunction(
       'moderation-decide',
       { report_id: targetReport, decision: 'remove', note: 'edge function smoke test' },
       moderatorToken ?? '',
-    );
-    record(
-      'a moderator can call moderation-decide',
-      decide.status === 200,
-      `HTTP ${decide.status}`,
-    );
+    )
+    record('a moderator can call moderation-decide', decide.status === 200, `HTTP ${decide.status}`)
 
     // The count is scoped to THIS run's report. A fixed note would accumulate
     // one row per run — the trail is append-only, so the count only grows —
@@ -498,13 +506,13 @@ async function main() {
     const auditRows = queryScalar(
       `select count(*) from public.moderation_actions
        where report_id = '${targetReport}' and note = 'edge function smoke test';`,
-    );
-    record('the decision wrote an append-only audit row', auditRows === '1', auditRows);
+    )
+    record('the decision wrote an append-only audit row', auditRows === '1', auditRows)
 
     const status = queryScalar(
       `select moderation_status from public.reports where id = '${targetReport}';`,
-    );
-    record('the report is now removed', status === 'removed', status);
+    )
+    record('the report is now removed', status === 'removed', status)
 
     // The second decision on the same report must be refused — and it must
     // write no second audit row. This is the "exactly one row per decision"
@@ -513,24 +521,24 @@ async function main() {
       'moderation-decide',
       { report_id: targetReport, decision: 'remove', note: 'edge function smoke test' },
       moderatorToken ?? '',
-    );
+    )
     record(
       'a second decision on the same report is refused with CONFLICT',
       secondDecide.status === 409 && secondDecide.body?.error?.code === 'CONFLICT',
       `HTTP ${secondDecide.status} ${secondDecide.body?.error?.code ?? ''}`,
-    );
+    )
 
     const auditRowsAfter = queryScalar(
       `select count(*) from public.moderation_actions
        where report_id = '${targetReport}' and note = 'edge function smoke test';`,
-    );
+    )
     record(
       'the refused second decision wrote no second audit row',
       auditRowsAfter === '1',
       auditRowsAfter,
-    );
+    )
   } else {
-    record('a moderator can call moderation-decide', false, 'no visible report to act on');
+    record('a moderator can call moderation-decide', false, 'no visible report to act on')
   }
 
   // A moderator cannot disable themselves.
@@ -538,23 +546,23 @@ async function main() {
     'disable-user',
     { user_id: '11111111-1111-1111-1111-1111111111a2', note: 'self attempt' },
     moderatorToken ?? '',
-  );
+  )
   record(
     'a moderator cannot disable their own account',
     selfDisable.status === 403,
     `HTTP ${selfDisable.status}`,
-  );
+  )
 
-  finish();
+  finish()
 }
 
 function finish() {
-  const failed = results.filter((result) => !result.passed);
-  console.log(`\n${results.length - failed.length}/${results.length} Edge Function checks passed`);
-  if (failed.length > 0) process.exit(1);
+  const failed = results.filter((result) => !result.passed)
+  console.log(`\n${results.length - failed.length}/${results.length} Edge Function checks passed`)
+  if (failed.length > 0) process.exit(1)
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+  console.error(error)
+  process.exit(1)
+})

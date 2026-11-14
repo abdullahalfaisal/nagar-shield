@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { supabase, secureStore } from '@/shared/api/supabase';
-import { isBiometricAvailable } from '@/shared/auth/biometricService';
+import { useCallback, useEffect, useState } from 'react'
+import { supabase, secureStore } from '@/shared/api/supabase'
+import { isBiometricAvailable } from '@/shared/auth/biometricService'
 
 /**
  * Decides whether a returning session must pass the biometric gate.
@@ -32,11 +32,11 @@ import { isBiometricAvailable } from '@/shared/auth/biometricService';
  * later foreground is treated as a returning session again.
  */
 
-export type BiometricGateState = 'checking' | 'required' | 'not-required';
+export type BiometricGateState = 'checking' | 'required' | 'not-required'
 
 export interface BiometricGate {
-  state: BiometricGateState;
-  refresh: () => Promise<void>;
+  state: BiometricGateState
+  refresh: () => Promise<void>
 }
 
 /**
@@ -46,12 +46,12 @@ export interface BiometricGate {
  * required — there is nothing to re-authenticate.
  */
 export function useBiometricGate(userId: string | undefined): BiometricGate {
-  const [state, setState] = useState<BiometricGateState>('checking');
+  const [state, setState] = useState<BiometricGateState>('checking')
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      setState('not-required');
-      return;
+      setState('not-required')
+      return
     }
 
     try {
@@ -59,48 +59,48 @@ export function useBiometricGate(userId: string | undefined): BiometricGate {
         .from('profiles')
         .select('biometric_opt_in')
         .eq('id', userId)
-        .maybeSingle();
+        .maybeSingle()
 
       if (!data?.biometric_opt_in) {
-        setState('not-required');
-        return;
+        setState('not-required')
+        return
       }
 
-      const available = await isBiometricAvailable();
+      const available = await isBiometricAvailable()
       if (!available) {
-        setState('not-required');
-        return;
+        setState('not-required')
+        return
       }
 
       // The user just signed in with a password — no gate for this launch.
       if (await wasSignedInWithPassword()) {
-        setState('not-required');
-        return;
+        setState('not-required')
+        return
       }
 
       // The gate was already passed in this foreground — asking again
       // would loop the user back onto the prompt they just satisfied.
       if (await wasGatePassed()) {
-        setState('not-required');
-        return;
+        setState('not-required')
+        return
       }
 
-      setState('required');
+      setState('required')
     } catch {
       // The preference could not be read. Offering the gate on a guess
       // would put a fingerprint prompt in front of a user who never asked
       // for one; skipping it would let an opted-in user in without the
       // check they wanted. Neither is safe, so the app falls back to the
       // password screen — the strictly-more-secure of the two.
-      setState('not-required');
+      setState('not-required')
     }
-  }, [userId]);
+  }, [userId])
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void refresh()
+  }, [refresh])
 
-  return { state, refresh };
+  return { state, refresh }
 }
 
 /**
@@ -110,12 +110,12 @@ export function useBiometricGate(userId: string | undefined): BiometricGate {
  * goes to the background, so the next foreground counts as a returning
  * session — which is the case the biometric gate is for.
  */
-const PASSWORD_SESSION_KEY = 'nagar-shield.password-session';
-const GATE_PASSED_KEY = 'nagar-shield.gate-passed';
+const PASSWORD_SESSION_KEY = 'nagar-shield.password-session'
+const GATE_PASSED_KEY = 'nagar-shield.gate-passed'
 
 export async function markPasswordSignIn(): Promise<void> {
   try {
-    await secureStore.setItem(PASSWORD_SESSION_KEY, '1');
+    await secureStore.setItem(PASSWORD_SESSION_KEY, '1')
   } catch {
     // If the flag cannot be written, the gate is offered on the next
     // foreground — which is the safe direction.
@@ -124,7 +124,7 @@ export async function markPasswordSignIn(): Promise<void> {
 
 export async function clearPasswordSignIn(): Promise<void> {
   try {
-    await secureStore.removeItem(PASSWORD_SESSION_KEY);
+    await secureStore.removeItem(PASSWORD_SESSION_KEY)
   } catch {
     // Nothing to do.
   }
@@ -132,9 +132,9 @@ export async function clearPasswordSignIn(): Promise<void> {
 
 export async function wasSignedInWithPassword(): Promise<boolean> {
   try {
-    return (await secureStore.getItem(PASSWORD_SESSION_KEY)) === '1';
+    return (await secureStore.getItem(PASSWORD_SESSION_KEY)) === '1'
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -151,7 +151,7 @@ export async function wasSignedInWithPassword(): Promise<boolean> {
  */
 export async function markGatePassed(): Promise<void> {
   try {
-    await secureStore.setItem(GATE_PASSED_KEY, '1');
+    await secureStore.setItem(GATE_PASSED_KEY, '1')
   } catch {
     // If the flag cannot be written the gate may re-arm. That is a
     // nuisance, not a lockout — the fingerprint still works.
@@ -160,15 +160,15 @@ export async function markGatePassed(): Promise<void> {
 
 export async function wasGatePassed(): Promise<boolean> {
   try {
-    return (await secureStore.getItem(GATE_PASSED_KEY)) === '1';
+    return (await secureStore.getItem(GATE_PASSED_KEY)) === '1'
   } catch {
-    return false;
+    return false
   }
 }
 
 export async function clearGatePassed(): Promise<void> {
   try {
-    await secureStore.removeItem(GATE_PASSED_KEY);
+    await secureStore.removeItem(GATE_PASSED_KEY)
   } catch {
     // Nothing to do.
   }

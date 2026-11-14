@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import {
-  AppError,
-  emergencyContactSchema,
-  type EmergencyContact,
-} from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar, Button, InputField, RadioGroup, Toggle } from '@/shared/ui';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError, emergencyContactSchema, type EmergencyContact } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar, Button, InputField, RadioGroup, Toggle } from '@/shared/ui'
 import {
   clearPrimary,
   createContact,
@@ -16,9 +12,9 @@ import {
   updateContact,
   useContact,
   useInvalidateContacts,
-} from '@/shared/api/contacts';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+} from '@/shared/api/contacts'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * The contact editor — the one screen behind both "add a contact" and
@@ -41,39 +37,39 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * There is **no cap** on how many contacts may be saved (A-4).
  */
 export default function ContactEditorScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
-  const invalidate = useInvalidateContacts();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
+  const invalidate = useInvalidateContacts()
 
-  const params = useLocalSearchParams<{ id?: string }>();
-  const contactId = params.id;
+  const params = useLocalSearchParams<{ id?: string }>()
+  const contactId = params.id
 
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [groupName, setGroupName] = useState<EmergencyContact['groupName']>('other');
-  const [isPrimary, setIsPrimary] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [groupName, setGroupName] = useState<EmergencyContact['groupName']>('other')
+  const [isPrimary, setIsPrimary] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
 
   // The contact being edited, if any. The form is pre-filled from it, so an
   // edit never overwrites a contact with a blank form.
-  const { data: existing } = useContact(contactId);
+  const { data: existing } = useContact(contactId)
 
   // Whether the row was primary **before** this edit. The demotion is only
   // worth writing when the flag was set and the user has now turned it off;
   // the app never silently promotes a different contact to compensate.
-  const wasPrimary = existing?.isPrimary ?? false;
+  const wasPrimary = existing?.isPrimary ?? false
 
   useEffect(() => {
-    if (!existing) return;
+    if (!existing) return
 
-    setName(existing.name);
-    setPhone(existing.phone);
-    setGroupName(existing.groupName);
-    setIsPrimary(existing.isPrimary);
-  }, [existing]);
+    setName(existing.name)
+    setPhone(existing.phone)
+    setGroupName(existing.groupName)
+    setIsPrimary(existing.isPrimary)
+  }, [existing])
 
   // The group options come from the shared schema's enum, so the screen and
   // the database can never disagree about which groups exist.
@@ -84,7 +80,7 @@ export default function ContactEditorScreen() {
         label: groupLabel(group, t),
       })),
     [t],
-  );
+  )
 
   const onSave = useCallback(async () => {
     const parsed = emergencyContactSchema.safeParse({
@@ -93,18 +89,18 @@ export default function ContactEditorScreen() {
       isPrimary,
       groupName,
       sortOrder: 0,
-    });
+    })
 
-    const nextErrors: Record<string, string> = {};
+    const nextErrors: Record<string, string> = {}
     if (!parsed.success) {
-      const field = parsed.error.issues[0]?.path[0];
-      nextErrors[field === 'phone' ? 'phone' : 'name'] = t('errors.validationFailed');
+      const field = parsed.error.issues[0]?.path[0]
+      nextErrors[field === 'phone' ? 'phone' : 'name'] = t('errors.validationFailed')
     }
-    setErrors(nextErrors);
-    if (!parsed.success) return;
+    setErrors(nextErrors)
+    if (!parsed.success) return
 
-    setSubmitting(true);
-    setFormError(undefined);
+    setSubmitting(true)
+    setFormError(undefined)
 
     try {
       if (contactId) {
@@ -122,42 +118,42 @@ export default function ContactEditorScreen() {
           name: parsed.data.name,
           phone: parsed.data.phone,
           groupName: parsed.data.groupName,
-        });
+        })
 
         if (parsed.data.isPrimary) {
-          await makePrimary(contactId);
+          await makePrimary(contactId)
         } else if (wasPrimary) {
-          await clearPrimary(contactId);
+          await clearPrimary(contactId)
         }
       } else {
         const created = await createContact({
           name: parsed.data.name,
           phone: parsed.data.phone,
           groupName: parsed.data.groupName,
-        });
+        })
 
         if (parsed.data.isPrimary) {
-          await makePrimary(created.id);
+          await makePrimary(created.id)
         }
       }
 
-      await invalidate();
-      router.back();
+      await invalidate()
+      router.back()
     } catch (error) {
-      const appError = error instanceof AppError ? error : fromSupabaseError(error);
+      const appError = error instanceof AppError ? error : fromSupabaseError(error)
 
       // A validation failure that names the phone field is shown **on that
       // field**, not as a banner above the form.
       if (appError.code === 'VALIDATION_FAILED' && appError.details?.field === 'phone') {
-        setErrors({ phone: t('errors.validationFailed') });
-        setFormError(undefined);
+        setErrors({ phone: t('errors.validationFailed') })
+        setFormError(undefined)
       } else {
-        setFormError(errorCopy(t, appError.code));
+        setFormError(errorCopy(t, appError.code))
       }
 
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  }, [contactId, groupName, invalidate, isPrimary, name, phone, router, t, wasPrimary]);
+  }, [contactId, groupName, invalidate, isPrimary, name, phone, router, t, wasPrimary])
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -245,19 +241,19 @@ export default function ContactEditorScreen() {
         />
       </View>
     </View>
-  );
+  )
 }
 
 function groupLabel(group: EmergencyContact['groupName'], t: (key: string) => string): string {
   switch (group) {
     case 'family':
-      return t('contacts.groupFamily');
+      return t('contacts.groupFamily')
     case 'friend':
-      return t('contacts.groupFriend');
+      return t('contacts.groupFriend')
     case 'colleague':
-      return t('contacts.groupColleague');
+      return t('contacts.groupColleague')
     default:
-      return t('contacts.groupOther');
+      return t('contacts.groupOther')
   }
 }
 
@@ -307,4 +303,4 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: 24,
   },
-});
+})

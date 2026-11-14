@@ -1,5 +1,5 @@
-import { ModeratorGate } from '@/app/moderator-gate';
-import { AuditClient } from '@/app/audit/audit-client';
+import { ModeratorGate } from '@/app/moderator-gate'
+import { AuditClient } from '@/app/audit/audit-client'
 
 /**
  * The audit trail route.
@@ -15,5 +15,5 @@ export default function AuditPage() {
     <ModeratorGate>
       <AuditClient />
     </ModeratorGate>
-  );
+  )
 }

@@ -7,123 +7,123 @@
  * console's copy is deliberately short: a moderator reads a queue, not prose.
  */
 
-export type AdminLocale = 'bn' | 'en';
+export type AdminLocale = 'bn' | 'en'
 
 export interface AdminCopy {
-  appName: string;
-  appTagline: string;
-  navQueue: string;
-  navUsers: string;
-  navAudit: string;
-  signOut: string;
+  appName: string
+  appTagline: string
+  navQueue: string
+  navUsers: string
+  navAudit: string
+  signOut: string
 
-  loginTitle: string;
-  loginSubtitle: string;
-  loginEmail: string;
-  loginPassword: string;
-  loginSubmit: string;
-  loginSubmitting: string;
-  loginBackToQueue: string;
+  loginTitle: string
+  loginSubtitle: string
+  loginEmail: string
+  loginPassword: string
+  loginSubmit: string
+  loginSubmitting: string
+  loginBackToQueue: string
 
-  accessOnlyTitle: string;
-  accessOnlyBody: string;
+  accessOnlyTitle: string
+  accessOnlyBody: string
 
-  queueTitle: string;
-  queueSubtitle: string;
-  queueEmptyTitle: string;
-  queueEmptyBody: string;
-  queueLoadMore: string;
-  queueEnd: string;
-  queueLoading: string;
-  queueUploader: string;
-  queueGroupAll: string;
-  queueGroupAuthorAutoHide: string;
-  queueGroupEmptyTitle: string;
-  queueGroupEmptyBody: string;
-  queueBadgeAuthorAutoHide: string;
-  queueBadgeBoth: string;
-  queueAuthorFlagCount: string;
-  queueOwnFlagCount: string;
-  queueAuthorAutoHideExplanation: string;
+  queueTitle: string
+  queueSubtitle: string
+  queueEmptyTitle: string
+  queueEmptyBody: string
+  queueLoadMore: string
+  queueEnd: string
+  queueLoading: string
+  queueUploader: string
+  queueGroupAll: string
+  queueGroupAuthorAutoHide: string
+  queueGroupEmptyTitle: string
+  queueGroupEmptyBody: string
+  queueBadgeAuthorAutoHide: string
+  queueBadgeBoth: string
+  queueAuthorFlagCount: string
+  queueOwnFlagCount: string
+  queueAuthorAutoHideExplanation: string
 
-  detailTitle: string;
-  detailMedia: string;
-  detailNoMedia: string;
-  detailMediaUnavailable: string;
-  detailMediaRetry: string;
-  detailArea: string;
-  detailCategory: string;
-  detailUncategorised: string;
-  detailDescription: string;
-  detailCapturedAt: string;
-  detailFlags: string;
-  detailFlagReporter: string;
-  detailUploader: string;
-  detailUploaderId: string;
-  detailUploaderPhone: string;
-  detailUploaderEmail: string;
-  detailUploaderRole: string;
-  detailUploaderState: string;
-  detailStateActive: string;
-  detailStateDisabled: string;
-  detailPriorActions: string;
-  detailAutoHideBanner: string;
-  detailNoPriorActions: string;
+  detailTitle: string
+  detailMedia: string
+  detailNoMedia: string
+  detailMediaUnavailable: string
+  detailMediaRetry: string
+  detailArea: string
+  detailCategory: string
+  detailUncategorised: string
+  detailDescription: string
+  detailCapturedAt: string
+  detailFlags: string
+  detailFlagReporter: string
+  detailUploader: string
+  detailUploaderId: string
+  detailUploaderPhone: string
+  detailUploaderEmail: string
+  detailUploaderRole: string
+  detailUploaderState: string
+  detailStateActive: string
+  detailStateDisabled: string
+  detailPriorActions: string
+  detailAutoHideBanner: string
+  detailNoPriorActions: string
 
-  decisionHeading: string;
-  decisionRestore: string;
-  decisionRemove: string;
-  decisionRemoveWarning: string;
-  decisionNote: string;
-  decisionNotePlaceholder: string;
-  decisionNoteRequired: string;
-  decisionSubmit: string;
-  decisionSubmitting: string;
-  decisionConfirmRemove: string;
+  decisionHeading: string
+  decisionRestore: string
+  decisionRemove: string
+  decisionRemoveWarning: string
+  decisionNote: string
+  decisionNotePlaceholder: string
+  decisionNoteRequired: string
+  decisionSubmit: string
+  decisionSubmitting: string
+  decisionConfirmRemove: string
 
-  usersTitle: string;
-  usersSubtitle: string;
-  usersSearchLabel: string;
-  usersSearchPlaceholder: string;
-  usersSearchSubmit: string;
-  usersEmptyTitle: string;
-  usersEmptyBody: string;
-  usersReportCount: string;
-  usersDisable: string;
-  usersDisableHeading: string;
-  usersDisableReason: string;
-  usersDisableReasonPlaceholder: string;
-  usersDisableSubmit: string;
-  usersDisableSubmitting: string;
-  usersDisableForbidden: string;
-  usersDisabledBadge: string;
+  usersTitle: string
+  usersSubtitle: string
+  usersSearchLabel: string
+  usersSearchPlaceholder: string
+  usersSearchSubmit: string
+  usersEmptyTitle: string
+  usersEmptyBody: string
+  usersReportCount: string
+  usersDisable: string
+  usersDisableHeading: string
+  usersDisableReason: string
+  usersDisableReasonPlaceholder: string
+  usersDisableSubmit: string
+  usersDisableSubmitting: string
+  usersDisableForbidden: string
+  usersDisabledBadge: string
 
-  auditTitle: string;
-  auditSubtitle: string;
-  auditFilterDecision: string;
-  auditFilterAll: string;
-  auditColumnTarget: string;
-  auditColumnModerator: string;
-  auditColumnDecision: string;
-  auditColumnNote: string;
-  auditColumnTimestamp: string;
-  auditDecisionRestore: string;
-  auditDecisionRemove: string;
-  auditDecisionDisableUser: string;
-  auditDecisionUnknown: string;
-  auditEmptyTitle: string;
-  auditEmptyBody: string;
-  auditLoadMore: string;
-  auditEnd: string;
-  auditModeratorDeleted: string;
-  auditReportUnavailable: string;
+  auditTitle: string
+  auditSubtitle: string
+  auditFilterDecision: string
+  auditFilterAll: string
+  auditColumnTarget: string
+  auditColumnModerator: string
+  auditColumnDecision: string
+  auditColumnNote: string
+  auditColumnTimestamp: string
+  auditDecisionRestore: string
+  auditDecisionRemove: string
+  auditDecisionDisableUser: string
+  auditDecisionUnknown: string
+  auditEmptyTitle: string
+  auditEmptyBody: string
+  auditLoadMore: string
+  auditEnd: string
+  auditModeratorDeleted: string
+  auditReportUnavailable: string
 
-  errorGeneric: string;
-  errorForbidden: string;
-  errorAuthRequired: string;
-  errorValidation: string;
-  errorConflict: string;
-  errorNotFound: string;
+  errorGeneric: string
+  errorForbidden: string
+  errorAuthRequired: string
+  errorValidation: string
+  errorConflict: string
+  errorNotFound: string
 }
 
 const bn: AdminCopy = {
@@ -185,7 +185,8 @@ const bn: AdminCopy = {
   detailStateActive: 'সক্রিয়',
   detailStateDisabled: 'নিষ্ক্রিয়',
   detailPriorActions: 'আগের সিদ্ধান্ত',
-  detailAutoHideBanner: 'এই রিপোর্টটি লেখকের নিয়মে লুকানো হয়েছে — ২৪ ঘণ্টায় ৫টি ফ্ল্যাগ হওয়ায়।',
+  detailAutoHideBanner:
+    'এই রিপোর্টটি লেখকের নিয়মে লুকানো হয়েছে — ২৪ ঘণ্টায় ৫টি ফ্ল্যাগ হওয়ায়।',
   detailNoPriorActions: 'এই রিপোর্টে আগের কোনো সিদ্ধান্ত নেই।',
 
   decisionHeading: 'সিদ্ধান্ত',
@@ -242,7 +243,7 @@ const bn: AdminCopy = {
   errorValidation: 'কিছু তথ্য সঠিক নয়।',
   errorConflict: 'এটি বর্তমান অবস্থার সাথে সঙ্ঘাত করছে।',
   errorNotFound: 'যা খুঁজছেন তা পাওয়া যায়নি।',
-};
+}
 
 const en: AdminCopy = {
   appName: 'Nagar Shield',
@@ -361,13 +362,13 @@ const en: AdminCopy = {
   errorValidation: 'Some details were not valid.',
   errorConflict: 'That conflicts with the current state.',
   errorNotFound: 'We could not find that.',
-};
+}
 
-const BUNDLES: Record<AdminLocale, AdminCopy> = { bn, en };
+const BUNDLES: Record<AdminLocale, AdminCopy> = { bn, en }
 
 export function getCopy(locale: AdminLocale): AdminCopy {
-  return BUNDLES[locale];
+  return BUNDLES[locale]
 }
 
 /** The console's default locale. Bangla is the product's primary language. */
-export const DEFAULT_ADMIN_LOCALE: AdminLocale = 'bn';
+export const DEFAULT_ADMIN_LOCALE: AdminLocale = 'bn'

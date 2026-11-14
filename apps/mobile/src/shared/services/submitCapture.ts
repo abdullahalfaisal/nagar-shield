@@ -1,8 +1,8 @@
-import { File } from 'expo-file-system';
-import { AppError, authorToken, type PublicVisibility } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { parseErrorBody } from '@/shared/api/errors';
-import { buildStoragePath, newClientRequestId, type PreparedMedia } from './mediaPipeline';
+import { File } from 'expo-file-system'
+import { AppError, authorToken, type PublicVisibility } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { parseErrorBody } from '@/shared/api/errors'
+import { buildStoragePath, newClientRequestId, type PreparedMedia } from './mediaPipeline'
 
 /**
  * The capture write path — the client half.
@@ -18,25 +18,25 @@ import { buildStoragePath, newClientRequestId, type PreparedMedia } from './medi
  */
 
 export interface CaptureSubmission {
-  clientRequestId: string;
-  media: PreparedMedia;
-  lat: number;
-  lng: number;
-  capturedAt: string;
-  description: string | null;
-  publicVisibility: PublicVisibility;
-  category: null;
+  clientRequestId: string
+  media: PreparedMedia
+  lat: number
+  lng: number
+  capturedAt: string
+  description: string | null
+  publicVisibility: PublicVisibility
+  category: null
 }
 
 export interface CaptureResult {
-  reportId: string;
+  reportId: string
   areaHierarchy: {
-    division: string | null;
-    city: string | null;
-    thana: string | null;
-    neighborhood: string | null;
-  } | null;
-  moderationStatus: string;
+    division: string | null
+    city: string | null
+    thana: string | null
+    neighborhood: string | null
+  } | null
+  moderationStatus: string
 }
 
 /**
@@ -55,18 +55,18 @@ export interface CaptureResult {
  * again as a duplicate.
  */
 interface CaptureResponseBody {
-  report_id?: string;
+  report_id?: string
   area_hierarchy?: {
-    division: string | null;
-    city: string | null;
-    thana: string | null;
-    neighborhood: string | null;
-  } | null;
-  moderation_status?: string;
+    division: string | null
+    city: string | null
+    thana: string | null
+    neighborhood: string | null
+  } | null
+  moderation_status?: string
 }
 
 /** The private bucket the report media lives in. */
-const MEDIA_BUCKET = 'report-media';
+const MEDIA_BUCKET = 'report-media'
 
 /**
  * Uploads the sanitised media and finalizes the report.
@@ -75,22 +75,22 @@ const MEDIA_BUCKET = 'report-media';
  * accepts the insert and the Edge Function's ownership check passes.
  */
 export async function submitCapture(submission: CaptureSubmission): Promise<CaptureResult> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session;
+  const { data: sessionData } = await supabase.auth.getSession()
+  const session = sessionData.session
 
   if (!session) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
-  const authorId = session.user.id;
+  const authorId = session.user.id
 
-  const fileName = `${submission.clientRequestId}.${submission.media.extension}`;
+  const fileName = `${submission.clientRequestId}.${submission.media.extension}`
   const storagePath = buildStoragePath({
     authorId,
     clientRequestId: submission.clientRequestId,
     fileName,
     authorToken: await authorToken(authorId),
-  });
+  })
 
   // (1) The bytes go straight to the bucket.
   const { error: uploadError } = await supabase.storage
@@ -98,10 +98,10 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
     .upload(storagePath, await readFileBytes(submission.media.uri), {
       contentType: submission.media.contentType,
       upsert: true,
-    });
+    })
 
   if (uploadError) {
-    throw new AppError('INTERNAL', { stage: 'upload' });
+    throw new AppError('INTERNAL', { stage: 'upload' })
   }
 
   // (2) The metadata goes to the Edge Function.
@@ -127,25 +127,25 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
       public_visibility: submission.publicVisibility,
       category: submission.category,
     }),
-  });
+  })
 
-  const body = await response.json().catch(() => null);
+  const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw parseErrorBody(body);
+    throw parseErrorBody(body)
   }
 
-  const data = (body as { data?: CaptureResponseBody } | null)?.data;
+  const data = (body as { data?: CaptureResponseBody } | null)?.data
 
   if (!data?.report_id) {
-    throw new AppError('INTERNAL');
+    throw new AppError('INTERNAL')
   }
 
   return {
     reportId: data.report_id,
     areaHierarchy: data.area_hierarchy ?? null,
     moderationStatus: data.moderation_status ?? 'visible',
-  };
+  }
 }
 
 /**
@@ -162,22 +162,22 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
  * statically for the same reason.
  */
 async function readFileBytes(uri: string): Promise<ArrayBuffer> {
-  const file = new File(uri);
-  return file.arrayBuffer();
+  const file = new File(uri)
+  return file.arrayBuffer()
 }
 
 /** The Supabase project URL. Public by design — RLS is the boundary. */
 export function supabaseUrl(): string {
-  const value = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  if (!value) throw new Error('EXPO_PUBLIC_SUPABASE_URL is not set');
-  return value;
+  const value = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (!value) throw new Error('EXPO_PUBLIC_SUPABASE_URL is not set')
+  return value
 }
 
 /** The Supabase anon key. Public by design — RLS is the boundary. */
 export function supabaseAnonKey(): string {
-  const value = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-  if (!value) throw new Error('EXPO_PUBLIC_SUPABASE_ANON_KEY is not set');
-  return value;
+  const value = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  if (!value) throw new Error('EXPO_PUBLIC_SUPABASE_ANON_KEY is not set')
+  return value
 }
 
-export { newClientRequestId };
+export { newClientRequestId }

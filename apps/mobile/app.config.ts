@@ -1,6 +1,6 @@
-import type { ConfigContext, ExpoConfig } from 'expo/config';
-import appJson from './app.json';
-import withCertPinning from './plugins/withCertPinning';
+import type { ConfigContext, ExpoConfig } from 'expo/config'
+import appJson from './app.json'
+import withCertPinning from './plugins/withCertPinning'
 
 /**
  * The dynamic Expo config.
@@ -20,16 +20,16 @@ import withCertPinning from './plugins/withCertPinning';
  * to the Edge Functions and CI (`docs/operations/secrets.md`).
  */
 
-const EAS_PROJECT_ID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
+const EAS_PROJECT_ID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000'
 
 export default function withConfig(config: ConfigContext): ExpoConfig {
-  const easProjectId = process.env.EAS_PROJECT_ID || EAS_PROJECT_ID_PLACEHOLDER;
-  const versionCode = Number.parseInt(process.env.APP_VERSION_CODE || '1', 10);
+  const easProjectId = process.env.EAS_PROJECT_ID || EAS_PROJECT_ID_PLACEHOLDER
+  const versionCode = Number.parseInt(process.env.APP_VERSION_CODE || '1', 10)
 
   // `app.json` is the committed base. It is typed as a literal object, so the
   // `extra` bag is read defensively — the key is optional and may be absent
   // from the base until a build profile needs it.
-  const base = appJson.expo as ExpoConfig;
+  const base = appJson.expo as ExpoConfig
 
   return {
     ...(config.config as ExpoConfig),
@@ -45,9 +45,6 @@ export default function withConfig(config: ConfigContext): ExpoConfig {
         projectId: easProjectId,
       },
     },
-    plugins: [
-      ...(base.plugins ?? []),
-      withCertPinning,
-    ],
-  } as ExpoConfig;
+    plugins: [...(base.plugins ?? []), withCertPinning],
+  } as ExpoConfig
 }

@@ -1,4 +1,4 @@
-import { AppError } from '@nagar-shield/shared';
+import { AppError } from '@nagar-shield/shared'
 import {
   QUEUE_MAX_ATTEMPTS,
   deleteDraftMedia,
@@ -7,8 +7,8 @@ import {
   readQueue,
   removeFromQueue,
   type QueuedUpload,
-} from './uploadQueue';
-import { submitCapture } from './submitCapture';
+} from './uploadQueue'
+import { submitCapture } from './submitCapture'
 
 /**
  * The offline queue's drain.
@@ -37,13 +37,13 @@ export type DrainOutcome =
   | { status: 'sent'; reportId: string }
   | { status: 'retry'; attempts: number; savedOnDevice: boolean }
   | { status: 'rejected'; code: string }
-  | { status: 'skipped' };
+  | { status: 'skipped' }
 
 export interface DrainResult {
-  sent: number;
-  retried: number;
-  rejected: number;
-  savedOnDevice: number;
+  sent: number
+  retried: number
+  rejected: number
+  savedOnDevice: number
 }
 
 /**
@@ -55,22 +55,22 @@ export interface DrainResult {
  * so every attempt would fail the same way.
  */
 export function isRetryable(error: unknown): boolean {
-  if (!(error instanceof AppError)) return true;
+  if (!(error instanceof AppError)) return true
 
   switch (error.code) {
     // The network. The whole point of the queue.
     case 'INTERNAL':
-      return true;
+      return true
     // A rate limit is a server-side throttle, not a bad payload.
     case 'CAPTURE_RATE_LIMIT':
-      return true;
+      return true
     // A session problem resolves on the next foreground.
     case 'AUTH_REQUIRED':
-      return true;
+      return true
     // Everything else — a validation failure, a media cap, a forbidden write
     // — would fail identically on every retry.
     default:
-      return false;
+      return false
   }
 }
 
@@ -86,8 +86,8 @@ export async function drainItem(item: QueuedUpload): Promise<DrainOutcome> {
   // continues from the persisted count rather than treating the interrupted
   // attempt as free. Recording it a second time after a failure would burn
   // two attempts on one failure.
-  const attempted = await markAttemptFailed(item.clientRequestId);
-  const attempts = attempted?.attempts ?? item.attempts + 1;
+  const attempted = await markAttemptFailed(item.clientRequestId)
+  const attempts = attempted?.attempts ?? item.attempts + 1
 
   try {
     const result = await submitCapture({
@@ -108,22 +108,22 @@ export async function drainItem(item: QueuedUpload): Promise<DrainOutcome> {
       description: item.description,
       publicVisibility: item.publicVisibility,
       category: null,
-    });
+    })
 
     // The report landed. The item leaves the queue and its draft is deleted.
-    await removeFromQueue(item.clientRequestId);
-    await deleteDraftMedia(item.mediaUri);
+    await removeFromQueue(item.clientRequestId)
+    await deleteDraftMedia(item.mediaUri)
 
-    return { status: 'sent', reportId: result.reportId };
+    return { status: 'sent', reportId: result.reportId }
   } catch (error) {
     if (!isRetryable(error)) {
       // The payload is invalid — retrying cannot succeed. The item leaves the
       // queue and the user is told it was rejected.
-      await removeFromQueue(item.clientRequestId);
-      await deleteDraftMedia(item.mediaUri);
+      await removeFromQueue(item.clientRequestId)
+      await deleteDraftMedia(item.mediaUri)
 
-      const code = error instanceof AppError ? error.code : 'INTERNAL';
-      return { status: 'rejected', code };
+      const code = error instanceof AppError ? error.code : 'INTERNAL'
+      return { status: 'rejected', code }
     }
 
     // A transport failure. The item keeps its place — the attempt was already
@@ -132,7 +132,7 @@ export async function drainItem(item: QueuedUpload): Promise<DrainOutcome> {
       status: 'retry',
       attempts,
       savedOnDevice: attempts >= QUEUE_MAX_ATTEMPTS,
-    };
+    }
   }
 }
 
@@ -145,29 +145,29 @@ export async function drainItem(item: QueuedUpload): Promise<DrainOutcome> {
  * exists to avoid.
  */
 export async function drainQueue(now: number = Date.now()): Promise<DrainResult> {
-  const queue = await readQueue();
-  const due = dueItems(queue, now);
+  const queue = await readQueue()
+  const due = dueItems(queue, now)
 
-  const result: DrainResult = { sent: 0, retried: 0, rejected: 0, savedOnDevice: 0 };
+  const result: DrainResult = { sent: 0, retried: 0, rejected: 0, savedOnDevice: 0 }
 
   for (const item of due) {
-    const outcome = await drainItem(item);
+    const outcome = await drainItem(item)
 
     switch (outcome.status) {
       case 'sent':
-        result.sent += 1;
-        break;
+        result.sent += 1
+        break
       case 'retry':
-        result.retried += 1;
-        if (outcome.savedOnDevice) result.savedOnDevice += 1;
-        break;
+        result.retried += 1
+        if (outcome.savedOnDevice) result.savedOnDevice += 1
+        break
       case 'rejected':
-        result.rejected += 1;
-        break;
+        result.rejected += 1
+        break
       case 'skipped':
-        break;
+        break
     }
   }
 
-  return result;
+  return result
 }

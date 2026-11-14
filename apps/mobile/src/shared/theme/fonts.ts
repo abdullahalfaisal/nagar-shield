@@ -7,20 +7,20 @@ import {
   MaterialSymbolsRounded_600SemiBold_Filled,
   MaterialSymbolsRounded_700Bold,
   MaterialSymbolsRounded_700Bold_Filled,
-} from '@expo-google-fonts/material-symbols-rounded';
+} from '@expo-google-fonts/material-symbols-rounded'
 import {
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
   Inter_800ExtraBold,
-} from '@expo-google-fonts/inter';
+} from '@expo-google-fonts/inter'
 import {
   NotoSansBengali_400Regular,
   NotoSansBengali_500Medium,
   NotoSansBengali_600SemiBold,
   NotoSansBengali_700Bold,
-} from '@expo-google-fonts/noto-sans-bengali';
+} from '@expo-google-fonts/noto-sans-bengali'
 
 /**
  * Every font face the app registers. Names must match the `fontFamily` values
@@ -46,4 +46,4 @@ export const appFonts = {
   MaterialSymbolsRounded600SemiBoldFilled: MaterialSymbolsRounded_600SemiBold_Filled,
   MaterialSymbolsRounded700Bold: MaterialSymbolsRounded_700Bold,
   MaterialSymbolsRounded700BoldFilled: MaterialSymbolsRounded_700Bold_Filled,
-};
+}

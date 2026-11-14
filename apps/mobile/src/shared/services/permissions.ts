@@ -1,6 +1,6 @@
-import * as Camera from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
+import * as Camera from 'expo-camera'
+import * as ImagePicker from 'expo-image-picker'
+import * as Location from 'expo-location'
 
 /**
  * The permission state.
@@ -23,17 +23,17 @@ import * as Location from 'expo-location';
  * user: the system prompt no longer appears. The distinction that matters is
  * only "will the prompt still come?".
  */
-export type PermissionState = 'granted' | 'denied' | 'undetermined';
+export type PermissionState = 'granted' | 'denied' | 'undetermined'
 
 /** The four permissions the app reads. */
-export type PermissionName = 'camera' | 'microphone' | 'mediaLibrary' | 'location';
+export type PermissionName = 'camera' | 'microphone' | 'mediaLibrary' | 'location'
 
 /** The state of all four permissions at a point in time. */
 export interface PermissionSnapshot {
-  camera: PermissionState;
-  microphone: PermissionState;
-  mediaLibrary: PermissionState;
-  location: PermissionState;
+  camera: PermissionState
+  microphone: PermissionState
+  mediaLibrary: PermissionState
+  location: PermissionState
 }
 
 /**
@@ -48,7 +48,7 @@ export const RESTRICTED_PERMISSIONS: PermissionSnapshot = {
   microphone: 'denied',
   mediaLibrary: 'denied',
   location: 'denied',
-};
+}
 
 /**
  * Maps an Expo permission status onto the three-way state.
@@ -58,9 +58,9 @@ export const RESTRICTED_PERMISSIONS: PermissionSnapshot = {
  * the same, and the only path back is the OS settings page.
  */
 export function toPermissionState(status: string | undefined): PermissionState {
-  if (status === 'granted') return 'granted';
-  if (status === 'undetermined') return 'undetermined';
-  return 'denied';
+  if (status === 'granted') return 'granted'
+  if (status === 'undetermined') return 'undetermined'
+  return 'denied'
 }
 
 /**
@@ -71,14 +71,12 @@ export function toPermissionState(status: string | undefined): PermissionState {
  * and the caller degrades to a different entry point instead of trapping the
  * user.
  */
-async function readPermission(
-  read: () => Promise<{ status: string }>,
-): Promise<PermissionState> {
+async function readPermission(read: () => Promise<{ status: string }>): Promise<PermissionState> {
   try {
-    const response = await read();
-    return toPermissionState(response.status);
+    const response = await read()
+    return toPermissionState(response.status)
   } catch {
-    return 'denied';
+    return 'denied'
   }
 }
 
@@ -95,9 +93,9 @@ export async function readPermissions(): Promise<PermissionSnapshot> {
     readPermission(() => Camera.Camera.getMicrophonePermissionsAsync()),
     readPermission(() => ImagePicker.getMediaLibraryPermissionsAsync()),
     readPermission(() => Location.getForegroundPermissionsAsync()),
-  ]);
+  ])
 
-  return { camera, microphone, mediaLibrary, location };
+  return { camera, microphone, mediaLibrary, location }
 }
 
 /**
@@ -108,13 +106,13 @@ export async function readPermissions(): Promise<PermissionSnapshot> {
  */
 export interface EntryPointAvailability {
   /** The video capture card. Needs the camera **and** the microphone. */
-  canRecordVideo: boolean;
+  canRecordVideo: boolean
   /** The camera half of the photo card. Needs the camera. */
-  canTakePhoto: boolean;
+  canTakePhoto: boolean
   /** The gallery half of the photo card. Needs the media library. */
-  canPickFromGallery: boolean;
+  canPickFromGallery: boolean
   /** The file upload card. Needs nothing. */
-  canUploadFile: boolean;
+  canUploadFile: boolean
 }
 
 /**
@@ -138,17 +136,15 @@ export interface EntryPointAvailability {
  * would be left with an entry point that never appears and a permission
  * that is never asked for.
  */
-export function entryPointAvailability(
-  permissions: PermissionSnapshot,
-): EntryPointAvailability {
-  const usable = (state: PermissionState): boolean => state !== 'denied';
+export function entryPointAvailability(permissions: PermissionSnapshot): EntryPointAvailability {
+  const usable = (state: PermissionState): boolean => state !== 'denied'
 
   return {
     canRecordVideo: usable(permissions.camera) && usable(permissions.microphone),
     canTakePhoto: usable(permissions.camera),
     canPickFromGallery: usable(permissions.mediaLibrary),
     canUploadFile: true,
-  };
+  }
 }
 
 /**
@@ -159,7 +155,7 @@ export function entryPointAvailability(
  * the card shows the acquiring state and the fix is requested.
  */
 export function needsManualLocation(permissions: PermissionSnapshot): boolean {
-  return permissions.location !== 'granted';
+  return permissions.location !== 'granted'
 }
 
 /**
@@ -171,12 +167,12 @@ export function needsManualLocation(permissions: PermissionSnapshot): boolean {
  * not come.
  */
 export interface RecoverablePermission {
-  name: PermissionName;
-  state: PermissionState;
+  name: PermissionName
+  state: PermissionState
   /** `true` when the OS will still show the system prompt. */
-  canPromptAgain: boolean;
+  canPromptAgain: boolean
   /** What the permission would unlock. */
-  unlocks: string;
+  unlocks: string
 }
 
 /** The permissions worth offering to recover, in the order they matter. */
@@ -185,4 +181,4 @@ export const RECOVERABLE_PERMISSIONS: PermissionName[] = [
   'microphone',
   'mediaLibrary',
   'location',
-];
+]

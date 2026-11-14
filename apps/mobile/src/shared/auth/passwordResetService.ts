@@ -1,6 +1,6 @@
-import { AppError, type ApiErrorCode } from '@nagar-shield/shared';
-import { parseErrorBody } from '@/shared/api/errors';
-import { supabaseAnonKey, supabaseUrl } from '@/shared/services/submitCapture';
+import { AppError, type ApiErrorCode } from '@nagar-shield/shared'
+import { parseErrorBody } from '@/shared/api/errors'
+import { supabaseAnonKey, supabaseUrl } from '@/shared/services/submitCapture'
 
 /**
  * The password-reset client service.
@@ -36,14 +36,14 @@ import { supabaseAnonKey, supabaseUrl } from '@/shared/services/submitCapture';
 
 /** The answer to a reset request. It carries no information about the account. */
 export interface PasswordResetRequestResult {
-  sent: boolean;
+  sent: boolean
 }
 
 /** The answer to a successful reset — a session, issued by GoTrue. */
 export interface PasswordResetVerifyResult {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number | undefined;
+  accessToken: string
+  refreshToken: string
+  expiresIn: number | undefined
 }
 
 /**
@@ -68,21 +68,21 @@ export async function sendPasswordResetOtp(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ identifier: identifier.trim() }),
-  });
+  })
 
-  const body = await response.json().catch(() => null);
+  const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw parseErrorBody(body);
+    throw parseErrorBody(body)
   }
 
-  const data = (body as { data?: PasswordResetRequestResult } | null)?.data;
+  const data = (body as { data?: PasswordResetRequestResult } | null)?.data
 
   // The answer is `{ sent: true }` for a known identifier and for an unknown
   // one alike. A missing flag is treated as "sent" rather than as a failure:
   // the point of the rule is that the client cannot distinguish the two
   // cases, and a false "we could not send it" would reintroduce a difference.
-  return { sent: data?.sent ?? true };
+  return { sent: data?.sent ?? true }
 }
 
 /**
@@ -117,28 +117,28 @@ export async function verifyPasswordResetOtp(
       code: code.trim(),
       new_password: newPassword,
     }),
-  });
+  })
 
-  const body = await response.json().catch(() => null);
+  const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw parseErrorBody(body);
+    throw parseErrorBody(body)
   }
 
-  const data = (body as { data?: Record<string, unknown> } | null)?.data;
+  const data = (body as { data?: Record<string, unknown> } | null)?.data
 
-  const accessToken = data?.access_token;
-  const refreshToken = data?.refresh_token;
+  const accessToken = data?.access_token
+  const refreshToken = data?.refresh_token
 
   if (typeof accessToken !== 'string' || accessToken.length === 0) {
-    throw new AppError('INTERNAL');
+    throw new AppError('INTERNAL')
   }
 
   return {
     accessToken,
     refreshToken: typeof refreshToken === 'string' ? refreshToken : '',
     expiresIn: typeof data?.expires_in === 'number' ? data.expires_in : undefined,
-  };
+  }
 }
 
 /**
@@ -149,10 +149,10 @@ export async function verifyPasswordResetOtp(
  * `details.retry_after_sec` and nowhere else.
  */
 export function readRetryAfterSeconds(error: unknown): number | undefined {
-  if (!(error instanceof AppError)) return undefined;
-  const details = error.details as { retry_after_sec?: unknown } | undefined;
-  const value = details?.retry_after_sec;
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  if (!(error instanceof AppError)) return undefined
+  const details = error.details as { retry_after_sec?: unknown } | undefined
+  const value = details?.retry_after_sec
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 /**
@@ -162,15 +162,15 @@ export function readRetryAfterSeconds(error: unknown): number | undefined {
  * about a count, rather than guessing.
  */
 export function readAttemptsRemaining(error: unknown): number | undefined {
-  if (!(error instanceof AppError)) return undefined;
-  const details = error.details as { attempts_remaining?: unknown } | undefined;
-  const value = details?.attempts_remaining;
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  if (!(error instanceof AppError)) return undefined
+  const details = error.details as { attempts_remaining?: unknown } | undefined
+  const value = details?.attempts_remaining
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 /** True when the rejection is the cooldown. */
 export function isRateLimited(error: unknown): boolean {
-  return error instanceof AppError && (error.code as ApiErrorCode) === 'OTP_RATE_LIMIT';
+  return error instanceof AppError && (error.code as ApiErrorCode) === 'OTP_RATE_LIMIT'
 }
 
 /**
@@ -191,11 +191,11 @@ export function isRateLimited(error: unknown): boolean {
  * reason: a phone number is PII.
  */
 interface PendingReset {
-  identifier: string;
-  code: string;
+  identifier: string
+  code: string
 }
 
-let pendingReset: PendingReset | null = null;
+let pendingReset: PendingReset | null = null
 
 /**
  * Hands the code and the identifier to the next step.
@@ -205,7 +205,7 @@ let pendingReset: PendingReset | null = null;
  * would be keeping a code the server has already superseded.
  */
 export function stagePasswordReset(identifier: string, code: string): void {
-  pendingReset = { identifier: identifier.trim(), code };
+  pendingReset = { identifier: identifier.trim(), code }
 }
 
 /**
@@ -216,9 +216,9 @@ export function stagePasswordReset(identifier: string, code: string): void {
  * code step rather than failing with an opaque error.
  */
 export function takePendingReset(): PendingReset | null {
-  const staged = pendingReset;
-  pendingReset = null;
-  return staged;
+  const staged = pendingReset
+  pendingReset = null
+  return staged
 }
 
 /**
@@ -228,7 +228,7 @@ export function takePendingReset(): PendingReset | null {
  * staged code in place for the password step to take.
  */
 export function peekPendingReset(): PendingReset | null {
-  return pendingReset;
+  return pendingReset
 }
 
 /**
@@ -238,6 +238,5 @@ export function peekPendingReset(): PendingReset | null {
  * wrong, expired or superseded, and it must not be reused.
  */
 export function clearPendingReset(): void {
-  pendingReset = null;
+  pendingReset = null
 }
-

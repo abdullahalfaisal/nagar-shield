@@ -18,57 +18,57 @@
  * "purged" marker on a cache row — that is the whole idempotency argument.
  */
 
-import { GEOCODE_CACHE_TTL_DAYS } from '@shared/jobs/index.ts';
-import { errorResponse, successResponse } from '../_shared/http.ts';
-import { logEvent } from '../_shared/logger.ts';
-import { CallerError, requireServiceRole } from '../_shared/auth.ts';
-import { closeJobRun, newRequestId, recordJobRun } from '../_shared/job-runner.ts';
-import { createServiceClient } from '../_shared/supabase.ts';
+import { GEOCODE_CACHE_TTL_DAYS } from '@shared/jobs/index.ts'
+import { errorResponse, successResponse } from '../_shared/http.ts'
+import { logEvent } from '../_shared/logger.ts'
+import { CallerError, requireServiceRole } from '../_shared/auth.ts'
+import { closeJobRun, newRequestId, recordJobRun } from '../_shared/job-runner.ts'
+import { createServiceClient } from '../_shared/supabase.ts'
 
-const DEFAULT_BATCH_SIZE = 500;
-const MAX_BATCHES = 20;
+const DEFAULT_BATCH_SIZE = 500
+const MAX_BATCHES = 20
 
 interface EvictionCandidate {
-  key: string;
+  key: string
 }
 
 Deno.serve(async (request) => {
-  const requestId = newRequestId();
+  const requestId = newRequestId()
 
   try {
-    requireServiceRole(request);
+    requireServiceRole(request)
   } catch (error) {
     if (error instanceof CallerError) {
-      return errorResponse(error.code === 'INTERNAL' ? 'INTERNAL' : 'FORBIDDEN');
+      return errorResponse(error.code === 'INTERNAL' ? 'INTERNAL' : 'FORBIDDEN')
     }
-    return errorResponse('INTERNAL');
+    return errorResponse('INTERNAL')
   }
 
-  const serviceClient = createServiceClient();
+  const serviceClient = createServiceClient()
 
-  const runId = await recordJobRun(serviceClient, 'cleanup_geocode_cache');
+  const runId = await recordJobRun(serviceClient, 'cleanup_geocode_cache')
   if (!runId) {
     logEvent('error', {
       requestId,
       jobName: 'cleanup_geocode_cache',
       action: 'job_run_open_failed',
-    });
-    return errorResponse('INTERNAL');
+    })
+    return errorResponse('INTERNAL')
   }
 
-  let itemsProcessed = 0;
-  let itemsFailed = 0;
+  let itemsProcessed = 0
+  let itemsFailed = 0
 
   try {
     for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
       const { data, error } = await serviceClient.rpc('job_geocode_cache_evictions', {
         p_batch_size: DEFAULT_BATCH_SIZE,
-      });
+      })
 
-      if (error) throw error;
+      if (error) throw error
 
-      const candidates = (data ?? []) as EvictionCandidate[];
-      if (candidates.length === 0) break;
+      const candidates = (data ?? []) as EvictionCandidate[]
+      if (candidates.length === 0) break
 
       // The batch is deleted by key. The predicate is re-evaluated between
       // batches, so a large backlog cannot time the function out.
@@ -78,21 +78,21 @@ Deno.serve(async (request) => {
         .in(
           'key',
           candidates.map((candidate) => candidate.key),
-        );
+        )
 
       if (deleteError) {
-        itemsFailed += candidates.length;
+        itemsFailed += candidates.length
       } else {
-        itemsProcessed += candidates.length;
+        itemsProcessed += candidates.length
       }
 
-      if (candidates.length < DEFAULT_BATCH_SIZE) break;
+      if (candidates.length < DEFAULT_BATCH_SIZE) break
     }
 
     await closeJobRun(serviceClient, runId, 'succeeded', {
       itemsProcessed,
       itemsFailed,
-    });
+    })
 
     logEvent('info', {
       requestId,
@@ -100,22 +100,22 @@ Deno.serve(async (request) => {
       action: 'completed',
       itemsProcessed,
       itemsFailed,
-    });
+    })
 
     return successResponse({
       job_name: 'cleanup_geocode_cache',
       items_processed: itemsProcessed,
       items_failed: itemsFailed,
       ttl_days: GEOCODE_CACHE_TTL_DAYS,
-    });
+    })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'Unknown cleanup failure';
+    const detail = error instanceof Error ? error.message : 'Unknown cleanup failure'
 
     await closeJobRun(serviceClient, runId, 'failed', {
       itemsProcessed,
       itemsFailed,
       errorDetail: detail,
-    });
+    })
 
     logEvent('error', {
       requestId,
@@ -123,8 +123,8 @@ Deno.serve(async (request) => {
       action: 'failed',
       itemsProcessed,
       itemsFailed,
-    });
+    })
 
-    return errorResponse('INTERNAL', undefined, { error_detail: detail });
+    return errorResponse('INTERNAL', undefined, { error_detail: detail })
   }
-});
+})

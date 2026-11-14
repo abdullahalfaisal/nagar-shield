@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import { useMemo, useState } from 'react'
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import {
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
   REPORT_CATEGORY_LABELS,
-} from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
+} from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
 import {
   CountRow,
   EmptyState,
@@ -19,15 +19,15 @@ import {
   MapViewLink,
   Screen,
   SegmentedTabs,
-} from '@/shared/ui';
-import { countByCategory, useHistory } from '@/shared/api/history';
-import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
+} from '@/shared/ui'
+import { countByCategory, useHistory } from '@/shared/api/history'
+import { resolveOrigin, useCurrentFix } from '@/shared/services/location'
 import {
   DEFAULT_HISTORY_FILTERS,
   historyFiltersEqual,
   type HistoryFilters,
-} from '@/shared/services/historyFilters';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
+} from '@/shared/services/historyFilters'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * Screen 21 — History.
@@ -78,19 +78,19 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
  * soon" would be a false claim in the shipped UI.
  */
 export default function HistoryScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
-  const [tab, setTab] = useState<'list' | 'totals' | 'distribution' | 'mine'>('list');
-  const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_HISTORY_FILTERS);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [tab, setTab] = useState<'list' | 'totals' | 'distribution' | 'mine'>('list')
+  const [filters, setFilters] = useState<HistoryFilters>(DEFAULT_HISTORY_FILTERS)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // The fix is requested just-in-time — when the History screen opens — and
   // never on the panic path (FR-PERMS-2). A denied permission degrades to the
   // Dhaka fallback origin rather than blocking the list.
-  const { state } = useCurrentFix();
-  const { origin, isFallback } = resolveOrigin(state);
+  const { state } = useCurrentFix()
+  const { origin, isFallback } = resolveOrigin(state)
 
   const { data, isLoading, isRefetching, refetch } = useHistory({
     lat: origin.lat,
@@ -99,18 +99,18 @@ export default function HistoryScreen() {
     windowHours: filters.windowHours,
     category: filters.category,
     limit: 50,
-  });
+  })
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const items = useMemo(() => data?.items ?? [], [data])
 
   // The author's own branch. It is independent of the radius and the window —
   // the RPC's own-reports branch is what makes FR-HIST-3 true.
-  const ownReports = useMemo(() => items.filter((report) => report.isOwn), [items]);
+  const ownReports = useMemo(() => items.filter((report) => report.isOwn), [items])
 
   // The neighbouring reports — the public projection.
-  const nearbyReports = useMemo(() => items.filter((report) => !report.isOwn), [items]);
+  const nearbyReports = useMemo(() => items.filter((report) => !report.isOwn), [items])
 
-  const distribution = useMemo(() => countByCategory(items), [items]);
+  const distribution = useMemo(() => countByCategory(items), [items])
 
   const tabs = useMemo(
     () => [
@@ -120,28 +120,28 @@ export default function HistoryScreen() {
       { id: 'mine', label: t('alerts.historyMyReports') },
     ],
     [t],
-  );
+  )
 
   const pillLabel = isFallback
     ? t('history.locationUnavailable')
-    : (filters.category
-        ? `${filters.category} · ${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`
-        : `${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`);
+    : filters.category
+      ? `${filters.category} · ${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`
+      : `${origin.lat.toFixed(3)}, ${origin.lng.toFixed(3)}`
 
   const applyFilters = (next: HistoryFilters) => {
     // A sheet that changes nothing must not re-query: the result set is
     // identical and a needless request would only make the list flicker.
-    if (historyFiltersEqual(next, filters)) return;
-    setFilters(next);
-  };
+    if (historyFiltersEqual(next, filters)) return
+    setFilters(next)
+  }
 
   const openRow = (reportId: string, isOwn: boolean) => {
     if (isOwn) {
-      router.push({ pathname: '/(app)/report-detail', params: { reportId } });
-      return;
+      router.push({ pathname: '/(app)/report-detail', params: { reportId } })
+      return
     }
-    router.push({ pathname: '/(app)/alert-detail', params: { id: reportId } });
-  };
+    router.push({ pathname: '/(app)/alert-detail', params: { id: reportId } })
+  }
 
   return (
     <Screen
@@ -189,7 +189,9 @@ export default function HistoryScreen() {
             <CountRow label={t('history.ownReports')} count={ownReports.length} />
             <CountRow label={t('history.nearbyReports')} count={nearbyReports.length} />
           </ListRowGroup>
-          <Text style={[styles.note, { color: theme.colors.ink[500] }]}>{t('history.distributionNote')}</Text>
+          <Text style={[styles.note, { color: theme.colors.ink[500] }]}>
+            {t('history.distributionNote')}
+          </Text>
         </ScrollView>
       ) : null}
 
@@ -218,7 +220,9 @@ export default function HistoryScreen() {
               ))}
             </ListRowGroup>
           )}
-          <Text style={[styles.note, { color: theme.colors.ink[500] }]}>{t('history.distributionNote')}</Text>
+          <Text style={[styles.note, { color: theme.colors.ink[500] }]}>
+            {t('history.distributionNote')}
+          </Text>
         </ScrollView>
       ) : null}
 
@@ -238,7 +242,9 @@ export default function HistoryScreen() {
         }
       />
 
-      <Text style={[styles.bodyCopy, { color: theme.colors.ink[500] }]}>{t('history.scopeNote')}</Text>
+      <Text style={[styles.bodyCopy, { color: theme.colors.ink[500] }]}>
+        {t('history.scopeNote')}
+      </Text>
 
       <HistoryFilterSheet
         visible={sheetOpen}
@@ -247,7 +253,7 @@ export default function HistoryScreen() {
         onApply={applyFilters}
       />
     </Screen>
-  );
+  )
 }
 
 /**
@@ -269,23 +275,23 @@ function HistoryList({
   emptyDescription,
 }: {
   reports: Array<{
-    id: string;
-    category: (keyof typeof REPORT_CATEGORY_LABELS) | null;
-    capturedAt: string;
-    areaHierarchy: { division: string; city: string; thana: string; neighborhood?: string } | null;
-    distanceM: number | null;
-    isOwn: boolean;
-  }>;
-  isLoading: boolean;
-  isRefetching: boolean;
-  onRefresh: () => void;
-  onOpen: (reportId: string, isOwn: boolean) => void;
-  language: string;
-  emptyTitle?: string;
-  emptyDescription?: string;
+    id: string
+    category: keyof typeof REPORT_CATEGORY_LABELS | null
+    capturedAt: string
+    areaHierarchy: { division: string; city: string; thana: string; neighborhood?: string } | null
+    distanceM: number | null
+    isOwn: boolean
+  }>
+  isLoading: boolean
+  isRefetching: boolean
+  onRefresh: () => void
+  onOpen: (reportId: string, isOwn: boolean) => void
+  language: string
+  emptyTitle?: string
+  emptyDescription?: string
 }) {
-  const theme = useTheme();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const { t } = useTranslation()
 
   if (isLoading) {
     return (
@@ -300,7 +306,7 @@ function HistoryList({
           />
         ))}
       </View>
-    );
+    )
   }
 
   if (reports.length === 0) {
@@ -312,7 +318,7 @@ function HistoryList({
           description={emptyDescription ?? t('history.noResultsSub')}
         />
       </View>
-    );
+    )
   }
 
   return (
@@ -329,29 +335,27 @@ function HistoryList({
     >
       <View style={styles.list}>
         {reports.map((report) => {
-          const label = report.category ? REPORT_CATEGORY_LABELS[report.category] : null;
+          const label = report.category ? REPORT_CATEGORY_LABELS[report.category] : null
           const accent = report.category
             ? REPORT_CATEGORY_ACCENTS[report.category]
-            : theme.colors.ink[400];
+            : theme.colors.ink[400]
 
           const area =
             report.areaHierarchy?.neighborhood ??
             report.areaHierarchy?.thana ??
             report.areaHierarchy?.city ??
             report.areaHierarchy?.division ??
-            '';
+            ''
 
           const distance =
             report.distanceM !== null
               ? ` · ${t('history.distanceAway', { distance: Math.round(report.distanceM) })}`
-              : '';
+              : ''
 
           return (
             <ListRow
               key={report.id}
-              title={
-                label ? `${label.bn} — ${label.en}` : t('alerts.uncategorized')
-              }
+              title={label ? `${label.bn} — ${label.en}` : t('alerts.uncategorized')}
               subtitle={`${formatRelativeTimeForLocale(report.capturedAt, language)} · ${area}${distance}`}
               icon={report.category ? REPORT_CATEGORY_ICONS[report.category] : 'help'}
               tone="gray"
@@ -368,11 +372,11 @@ function HistoryList({
                 </View>
               }
             />
-          );
+          )
         })}
       </View>
     </ScrollView>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -417,4 +421,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

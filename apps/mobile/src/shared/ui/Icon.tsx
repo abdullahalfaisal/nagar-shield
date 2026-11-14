@@ -1,5 +1,5 @@
-import { StyleSheet, Text, type TextStyle } from 'react-native';
-import { useTheme } from '../theme';
+import { StyleSheet, Text, type TextStyle } from 'react-native'
+import { useTheme } from '../theme'
 
 /**
  * Material Symbols Rounded — the exact icon font the prototype uses.
@@ -14,18 +14,18 @@ import { useTheme } from '../theme';
  * The prototype uses the filled face for `.help-card-icon`,
  * `.action-card-icon`, `.list-row-icon` and the brand logo.
  */
-export const ICON_FONT = 'MaterialSymbolsRounded';
-export const ICON_FONT_FILLED = 'MaterialSymbolsRoundedFill';
+export const ICON_FONT = 'MaterialSymbolsRounded'
+export const ICON_FONT_FILLED = 'MaterialSymbolsRoundedFill'
 
 interface IconProps {
   /** Material Symbols ligature name, e.g. `local_police`. */
-  name: string;
-  size?: number;
-  color?: string;
-  filled?: boolean;
-  weight?: '400Regular' | '500Medium' | '600SemiBold' | '700Bold';
-  style?: TextStyle;
-  accessibilityLabel?: string;
+  name: string
+  size?: number
+  color?: string
+  filled?: boolean
+  weight?: '400Regular' | '500Medium' | '600SemiBold' | '700Bold'
+  style?: TextStyle
+  accessibilityLabel?: string
 }
 
 export function Icon({
@@ -37,10 +37,8 @@ export function Icon({
   style,
   accessibilityLabel,
 }: IconProps) {
-  const theme = useTheme();
-  const fontFamily = filled
-    ? `${ICON_FONT}${weight}Filled`
-    : `${ICON_FONT}${weight}`;
+  const theme = useTheme()
+  const fontFamily = filled ? `${ICON_FONT}${weight}Filled` : `${ICON_FONT}${weight}`
 
   return (
     <Text
@@ -54,7 +52,7 @@ export function Icon({
     >
       {name}
     </Text>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -64,4 +62,4 @@ const styles = StyleSheet.create({
     // Material Symbols needs a little extra leading to avoid clipping.
     lineHeight: undefined,
   },
-});
+})

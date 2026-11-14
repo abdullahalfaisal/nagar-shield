@@ -50,14 +50,14 @@
  *     the account list or the mail service.
  */
 
-import { logEvent } from './logger.ts';
+import { logEvent } from './logger.ts'
 
 /** What a mailer needs to send one message. */
 export interface MailMessage {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
+  to: string
+  subject: string
+  text: string
+  html?: string
 }
 
 /**
@@ -70,14 +70,14 @@ export interface MailMessage {
  * `http://127.0.0.1:54324`.
  */
 export interface MailerConfig {
-  smtpUrl?: string;
-  httpEndpoint?: string;
-  from: string;
+  smtpUrl?: string
+  httpEndpoint?: string
+  from: string
 }
 
 function env(name: string): string | undefined {
-  const value = Deno.env.get(name);
-  return value && value.trim() !== '' ? value.trim() : undefined;
+  const value = Deno.env.get(name)
+  return value && value.trim() !== '' ? value.trim() : undefined
 }
 
 /**
@@ -87,16 +87,16 @@ function env(name: string): string | undefined {
  * the send as failed.
  */
 export function readMailerConfig(): MailerConfig | null {
-  const smtpUrl = env('MAIL_SMTP_URL');
-  const httpEndpoint = env('MAIL_HTTP_ENDPOINT');
+  const smtpUrl = env('MAIL_SMTP_URL')
+  const httpEndpoint = env('MAIL_HTTP_ENDPOINT')
 
-  if (!smtpUrl && !httpEndpoint) return null;
+  if (!smtpUrl && !httpEndpoint) return null
 
   return {
     smtpUrl,
     httpEndpoint,
     from: env('MAIL_FROM') ?? 'no-reply@nagarshield.bd',
-  };
+  }
 }
 
 /**
@@ -113,78 +113,84 @@ export function readMailerConfig(): MailerConfig | null {
  * trusted with the credentials.
  */
 async function sendViaSmtp(config: MailerConfig, message: MailMessage): Promise<boolean> {
-  const url = new URL(config.smtpUrl as string);
-  const secure = url.protocol === 'smtps:';
-  const port = Number(url.port || (secure ? 465 : 587));
-  const host = url.hostname;
+  const url = new URL(config.smtpUrl as string)
+  const secure = url.protocol === 'smtps:'
+  const port = Number(url.port || (secure ? 465 : 587))
+  const host = url.hostname
 
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
+  const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
 
   // `Deno.connect` is plain TCP only. The TLS socket is a separate call —
   // `Deno.connectTls` — and it takes the `caCert`/`certChain` options a
   // relay with a private CA needs.
   const socket = secure
     ? await Deno.connectTls({ hostname: host, port })
-    : await Deno.connect({ hostname: host, port });
+    : await Deno.connect({ hostname: host, port })
 
   const readReply = async (): Promise<string> => {
-    let buffer = '';
+    let buffer = ''
     while (true) {
       // `socket.read(buffer)` resolves to the **number of bytes** read, not
       // the bytes themselves, so the chunk is read into a local array and
       // decoded from there.
-      const chunk = new Uint8Array(1024);
-      const read = await socket.read(chunk);
-      if (read === null) break;
-      buffer += decoder.decode(chunk.subarray(0, read));
+      const chunk = new Uint8Array(1024)
+      const read = await socket.read(chunk)
+      if (read === null) break
+      buffer += decoder.decode(chunk.subarray(0, read))
       // A multi-line reply has a '-' in the fourth position; the final line
       // has a space.
-      if (/^\d{3} /.test(buffer)) break;
+      if (/^\d{3} /.test(buffer)) break
     }
-    return buffer;
-  };
+    return buffer
+  }
 
   const send = async (line: string): Promise<void> => {
-    await socket.write(encoder.encode(`${line}\r\n`));
-  };
+    await socket.write(encoder.encode(`${line}\r\n`))
+  }
 
   try {
-    await readReply(); // 220 greeting
+    await readReply() // 220 greeting
 
-    await send('EHLO nagarshield.local');
-    const ehlo = await readReply();
+    await send('EHLO nagarshield.local')
+    const ehlo = await readReply()
 
     // STARTTLS, when the server offers it.
     if (!secure && /STARTTLS/i.test(ehlo)) {
-      await send('STARTTLS');
-      await readReply();
+      await send('STARTTLS')
+      await readReply()
       // The socket must be reconnected in TLS mode after the upgrade. Deno's
       // `connect` cannot upgrade in place, so the TLS session is opened by
       // connecting again with `transport: 'tls'` and replaying EHLO.
-      socket.close();
-      return sendViaSmtp({ ...config, smtpUrl: `smtps://${url.username ? `${url.username}:${url.password}@` : ''}${host}:${port}` }, message);
+      socket.close()
+      return sendViaSmtp(
+        {
+          ...config,
+          smtpUrl: `smtps://${url.username ? `${url.username}:${url.password}@` : ''}${host}:${port}`,
+        },
+        message,
+      )
     }
 
     // AUTH LOGIN, when the server offers it and the URL carries credentials.
     if (/^AUTH/i.test(ehlo) && url.username) {
-      await send('AUTH LOGIN');
-      await readReply();
-      await send(btoa(decodeURIComponent(url.username)));
-      await readReply();
-      await send(btoa(decodeURIComponent(url.password)));
-      const authReply = await readReply();
-      if (!/^235/.test(authReply)) return false;
+      await send('AUTH LOGIN')
+      await readReply()
+      await send(btoa(decodeURIComponent(url.username)))
+      await readReply()
+      await send(btoa(decodeURIComponent(url.password)))
+      const authReply = await readReply()
+      if (!/^235/.test(authReply)) return false
     }
 
-    await send(`MAIL FROM:<${config.from}>`);
-    if (!/^250/.test(await readReply())) return false;
+    await send(`MAIL FROM:<${config.from}>`)
+    if (!/^250/.test(await readReply())) return false
 
-    await send(`RCPT TO:<${message.to}>`);
-    if (!/^250|^251/.test(await readReply())) return false;
+    await send(`RCPT TO:<${message.to}>`)
+    if (!/^250|^251/.test(await readReply())) return false
 
-    await send('DATA');
-    if (!/^354/.test(await readReply())) return false;
+    await send('DATA')
+    if (!/^354/.test(await readReply())) return false
 
     const body = [
       `From: Nagar Shield <${config.from}>`,
@@ -195,20 +201,18 @@ async function sendViaSmtp(config: MailerConfig, message: MailMessage): Promise<
       'Content-Type: text/plain; charset=utf-8',
       '',
       message.text,
-    ].join('\r\n');
+    ].join('\r\n')
 
     // A line that begins with a dot is escaped, and the message is
     // terminated by a lone dot.
-    await socket.write(
-      encoder.encode(`${body.replace(/\r?\n\./g, '\r\n..')}\r\n.\r\n`),
-    );
-    const dataReply = await readReply();
-    if (!/^250/.test(dataReply)) return false;
+    await socket.write(encoder.encode(`${body.replace(/\r?\n\./g, '\r\n..')}\r\n.\r\n`))
+    const dataReply = await readReply()
+    if (!/^250/.test(dataReply)) return false
 
-    await send('QUIT');
-    return true;
+    await send('QUIT')
+    return true
   } finally {
-    socket.close();
+    socket.close()
   }
 }
 
@@ -219,7 +223,7 @@ async function sendViaSmtp(config: MailerConfig, message: MailMessage): Promise<
  * the capitalised field names and `Email`/`Name` inside each address.
  */
 async function sendViaHttp(config: MailerConfig, message: MailMessage): Promise<boolean> {
-  const base = (config.httpEndpoint as string).replace(/\/+$/, '');
+  const base = (config.httpEndpoint as string).replace(/\/+$/, '')
   const response = await fetch(`${base}/api/v1/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -230,9 +234,9 @@ async function sendViaHttp(config: MailerConfig, message: MailMessage): Promise<
       Text: message.text,
       ...(message.html ? { HTML: message.html } : {}),
     }),
-  });
+  })
 
-  return response.ok;
+  return response.ok
 }
 
 /**
@@ -244,25 +248,25 @@ async function sendViaHttp(config: MailerConfig, message: MailMessage): Promise<
  * the shape of that answer must not depend on whether the mail service is up.
  */
 export async function sendMail(message: MailMessage): Promise<boolean> {
-  const config = readMailerConfig();
+  const config = readMailerConfig()
 
   if (!config) {
-    logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_unconfigured' });
-    return false;
+    logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_unconfigured' })
+    return false
   }
 
   try {
     const sent = config.smtpUrl
       ? await sendViaSmtp(config, message)
-      : await sendViaHttp(config, message);
+      : await sendViaHttp(config, message)
 
     if (!sent) {
-      logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_failed' });
+      logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_failed' })
     }
-    return sent;
+    return sent
   } catch {
-    logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_failed' });
-    return false;
+    logEvent('warn', { requestId: 'mailer', action: 'password_reset_mail_failed' })
+    return false
   }
 }
 
@@ -275,7 +279,7 @@ export async function sendMail(message: MailMessage): Promise<boolean> {
  * a password reset — one with no attempt counter and no cooldown.
  */
 export function buildResetEmailBody(code: string): { subject: string; text: string; html: string } {
-  const subject = 'Your Nagar Shield verification code';
+  const subject = 'Your Nagar Shield verification code'
 
   const text = [
     'আপনার নগর শিল্ড কোড:',
@@ -291,7 +295,7 @@ export function buildResetEmailBody(code: string): { subject: string; text: stri
     'This code expires in 10 minutes. After three wrong attempts, the code is blocked for 30 minutes.',
     '',
     'If you did not ask for this code, you can ignore this message — nobody can change your password without it.',
-  ].join('\n');
+  ].join('\n')
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 420px; margin: 0 auto;">
@@ -302,7 +306,7 @@ export function buildResetEmailBody(code: string): { subject: string; text: stri
       <p style="font-size: 14px; color: #555;">This code expires in 10 minutes. After three wrong attempts, the code is blocked for 30 minutes.</p>
       <p style="font-size: 12px; color: #888;">If you did not ask for this code, you can ignore this message — nobody can change your password without it.</p>
     </div>
-  `.trim();
+  `.trim()
 
-  return { subject, text, html };
+  return { subject, text, html }
 }

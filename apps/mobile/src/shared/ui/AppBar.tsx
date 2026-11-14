@@ -1,22 +1,22 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 /** `.badge-dot` — the red notification dot on the More Options button. */
-const BADGE_DOT_COLOR = '#EF4444';
+const BADGE_DOT_COLOR = '#EF4444'
 
 interface AppBarProps {
-  title: string;
-  subtitle?: string;
-  onBack?: () => void;
+  title: string
+  subtitle?: string
+  onBack?: () => void
   /** Right-hand action, e.g. the Home screen's `more_horiz` button. */
-  action?: { icon: string; onPress: () => void; accessibilityLabel: string; badge?: boolean };
+  action?: { icon: string; onPress: () => void; accessibilityLabel: string; badge?: boolean }
   /** `.app-bar-no-border` — used by the Capture screen. */
-  noBorder?: boolean;
-  transparent?: boolean;
+  noBorder?: boolean
+  transparent?: boolean
   /** Centres the title instead of left-aligning it (Capture screen). */
-  centered?: boolean;
+  centered?: boolean
 }
 
 /**
@@ -36,8 +36,8 @@ export function AppBar({
   transparent = false,
   centered = false,
 }: AppBarProps) {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
+  const theme = useTheme()
+  const insets = useSafeAreaInsets()
 
   return (
     <View
@@ -77,7 +77,11 @@ export function AppBar({
           numberOfLines={1}
           style={[
             styles.title,
-            { color: theme.colors.ink[950], fontSize: 17, fontWeight: theme.typography.weight.bold },
+            {
+              color: theme.colors.ink[950],
+              fontSize: 17,
+              fontWeight: theme.typography.weight.bold,
+            },
           ]}
         >
           {title}
@@ -111,7 +115,7 @@ export function AppBar({
         <View style={styles.iconButton} />
       )}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -148,4 +152,4 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: BADGE_DOT_COLOR,
   },
-});
+})

@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
+import { useMemo, useState } from 'react'
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
 import {
   AlertCard,
   AreaChipRow,
@@ -11,10 +11,10 @@ import {
   PulseDot,
   Screen,
   type AreaChip,
-} from '@/shared/ui';
-import { alertsItems, useAlerts } from '@/shared/api/alerts';
-import { useRefreshGuard } from '@/shared/services/refreshGuard';
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
+} from '@/shared/ui'
+import { alertsItems, useAlerts } from '@/shared/api/alerts'
+import { useRefreshGuard } from '@/shared/services/refreshGuard'
+import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * The Alerts feed.
@@ -31,45 +31,46 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
  * hook, so a backgrounded app performs **no** feed requests.
  */
 export default function AlertsScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
-  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null });
-  const [flagTarget, setFlagTarget] = useState<string | null>(null);
+  const [chip, setChip] = useState<AreaChip>({ id: 'all', label: 'All BD', value: null })
+  const [flagTarget, setFlagTarget] = useState<string | null>(null)
 
-  const guard = useRefreshGuard();
+  const guard = useRefreshGuard()
 
   // The polling interval is the shared 60 s, and it only runs while the guard
   // says the refresh may run.
-  const {
-    data,
-    isLoading,
-    isRefetching,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useAlerts(chip.value ?? {}, {
-    enabled: !guard.isPaused,
-  });
+  const { data, isLoading, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAlerts(chip.value ?? {}, {
+      enabled: !guard.isPaused,
+    })
 
   // The feed is cursor-paginated, so the rows are **every loaded page**
   // flattened — not the first page alone.
-  const items = alertsItems(data);
+  const items = alertsItems(data)
 
   const chips: AreaChip[] = useMemo(
     () => [
       { id: 'all', label: t('alerts.areaChipAll'), value: null },
       { id: 'division', label: t('alerts.areaChipDivision'), value: { division: 'Dhaka' } },
       { id: 'city', label: t('alerts.areaChipCity'), value: { division: 'Dhaka', city: 'Dhaka' } },
-      { id: 'mirpur', label: 'Mirpur', value: { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' } },
-      { id: 'dhanmondi', label: 'Dhanmondi', value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' } },
+      {
+        id: 'mirpur',
+        label: 'Mirpur',
+        value: { division: 'Dhaka', city: 'Dhaka', thana: 'Mirpur' },
+      },
+      {
+        id: 'dhanmondi',
+        label: 'Dhanmondi',
+        value: { division: 'Dhaka', city: 'Dhaka', thana: 'Dhanmondi' },
+      },
     ],
     [t],
-  );
+  )
 
-  const headerLabel = pausedLabel(guard.pausedReason, t);
+  const headerLabel = pausedLabel(guard.pausedReason, t)
 
   return (
     <Screen
@@ -99,7 +100,9 @@ export default function AlertsScreen() {
         <AreaChipRow chips={chips} activeId={chip.id} onSelect={setChip} />
 
         {isLoading ? (
-          <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>{t('common.loading')}</Text>
+          <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+            {t('common.loading')}
+          </Text>
         ) : items.length > 0 ? (
           <>
             {items.map((report) => (
@@ -145,20 +148,23 @@ export default function AlertsScreen() {
         onClose={() => setFlagTarget(null)}
       />
     </Screen>
-  );
+  )
 }
 
 /** The feed-header label. The paused state swaps the copy, not the layout. */
-function pausedLabel(reason: ReturnType<typeof useRefreshGuard>['pausedReason'], t: (key: string) => string): string {
+function pausedLabel(
+  reason: ReturnType<typeof useRefreshGuard>['pausedReason'],
+  t: (key: string) => string,
+): string {
   switch (reason) {
     case 'battery':
-      return t('alerts.pausedBattery');
+      return t('alerts.pausedBattery')
     case 'offline':
-      return t('alerts.pausedOffline');
+      return t('alerts.pausedOffline')
     case 'background':
-      return t('alerts.pausedBackground');
+      return t('alerts.pausedBackground')
     default:
-      return t('alerts.autoRefresh');
+      return t('alerts.autoRefresh')
   }
 }
 
@@ -196,4 +202,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-});
+})

@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError, phoneSchema } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui';
-import { signUp } from '@/shared/auth/authService';
-import { setAlternatePhone } from '@/shared/api/profile';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError, phoneSchema } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui'
+import { signUp } from '@/shared/auth/authService'
+import { setAlternatePhone } from '@/shared/api/profile'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 12 — Registration.
@@ -21,54 +21,53 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * promise the build cannot keep.
  */
 export default function RegisterScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
   const params = useLocalSearchParams<{
-    phone?: string;
-    email?: string;
-    password?: string;
-    alternatePhone?: string;
-  }>();
+    phone?: string
+    email?: string
+    password?: string
+    alternatePhone?: string
+  }>()
 
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState(params.email ?? '');
-  const [password, setPassword] = useState(params.password ?? '');
-  const [phone, setPhone] = useState(params.phone ?? '');
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState(params.email ?? '')
+  const [password, setPassword] = useState(params.password ?? '')
+  const [phone, setPhone] = useState(params.phone ?? '')
   // The alternate phone comes from the S-02 step, already normalised there.
   // It is not editable on this screen — the wizard collected it one step ago,
   // and the prototype does not repeat the field.
-  const [alternatePhone] = useState(params.alternatePhone ?? '');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
+  const [alternatePhone] = useState(params.alternatePhone ?? '')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
 
   // The phone is checked with the shared schema, not a length test: the
   // schema normalises the number to E.164 and refuses anything that is not a
   // valid Bangladesh number. A length check would let `1234567890` through to
   // the server, which would reject it with a less useful message.
-  const isPhoneValid = phoneSchema.safeParse(phone).success;
+  const isPhoneValid = phoneSchema.safeParse(phone).success
 
-  const canSubmit =
-    email.includes('@') && password.length >= 8 && isPhoneValid && !submitting;
+  const canSubmit = email.includes('@') && password.length >= 8 && isPhoneValid && !submitting
 
   const onSubmit = async () => {
-    const nextErrors: Record<string, string> = {};
-    if (!email.includes('@')) nextErrors.email = t('errors.validationFailed');
-    if (password.length < 8) nextErrors.password = t('errors.validationFailed');
-    if (!isPhoneValid) nextErrors.phone = t('errors.validationFailed');
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const nextErrors: Record<string, string> = {}
+    if (!email.includes('@')) nextErrors.email = t('errors.validationFailed')
+    if (password.length < 8) nextErrors.password = t('errors.validationFailed')
+    if (!isPhoneValid) nextErrors.phone = t('errors.validationFailed')
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
 
-    setSubmitting(true);
-    setFormError(undefined);
+    setSubmitting(true)
+    setFormError(undefined)
     try {
       const userId = await signUp({
         email,
         password,
         phone,
         fullName: fullName || undefined,
-      });
+      })
 
       // The alternate phone is written **after** the signup, not before.
       //
@@ -83,9 +82,9 @@ export default function RegisterScreen() {
       // user is told, but they are not thrown back to the form.
       if (alternatePhone) {
         try {
-          await setAlternatePhone(userId, alternatePhone);
+          await setAlternatePhone(userId, alternatePhone)
         } catch {
-          setFormError(t('auth.alternatePhoneNotSaved'));
+          setFormError(t('auth.alternatePhoneNotSaved'))
         }
       }
 
@@ -94,9 +93,9 @@ export default function RegisterScreen() {
       // contacts. The account is not "complete" until the safety profile
       // has been set up, so the wizard is entered here rather than the home
       // screen.
-      router.replace('/(auth)/contact-1');
+      router.replace('/(auth)/contact-1')
     } catch (error) {
-      const appError = error instanceof AppError ? error : fromSupabaseError(error);
+      const appError = error instanceof AppError ? error : fromSupabaseError(error)
 
       // A validation failure that names the phone field is shown **on that
       // field**, not as a banner above the form. The user has to know which
@@ -105,15 +104,15 @@ export default function RegisterScreen() {
         setErrors((current) => ({
           ...current,
           phone: t('errors.phoneAlreadyRegistered'),
-        }));
-        setFormError(undefined);
+        }))
+        setFormError(undefined)
       } else {
-        setFormError(errorCopy(t, appError.code));
+        setFormError(errorCopy(t, appError.code))
       }
 
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   return (
     <WizardScreen
@@ -189,7 +188,7 @@ export default function RegisterScreen() {
         testID="reg-password"
       />
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -198,4 +197,4 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-});
+})

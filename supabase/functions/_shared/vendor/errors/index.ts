@@ -28,11 +28,11 @@ export const API_ERROR_CODES = [
   'GEOCODE_UNAVAILABLE',
   'OFFLINE_QUEUED',
   'INTERNAL',
-] as const;
+] as const
 
-export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number]
 
-export const API_ERROR_CODE_SET: ReadonlySet<string> = new Set(API_ERROR_CODES);
+export const API_ERROR_CODE_SET: ReadonlySet<string> = new Set(API_ERROR_CODES)
 
 /** HTTP status for each error code. */
 export const API_ERROR_HTTP_STATUS: Record<ApiErrorCode, number> = {
@@ -50,7 +50,7 @@ export const API_ERROR_HTTP_STATUS: Record<ApiErrorCode, number> = {
   GEOCODE_UNAVAILABLE: 200,
   OFFLINE_QUEUED: 202,
   INTERNAL: 500,
-};
+}
 
 /** Default developer-facing message per code. Never shown raw to a user. */
 export const API_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
@@ -68,7 +68,7 @@ export const API_ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   GEOCODE_UNAVAILABLE: 'The area could not be resolved; the report was saved anyway.',
   OFFLINE_QUEUED: 'The report was queued and will be sent when the network returns.',
   INTERNAL: 'Something went wrong.',
-};
+}
 
 /** i18n key for each error code — the client resolves this to a BN/EN string. */
 export const API_ERROR_I18N_KEYS: Record<ApiErrorCode, string> = {
@@ -86,12 +86,12 @@ export const API_ERROR_I18N_KEYS: Record<ApiErrorCode, string> = {
   GEOCODE_UNAVAILABLE: 'errors.geocodeUnavailable',
   OFFLINE_QUEUED: 'errors.offlineQueued',
   INTERNAL: 'errors.internal',
-};
+}
 
 export interface ApiErrorBody {
-  code: ApiErrorCode;
-  message: string;
-  details?: Record<string, unknown>;
+  code: ApiErrorCode
+  message: string
+  details?: Record<string, unknown>
 }
 
 /**
@@ -111,39 +111,45 @@ export interface ApiErrorBody {
  * ended up seeing the literal word "undefined".
  */
 export function resolveErrorMessage(code: ApiErrorCode): string {
-  return API_ERROR_I18N_KEYS[code] ?? 'errors.internal';
+  return API_ERROR_I18N_KEYS[code] ?? 'errors.internal'
 }
 
 export interface ApiErrorResponse {
-  error: ApiErrorBody;
+  error: ApiErrorBody
 }
 
 export interface ApiSuccessResponse<T> {
-  data: T;
+  data: T
 }
 
 /** A typed error carrying a stable code across the API boundary. */
 export class AppError extends Error {
-  readonly code: ApiErrorCode;
-  readonly details?: Record<string, unknown>;
-  readonly httpStatus: number;
+  readonly code: ApiErrorCode
+  readonly details?: Record<string, unknown>
+  readonly httpStatus: number
 
   constructor(code: ApiErrorCode, details?: Record<string, unknown>, message?: string) {
-    super(message ?? API_ERROR_MESSAGES[code]);
-    this.name = 'AppError';
-    this.code = code;
-    this.details = details;
-    this.httpStatus = API_ERROR_HTTP_STATUS[code];
+    super(message ?? API_ERROR_MESSAGES[code])
+    this.name = 'AppError'
+    this.code = code
+    this.details = details
+    this.httpStatus = API_ERROR_HTTP_STATUS[code]
   }
 
   toBody(): ApiErrorResponse {
-    return { error: { code: this.code, message: this.message, ...(this.details ? { details: this.details } : {}) } };
+    return {
+      error: {
+        code: this.code,
+        message: this.message,
+        ...(this.details ? { details: this.details } : {}),
+      },
+    }
   }
 }
 
 /** Narrow an unknown thrown value to an AppError. */
 export function isAppError(value: unknown): value is AppError {
-  return value instanceof AppError;
+  return value instanceof AppError
 }
 
 /**
@@ -151,6 +157,6 @@ export function isAppError(value: unknown): value is AppError {
  * are never surfaced to a user — they collapse to a stable code.
  */
 export function toAppError(value: unknown): AppError {
-  if (isAppError(value)) return value;
-  return new AppError('INTERNAL');
+  if (isAppError(value)) return value
+  return new AppError('INTERNAL')
 }

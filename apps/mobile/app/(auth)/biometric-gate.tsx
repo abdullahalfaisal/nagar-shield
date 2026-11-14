@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Button, WizardScreen } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
+import { useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Button, WizardScreen } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
 import {
   clearLocalBiometricState,
   getBiometricType,
@@ -13,8 +13,8 @@ import {
   readLocalBiometricState,
   recordBiometricAttempt,
   runBiometricPrompt,
-} from '@/shared/auth/biometricService';
-import { markGatePassed } from '@/shared/auth/useBiometricGate';
+} from '@/shared/auth/biometricService'
+import { markGatePassed } from '@/shared/auth/useBiometricGate'
 
 /**
  * Screen — Biometric Gate.
@@ -42,47 +42,47 @@ import { markGatePassed } from '@/shared/auth/useBiometricGate';
  * question, not a decision by the user.
  */
 export default function BiometricGateScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [kind, setKind] = useState<'fingerprint' | 'facial' | null>(null);
-  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
-  const [disabled, setDisabled] = useState(false);
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const [available, setAvailable] = useState<boolean | null>(null)
+  const [kind, setKind] = useState<'fingerprint' | 'facial' | null>(null)
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
+  const [disabled, setDisabled] = useState(false)
 
   // The prompt fires once when the screen opens. A re-fire is the user
   // pressing the button, so the auto-prompt is guarded by a ref rather than
   // by state that would also flip on a re-render.
-  const autoPrompted = useRef(false);
+  const autoPrompted = useRef(false)
 
   const prompt = async () => {
-    setBusy(true);
-    setError(undefined);
+    setBusy(true)
+    setError(undefined)
 
-    const outcome = await runBiometricPrompt(t('auth.biometricPrompt'));
+    const outcome = await runBiometricPrompt(t('auth.biometricPrompt'))
 
     if (outcome === 'success') {
       try {
-        const result = await recordBiometricAttempt(true);
+        const result = await recordBiometricAttempt(true)
         // The mirror follows the server's answer, never a locally computed
         // count — the two would drift.
-        await mirrorBiometricState(result);
+        await mirrorBiometricState(result)
       } catch {
         // The accounting is a convenience on the success path. The
         // fingerprint already proved who the user is, so a failure to
         // record it must not block the sign-in.
-        await clearLocalBiometricState();
+        await clearLocalBiometricState()
       }
 
       // The gate is satisfied. Without this the app group layout would see
       // the account is opted in and redirect straight back here.
-      await markGatePassed();
+      await markGatePassed()
 
-      router.replace('/(app)/home');
-      return;
+      router.replace('/(app)/home')
+      return
     }
 
     if (outcome === 'unavailable') {
@@ -91,83 +91,83 @@ export default function BiometricGateScreen() {
       // than leaving the user on a dead prompt. This is **not** counted as
       // a failure: the device simply cannot do it, and the user did not
       // decline anything.
-      router.replace('/(auth)/login');
-      return;
+      router.replace('/(auth)/login')
+      return
     }
 
     // A failure or a cancellation. Both are counted: the prompt is the
     // gate, and a gate that a dismissal walks past for free is not a gate.
     try {
-      const result = await recordBiometricAttempt(false);
-      await mirrorBiometricState(result);
-      setAttemptsLeft(result.failCount);
+      const result = await recordBiometricAttempt(false)
+      await mirrorBiometricState(result)
+      setAttemptsLeft(result.failCount)
 
       if (!result.biometricEnabled) {
         // Five failures in the window — the server has turned biometric
         // sign-in off for this account. The user is told why, then sent to
         // the password screen, which always works.
-        setDisabled(true);
-        setBusy(false);
-        return;
+        setDisabled(true)
+        setBusy(false)
+        return
       }
 
       if (result.fallback === 'password') {
-        router.replace('/(auth)/login');
-        return;
+        router.replace('/(auth)/login')
+        return
       }
     } catch {
       // The server could not be reached. The password screen is still the
       // right answer — the user must not be locked out by a network fault.
-      setError(t('errors.network'));
+      setError(t('errors.network'))
     }
 
-    setBusy(false);
-  };
+    setBusy(false)
+  }
 
   useEffect(() => {
-    let active = true;
+    let active = true
 
     void (async () => {
-      const ok = await isBiometricAvailable();
-      const type = ok ? await getBiometricType() : null;
-      if (!active) return;
+      const ok = await isBiometricAvailable()
+      const type = ok ? await getBiometricType() : null
+      if (!active) return
 
-      setAvailable(ok);
-      setKind(type);
+      setAvailable(ok)
+      setKind(type)
 
       // The device mirror is read first so the attempt count is on screen
       // without waiting for the network. The server's count replaces it
       // when the prompt is answered.
-      const local = await readLocalBiometricState();
+      const local = await readLocalBiometricState()
       if (active && local.failCount > 0) {
-        setAttemptsLeft(local.failCount);
+        setAttemptsLeft(local.failCount)
       }
 
       // No biometric on this device (or none enrolled): there is no gate to
       // show, so the password screen is the answer.
       if (!ok) {
-        router.replace('/(auth)/login');
-        return;
+        router.replace('/(auth)/login')
+        return
       }
 
       if (!autoPrompted.current) {
-        autoPrompted.current = true;
-        void prompt();
+        autoPrompted.current = true
+        void prompt()
       }
-    })();
+    })()
 
     return () => {
-      active = false;
-    };
+      active = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
-  const iconName = kind === 'facial' ? 'face' : 'fingerprint';
+  const iconName = kind === 'facial' ? 'face' : 'fingerprint'
 
   // Once the server has auto-disabled biometric sign-in there is nothing to
   // retry — the only way forward is the password. The screen says so rather
   // than offering a button that cannot work.
-  const autoDisabled = disabled || attemptsLeft !== null && attemptsLeft >= 5;
+  const autoDisabled = disabled || (attemptsLeft !== null && attemptsLeft >= 5)
 
   return (
     <WizardScreen
@@ -226,7 +226,7 @@ export default function BiometricGateScreen() {
         />
       ) : null}
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -253,4 +253,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-});
+})

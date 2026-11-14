@@ -1,13 +1,20 @@
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { STATIONS, type StationEntry } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Icon, ListRow, ManualDialGuidance, Screen, StationMap, type StationMarker } from '@/shared/ui';
-import { useDegradedHelp } from '@/shared/services/useDegradedHelp';
-import { resolveOrigin, useCurrentFix } from '@/shared/services/location';
-import { useRefreshGuard } from '@/shared/services/refreshGuard';
+import { useMemo, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { STATIONS, type StationEntry } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import {
+  Icon,
+  ListRow,
+  ManualDialGuidance,
+  Screen,
+  StationMap,
+  type StationMarker,
+} from '@/shared/ui'
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
+import { resolveOrigin, useCurrentFix } from '@/shared/services/location'
+import { useRefreshGuard } from '@/shared/services/refreshGuard'
 
 /**
  * The Find-a-station map.
@@ -32,24 +39,24 @@ import { useRefreshGuard } from '@/shared/services/refreshGuard';
  *     number and type — what the app knows — and nothing else (C-6).
  */
 export default function StationMapScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
 
   // The fix is requested **just-in-time**, when the map opens. It is never
   // requested at app open and never on the panic path.
-  const { state } = useCurrentFix();
-  const { origin, isFallback } = useMemo(() => resolveOrigin(state), [state]);
+  const { state } = useCurrentFix()
+  const { origin, isFallback } = useMemo(() => resolveOrigin(state), [state])
 
   // The offline notice. The tiles are the only thing that needs the network —
   // the markers and the list come from the bundle — so an offline device
   // loses the canvas, not the surface.
-  const { isOffline } = useRefreshGuard();
+  const { isOffline } = useRefreshGuard()
 
-  const [selected, setSelected] = useState<StationEntry | null>(null);
+  const [selected, setSelected] = useState<StationEntry | null>(null)
 
   // The same degraded-mode flow every help entry point uses.
-  const degradedHelp = useDegradedHelp();
+  const degradedHelp = useDegradedHelp()
 
   // The marker colours come from the design tokens, not from literals, and
   // the prototype's Help-card palette is the starting point so the map and
@@ -62,14 +69,14 @@ export default function StationMapScreen() {
       fire: theme.palette.amber[600],
     }),
     [theme],
-  );
+  )
 
   const displayName = (station: StationEntry) =>
-    i18n.language === 'bn' ? (station.nameBn ?? station.name) : station.name;
+    i18n.language === 'bn' ? (station.nameBn ?? station.name) : station.name
 
   // The station set is the **active** bundled rows. An inactive station is
   // excluded from the marker set — a retired station is never shown.
-  const stations = useMemo(() => STATIONS.filter((station) => station.isActive), []);
+  const stations = useMemo(() => STATIONS.filter((station) => station.isActive), [])
 
   const markers = useMemo<StationMarker[]>(
     () =>
@@ -83,9 +90,9 @@ export default function StationMapScreen() {
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stations, typeColor, i18n.language],
-  );
+  )
 
-  const selectedName = selected ? displayName(selected) : null;
+  const selectedName = selected ? displayName(selected) : null
 
   return (
     <Screen
@@ -199,7 +206,7 @@ export default function StationMapScreen() {
                 number: selected.phone,
               })}
               onPress={() => {
-                void degradedHelp.dial(selected.phone);
+                void degradedHelp.dial(selected.phone)
               }}
               style={[styles.callButton, { backgroundColor: theme.palette.violet[50] }]}
             >
@@ -235,7 +242,7 @@ export default function StationMapScreen() {
                     number: station.phone,
                   })}
                   onPress={() => {
-                    void degradedHelp.dial(station.phone);
+                    void degradedHelp.dial(station.phone)
                   }}
                   style={styles.rowCall}
                 >
@@ -257,19 +264,19 @@ export default function StationMapScreen() {
         />
       ) : null}
     </Screen>
-  );
+  )
 }
 
 /** One entry of the map legend — a colour and its name. */
 function LegendSwatch({ color, label }: { color: string; label: string }) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <View style={styles.legendItem}>
       <View style={[styles.swatch, { backgroundColor: color }]} />
       <Text style={[styles.legendLabel, { color: theme.colors.ink[700] }]}>{label}</Text>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -387,4 +394,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

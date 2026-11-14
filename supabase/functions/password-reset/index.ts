@@ -63,36 +63,36 @@
 import {
   passwordResetRequestBodySchema,
   passwordResetVerifyBodySchema,
-} from '../_shared/contracts.ts';
-import { errorResponse, successResponse } from '../_shared/http.ts';
-import { logEvent } from '../_shared/logger.ts';
-import { buildResetEmailBody, sendMail } from '../_shared/mailer.ts';
-import { newRequestId } from '../_shared/job-runner.ts';
-import { createServiceClient, projectUrl, requireEnv } from '../_shared/supabase.ts';
+} from '../_shared/contracts.ts'
+import { errorResponse, successResponse } from '../_shared/http.ts'
+import { logEvent } from '../_shared/logger.ts'
+import { buildResetEmailBody, sendMail } from '../_shared/mailer.ts'
+import { newRequestId } from '../_shared/job-runner.ts'
+import { createServiceClient, projectUrl, requireEnv } from '../_shared/supabase.ts'
 
 /** The GoTrue admin API — the service-role key is what authorises it. */
 function adminUrl(path: string): string {
-  return `${projectUrl()}/auth/v1${path}`;
+  return `${projectUrl()}/auth/v1${path}`
 }
 
 function adminHeaders(): Record<string, string> {
-  const key = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const key = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
   return {
     apikey: key,
     Authorization: `Bearer ${key}`,
     'Content-Type': 'application/json',
-  };
+  }
 }
 
 interface GenerateLinkResponse {
-  hashed_token?: string;
+  hashed_token?: string
 }
 
 interface VerifyResponse {
-  access_token?: string;
-  refresh_token?: string;
-  expires_in?: number;
-  user?: { id?: string; email?: string };
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  user?: { id?: string; email?: string }
 }
 
 /**
@@ -105,17 +105,17 @@ interface VerifyResponse {
  * generator is not a cryptographic one, and the code is a credential.
  */
 function generateCode(): string {
-  const digits = new Uint8Array(6);
-  crypto.getRandomValues(digits);
+  const digits = new Uint8Array(6)
+  crypto.getRandomValues(digits)
 
-  let code = '';
+  let code = ''
   for (const digit of digits) {
     // 10 % 10 is the identity; the modulo bias for 256 % 10 is negligible
     // for a one-time code, and rejecting the top of the range would make
     // the loop non-terminating in the worst case.
-    code += String(digit % 10);
+    code += String(digit % 10)
   }
-  return code;
+  return code
 }
 
 /**
@@ -134,15 +134,15 @@ async function generateRecoveryToken(email: string): Promise<string | null> {
       email,
       options: { redirect_to: 'nagarshield://auth/reset' },
     }),
-  });
+  })
 
   if (!response.ok) {
-    logEvent('warn', { requestId: 'generate_link', action: 'password_reset_generate_link' });
-    return null;
+    logEvent('warn', { requestId: 'generate_link', action: 'password_reset_generate_link' })
+    return null
   }
 
-  const body = (await response.json().catch(() => ({}))) as GenerateLinkResponse;
-  return body.hashed_token ?? null;
+  const body = (await response.json().catch(() => ({}))) as GenerateLinkResponse
+  return body.hashed_token ?? null
 }
 
 /**
@@ -164,10 +164,10 @@ async function redeemTokenWithGoTrue(tokenHash: string): Promise<VerifyResponse 
       type: 'recovery',
       token_hash: tokenHash,
     }),
-  });
+  })
 
-  const body = (await response.json().catch(() => ({}))) as VerifyResponse;
-  return response.ok ? body : null;
+  const body = (await response.json().catch(() => ({}))) as VerifyResponse
+  return response.ok ? body : null
 }
 
 /**
@@ -176,10 +176,7 @@ async function redeemTokenWithGoTrue(tokenHash: string): Promise<VerifyResponse 
  * The session proves the code was correct, so the password can be changed
  * against it without a second credential entry.
  */
-async function applyNewPassword(
-  accessToken: string,
-  newPassword: string,
-): Promise<boolean> {
+async function applyNewPassword(accessToken: string, newPassword: string): Promise<boolean> {
   const response = await fetch(adminUrl('/user'), {
     method: 'PUT',
     headers: {
@@ -188,69 +185,68 @@ async function applyNewPassword(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ password: newPassword }),
-  });
+  })
 
-  return response.ok;
+  return response.ok
 }
 
 Deno.serve(async (request) => {
-  const requestId = newRequestId();
+  const requestId = newRequestId()
 
   if (request.method !== 'POST') {
-    return errorResponse('VALIDATION_FAILED', 'Only POST is accepted.');
+    return errorResponse('VALIDATION_FAILED', 'Only POST is accepted.')
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await request.json().catch(() => null)
   if (!body || typeof body !== 'object') {
-    return errorResponse('VALIDATION_FAILED', 'A JSON body is required.');
+    return errorResponse('VALIDATION_FAILED', 'A JSON body is required.')
   }
 
-  const service = createServiceClient();
+  const service = createServiceClient()
 
   // ---------------------------------------------------------------------------
   // Mode 1 — request a code
   // ---------------------------------------------------------------------------
 
   if (!('code' in body)) {
-    const parsed = passwordResetRequestBodySchema.safeParse(body);
+    const parsed = passwordResetRequestBodySchema.safeParse(body)
     if (!parsed.success) {
-      return errorResponse('VALIDATION_FAILED', 'An identifier is required.');
+      return errorResponse('VALIDATION_FAILED', 'An identifier is required.')
     }
 
-    const identifier = parsed.data.identifier;
+    const identifier = parsed.data.identifier
 
     // The identifier is resolved to the account's email. The resolution
     // happens in the database, where it can see every profile — an
     // anonymous client cannot, because `profiles` is RLS-scoped to the
     // owner.
-    const { data: resolved, error: resolveError } = await service.rpc(
-      'resolve_login_identifier',
-      { p_identifier: identifier },
-    );
+    const { data: resolved, error: resolveError } = await service.rpc('resolve_login_identifier', {
+      p_identifier: identifier,
+    })
 
     if (resolveError || !resolved?.email) {
       // No account. The answer is deliberately identical to the one a
       // registered address gets — no existence signal.
-      logEvent('info', { requestId, action: 'password_reset_request', itemsProcessed: 0 });
-      return successResponse({ sent: true });
+      logEvent('info', { requestId, action: 'password_reset_request', itemsProcessed: 0 })
+      return successResponse({ sent: true })
     }
 
-    const accountEmail = resolved.email as string;
+    const accountEmail = resolved.email as string
 
     // The code is ours: generated here, hashed by the database, delivered by
     // the mail transport. It exists in plaintext only in this function's
     // memory, and only until the mail is sent.
-    const code = generateCode();
+    const code = generateCode()
 
     // GoTrue issues the recovery token. The token alone cannot reset the
     // password — it is redeemed only after the code is proven correct.
-    const tokenHash = await generateRecoveryToken(accountEmail);
+    const tokenHash = await generateRecoveryToken(accountEmail)
     if (!tokenHash) {
       // The token could not be issued. The user gets the same generic
       // answer — an account-existence signal must not depend on the
       // downstream services working.
-      logEvent('warn', { requestId, action: 'password_reset_generate_link_failed' });
-      return successResponse({ sent: true });
+      logEvent('warn', { requestId, action: 'password_reset_generate_link_failed' })
+      return successResponse({ sent: true })
     }
 
     // The challenge is recorded: the code's hash, the GoTrue token, the
@@ -260,12 +256,12 @@ Deno.serve(async (request) => {
     // disagree about the salt or the cost factor. If the hashing fails, the
     // request fails **open-looking** to the same generic answer — the user
     // gets no code, and no signal about whether the account exists.
-    let codeHash: string;
+    let codeHash: string
     try {
-      codeHash = await hashCode(code);
+      codeHash = await hashCode(code)
     } catch {
-      logEvent('error', { requestId, action: 'password_reset_hash_failed' });
-      return successResponse({ sent: true });
+      logEvent('error', { requestId, action: 'password_reset_hash_failed' })
+      return successResponse({ sent: true })
     }
 
     const { error: startError } = await service.rpc('start_password_reset_otp', {
@@ -273,57 +269,58 @@ Deno.serve(async (request) => {
       p_account_email: accountEmail,
       p_code_hash: codeHash,
       p_token_hash: tokenHash,
-    });
+    })
 
     if (startError) {
-      logEvent('error', { requestId, action: 'password_reset_start_failed' });
-      return successResponse({ sent: true });
+      logEvent('error', { requestId, action: 'password_reset_start_failed' })
+      return successResponse({ sent: true })
     }
 
     // The mail. A delivery failure does not change the response's shape —
     // see the note at the top of this file.
-    const mail = buildResetEmailBody(code);
+    const mail = buildResetEmailBody(code)
     await sendMail({
       to: accountEmail,
       subject: mail.subject,
       text: mail.text,
       html: mail.html,
-    });
+    })
 
-    logEvent('info', { requestId, action: 'password_reset_request', itemsProcessed: 1 });
-    return successResponse({ sent: true });
+    logEvent('info', { requestId, action: 'password_reset_request', itemsProcessed: 1 })
+    return successResponse({ sent: true })
   }
 
   // ---------------------------------------------------------------------------
   // Mode 2 — verify the code and set the new password
   // ---------------------------------------------------------------------------
 
-  const parsed = passwordResetVerifyBodySchema.safeParse(body);
+  const parsed = passwordResetVerifyBodySchema.safeParse(body)
   if (!parsed.success) {
-    return errorResponse('VALIDATION_FAILED', 'The code or the password is not valid.');
+    return errorResponse('VALIDATION_FAILED', 'The code or the password is not valid.')
   }
 
-  const { identifier, code, new_password: newPassword } = parsed.data;
+  const { identifier, code, new_password: newPassword } = parsed.data
 
   // (1) May this attempt proceed, and is the code correct?
   //
   //     The RPC checks the cooldown, the validity window, and compares the
   //     submitted code against the challenge's bcrypt hash. It returns the
   //     GoTrue token **only** on a correct code.
-  const { data: state, error: stateError } = await service.rpc(
-    'check_password_reset_otp_state',
-    { p_identifier: identifier, p_code: code, p_attempt_ok: true },
-  );
+  const { data: state, error: stateError } = await service.rpc('check_password_reset_otp_state', {
+    p_identifier: identifier,
+    p_code: code,
+    p_attempt_ok: true,
+  })
 
   if (stateError || !state) {
-    return errorResponse('VALIDATION_FAILED', 'The code is not valid.');
+    return errorResponse('VALIDATION_FAILED', 'The code is not valid.')
   }
 
   if (state.ok === false) {
     if (state.code === 'OTP_RATE_LIMIT') {
       return errorResponse('OTP_RATE_LIMIT', 'Too many attempts.', {
         retry_after_sec: state.retry_after_sec ?? 0,
-      });
+      })
     }
 
     // (2) The code was wrong. The attempt is accounted for, and the cooldown
@@ -332,22 +329,22 @@ Deno.serve(async (request) => {
       p_identifier: identifier,
       p_code: code,
       p_attempt_ok: false,
-    });
+    })
 
     if (after?.code === 'OTP_RATE_LIMIT') {
       return errorResponse('OTP_RATE_LIMIT', 'Too many attempts.', {
         retry_after_sec: after.retry_after_sec ?? 0,
-      });
+      })
     }
 
-    logEvent('info', { requestId, action: 'password_reset_wrong_code' });
+    logEvent('info', { requestId, action: 'password_reset_wrong_code' })
     return errorResponse('VALIDATION_FAILED', 'The code is not valid.', {
       attempts_remaining: after?.attempts_remaining ?? 0,
-    });
+    })
   }
 
   // (3) The code was right. The GoTrue token is redeemed now — and only now.
-  const verified = await redeemTokenWithGoTrue(state.token_hash as string);
+  const verified = await redeemTokenWithGoTrue(state.token_hash as string)
 
   if (!verified?.access_token) {
     // The token could not be redeemed. The code was correct, but the
@@ -357,31 +354,31 @@ Deno.serve(async (request) => {
       p_identifier: identifier,
       p_code: code,
       p_attempt_ok: false,
-    });
+    })
 
-    logEvent('warn', { requestId, action: 'password_reset_redeem_failed' });
-    return errorResponse('VALIDATION_FAILED', 'The code is not valid.');
+    logEvent('warn', { requestId, action: 'password_reset_redeem_failed' })
+    return errorResponse('VALIDATION_FAILED', 'The code is not valid.')
   }
 
   // (4) The new password is applied to the session GoTrue issued.
-  const applied = await applyNewPassword(verified.access_token, newPassword);
+  const applied = await applyNewPassword(verified.access_token, newPassword)
   if (!applied) {
-    logEvent('error', { requestId, action: 'password_reset_apply_failed' });
-    return errorResponse('INTERNAL', 'The password could not be set.');
+    logEvent('error', { requestId, action: 'password_reset_apply_failed' })
+    return errorResponse('INTERNAL', 'The password could not be set.')
   }
 
   // (5) The challenge is consumed, so the code cannot be used twice.
-  await service.rpc('consume_password_reset_otp', { p_identifier: identifier });
+  await service.rpc('consume_password_reset_otp', { p_identifier: identifier })
 
-  logEvent('info', { requestId, action: 'password_reset_verified', itemsProcessed: 1 });
+  logEvent('info', { requestId, action: 'password_reset_verified', itemsProcessed: 1 })
 
   return successResponse({
     ok: true,
     access_token: verified.access_token,
     refresh_token: verified.refresh_token,
     expires_in: verified.expires_in,
-  });
-});
+  })
+})
 
 /**
  * Hashes the code with the database's bcrypt helper.
@@ -392,14 +389,14 @@ Deno.serve(async (request) => {
  * stored.
  */
 async function hashCode(code: string): Promise<string> {
-  const service = createServiceClient();
+  const service = createServiceClient()
   const { data, error } = await service.rpc('password_reset_code_hash', {
     p_code: code,
-  });
+  })
 
   if (error || typeof data !== 'string' || data === '') {
-    throw new Error('The code could not be hashed.');
+    throw new Error('The code could not be hashed.')
   }
 
-  return data;
+  return data
 }

@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 interface LocationPillProps {
-  label: string;
-  onPress?: () => void;
-  accessibilityLabel?: string;
+  label: string
+  onPress?: () => void
+  accessibilityLabel?: string
 }
 
 /**
@@ -16,20 +16,17 @@ interface LocationPillProps {
  * `location_on` icon on the left and the `keyboard_arrow_down` on the right.
  */
 export function LocationPill({ label, onPress, accessibilityLabel }: LocationPillProps) {
-  const theme = useTheme();
+  const theme = useTheme()
 
   const content = (
     <>
       <Icon name="location_on" size={18} color={theme.palette.violet[700]} />
-      <Text
-        numberOfLines={1}
-        style={[styles.label, { color: theme.colors.ink[700] }]}
-      >
+      <Text numberOfLines={1} style={[styles.label, { color: theme.colors.ink[700] }]}>
         {label}
       </Text>
       {onPress ? <Icon name="keyboard_arrow_down" size={18} color={theme.colors.ink[400]} /> : null}
     </>
-  );
+  )
 
   if (!onPress) {
     return (
@@ -44,7 +41,7 @@ export function LocationPill({ label, onPress, accessibilityLabel }: LocationPil
       >
         {content}
       </View>
-    );
+    )
   }
 
   return (
@@ -62,7 +59,7 @@ export function LocationPill({ label, onPress, accessibilityLabel }: LocationPil
     >
       {content}
     </Pressable>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -84,4 +81,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-});
+})

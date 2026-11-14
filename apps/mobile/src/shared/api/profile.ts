@@ -1,7 +1,7 @@
-import { AppError, alternatePhoneSchema } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
-import type { Database } from '@/shared/api/database.types';
+import { AppError, alternatePhoneSchema } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
+import type { Database } from '@/shared/api/database.types'
 
 /**
  * The profile — the signed-in user's own row in `profiles`.
@@ -19,7 +19,7 @@ import type { Database } from '@/shared/api/database.types';
  * otherwise: the session has to notice the disable and stop.
  */
 
-export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+export type ProfileRow = Database['public']['Tables']['profiles']['Row']
 
 /**
  * Loads the signed-in user's profile row.
@@ -28,15 +28,11 @@ export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
  * validation failure rather than an internal error so the user can retry.
  */
 export async function loadProfile(userId: string): Promise<ProfileRow> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
-  if (!data) throw new AppError('NOT_FOUND');
-  return data;
+  if (error) throw fromSupabaseError(error)
+  if (!data) throw new AppError('NOT_FOUND')
+  return data
 }
 
 /**
@@ -49,31 +45,31 @@ export async function loadProfile(userId: string): Promise<ProfileRow> {
  * screen that does not need them.
  */
 export async function loadAccountStatus(userId: string): Promise<{
-  disabled: boolean;
-  deleted: boolean;
-  disabledAt: string | null;
+  disabled: boolean
+  deleted: boolean
+  disabledAt: string | null
 }> {
   const { data, error } = await supabase
     .from('profiles')
     .select('disabled_at, deleted_at')
     .eq('id', userId)
-    .maybeSingle();
+    .maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
   // No profile row: the account has no lifecycle state to report. The signup
   // trigger creates the row, so this is either a fresh account or a purged
   // tombstone whose `deleted_at` was already cleared. Either way, the account
   // is not disabled.
   if (!data) {
-    return { disabled: false, deleted: false, disabledAt: null };
+    return { disabled: false, deleted: false, disabledAt: null }
   }
 
   return {
     disabled: Boolean(data.disabled_at),
     deleted: Boolean(data.deleted_at),
     disabledAt: data.disabled_at,
-  };
+  }
 }
 
 /**
@@ -86,18 +82,20 @@ export async function loadAccountStatus(userId: string): Promise<{
  */
 export async function updateProfile(
   userId: string,
-  changes: Partial<Pick<ProfileRow, 'full_name' | 'alternate_phone' | 'locale' | 'theme' | 'biometric_opt_in'>>,
+  changes: Partial<
+    Pick<ProfileRow, 'full_name' | 'alternate_phone' | 'locale' | 'theme' | 'biometric_opt_in'>
+  >,
 ): Promise<ProfileRow> {
   const { data, error } = await supabase
     .from('profiles')
     .update(changes)
     .eq('id', userId)
     .select('*')
-    .maybeSingle();
+    .maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
-  if (!data) throw new AppError('NOT_FOUND');
-  return data;
+  if (error) throw fromSupabaseError(error)
+  if (!data) throw new AppError('NOT_FOUND')
+  return data
 }
 
 /**
@@ -117,24 +115,21 @@ export async function updateProfile(
  * list, and the story's edge-case table says so explicitly. Nothing here
  * checks for a duplicate, and nothing in the database should.
  */
-export async function setAlternatePhone(
-  userId: string,
-  value: string | null,
-): Promise<void> {
-  const trimmed = value?.trim() ?? '';
+export async function setAlternatePhone(userId: string, value: string | null): Promise<void> {
+  const trimmed = value?.trim() ?? ''
 
   if (!trimmed) {
-    await updateProfile(userId, { alternate_phone: null });
-    return;
+    await updateProfile(userId, { alternate_phone: null })
+    return
   }
 
-  const parsed = alternatePhoneSchema.safeParse(trimmed);
+  const parsed = alternatePhoneSchema.safeParse(trimmed)
   if (!parsed.success) {
     // A number that is not a valid Bangladesh number never reaches the
     // server — the CHECK constraint would refuse it, and a typed failure
     // tells the user which field is wrong.
-    throw new AppError('VALIDATION_FAILED');
+    throw new AppError('VALIDATION_FAILED')
   }
 
-  await updateProfile(userId, { alternate_phone: parsed.data });
+  await updateProfile(userId, { alternate_phone: parsed.data })
 }

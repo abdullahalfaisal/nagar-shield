@@ -20,10 +20,10 @@
  */
 
 /** The coordinate precision the payload is rendered at. */
-const COORDINATE_PRECISION = 5;
+const COORDINATE_PRECISION = 5
 
 /** The channel a snapshot was shared over. */
-export type ShareChannel = 'app' | 'os_share_sheet';
+export type ShareChannel = 'app' | 'os_share_sheet'
 
 /**
  * The payload.
@@ -34,17 +34,17 @@ export type ShareChannel = 'app' | 'os_share_sheet';
  */
 export interface SnapshotPayload {
   /** The plain-text message the OS share sheet carries. */
-  message: string;
+  message: string
   /** The `geo:` URI. */
-  geoUri: string;
+  geoUri: string
   /** The Google Maps URL. */
-  mapsUrl: string;
-  lat: number;
-  lng: number;
+  mapsUrl: string
+  lat: number
+  lng: number
   /** The fix accuracy in metres, or `null` when there is none. */
-  accuracyM: number | null;
+  accuracyM: number | null
   /** The ISO-8601 instant the snapshot was captured. */
-  capturedAt: string;
+  capturedAt: string
 }
 
 /**
@@ -57,7 +57,7 @@ export interface SnapshotPayload {
  * meridian — so the rounding never treats it as absent.
  */
 export function roundCoordinate(value: number): number {
-  return Number(value.toFixed(COORDINATE_PRECISION));
+  return Number(value.toFixed(COORDINATE_PRECISION))
 }
 
 /**
@@ -66,9 +66,9 @@ export function roundCoordinate(value: number): number {
  * The form is `geo:<lat>,<lng>?q=<lat>,<lng>`.
  */
 export function buildGeoUri(lat: number, lng: number): string {
-  const latText = String(roundCoordinate(lat));
-  const lngText = String(roundCoordinate(lng));
-  return `geo:${latText},${lngText}?q=${latText},${lngText}`;
+  const latText = String(roundCoordinate(lat))
+  const lngText = String(roundCoordinate(lng))
+  return `geo:${latText},${lngText}?q=${latText},${lngText}`
 }
 
 /**
@@ -77,7 +77,7 @@ export function buildGeoUri(lat: number, lng: number): string {
  * The form is `https://maps.google.com/?q=<lat>,<lng>`.
  */
 export function buildMapsUrl(lat: number, lng: number): string {
-  return `https://maps.google.com/?q=${roundCoordinate(lat)},${roundCoordinate(lng)}`;
+  return `https://maps.google.com/?q=${roundCoordinate(lat)},${roundCoordinate(lng)}`
 }
 
 /**
@@ -88,18 +88,18 @@ export function buildMapsUrl(lat: number, lng: number): string {
  * `geo:` URI and the Maps URL are locale-independent.
  */
 export function formatCapturedAt(iso: string, locale: string): string {
-  const captured = new Date(iso);
-  if (Number.isNaN(captured.getTime())) return '';
+  const captured = new Date(iso)
+  if (Number.isNaN(captured.getTime())) return ''
 
   try {
     return new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', {
       dateStyle: 'medium',
       timeStyle: 'short',
-    }).format(captured);
+    }).format(captured)
   } catch {
     // A runtime without the locale data falls back to the ISO form, which is
     // still a parseable timestamp — never an empty one.
-    return captured.toISOString();
+    return captured.toISOString()
   }
 }
 
@@ -112,25 +112,25 @@ export function formatCapturedAt(iso: string, locale: string): string {
  * but `'snapshot'` regardless.
  */
 export function buildSnapshotPayload(input: {
-  lat: number;
-  lng: number;
-  accuracyM: number | null;
-  capturedAt: string;
-  locale?: string;
+  lat: number
+  lng: number
+  accuracyM: number | null
+  capturedAt: string
+  locale?: string
 }): SnapshotPayload {
-  const lat = roundCoordinate(input.lat);
-  const lng = roundCoordinate(input.lng);
+  const lat = roundCoordinate(input.lat)
+  const lng = roundCoordinate(input.lng)
 
-  const geoUri = buildGeoUri(lat, lng);
-  const mapsUrl = buildMapsUrl(lat, lng);
-  const capturedAt = formatCapturedAt(input.capturedAt, input.locale ?? 'en');
+  const geoUri = buildGeoUri(lat, lng)
+  const mapsUrl = buildMapsUrl(lat, lng)
+  const capturedAt = formatCapturedAt(input.capturedAt, input.locale ?? 'en')
 
   // The accuracy line is only present when there is a real accuracy. A
   // manual entry has none, and reporting `±0 m` would be a fabrication.
   const accuracyLine =
     input.accuracyM === null || input.accuracyM === undefined
       ? null
-      : `±${Math.round(input.accuracyM)} m`;
+      : `±${Math.round(input.accuracyM)} m`
 
   const lines = [
     'Nagar Shield — my current location',
@@ -138,7 +138,7 @@ export function buildSnapshotPayload(input: {
     accuracyLine ? `Accuracy: ${accuracyLine}` : null,
     geoUri,
     mapsUrl,
-  ].filter((line): line is string => line !== null);
+  ].filter((line): line is string => line !== null)
 
   return {
     message: lines.join('\n'),
@@ -148,7 +148,7 @@ export function buildSnapshotPayload(input: {
     lng,
     accuracyM: input.accuracyM ?? null,
     capturedAt: input.capturedAt,
-  };
+  }
 }
 
 /**
@@ -159,17 +159,17 @@ export function buildSnapshotPayload(input: {
  * fabricated to fill the gap.
  */
 export function buildPayloadWithoutLocation(input: {
-  capturedAt: string;
-  locale?: string;
-  note: string;
+  capturedAt: string
+  locale?: string
+  note: string
 }): SnapshotPayload {
-  const capturedAt = formatCapturedAt(input.capturedAt, input.locale ?? 'en');
+  const capturedAt = formatCapturedAt(input.capturedAt, input.locale ?? 'en')
 
   const lines = [
     'Nagar Shield — location sharing',
     capturedAt ? `Taken: ${capturedAt}` : null,
     input.note,
-  ].filter((line): line is string => line !== null);
+  ].filter((line): line is string => line !== null)
 
   return {
     message: lines.join('\n'),
@@ -179,5 +179,5 @@ export function buildPayloadWithoutLocation(input: {
     lng: 0,
     accuracyM: null,
     capturedAt: input.capturedAt,
-  };
+  }
 }

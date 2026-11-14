@@ -52,7 +52,7 @@ export const palette = {
     100: '#E0F2FE',
     50: '#F0F9FF',
   },
-} as const;
+} as const
 
 /** Gradient stops, mirroring the CSS `linear-gradient(135deg, …)` definitions. */
 export const gradients = {
@@ -64,7 +64,7 @@ export const gradients = {
   green: ['#059669', '#10B981'],
   success: ['#10B981', '#059669'],
   family: ['#F472B6', '#EC4899'],
-} as const;
+} as const
 
 export const radius = {
   xs: 6,
@@ -74,7 +74,7 @@ export const radius = {
   xl: 22,
   xxl: 28,
   pill: 999,
-} as const;
+} as const
 
 export const spacing = {
   xs: 4,
@@ -84,13 +84,13 @@ export const spacing = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
-} as const;
+} as const
 
 /**
  * Minimum tap target. Material 48 dp (FR-UX-4 / PRD-X-3).
  * Every interactive control must be at least this size in both dimensions.
  */
-export const MIN_TAP_TARGET = 48;
+export const MIN_TAP_TARGET = 48
 
 /** The prototype phone frame is 390 × 844. */
 export const layout = {
@@ -102,7 +102,7 @@ export const layout = {
   helpCardIconSize: 56,
   flagButtonSize: 48,
   avatarSize: 44,
-} as const;
+} as const
 
 export const typography = {
   /**
@@ -146,26 +146,62 @@ export const typography = {
     snug: 1.4,
     normal: 1.5,
   },
-} as const;
+} as const
 
 /**
  * Shadows. React Native needs one shadow config per platform:
  * iOS uses `shadow*`, Android uses `elevation`. The values are the prototype's.
  */
 export const shadows = {
-  xs: { shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  sm: { shadowColor: '#0F172A', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  card: { shadowColor: '#0F172A', shadowOpacity: 0.05, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
-  lift: { shadowColor: '#0F172A', shadowOpacity: 0.1, shadowRadius: 32, shadowOffset: { width: 0, height: 16 }, elevation: 8 },
-  fab: { shadowColor: '#7C3AED', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-  emergency: { shadowColor: '#DC2626', shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
-} as const;
+  xs: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  sm: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  card: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  lift: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.1,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 8,
+  },
+  fab: {
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  emergency: {
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+} as const
 
 export const duration = {
   fast: 150,
   base: 220,
   slow: 360,
-} as const;
+} as const
 
 /**
  * The theme-independent colours. Everything else is theme-scoped because the
@@ -178,31 +214,31 @@ export const staticColors = {
   helpCardIconBg: 'rgba(255,255,255,0.20)',
   helpCardSub: 'rgba(255,255,255,0.85)',
   mapPinGlow: 'rgba(124,58,237,0.16)',
-} as const;
+} as const
 
 export interface ThemeColors {
   /** Cool slate neutrals. Inverted between themes. */
   ink: {
-    950: string;
-    900: string;
-    800: string;
-    700: string;
-    600: string;
-    500: string;
-    400: string;
-    300: string;
-    200: string;
-    100: string;
-    50: string;
-  };
+    950: string
+    900: string
+    800: string
+    700: string
+    600: string
+    500: string
+    400: string
+    300: string
+    200: string
+    100: string
+    50: string
+  }
   surface: {
-    white: string;
-    lavender: string;
-    card: string;
-    outline: string;
-  };
-  appBarBg: string;
-  isDark: boolean;
+    white: string
+    lavender: string
+    card: string
+    outline: string
+  }
+  appBarBg: string
+  isDark: boolean
 }
 
 export const lightColors: ThemeColors = {
@@ -227,7 +263,7 @@ export const lightColors: ThemeColors = {
   },
   appBarBg: 'rgba(255,255,255,0.86)',
   isDark: false,
-};
+}
 
 export const darkColors: ThemeColors = {
   ink: {
@@ -251,20 +287,20 @@ export const darkColors: ThemeColors = {
   },
   appBarBg: 'rgba(11,11,26,0.86)',
   isDark: true,
-};
+}
 
 export interface Theme {
-  name: 'light' | 'dark';
-  colors: ThemeColors;
-  palette: typeof palette;
-  gradients: typeof gradients;
-  radius: typeof radius;
-  spacing: typeof spacing;
-  layout: typeof layout;
-  typography: typeof typography;
-  shadows: typeof shadows;
-  duration: typeof duration;
-  staticColors: typeof staticColors;
+  name: 'light' | 'dark'
+  colors: ThemeColors
+  palette: typeof palette
+  gradients: typeof gradients
+  radius: typeof radius
+  spacing: typeof spacing
+  layout: typeof layout
+  typography: typeof typography
+  shadows: typeof shadows
+  duration: typeof duration
+  staticColors: typeof staticColors
 }
 
 export function buildTheme(name: 'light' | 'dark'): Theme {
@@ -280,5 +316,5 @@ export function buildTheme(name: 'light' | 'dark'): Theme {
     shadows,
     duration,
     staticColors,
-  };
+  }
 }

@@ -27,13 +27,13 @@
  * anon key is public by design and is protected by Row Level Security.
  */
 
-'use strict';
+'use strict'
 
-const fs = require('node:fs');
-const path = require('node:path');
-const zlib = require('node:zlib');
+const fs = require('node:fs')
+const path = require('node:path')
+const zlib = require('node:zlib')
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..')
 
 /** The paths scanned when none are given on the command line. */
 const DEFAULT_TARGETS = [
@@ -42,7 +42,7 @@ const DEFAULT_TARGETS = [
   'packages/shared',
   'eas.json',
   'apps/mobile/app.config.ts',
-];
+]
 
 /** Directories that never carry shippable client code. */
 const IGNORED_DIRS = new Set([
@@ -55,10 +55,10 @@ const IGNORED_DIRS = new Set([
   '.git',
   '.turbo',
   'vendor',
-]);
+])
 
 /** Files that legitimately hold the service key for a local function serve. */
-const IGNORED_FILES = new Set([path.join('supabase', 'functions', '.env.local')]);
+const IGNORED_FILES = new Set([path.join('supabase', 'functions', '.env.local')])
 
 /** Text file extensions worth scanning. Binary files are handled separately. */
 const TEXT_EXTENSIONS = new Set([
@@ -82,7 +82,7 @@ const TEXT_EXTENSIONS = new Set([
   '.env',
   '.plist',
   '.pbxproj',
-]);
+])
 
 /** Extensions that are never scanned as text. */
 const BINARY_EXTENSIONS = new Set([
@@ -102,7 +102,7 @@ const BINARY_EXTENSIONS = new Set([
   '.keystore',
   '.jks',
   '.pdf',
-]);
+])
 
 /**
  * The forbidden literals.
@@ -114,13 +114,13 @@ const FORBIDDEN_LITERALS = [
   { label: 'service-role key env name', pattern: 'SUPABASE_SERVICE_ROLE_KEY' },
   { label: 'service-role key env name', pattern: 'SUPABASE_SECRET_KEY' },
   { label: 'Supabase secret-key prefix', pattern: 'sb_secret_' },
-];
+]
 
 /** The service-role JWT role claim, with optional whitespace. */
-const SERVICE_ROLE_CLAIM = /["']role["']\s*:\s*["']service_role["']/;
+const SERVICE_ROLE_CLAIM = /["']role["']\s*:\s*["']service_role["']/
 
 /** A JWT — three base64url segments. */
-const JWT_PATTERN = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
+const JWT_PATTERN = /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g
 
 /**
  * The banned third-party SDKs.
@@ -143,18 +143,18 @@ const BANNED_SDKS = [
   'react-native-admob',
   'google-mobile-ads',
   'expo-ads-admob',
-];
+]
 
 /** Manifests whose dependency blocks are scanned for banned SDKs. */
-const MANIFEST_NAMES = new Set(['package.json']);
+const MANIFEST_NAMES = new Set(['package.json'])
 
 function relative(file) {
-  return path.relative(ROOT, file).replace(/\\/g, '/');
+  return path.relative(ROOT, file).replace(/\\/g, '/')
 }
 
 function isIgnoredFile(file) {
-  const rel = path.relative(ROOT, file);
-  return IGNORED_FILES.has(rel);
+  const rel = path.relative(ROOT, file)
+  return IGNORED_FILES.has(rel)
 }
 
 /**
@@ -164,48 +164,48 @@ function isIgnoredFile(file) {
  * ignored directories so `node_modules` never dominates the scan.
  */
 function collectFiles(target) {
-  const absolute = path.resolve(ROOT, target);
+  const absolute = path.resolve(ROOT, target)
 
-  if (!fs.existsSync(absolute)) return { files: [], missing: absolute };
+  if (!fs.existsSync(absolute)) return { files: [], missing: absolute }
 
   if (fs.statSync(absolute).isFile()) {
-    if (isIgnoredFile(absolute)) return { files: [], missing: null };
-    return { files: [absolute], missing: null };
+    if (isIgnoredFile(absolute)) return { files: [], missing: null }
+    return { files: [absolute], missing: null }
   }
 
-  const files = [];
+  const files = []
 
   const walk = (dir) => {
-    let entries;
+    let entries
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      entries = fs.readdirSync(dir, { withFileTypes: true })
     } catch {
-      return;
+      return
     }
 
     for (const entry of entries) {
-      const full = path.join(dir, entry.name);
+      const full = path.join(dir, entry.name)
 
       if (entry.isDirectory()) {
-        if (IGNORED_DIRS.has(entry.name)) continue;
-        walk(full);
-        continue;
+        if (IGNORED_DIRS.has(entry.name)) continue
+        walk(full)
+        continue
       }
 
-      if (!entry.isFile()) continue;
-      if (isIgnoredFile(full)) continue;
+      if (!entry.isFile()) continue
+      if (isIgnoredFile(full)) continue
 
-      const ext = path.extname(entry.name).toLowerCase();
-      if (BINARY_EXTENSIONS.has(ext)) continue;
-      if (!TEXT_EXTENSIONS.has(ext) && !MANIFEST_NAMES.has(entry.name)) continue;
+      const ext = path.extname(entry.name).toLowerCase()
+      if (BINARY_EXTENSIONS.has(ext)) continue
+      if (!TEXT_EXTENSIONS.has(ext) && !MANIFEST_NAMES.has(entry.name)) continue
 
-      files.push(full);
+      files.push(full)
     }
-  };
+  }
 
-  walk(absolute);
+  walk(absolute)
 
-  return { files, missing: null };
+  return { files, missing: null }
 }
 
 /**
@@ -216,60 +216,60 @@ function collectFiles(target) {
  * dependency, and it works on Windows.
  */
 function readZipEntries(buffer) {
-  const entries = [];
-  const EOCD_SIGNATURE = 0x06054b50;
-  const CENTRAL_SIGNATURE = 0x02014b50;
+  const entries = []
+  const EOCD_SIGNATURE = 0x06054b50
+  const CENTRAL_SIGNATURE = 0x02014b50
 
   // The end-of-central-directory record is at the tail.
-  let eocd = -1;
+  let eocd = -1
   for (let index = buffer.length - 22; index >= 0; index -= 1) {
     if (buffer.readUInt32LE(index) === EOCD_SIGNATURE) {
-      eocd = index;
-      break;
+      eocd = index
+      break
     }
   }
-  if (eocd < 0) throw new Error('not a ZIP archive (no end-of-central-directory record)');
+  if (eocd < 0) throw new Error('not a ZIP archive (no end-of-central-directory record)')
 
-  const entryCount = buffer.readUInt16LE(eocd + 10);
-  let offset = buffer.readUInt32LE(eocd + 16);
+  const entryCount = buffer.readUInt16LE(eocd + 10)
+  let offset = buffer.readUInt32LE(eocd + 16)
 
   for (let index = 0; index < entryCount; index += 1) {
-    if (buffer.readUInt32LE(offset) !== CENTRAL_SIGNATURE) break;
+    if (buffer.readUInt32LE(offset) !== CENTRAL_SIGNATURE) break
 
-    const method = buffer.readUInt16LE(offset + 10);
-    const compressedSize = buffer.readUInt32LE(offset + 20);
-    const nameLength = buffer.readUInt16LE(offset + 28);
-    const extraLength = buffer.readUInt16LE(offset + 30);
-    const commentLength = buffer.readUInt16LE(offset + 32);
-    const localOffset = buffer.readUInt32LE(offset + 42);
-    const name = buffer.toString('utf8', offset + 46, offset + 46 + nameLength);
+    const method = buffer.readUInt16LE(offset + 10)
+    const compressedSize = buffer.readUInt32LE(offset + 20)
+    const nameLength = buffer.readUInt16LE(offset + 28)
+    const extraLength = buffer.readUInt16LE(offset + 30)
+    const commentLength = buffer.readUInt16LE(offset + 32)
+    const localOffset = buffer.readUInt32LE(offset + 42)
+    const name = buffer.toString('utf8', offset + 46, offset + 46 + nameLength)
 
     // The local header repeats the name and extra lengths.
-    const localNameLength = buffer.readUInt16LE(localOffset + 26);
-    const localExtraLength = buffer.readUInt16LE(localOffset + 28);
-    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-    const data = buffer.subarray(dataStart, dataStart + compressedSize);
+    const localNameLength = buffer.readUInt16LE(localOffset + 26)
+    const localExtraLength = buffer.readUInt16LE(localOffset + 28)
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength
+    const data = buffer.subarray(dataStart, dataStart + compressedSize)
 
     if (method === 0) {
-      entries.push({ name, data });
+      entries.push({ name, data })
     } else if (method === 8) {
       try {
-        entries.push({ name, data: zlib.inflateRawSync(data) });
+        entries.push({ name, data: zlib.inflateRawSync(data) })
       } catch {
         // A corrupt or unsupported entry is skipped, not fatal — the scan
         // reports what it could read.
       }
     }
 
-    offset += 46 + nameLength + extraLength + commentLength;
+    offset += 46 + nameLength + extraLength + commentLength
   }
 
-  return entries;
+  return entries
 }
 
 /** True when the buffer looks like a ZIP/APK. */
 function looksLikeZip(buffer) {
-  return buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+  return buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b
 }
 
 /**
@@ -280,7 +280,7 @@ function looksLikeZip(buffer) {
 function scanText(source, text, findings) {
   for (const { label, pattern } of FORBIDDEN_LITERALS) {
     if (text.includes(pattern)) {
-      findings.push({ source, kind: label, match: pattern, snippet: redact(pattern) });
+      findings.push({ source, kind: label, match: pattern, snippet: redact(pattern) })
     }
   }
 
@@ -290,19 +290,19 @@ function scanText(source, text, findings) {
       kind: 'service-role JWT role claim',
       match: '"role":"service_role"',
       snippet: redact('"role":"service_role"'),
-    });
+    })
   }
 
   for (const match of text.matchAll(JWT_PATTERN)) {
-    const token = match[0];
-    const payload = decodeJwtPayload(token);
+    const token = match[0]
+    const payload = decodeJwtPayload(token)
     if (payload && /"role"\s*:\s*"service_role"/.test(payload)) {
       findings.push({
         source,
         kind: 'service-role JWT',
         match: token,
         snippet: redact(token),
-      });
+      })
     }
   }
 
@@ -312,44 +312,44 @@ function scanText(source, text, findings) {
       kind: 'SMS OTP feature flag enabled',
       match: 'EXPO_PUBLIC_SMS_OTP_ENABLED=true',
       snippet: 'EXPO_PUBLIC_SMS_OTP_ENABLED=true',
-    });
+    })
   }
 }
 
 /** Decodes a JWT payload, returning `null` when it is not decodable JSON. */
 function decodeJwtPayload(token) {
-  const segments = token.split('.');
-  if (segments.length < 2) return null;
+  const segments = token.split('.')
+  if (segments.length < 2) return null
 
   try {
-    const normalized = segments[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-    return Buffer.from(padded, 'base64').toString('utf8');
+    const normalized = segments[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    return Buffer.from(padded, 'base64').toString('utf8')
   } catch {
-    return null;
+    return null
   }
 }
 
 /** Redacts a match so a report never repeats a live credential. */
 function redact(value) {
-  if (value.length <= 12) return `${value.slice(0, 4)}…`;
-  return `${value.slice(0, 8)}…`;
+  if (value.length <= 12) return `${value.slice(0, 4)}…`
+  return `${value.slice(0, 8)}…`
 }
 
 /** Scans a dependency manifest for the banned SDKs. */
 function scanManifest(file, text, findings) {
-  let manifest;
+  let manifest
   try {
-    manifest = JSON.parse(text);
+    manifest = JSON.parse(text)
   } catch {
-    return;
+    return
   }
 
-  const sections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
+  const sections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
 
   for (const section of sections) {
-    const deps = manifest[section];
-    if (!deps || typeof deps !== 'object') continue;
+    const deps = manifest[section]
+    if (!deps || typeof deps !== 'object') continue
 
     for (const name of Object.keys(deps)) {
       if (BANNED_SDKS.includes(name)) {
@@ -358,96 +358,96 @@ function scanManifest(file, text, findings) {
           kind: 'third-party analytics / ad SDK (FR-DATA-5)',
           match: name,
           snippet: name,
-        });
+        })
       }
     }
   }
 }
 
 function main() {
-  const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
-  const scanTargets = targets.length > 0 ? targets : DEFAULT_TARGETS;
+  const targets = process.argv.slice(2).filter((arg) => !arg.startsWith('--'))
+  const scanTargets = targets.length > 0 ? targets : DEFAULT_TARGETS
 
-  const findings = [];
-  const scannedFiles = [];
-  const missingTargets = [];
+  const findings = []
+  const scannedFiles = []
+  const missingTargets = []
 
   for (const target of scanTargets) {
-    const { files, missing } = collectFiles(target);
+    const { files, missing } = collectFiles(target)
 
     if (missing) {
-      missingTargets.push(target);
-      continue;
+      missingTargets.push(target)
+      continue
     }
 
     for (const file of files) {
-      const stat = fs.statSync(file);
+      const stat = fs.statSync(file)
 
       // An APK (or any zip) is scanned through its entries.
       if (stat.isFile() && looksLikeZip(fs.readFileSync(file).subarray(0, 4))) {
-        const buffer = fs.readFileSync(file);
-        let entries = [];
+        const buffer = fs.readFileSync(file)
+        let entries = []
         try {
-          entries = readZipEntries(buffer);
+          entries = readZipEntries(buffer)
         } catch (error) {
           findings.push({
             source: relative(file),
             kind: 'unreadable archive',
             match: '—',
             snippet: error instanceof Error ? error.message : String(error),
-          });
-          continue;
+          })
+          continue
         }
 
         for (const entry of entries) {
-          if (entry.name.endsWith('/')) continue;
-          const ext = path.extname(entry.name).toLowerCase();
-          if (!TEXT_EXTENSIONS.has(ext)) continue;
+          if (entry.name.endsWith('/')) continue
+          const ext = path.extname(entry.name).toLowerCase()
+          if (!TEXT_EXTENSIONS.has(ext)) continue
 
-          const text = entry.data.toString('utf8');
-          scanText(`${relative(file)}!/${entry.name}`, text, findings);
-          scannedFiles.push(`${relative(file)}!/${entry.name}`);
+          const text = entry.data.toString('utf8')
+          scanText(`${relative(file)}!/${entry.name}`, text, findings)
+          scannedFiles.push(`${relative(file)}!/${entry.name}`)
         }
-        continue;
+        continue
       }
 
-      let text;
+      let text
       try {
-        text = fs.readFileSync(file, 'utf8');
+        text = fs.readFileSync(file, 'utf8')
       } catch {
-        continue;
+        continue
       }
 
-      scannedFiles.push(relative(file));
+      scannedFiles.push(relative(file))
 
       if (MANIFEST_NAMES.has(path.basename(file))) {
-        scanManifest(file, text, findings);
+        scanManifest(file, text, findings)
       }
 
-      scanText(relative(file), text, findings);
+      scanText(relative(file), text, findings)
     }
   }
 
-  console.log(`Secret scan — ${scannedFiles.length} file(s) across ${scanTargets.length} target(s)`);
+  console.log(`Secret scan — ${scannedFiles.length} file(s) across ${scanTargets.length} target(s)`)
 
   for (const target of missingTargets) {
-    console.log(`  · skipped (not found): ${target}`);
+    console.log(`  · skipped (not found): ${target}`)
   }
 
   if (findings.length === 0) {
-    console.log('✓ no service-role material found');
-    console.log('✓ no third-party analytics or ad SDK found');
-    console.log('✓ SMS OTP remains feature-flagged off');
-    process.exit(0);
+    console.log('✓ no service-role material found')
+    console.log('✓ no third-party analytics or ad SDK found')
+    console.log('✓ SMS OTP remains feature-flagged off')
+    process.exit(0)
   }
 
-  console.error(`\n✗ ${findings.length} finding(s):`);
+  console.error(`\n✗ ${findings.length} finding(s):`)
   for (const finding of findings) {
-    console.error(`   [${finding.kind}] ${finding.source}`);
-    console.error(`      ${finding.snippet}`);
+    console.error(`   [${finding.kind}] ${finding.source}`)
+    console.error(`      ${finding.snippet}`)
   }
-  console.error('\nA service-role key in a client bundle is a release blocker.');
-  process.exit(1);
+  console.error('\nA service-role key in a client bundle is a release blocker.')
+  process.exit(1)
 }
 
-main();
+main()

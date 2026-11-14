@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 /**
  * The coverage of the shared suite.
@@ -21,47 +21,47 @@ import { join } from 'node:path';
  * exported is not a gap — it is a mistake in the list.
  */
 
-const SRC = join(__dirname);
+const SRC = join(__dirname)
 
 /** Every `.ts` file in the package's `src`, excluding the tests. */
 function sourceFiles(dir = SRC): string[] {
-  const found: string[] = [];
+  const found: string[] = []
 
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) found.push(...sourceFiles(full));
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) found.push(full);
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...sourceFiles(full))
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) found.push(full)
   }
 
-  return found;
+  return found
 }
 
 /** Every test file in the package's `src`. */
 function testFiles(dir = SRC): string[] {
-  const found: string[] = [];
+  const found: string[] = []
 
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) found.push(...testFiles(full));
-    else if (entry.name.endsWith('.test.ts')) found.push(full);
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) found.push(...testFiles(full))
+    else if (entry.name.endsWith('.test.ts')) found.push(full)
   }
 
-  return found;
+  return found
 }
 
 /** The names the test files mention. */
 const mentionedNames = (): Set<string> => {
-  const names = new Set<string>();
+  const names = new Set<string>()
 
   for (const file of testFiles()) {
-    const text = readFileSync(file, 'utf8');
+    const text = readFileSync(file, 'utf8')
     for (const match of text.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g)) {
-      names.add(match[1] as string);
+      names.add(match[1] as string)
     }
   }
 
-  return names;
-};
+  return names
+}
 
 /**
  * The first capture group of every match of `pattern` in `text`.
@@ -71,73 +71,77 @@ const mentionedNames = (): Set<string> => {
  * mandatory capture group.
  */
 function captures(text: string, pattern: RegExp): string[] {
-  return [...text.matchAll(pattern)].map((match) => match[1] as string);
+  return [...text.matchAll(pattern)].map((match) => match[1] as string)
 }
 
 describe('the shared suite', () => {
-  const mentioned = mentionedNames();
+  const mentioned = mentionedNames()
 
   it('has test files', () => {
     // A suite with no tests would make every check below vacuous.
-    expect(testFiles().length).toBeGreaterThan(0);
-  });
+    expect(testFiles().length).toBeGreaterThan(0)
+  })
 
   it('covers every exported Zod schema', () => {
-    const schemas: string[] = [];
+    const schemas: string[] = []
 
     for (const file of sourceFiles()) {
-      schemas.push(...captures(readFileSync(file, 'utf8'), /export const (\w*Schema)\b/g));
+      schemas.push(...captures(readFileSync(file, 'utf8'), /export const (\w*Schema)\b/g))
     }
 
-    expect(schemas.length).toBeGreaterThan(0);
+    expect(schemas.length).toBeGreaterThan(0)
 
-    const uncovered = schemas.filter((name) => !mentioned.has(name));
+    const uncovered = schemas.filter((name) => !mentioned.has(name))
 
-    expect(uncovered).toEqual([]);
-  });
+    expect(uncovered).toEqual([])
+  })
 
   it('covers every exported enum parser', () => {
-    const parsers: string[] = [];
+    const parsers: string[] = []
 
     for (const file of sourceFiles()) {
       // The parsers the story names: `parseReportCategory`,
       // `parseAreaHierarchy`, and the rest of the `parse*` family.
-      parsers.push(...captures(readFileSync(file, 'utf8'), /export function (parse\w+)\b/g));
+      parsers.push(...captures(readFileSync(file, 'utf8'), /export function (parse\w+)\b/g))
     }
 
-    expect(parsers.length).toBeGreaterThan(0);
+    expect(parsers.length).toBeGreaterThan(0)
 
-    const uncovered = parsers.filter((name) => !mentioned.has(name));
+    const uncovered = parsers.filter((name) => !mentioned.has(name))
 
-    expect(uncovered).toEqual([]);
-  });
+    expect(uncovered).toEqual([])
+  })
 
   it('covers every exported enum', () => {
-    const enums: string[] = [];
+    const enums: string[] = []
 
     for (const file of sourceFiles()) {
       // The value enums are the exported `as const` arrays.
-      enums.push(...captures(readFileSync(file, 'utf8'), /export const ([A-Z][A-Z0-9_]*(?:S|IES))\b/g));
+      enums.push(
+        ...captures(readFileSync(file, 'utf8'), /export const ([A-Z][A-Z0-9_]*(?:S|IES))\b/g),
+      )
     }
 
-    expect(enums.length).toBeGreaterThan(0);
+    expect(enums.length).toBeGreaterThan(0)
 
-    const uncovered = enums.filter((name) => !mentioned.has(name));
+    const uncovered = enums.filter((name) => !mentioned.has(name))
 
-    expect(uncovered).toEqual([]);
-  });
+    expect(uncovered).toEqual([])
+  })
 
   it('covers every exported business-rule constant', () => {
-    const constants: string[] = [];
+    const constants: string[] = []
 
     for (const file of sourceFiles()) {
-      constants.push(...captures(readFileSync(file, 'utf8'), /export const ([A-Z][A-Z0-9_]{3,})\b/g));
+      constants.push(
+        ...captures(readFileSync(file, 'utf8'), /export const ([A-Z][A-Z0-9_]{3,})\b/g),
+      )
     }
 
-    expect(constants.length).toBeGreaterThan(0);
+    expect(constants.length).toBeGreaterThan(0)
 
-    const uncovered = constants.filter((name) => !mentioned.has(name));
+    const uncovered = constants.filter((name) => !mentioned.has(name))
 
-    expect(uncovered).toEqual([]);
-  });
-});
+    expect(uncovered).toEqual([])
+  })
+})

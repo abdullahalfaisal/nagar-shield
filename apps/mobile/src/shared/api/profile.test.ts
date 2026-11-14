@@ -1,5 +1,5 @@
-import { AppError } from '@nagar-shield/shared';
-import { setAlternatePhone } from '@/shared/api/profile';
+import { AppError } from '@nagar-shield/shared'
+import { setAlternatePhone } from '@/shared/api/profile'
 
 /**
  * The alternate phone's write path.
@@ -21,31 +21,31 @@ import { setAlternatePhone } from '@/shared/api/profile';
  * exercise the real write is worth nothing here.
  */
 
-const mockUpdate = jest.fn();
-const mockEq = jest.fn();
-const mockSelect = jest.fn();
+const mockUpdate = jest.fn()
+const mockEq = jest.fn()
+const mockSelect = jest.fn()
 
 jest.mock('@/shared/api/supabase', () => ({
   supabase: {
     from: jest.fn(() => ({
       update: (...args: unknown[]) => {
-        mockUpdate(...args);
+        mockUpdate(...args)
         return {
           eq: (...eqArgs: unknown[]) => {
-            mockEq(...eqArgs);
+            mockEq(...eqArgs)
             return {
               select: (...selectArgs: unknown[]) => {
-                mockSelect(...selectArgs);
+                mockSelect(...selectArgs)
                 return {
                   maybeSingle: jest.fn().mockResolvedValue({
                     data: { id: '11111111-1111-1111-1111-111111111101' },
                     error: null,
                   }),
-                };
+                }
               },
-            };
+            }
           },
-        };
+        }
       },
     })),
   },
@@ -54,52 +54,52 @@ jest.mock('@/shared/api/supabase', () => ({
     setItem: jest.fn().mockResolvedValue(undefined),
     removeItem: jest.fn().mockResolvedValue(undefined),
   },
-}));
+}))
 
-const USER_ID = '11111111-1111-1111-1111-111111111101';
+const USER_ID = '11111111-1111-1111-1111-111111111101'
 
 describe('setAlternatePhone', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-  });
+    jest.clearAllMocks()
+  })
 
   it('normalises a local number to E.164 before writing it', async () => {
-    await setAlternatePhone(USER_ID, '01711-111111');
+    await setAlternatePhone(USER_ID, '01711-111111')
 
-    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: '+8801711111111' });
-    expect(mockEq).toHaveBeenCalledWith('id', USER_ID);
-  });
+    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: '+8801711111111' })
+    expect(mockEq).toHaveBeenCalledWith('id', USER_ID)
+  })
 
   it('writes an already-canonical number unchanged', async () => {
-    await setAlternatePhone(USER_ID, '+8801711111111');
+    await setAlternatePhone(USER_ID, '+8801711111111')
 
-    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: '+8801711111111' });
-  });
+    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: '+8801711111111' })
+  })
 
   it('clears the column for an empty value', async () => {
-    await setAlternatePhone(USER_ID, '   ');
+    await setAlternatePhone(USER_ID, '   ')
 
-    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: null });
-  });
+    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: null })
+  })
 
   it('clears the column for an explicit null', async () => {
-    await setAlternatePhone(USER_ID, null);
+    await setAlternatePhone(USER_ID, null)
 
-    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: null });
-  });
+    expect(mockUpdate).toHaveBeenCalledWith({ alternate_phone: null })
+  })
 
   it('refuses a non-Bangladesh number without writing it', async () => {
-    await expect(setAlternatePhone(USER_ID, '+14155550123')).rejects.toThrow(AppError);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
+    await expect(setAlternatePhone(USER_ID, '+14155550123')).rejects.toThrow(AppError)
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
 
   it('refuses a number that is too short without writing it', async () => {
-    await expect(setAlternatePhone(USER_ID, '12345')).rejects.toThrow(AppError);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
+    await expect(setAlternatePhone(USER_ID, '12345')).rejects.toThrow(AppError)
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
 
   it('refuses a non-number without writing it', async () => {
-    await expect(setAlternatePhone(USER_ID, 'my landline')).rejects.toThrow(AppError);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-});
+    await expect(setAlternatePhone(USER_ID, 'my landline')).rejects.toThrow(AppError)
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+})

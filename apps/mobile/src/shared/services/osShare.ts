@@ -1,5 +1,5 @@
-import { Platform, Share } from 'react-native';
-import * as Sharing from 'expo-sharing';
+import { Platform, Share } from 'react-native'
+import * as Sharing from 'expo-sharing'
 
 /**
  * The OS share sheet.
@@ -29,7 +29,7 @@ export type OsShareOutcome =
   /** The user dismissed the sheet without picking a target. Nothing was sent. */
   | { status: 'dismissed' }
   /** The OS refused to present the sheet. Nothing was sent. */
-  | { status: 'unavailable' };
+  | { status: 'unavailable' }
 
 /**
  * Presents the OS share sheet with the given message.
@@ -46,20 +46,20 @@ export type OsShareOutcome =
  */
 export async function fireOsShare(message: string): Promise<OsShareOutcome> {
   if (message.trim().length === 0) {
-    return { status: 'unavailable' };
+    return { status: 'unavailable' }
   }
 
   // `expo-sharing` is the preferred path on both platforms.
   try {
-    const available = await Sharing.isAvailableAsync();
+    const available = await Sharing.isAvailableAsync()
 
     if (available) {
       await Sharing.shareAsync(message, {
         mimeType: 'text/plain',
         dialogTitle: undefined,
         UTI: 'public.plain-text',
-      });
-      return { status: 'shared' };
+      })
+      return { status: 'shared' }
     }
   } catch {
     // Fall through to the React Native `Share` module. A device where
@@ -74,18 +74,18 @@ export async function fireOsShare(message: string): Promise<OsShareOutcome> {
       // Android's `Share.share` resolves with the dismissed action when the
       // user backs out of the sheet. It never reports a delivery.
       { dialogTitle: undefined },
-    );
+    )
 
     if (result.action === Share.dismissedAction) {
-      return { status: 'dismissed' };
+      return { status: 'dismissed' }
     }
 
-    return { status: 'shared' };
+    return { status: 'shared' }
   } catch {
     // The OS threw — there is no app that can receive a shared text, or the
     // sheet could not be presented. Nothing was sent, and the caller must
     // say so plainly.
-    return { status: 'unavailable' };
+    return { status: 'unavailable' }
   }
 }
 
@@ -99,11 +99,11 @@ export async function fireOsShare(message: string): Promise<OsShareOutcome> {
 export async function canShare(): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
-      return await Sharing.isAvailableAsync();
+      return await Sharing.isAvailableAsync()
     }
 
-    return true;
+    return true
   } catch {
-    return false;
+    return false
   }
 }

@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError, otpCodeSchema } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { AppBar, Button, InputField } from '@/shared/ui';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError, otpCodeSchema } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { AppBar, Button, InputField } from '@/shared/ui'
 import {
   clearPendingReset,
   peekPendingReset,
   sendPasswordResetOtp,
   stagePasswordReset,
-} from '@/shared/auth/passwordResetService';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+} from '@/shared/auth/passwordResetService'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 13b — the reset-code entry step.
@@ -48,15 +48,15 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * `parseInt` would turn it into `123` — a different code.
  */
 export default function VerifyOtpScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
   const params = useLocalSearchParams<{
     /** The server's remaining cooldown, in seconds. */
-    retryAfter?: string;
+    retryAfter?: string
     /** The server's remaining attempts. */
-    attemptsRemaining?: string;
-  }>();
+    attemptsRemaining?: string
+  }>()
 
   // The identifier is read from the in-memory hand-off, not from the route
   // params: it is PII, and a route param is part of a URL.
@@ -64,13 +64,13 @@ export default function VerifyOtpScreen() {
   // The hand-off is **peeked**, not taken — the identifier has to survive the
   // round trip to the password step and back again, so it is read without
   // being consumed. The code is not read here at all.
-  const identifier = useMemo(() => peekPendingReset()?.identifier ?? '', []);
+  const identifier = useMemo(() => peekPendingReset()?.identifier ?? '', [])
 
-  const [code, setCode] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | undefined>();
-  const [submitting, setSubmitting] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [code, setCode] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formError, setFormError] = useState<string | undefined>()
+  const [submitting, setSubmitting] = useState(false)
+  const [sending, setSending] = useState(false)
 
   // The cooldown, mirrored from the server. `null` means "no cooldown".
   //
@@ -78,21 +78,21 @@ export default function VerifyOtpScreen() {
   // previous attempt is the only authority on the wait. The user is sent
   // back here from the password step carrying that answer.
   const [cooldownSeconds, setCooldownSeconds] = useState<number | null>(() => {
-    const value = Number(params.retryAfter);
-    return Number.isFinite(value) && value > 0 ? Math.ceil(value) : null;
-  });
+    const value = Number(params.retryAfter)
+    return Number.isFinite(value) && value > 0 ? Math.ceil(value) : null
+  })
 
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | undefined>(() => {
-    const value = Number(params.attemptsRemaining);
-    return Number.isFinite(value) ? value : undefined;
-  });
+    const value = Number(params.attemptsRemaining)
+    return Number.isFinite(value) ? value : undefined
+  })
 
   // The 10-minute validity window, mirrored from the server's answer.
   //
   // It is seeded on mount: the code the user is about to type was issued
   // moments ago, so the window starts now. The countdown is a **mirror** —
   // it is the server that decides whether a code has expired.
-  const [validitySeconds, setValiditySeconds] = useState<number | null>(10 * 60);
+  const [validitySeconds, setValiditySeconds] = useState<number | null>(10 * 60)
 
   /**
    * Ticks the mirrored countdown.
@@ -102,46 +102,46 @@ export default function VerifyOtpScreen() {
    * server's answer is the only thing that decides.
    */
   useEffect(() => {
-    if (cooldownSeconds === null || cooldownSeconds <= 0) return;
+    if (cooldownSeconds === null || cooldownSeconds <= 0) return
 
     const timer = setInterval(() => {
       setCooldownSeconds((current) => {
-        if (current === null) return null;
-        const next = current - 1;
-        return next <= 0 ? null : next;
-      });
-    }, 1000);
+        if (current === null) return null
+        const next = current - 1
+        return next <= 0 ? null : next
+      })
+    }, 1000)
 
-    return () => clearInterval(timer);
-  }, [cooldownSeconds]);
+    return () => clearInterval(timer)
+  }, [cooldownSeconds])
 
   useEffect(() => {
-    if (validitySeconds === null || validitySeconds <= 0) return;
+    if (validitySeconds === null || validitySeconds <= 0) return
 
     const timer = setInterval(() => {
       setValiditySeconds((current) => {
-        if (current === null) return null;
-        const next = current - 1;
-        return next <= 0 ? null : next;
-      });
-    }, 1000);
+        if (current === null) return null
+        const next = current - 1
+        return next <= 0 ? null : next
+      })
+    }, 1000)
 
-    return () => clearInterval(timer);
-  }, [validitySeconds]);
+    return () => clearInterval(timer)
+  }, [validitySeconds])
 
-  const inCooldown = cooldownSeconds !== null && cooldownSeconds > 0;
+  const inCooldown = cooldownSeconds !== null && cooldownSeconds > 0
 
   const onVerify = useCallback(async () => {
-    const parsed = otpCodeSchema.safeParse(code);
+    const parsed = otpCodeSchema.safeParse(code)
 
     if (!parsed.success) {
-      setErrors({ code: t('auth.otpCodeInvalid') });
-      return;
+      setErrors({ code: t('auth.otpCodeInvalid') })
+      return
     }
 
-    setErrors({});
-    setSubmitting(true);
-    setFormError(undefined);
+    setErrors({})
+    setSubmitting(true)
+    setFormError(undefined)
 
     try {
       // The code is checked, the password is set and the session is issued by
@@ -155,60 +155,53 @@ export default function VerifyOtpScreen() {
       //
       // It is still never the client's decision: the server compares it
       // against the challenge's bcrypt hash whatever the client says.
-      stagePasswordReset(identifier, parsed.data);
-      router.push('/(auth)/reset-password');
+      stagePasswordReset(identifier, parsed.data)
+      router.push('/(auth)/reset-password')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  }, [code, identifier, router, t]);
+  }, [code, identifier, router, t])
 
   const onResend = useCallback(async () => {
-    setSending(true);
-    setFormError(undefined);
+    setSending(true)
+    setFormError(undefined)
 
     try {
-      await sendPasswordResetOtp(identifier);
+      await sendPasswordResetOtp(identifier)
 
       // A fresh code supersedes the old one. The server's window restarts
       // with it, so the mirror restarts too — and any code that was staged
       // for the password step is now a code the server has already
       // superseded, so it is discarded.
-      clearPendingReset();
-      setValiditySeconds(10 * 60);
-      setCooldownSeconds(null);
-      setAttemptsRemaining(undefined);
-      setCode('');
+      clearPendingReset()
+      setValiditySeconds(10 * 60)
+      setCooldownSeconds(null)
+      setAttemptsRemaining(undefined)
+      setCode('')
     } catch (error) {
-      const appError = error instanceof AppError ? error : null;
-      setFormError(
-        appError ? errorCopy(t, appError.code) : t('errors.internal'),
-      );
+      const appError = error instanceof AppError ? error : null
+      setFormError(appError ? errorCopy(t, appError.code) : t('errors.internal'))
     } finally {
-      setSending(false);
+      setSending(false)
     }
-  }, [identifier, t]);
+  }, [identifier, t])
 
   const validityLabel = useMemo(() => {
-    if (validitySeconds === null) return null;
-    const minutes = Math.floor(validitySeconds / 60);
-    const seconds = validitySeconds % 60;
+    if (validitySeconds === null) return null
+    const minutes = Math.floor(validitySeconds / 60)
+    const seconds = validitySeconds % 60
     return t('auth.otpExpiresIn', {
       minutes,
       seconds: String(seconds).padStart(2, '0'),
-    });
-  }, [t, validitySeconds]);
+    })
+  }, [t, validitySeconds])
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-      <AppBar
-        title={t('auth.accountRecovery')}
-        onBack={() => router.back()}
-      />
+      <AppBar title={t('auth.accountRecovery')} onBack={() => router.back()} />
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
-          {t('auth.otpTitle')}
-        </Text>
+        <Text style={[styles.title, { color: theme.colors.ink[950] }]}>{t('auth.otpTitle')}</Text>
         <Text style={[styles.subtitle, { color: theme.colors.ink[600] }]}>
           {t('auth.otpEmailSubtitle')}
         </Text>
@@ -267,7 +260,7 @@ export default function VerifyOtpScreen() {
         </Text>
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -313,4 +306,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingVertical: 12,
   },
-});
+})

@@ -14,25 +14,25 @@
  * appears in a response or a log line.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { readBearerToken } from './supabase.ts';
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { readBearerToken } from './supabase.ts'
 
 export interface CallerIdentity {
-  id: string;
-  role: 'citizen' | 'moderator';
-  disabled: boolean;
-  deleted: boolean;
+  id: string
+  role: 'citizen' | 'moderator'
+  disabled: boolean
+  deleted: boolean
 }
 
-export type CallerRejection = 'AUTH_REQUIRED' | 'AUTH_DISABLED' | 'FORBIDDEN' | 'INTERNAL';
+export type CallerRejection = 'AUTH_REQUIRED' | 'AUTH_DISABLED' | 'FORBIDDEN' | 'INTERNAL'
 
 export class CallerError extends Error {
-  readonly code: CallerRejection;
+  readonly code: CallerRejection
 
   constructor(code: CallerRejection, message?: string) {
-    super(message ?? code);
-    this.name = 'CallerError';
-    this.code = code;
+    super(message ?? code)
+    this.name = 'CallerError'
+    this.code = code
   }
 }
 
@@ -48,36 +48,36 @@ export async function authenticateCaller(
   client: SupabaseClient,
   request: Request,
 ): Promise<CallerIdentity> {
-  const token = readBearerToken(request);
-  if (!token) throw new CallerError('AUTH_REQUIRED');
+  const token = readBearerToken(request)
+  if (!token) throw new CallerError('AUTH_REQUIRED')
 
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) throw new CallerError('AUTH_REQUIRED');
+  const { data, error } = await client.auth.getUser(token)
+  if (error || !data.user) throw new CallerError('AUTH_REQUIRED')
 
   const { data: profile, error: profileError } = await client
     .from('profiles')
     .select('id, role, disabled_at, deleted_at')
     .eq('id', data.user.id)
-    .maybeSingle();
+    .maybeSingle()
 
-  if (profileError) throw new CallerError('INTERNAL');
-  if (!profile) throw new CallerError('AUTH_REQUIRED');
+  if (profileError) throw new CallerError('INTERNAL')
+  if (!profile) throw new CallerError('AUTH_REQUIRED')
 
   const identity: CallerIdentity = {
     id: profile.id as string,
     role: (profile.role as 'citizen' | 'moderator') ?? 'citizen',
     disabled: Boolean(profile.disabled_at),
     deleted: Boolean(profile.deleted_at),
-  };
+  }
 
-  if (identity.disabled || identity.deleted) throw new CallerError('AUTH_DISABLED');
+  if (identity.disabled || identity.deleted) throw new CallerError('AUTH_DISABLED')
 
-  return identity;
+  return identity
 }
 
 /** Asserts the caller is a moderator. The check is server-side, always. */
 export function assertModerator(caller: CallerIdentity): void {
-  if (caller.role !== 'moderator') throw new CallerError('FORBIDDEN');
+  if (caller.role !== 'moderator') throw new CallerError('FORBIDDEN')
 }
 
 /**
@@ -87,9 +87,9 @@ export function assertModerator(caller: CallerIdentity): void {
  * authenticated path. The bearer must be the service-role key itself.
  */
 export function requireServiceRole(request: Request): void {
-  const token = readBearerToken(request);
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const token = readBearerToken(request)
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!serviceKey) throw new CallerError('INTERNAL', 'SUPABASE_SERVICE_ROLE_KEY is not set');
-  if (!token || token !== serviceKey) throw new CallerError('FORBIDDEN');
+  if (!serviceKey) throw new CallerError('INTERNAL', 'SUPABASE_SERVICE_ROLE_KEY is not set')
+  if (!token || token !== serviceKey) throw new CallerError('FORBIDDEN')
 }

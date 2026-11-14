@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
-import { Button } from './Button';
-import { RadioGroup } from './RadioGroup';
-import { useReportWrongNumber, type WrongNumberEntryType } from '@/shared/api/wrongNumber';
+import { useState } from 'react'
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
+import { Button } from './Button'
+import { RadioGroup } from './RadioGroup'
+import { useReportWrongNumber, type WrongNumberEntryType } from '@/shared/api/wrongNumber'
 
 /**
  * The wrong-number report sheet.
@@ -27,13 +27,13 @@ import { useReportWrongNumber, type WrongNumberEntryType } from '@/shared/api/wr
  *     null reporter; the curator still triages it.
  */
 interface WrongNumberSheetProps {
-  visible: boolean;
-  onClose: () => void;
+  visible: boolean
+  onClose: () => void
   /** The entry the report is about. Omitted means the general report form. */
-  entryType?: WrongNumberEntryType;
-  entryId?: string;
+  entryType?: WrongNumberEntryType
+  entryId?: string
   /** The entry's name, shown so the user knows what they are reporting. */
-  entryName?: string;
+  entryName?: string
 }
 
 export function WrongNumberSheet({
@@ -43,17 +43,17 @@ export function WrongNumberSheet({
   entryId = '',
   entryName,
 }: WrongNumberSheetProps) {
-  const theme = useTheme();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const { t } = useTranslation()
 
-  const [reason, setReason] = useState<string | null>(null);
-  const [details, setDetails] = useState('');
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState<string | null>(null)
+  const [details, setDetails] = useState('')
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const report = useReportWrongNumber();
+  const report = useReportWrongNumber()
 
-  if (!visible) return null;
+  if (!visible) return null
 
   const reasons = [
     { id: 'not_connecting', label: t('help.wrongReasonNotConnecting') },
@@ -61,15 +61,15 @@ export function WrongNumberSheet({
     { id: 'other_service', label: t('help.wrongReasonOtherService') },
     { id: 'no_longer_active', label: t('help.wrongReasonNoLongerActive') },
     { id: 'other', label: t('help.wrongReasonOther') },
-  ];
+  ]
 
   const submit = async () => {
     if (!reason) {
-      setError(t('help.wrongReasonRequired'));
-      return;
+      setError(t('help.wrongReasonRequired'))
+      return
     }
 
-    setError(null);
+    setError(null)
 
     try {
       await report.mutateAsync({
@@ -80,18 +80,18 @@ export function WrongNumberSheet({
         // citizen's own words.
         reason,
         details: details.trim() || undefined,
-      });
-      setSent(true);
-      setReason(null);
-      setDetails('');
-      report.reset();
-      onClose();
+      })
+      setSent(true)
+      setReason(null)
+      setDetails('')
+      report.reset()
+      onClose()
     } catch {
       // The sheet stays open with the entered reason and details intact, and
       // no success toast is shown. A raw server error is never surfaced.
-      setError(t('help.wrongReportFailed'));
+      setError(t('help.wrongReportFailed'))
     }
-  };
+  }
 
   return (
     <View style={styles.scrim}>
@@ -122,7 +122,9 @@ export function WrongNumberSheet({
               {t('help.wrongNumberTitle')}
             </Text>
             <Text style={[styles.helper, { color: theme.colors.ink[500] }]}>
-              {entryName ? t('help.wrongReportForEntry', { name: entryName }) : t('help.wrongNumberSubtitle')}
+              {entryName
+                ? t('help.wrongReportForEntry', { name: entryName })
+                : t('help.wrongNumberSubtitle')}
             </Text>
           </View>
         </View>
@@ -130,10 +132,14 @@ export function WrongNumberSheet({
         <Text style={[styles.label, { color: theme.colors.ink[700] }]}>
           {t('help.wrongReasonLabel')}
         </Text>
-        <RadioGroup options={reasons} selectedId={reason} onSelect={(id) => {
-          setReason(id);
-          setError(null);
-        }} />
+        <RadioGroup
+          options={reasons}
+          selectedId={reason}
+          onSelect={(id) => {
+            setReason(id)
+            setError(null)
+          }}
+        />
 
         <Text style={[styles.label, { color: theme.colors.ink[700] }]}>
           {t('help.wrongDetailsLabel')}
@@ -158,10 +164,7 @@ export function WrongNumberSheet({
         />
 
         {error ? (
-          <Text
-            accessibilityRole="alert"
-            style={[styles.error, { color: theme.palette.red[600] }]}
-          >
+          <Text accessibilityRole="alert" style={[styles.error, { color: theme.palette.red[600] }]}>
             {error}
           </Text>
         ) : null}
@@ -193,7 +196,7 @@ export function WrongNumberSheet({
         ) : null}
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -287,4 +290,4 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
   },
-});
+})

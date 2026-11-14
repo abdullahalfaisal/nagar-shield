@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen';
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen'
 
 /**
  * Screen 5 — S-04a, Contact 1 of 3.
@@ -15,8 +15,8 @@ import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen';
  * from the Emergency Contacts screen.
  */
 export default function WizardContact1Screen() {
-  const router = useRouter();
-  const { t } = useTranslation();
+  const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <ContactCaptureScreen
@@ -29,5 +29,5 @@ export default function WizardContact1Screen() {
       onBack={() => router.back()}
       onComplete={() => router.push('/(auth)/contact-2')}
     />
-  );
+  )
 }

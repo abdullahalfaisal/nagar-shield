@@ -1,20 +1,20 @@
-import { z } from 'zod';
-import { REPORT_CATEGORIES, FLAG_REASONS } from '../enums';
+import { z } from 'zod'
+import { REPORT_CATEGORIES, FLAG_REASONS } from '../enums'
 
 /**
  * Bangladesh phone numbers in E.164 form: `+880` followed by a 10-digit
  * national number (8XXXXXXXXX). Spaces, dashes and a leading `0` are stripped
  * before validation.
  */
-export const E164_PHONE_REGEX = /^\+880\d{10}$/;
+export const E164_PHONE_REGEX = /^\+880\d{10}$/
 
 export function normalisePhone(input: string): string {
-  const trimmed = input.trim();
-  const digits = trimmed.replace(/[\s\-()]/g, '');
-  if (digits.startsWith('+880')) return `+880${digits.slice(4)}`;
-  if (digits.startsWith('880') && digits.length === 13) return `+${digits}`;
-  if (digits.startsWith('0') && digits.length === 11) return `+880${digits.slice(1)}`;
-  return digits.startsWith('+') ? digits : `+${digits}`;
+  const trimmed = input.trim()
+  const digits = trimmed.replace(/[\s\-()]/g, '')
+  if (digits.startsWith('+880')) return `+880${digits.slice(4)}`
+  if (digits.startsWith('880') && digits.length === 13) return `+${digits}`
+  if (digits.startsWith('0') && digits.length === 11) return `+880${digits.slice(1)}`
+  return digits.startsWith('+') ? digits : `+${digits}`
 }
 
 export const phoneSchema = z
@@ -22,9 +22,9 @@ export const phoneSchema = z
   .transform(normalisePhone)
   .refine((value) => E164_PHONE_REGEX.test(value), {
     message: 'Phone must be a valid Bangladesh number in E.164 format (+880XXXXXXXXX)',
-  });
+  })
 
-export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address');
+export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address')
 
 /**
  * The alternate phone — a second way to reach the user.
@@ -40,7 +40,7 @@ export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid 
  * same alternate number. A shared family number is a legitimate thing for
  * two people to list.
  */
-export const alternatePhoneSchema = phoneSchema;
+export const alternatePhoneSchema = phoneSchema
 
 /**
  * Password policy. Deliberately length-first — NIST SP 800-63B guidance
@@ -49,18 +49,21 @@ export const alternatePhoneSchema = phoneSchema;
 export const passwordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters')
-  .max(128, 'Password must be at most 128 characters');
+  .max(128, 'Password must be at most 128 characters')
 
 /** FR-CAPTURE-6 — the description cap. */
-export const CAPTURE_DESCRIPTION_MAX_LENGTH = 140;
+export const CAPTURE_DESCRIPTION_MAX_LENGTH = 140
 
 export const captureDescriptionSchema = z
   .string()
-  .max(CAPTURE_DESCRIPTION_MAX_LENGTH, `Description must be ${CAPTURE_DESCRIPTION_MAX_LENGTH} characters or fewer`)
-  .transform((value) => value.trim());
+  .max(
+    CAPTURE_DESCRIPTION_MAX_LENGTH,
+    `Description must be ${CAPTURE_DESCRIPTION_MAX_LENGTH} characters or fewer`,
+  )
+  .transform((value) => value.trim())
 
-export const reportCategorySchema = z.enum(REPORT_CATEGORIES);
-export const flagReasonSchema = z.enum(FLAG_REASONS);
+export const reportCategorySchema = z.enum(REPORT_CATEGORIES)
+export const flagReasonSchema = z.enum(FLAG_REASONS)
 
 /** FR-AUTH-1 — signup collects email + password + phone. */
 export const signupSchema = z.object({
@@ -68,9 +71,9 @@ export const signupSchema = z.object({
   password: passwordSchema,
   phone: phoneSchema,
   fullName: z.string().trim().min(1).max(120).optional(),
-});
+})
 
-export type SignupInput = z.infer<typeof signupSchema>;
+export type SignupInput = z.infer<typeof signupSchema>
 
 /**
  * FR-AUTH-1 — login accepts phone OR email + password. The identifier is
@@ -80,14 +83,14 @@ export const loginSchema = z.object({
   identifier: z.string().trim().min(1, 'Enter your phone number or email'),
   password: z.string().min(1, 'Enter your password'),
   rememberMe: z.boolean().default(false),
-});
+})
 
-export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginInput = z.infer<typeof loginSchema>
 
 /** FR-AUTH-3 — password reset requests an OTP for a known identifier. */
 export const passwordResetRequestSchema = z.object({
   identifier: z.string().trim().min(1, 'Enter your phone number or email'),
-});
+})
 
 /**
  * The 6-digit OTP.
@@ -102,13 +105,13 @@ export const passwordResetRequestSchema = z.object({
 export const otpCodeSchema = z
   .string()
   .trim()
-  .regex(/^\d{6}$/, 'Enter the 6-digit code');
+  .regex(/^\d{6}$/, 'Enter the 6-digit code')
 
 export const passwordResetVerifySchema = z.object({
   token: z.string().min(1),
   code: otpCodeSchema,
   newPassword: passwordSchema,
-});
+})
 
 /**
  * The password-reset wire contract.
@@ -118,29 +121,29 @@ export const passwordResetVerifySchema = z.object({
  */
 export const passwordResetRequestBodySchema = z.object({
   identifier: z.string().trim().min(1, 'Enter your phone number or email'),
-});
+})
 
 export const passwordResetVerifyBodySchema = z.object({
   identifier: z.string().trim().min(1, 'Enter your phone number or email'),
   code: otpCodeSchema,
   new_password: passwordSchema,
-});
+})
 
-export type PasswordResetRequestBody = z.infer<typeof passwordResetRequestBodySchema>;
-export type PasswordResetVerifyBody = z.infer<typeof passwordResetVerifyBodySchema>;
+export type PasswordResetRequestBody = z.infer<typeof passwordResetRequestBodySchema>
+export type PasswordResetVerifyBody = z.infer<typeof passwordResetVerifyBodySchema>
 
 /** FR-AUTH-3 — 10-minute OTP validity, 3 attempts, then a 30-minute cooldown. */
-export const OTP_TTL_MINUTES = 10;
-export const OTP_MAX_ATTEMPTS = 3;
-export const OTP_COOLDOWN_MINUTES = 30;
+export const OTP_TTL_MINUTES = 10
+export const OTP_MAX_ATTEMPTS = 3
+export const OTP_COOLDOWN_MINUTES = 30
 
 /** Biometric failure rules — FR-AUTH-5. */
-export const BIOMETRIC_FAILS_TO_PASSWORD = 3;
-export const BIOMETRIC_FAILS_TO_DISABLE = 5;
-export const BIOMETRIC_FAIL_WINDOW_HOURS = 24;
+export const BIOMETRIC_FAILS_TO_PASSWORD = 3
+export const BIOMETRIC_FAILS_TO_DISABLE = 5
+export const BIOMETRIC_FAIL_WINDOW_HOURS = 24
 
 /** FR-AUTH-2 — Remember me persists the session for 30 days. */
-export const REMEMBER_ME_DAYS = 30;
+export const REMEMBER_ME_DAYS = 30
 
 export const emergencyContactSchema = z.object({
   name: z.string().trim().min(1, 'Enter a name').max(120),
@@ -148,9 +151,9 @@ export const emergencyContactSchema = z.object({
   isPrimary: z.boolean().default(false),
   groupName: z.enum(['family', 'friend', 'colleague', 'other']).default('other'),
   sortOrder: z.number().int().min(0).default(0),
-});
+})
 
-export type EmergencyContactInput = z.infer<typeof emergencyContactSchema>;
+export type EmergencyContactInput = z.infer<typeof emergencyContactSchema>
 
 /**
  * The contact schema, under the name the acceptance criteria use.
@@ -160,7 +163,7 @@ export type EmergencyContactInput = z.infer<typeof emergencyContactSchema>;
  * Notes. They are the **same** schema — an alias, not a second definition,
  * so the two names can never drift.
  */
-export const contactSchema = emergencyContactSchema;
+export const contactSchema = emergencyContactSchema
 
 /** FR-CAPTURE-1..5 — the Capture submission payload. */
 export const captureSubmissionSchema = z.object({
@@ -175,9 +178,9 @@ export const captureSubmissionSchema = z.object({
   description: captureDescriptionSchema.nullable().default(null),
   publicVisibility: z.enum(['anonymous', 'identified']).default('anonymous'),
   category: reportCategorySchema.nullable().default(null),
-});
+})
 
-export type CaptureSubmission = z.infer<typeof captureSubmissionSchema>;
+export type CaptureSubmission = z.infer<typeof captureSubmissionSchema>
 
 /** FR-ALERTS-4 — area filters for the feed. */
 export const areaFilterSchema = z.object({
@@ -185,9 +188,9 @@ export const areaFilterSchema = z.object({
   city: z.string().trim().min(1).optional(),
   thana: z.string().trim().min(1).optional(),
   neighborhood: z.string().trim().min(1).optional(),
-});
+})
 
-export type AreaFilter = z.infer<typeof areaFilterSchema>;
+export type AreaFilter = z.infer<typeof areaFilterSchema>
 
 /**
  * The reverse-geocode payload — W-3: the Dhaka-local table first, the online
@@ -211,9 +214,9 @@ export const areaHierarchySchema = z.object({
     .optional()
     .nullable()
     .transform((value) => (value && value.length > 0 ? value : undefined)),
-});
+})
 
-export type AreaHierarchyInput = z.infer<typeof areaHierarchySchema>;
+export type AreaHierarchyInput = z.infer<typeof areaHierarchySchema>
 
 /**
  * The exported validator for `AreaHierarchy`.
@@ -230,14 +233,14 @@ export type AreaHierarchyInput = z.infer<typeof areaHierarchySchema>;
  * cannot drift.
  */
 export function parseAreaHierarchy(value: unknown): AreaHierarchyInput {
-  return areaHierarchySchema.parse(value);
+  return areaHierarchySchema.parse(value)
 }
 
 /** FR-HIST-1 — History defaults: 1 km radius, 24-hour window. */
-export const HISTORY_DEFAULT_RADIUS_KM = 1;
-export const HISTORY_DEFAULT_WINDOW_HOURS = 24;
-export const HISTORY_MAX_RADIUS_KM = 50;
-export const HISTORY_MAX_WINDOW_HOURS = 720;
+export const HISTORY_DEFAULT_RADIUS_KM = 1
+export const HISTORY_DEFAULT_WINDOW_HOURS = 24
+export const HISTORY_MAX_RADIUS_KM = 50
+export const HISTORY_MAX_WINDOW_HOURS = 720
 
 export const historyQuerySchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -251,24 +254,24 @@ export const historyQuerySchema = z.object({
   category: reportCategorySchema.nullable().default(null),
   cursor: z.string().nullable().default(null),
   limit: z.number().int().min(1).max(100).default(20),
-});
+})
 
-export type HistoryQuery = z.infer<typeof historyQuerySchema>;
+export type HistoryQuery = z.infer<typeof historyQuerySchema>
 
 /** FR-ALERTS-1..4 — the feed query. */
 export const alertsQuerySchema = z.object({
   ...areaFilterSchema.shape,
   cursor: z.string().nullable().default(null),
   limit: z.number().int().min(1).max(100).default(20),
-});
+})
 
-export type AlertsQuery = z.infer<typeof alertsQuerySchema>;
+export type AlertsQuery = z.infer<typeof alertsQuerySchema>
 
 /** FR-ALERTS-6 — flagging an alert. */
 export const flagReportSchema = z.object({
   reportId: z.string().uuid(),
   reason: flagReasonSchema,
-});
+})
 
 /**
  * FR-SEEK-6 — a user reporting a wrong number.
@@ -294,7 +297,7 @@ export const wrongNumberReportSchema = z.object({
     .max(500, 'That is too long')
     .optional()
     .transform((value) => (value && value.length > 0 ? value : undefined)),
-});
+})
 
 /** FR-LOC-1 — sharing a snapshot with one contact or all primaries. */
 export const locationShareSchema = z.object({
@@ -303,9 +306,9 @@ export const locationShareSchema = z.object({
   lng: z.number().min(-180).max(180).nullable(),
   accuracyM: z.number().min(0).nullable().default(null),
   sharedAt: z.string().datetime(),
-});
+})
 
-export type LocationShareInput = z.infer<typeof locationShareSchema>;
+export type LocationShareInput = z.infer<typeof locationShareSchema>
 
 /** FR-MOD-3 — a decision always carries a note. */
 export const moderationDecisionSchema = z.object({
@@ -316,9 +319,9 @@ export const moderationDecisionSchema = z.object({
     .trim()
     .min(1, 'A note is required for every decision')
     .max(2000, 'Note must be 2000 characters or fewer'),
-});
+})
 
-export type ModerationDecisionInput = z.infer<typeof moderationDecisionSchema>;
+export type ModerationDecisionInput = z.infer<typeof moderationDecisionSchema>
 
 export const disableUserSchema = z.object({
   userId: z.string().uuid(),
@@ -327,18 +330,18 @@ export const disableUserSchema = z.object({
     .trim()
     .min(1, 'A note is required')
     .max(2000, 'Note must be 2000 characters or fewer'),
-});
+})
 
 /** Business-rule constants shared by the client and the server. */
-export const FLAG_HIDE_THRESHOLD = 3;
-export const FLAG_RATE_LIMIT_PER_HOUR = 10;
-export const AUTHOR_FLAG_AUTO_HIDE_THRESHOLD = 5;
-export const AUTHOR_FLAG_AUTO_HIDE_WINDOW_HOURS = 24;
-export const SEEK_THANA_FALLBACK_RADIUS_KM = 10;
-export const SEEK_THANA_FALLBACK_NUMBER = '999';
-export const MEDIA_MAX_VIDEO_SECONDS = 30;
-export const MEDIA_MAX_DIMENSION = 1080;
-export const MEDIA_MAX_FILE_BYTES = 10 * 1024 * 1024;
-export const CAPTURE_MAX_PER_DAY = 50;
-export const ALERTS_REFRESH_INTERVAL_MS = 60_000;
-export const ALERTS_BATTERY_PAUSE_THRESHOLD = 20;
+export const FLAG_HIDE_THRESHOLD = 3
+export const FLAG_RATE_LIMIT_PER_HOUR = 10
+export const AUTHOR_FLAG_AUTO_HIDE_THRESHOLD = 5
+export const AUTHOR_FLAG_AUTO_HIDE_WINDOW_HOURS = 24
+export const SEEK_THANA_FALLBACK_RADIUS_KM = 10
+export const SEEK_THANA_FALLBACK_NUMBER = '999'
+export const MEDIA_MAX_VIDEO_SECONDS = 30
+export const MEDIA_MAX_DIMENSION = 1080
+export const MEDIA_MAX_FILE_BYTES = 10 * 1024 * 1024
+export const CAPTURE_MAX_PER_DAY = 50
+export const ALERTS_REFRESH_INTERVAL_MS = 60_000
+export const ALERTS_BATTERY_PAUSE_THRESHOLD = 20

@@ -1,8 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-import type { Database } from './database.types';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import * as SecureStore from 'expo-secure-store'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import Constants from 'expo-constants'
+import type { Database } from './database.types'
 
 /**
  * The Supabase URL and anon key are public by design — they ship in the
@@ -12,10 +12,10 @@ import type { Database } from './database.types';
 
 const supabaseUrl =
   (Constants.expoConfig?.extra?.supabaseUrl as string | undefined) ??
-  process.env.EXPO_PUBLIC_SUPABASE_URL;
+  process.env.EXPO_PUBLIC_SUPABASE_URL
 const supabaseAnonKey =
   (Constants.expoConfig?.extra?.supabaseAnonKey as string | undefined) ??
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 /**
  * True when the build has the credentials it needs to reach the API.
@@ -31,7 +31,7 @@ const supabaseAnonKey =
  * A user in a mis-built bundle sees an explanation in their own language
  * instead of a crash.
  */
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 /**
  * SecureStore cannot hold values larger than 2048 bytes, and the session
@@ -41,28 +41,28 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 const secureStore = {
   getItem: async (key: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(key);
+      return await SecureStore.getItemAsync(key)
     } catch {
-      return AsyncStorage.getItem(key);
+      return AsyncStorage.getItem(key)
     }
   },
   setItem: async (key: string, value: string): Promise<void> => {
     try {
       await SecureStore.setItemAsync(key, value, {
         keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-      });
+      })
     } catch {
-      await AsyncStorage.setItem(key, value);
+      await AsyncStorage.setItem(key, value)
     }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(key);
+      await SecureStore.deleteItemAsync(key)
     } catch {
-      await AsyncStorage.removeItem(key);
+      await AsyncStorage.removeItem(key)
     }
   },
-};
+}
 
 /**
  * The Supabase client.
@@ -77,8 +77,8 @@ function unconfiguredClient(): SupabaseClient<Database> {
   const fail = async (): Promise<never> => {
     throw new Error(
       'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
-    );
-  };
+    )
+  }
 
   /**
    * A namespace whose every member — and every member of every member — is
@@ -93,7 +93,7 @@ function unconfiguredClient(): SupabaseClient<Database> {
     {
       get: () => fail,
     },
-  );
+  )
 
   return {
     auth: namespace,
@@ -103,7 +103,7 @@ function unconfiguredClient(): SupabaseClient<Database> {
     functions: namespace,
     channel: namespace,
     removeChannel: fail,
-  } as unknown as SupabaseClient<Database>;
+  } as unknown as SupabaseClient<Database>
 }
 
 export const supabase: SupabaseClient<Database> = isSupabaseConfigured
@@ -118,6 +118,6 @@ export const supabase: SupabaseClient<Database> = isSupabaseConfigured
         headers: { 'x-application-name': 'nagar-shield-mobile' },
       },
     })
-  : unconfiguredClient();
+  : unconfiguredClient()
 
-export { secureStore };
+export { secureStore }

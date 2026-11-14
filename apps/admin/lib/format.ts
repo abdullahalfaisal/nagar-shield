@@ -7,8 +7,13 @@
  * instead of spread across the routes.
  */
 
-import type { FlagReason, HideReason, ModerationDecision, ReportCategory } from '@nagar-shield/shared';
-import { REPORT_CATEGORY_LABELS } from '@nagar-shield/shared';
+import type {
+  FlagReason,
+  HideReason,
+  ModerationDecision,
+  ReportCategory,
+} from '@nagar-shield/shared'
+import { REPORT_CATEGORY_LABELS } from '@nagar-shield/shared'
 
 /**
  * Masks an uploader's phone number for the queue list.
@@ -21,22 +26,22 @@ import { REPORT_CATEGORY_LABELS } from '@nagar-shield/shared';
  * The masked value never reaches a URL, a query key, or a log line.
  */
 export function maskPhone(phone: string | null | undefined): string {
-  if (!phone) return '—';
+  if (!phone) return '—'
 
-  const trimmed = phone.trim();
-  if (trimmed.length === 0) return '—';
+  const trimmed = phone.trim()
+  if (trimmed.length === 0) return '—'
 
   // A tombstoned account's placeholder is not a phone number; show it as-is.
-  if (trimmed.startsWith('purged-')) return trimmed;
+  if (trimmed.startsWith('purged-')) return trimmed
 
-  const visibleTail = trimmed.slice(-4);
-  const prefix = trimmed.startsWith('+') ? '+' : '';
+  const visibleTail = trimmed.slice(-4)
+  const prefix = trimmed.startsWith('+') ? '+' : ''
 
   if (trimmed.length <= visibleTail.length + 2) {
-    return `${prefix}${'•'.repeat(Math.max(trimmed.length - visibleTail.length, 1))}${visibleTail}`;
+    return `${prefix}${'•'.repeat(Math.max(trimmed.length - visibleTail.length, 1))}${visibleTail}`
   }
 
-  return `${prefix}${'•'.repeat(3)}${visibleTail}`;
+  return `${prefix}${'•'.repeat(3)}${visibleTail}`
 }
 
 /**
@@ -46,36 +51,38 @@ export function maskPhone(phone: string | null | undefined): string {
  * masked phone is the handle.
  */
 export function maskUploaderIdentity(uploader: {
-  fullName: string | null;
-  phone: string | null;
+  fullName: string | null
+  phone: string | null
 }): string {
   if (uploader.fullName && uploader.fullName.trim().length > 0) {
-    return uploader.fullName.trim();
+    return uploader.fullName.trim()
   }
-  return maskPhone(uploader.phone);
+  return maskPhone(uploader.phone)
 }
 
 /** The area line: `English · বাংলা`, matching the mobile alert card. */
-export function formatAreaLine(area: {
-  neighborhood?: string | null;
-  thana?: string | null;
-  city?: string | null;
-  division?: string | null;
-} | null): string {
-  if (!area) return '—';
+export function formatAreaLine(
+  area: {
+    neighborhood?: string | null
+    thana?: string | null
+    city?: string | null
+    division?: string | null
+  } | null,
+): string {
+  if (!area) return '—'
 
-  const english = area.neighborhood ?? area.thana ?? area.city ?? area.division ?? null;
-  if (!english) return '—';
+  const english = area.neighborhood ?? area.thana ?? area.city ?? area.division ?? null
+  if (!english) return '—'
 
   // The curated dataset is Bangla-first; the mobile card shows one line.
-  return english;
+  return english
 }
 
 /** The category label, or the neutral placeholder when it is null. */
 export function formatCategoryLabel(category: ReportCategory | null): string | null {
-  if (!category) return null;
-  const label = REPORT_CATEGORY_LABELS[category];
-  return `${label.bn} — ${label.en}`;
+  if (!category) return null
+  const label = REPORT_CATEGORY_LABELS[category]
+  return `${label.bn} — ${label.en}`
 }
 
 /**
@@ -98,7 +105,7 @@ export function formatCategoryLabel(category: ReportCategory | null): string | n
  * fraud and suspicion are sky. An uncategorised report gets the neutral
  * ink, which is what the tile falls back to.
  */
-export type CategoryAccentFamily = 'violet' | 'red' | 'amber' | 'green' | 'sky' | 'neutral';
+export type CategoryAccentFamily = 'violet' | 'red' | 'amber' | 'green' | 'sky' | 'neutral'
 
 const CATEGORY_ACCENTS: Record<ReportCategory, CategoryAccentFamily> = {
   // Property crime — violet, the brand family.
@@ -118,7 +125,7 @@ const CATEGORY_ACCENTS: Record<ReportCategory, CategoryAccentFamily> = {
   suspicious: 'sky',
   // Everything else — the neutral ink.
   other: 'neutral',
-};
+}
 
 /**
  * The accent family for a report's category.
@@ -127,8 +134,8 @@ const CATEGORY_ACCENTS: Record<ReportCategory, CategoryAccentFamily> = {
  * renders, in the same ink the rest of the console uses for "nothing here".
  */
 export function formatCategoryAccent(category: ReportCategory | null): CategoryAccentFamily {
-  if (!category) return 'neutral';
-  return CATEGORY_ACCENTS[category] ?? 'neutral';
+  if (!category) return 'neutral'
+  return CATEGORY_ACCENTS[category] ?? 'neutral'
 }
 
 /**
@@ -146,8 +153,8 @@ export function formatFlagReason(reason: FlagReason | string): string {
     duplicate: 'ডুপ্লিকেট — Duplicate',
     off_topic: 'অপ্রাসঙ্গিক — Off topic',
     other: 'অন্যান্য — Other',
-  };
-  return labels[reason as FlagReason] ?? reason;
+  }
+  return labels[reason as FlagReason] ?? reason
 }
 
 /** The decision label for the audit trail. Unknown values never crash. */
@@ -156,8 +163,8 @@ export function formatDecisionLabel(decision: string): string {
     restore: 'ফিরিয়ে আনা — Restored',
     remove: 'সরানো — Removed',
     disable_user: 'ব্যবহারকারী নিষ্ক্রিয় — User disabled',
-  };
-  return labels[decision as ModerationDecision] ?? 'অজানা — Unknown';
+  }
+  return labels[decision as ModerationDecision] ?? 'অজানা — Unknown'
 }
 
 /** The hide-reason badge text. `manual` is a moderator's earlier decision. */
@@ -167,8 +174,8 @@ export function formatHideReason(reason: HideReason): string {
     author_auto_hide: 'লেখকের নিয়মে লুকানো — Author auto-hide',
     both: 'ফ্ল্যাগ ও লেখকের নিয়মে লুকানো — Both rules',
     manual: 'মডারেটরের আগে লুকানো — Hidden by a moderator',
-  };
-  return labels[reason];
+  }
+  return labels[reason]
 }
 
 /**
@@ -177,7 +184,7 @@ export function formatHideReason(reason: HideReason): string {
  * threshold. The banner that explains this is what makes FR-ALERTS-11 legible.
  */
 export function isAuthorAutoHide(reason: HideReason): boolean {
-  return reason === 'author_auto_hide' || reason === 'both';
+  return reason === 'author_auto_hide' || reason === 'both'
 }
 
 /**
@@ -192,7 +199,7 @@ export function isAuthorAutoHide(reason: HideReason): boolean {
  * **narrow** what `moderation_queue` returned — it never widens it. A
  * non-moderator is refused by the RPC before any of this runs.
  */
-export type QueueGroup = 'all' | 'author_auto_hide';
+export type QueueGroup = 'all' | 'author_auto_hide'
 
 /**
  * Whether a queue row belongs to the author-auto-hide group.
@@ -205,7 +212,7 @@ export type QueueGroup = 'all' | 'author_auto_hide';
  * though the report is still `hidden_pending_review`.
  */
 export function isInAuthorAutoHideGroup(hideReason: HideReason): boolean {
-  return isAuthorAutoHide(hideReason);
+  return isAuthorAutoHide(hideReason)
 }
 
 /**
@@ -217,35 +224,35 @@ export function isInAuthorAutoHideGroup(hideReason: HideReason): boolean {
  * threshold apart from one that was swept up by the author's flag history.
  * `null` means the report carries no author-rule badge at all.
  */
-export type AuthorAutoHideBadge = 'author' | 'both' | null;
+export type AuthorAutoHideBadge = 'author' | 'both' | null
 
 export function authorAutoHideBadge(hideReason: HideReason): AuthorAutoHideBadge {
-  if (hideReason === 'both') return 'both';
-  if (hideReason === 'author_auto_hide') return 'author';
-  return null;
+  if (hideReason === 'both') return 'both'
+  if (hideReason === 'author_auto_hide') return 'author'
+  return null
 }
 
 /** Formats an ISO timestamp for the audit trail and the detail view. */
 export function formatTimestamp(iso: string): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) return iso
 
-  const pad = (value: number) => String(value).padStart(2, '0');
+  const pad = (value: number) => String(value).padStart(2, '0')
   return (
     `${parsed.getUTCFullYear()}-${pad(parsed.getUTCMonth() + 1)}-${pad(parsed.getUTCDate())} ` +
     `${pad(parsed.getUTCHours())}:${pad(parsed.getUTCMinutes())}:${pad(parsed.getUTCSeconds())} UTC`
-  );
+  )
 }
 
 /** The compact form of a timestamp for a dense table cell. */
 export function formatTimestampShort(iso: string): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) return iso
 
-  const pad = (value: number) => String(value).padStart(2, '0');
+  const pad = (value: number) => String(value).padStart(2, '0')
   return `${pad(parsed.getUTCMonth() + 1)}/${pad(parsed.getUTCDate())} ${pad(parsed.getUTCHours())}:${pad(
     parsed.getUTCMinutes(),
-  )}`;
+  )}`
 }
 
 /**
@@ -253,18 +260,18 @@ export function formatTimestampShort(iso: string): string {
  * timestamp is unparseable rather than rendering "Invalid Date".
  */
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '—';
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) return '—'
 
-  const deltaMs = now.getTime() - parsed.getTime();
-  const minutes = Math.round(deltaMs / 60_000);
+  const deltaMs = now.getTime() - parsed.getTime()
+  const minutes = Math.round(deltaMs / 60_000)
 
-  if (minutes < 1) return 'এইমাত্র · just now';
-  if (minutes < 60) return `${minutes} মিনিট আগে · ${minutes} min ago`;
+  if (minutes < 1) return 'এইমাত্র · just now'
+  if (minutes < 60) return `${minutes} মিনিট আগে · ${minutes} min ago`
   if (minutes < 60 * 24) {
-    const hours = Math.floor(minutes / 60);
-    return `${hours} ঘণ্টা আগে · ${hours} h ago`;
+    const hours = Math.floor(minutes / 60)
+    return `${hours} ঘণ্টা আগে · ${hours} h ago`
   }
-  const days = Math.floor(minutes / (60 * 24));
-  return `${days} দিন আগে · ${days} d ago`;
+  const days = Math.floor(minutes / (60 * 24))
+  return `${days} দিন আগে · ${days} d ago`
 }

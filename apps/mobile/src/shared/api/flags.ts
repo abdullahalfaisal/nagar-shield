@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AppError, type FlagReason } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AppError, type FlagReason } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The flag write path — the only write unit `006` owns.
@@ -18,27 +18,27 @@ import { fromSupabaseError } from '@/shared/api/errors';
  */
 export type FlagOutcome =
   | {
-      status: 'ok';
-      reportHidden: boolean;
-      authorHidden: boolean;
-      flagCount: number;
+      status: 'ok'
+      reportHidden: boolean
+      authorHidden: boolean
+      flagCount: number
       /** The author's flag count in the last 24 h — a context number, not a verdict. */
-      authorFlags24h: number;
+      authorFlags24h: number
       /** The author's DISTINCT flagged reports in the last 24 h — the tally the hide uses. */
-      authorFlaggedReports24h: number;
+      authorFlaggedReports24h: number
     }
   | { status: 'duplicate' }
   | { status: 'own_report' }
-  | { status: 'rate_limited'; retryAfterSec: number };
+  | { status: 'rate_limited'; retryAfterSec: number }
 
 interface FlagResponse {
-  status: string;
-  flag_count?: number;
-  report_hidden?: boolean;
-  author_hidden?: boolean;
-  author_flags_24h?: number;
-  author_flagged_reports_24h?: number;
-  retry_after_sec?: number;
+  status: string
+  flag_count?: number
+  report_hidden?: boolean
+  author_hidden?: boolean
+  author_flags_24h?: number
+  author_flagged_reports_24h?: number
+  retry_after_sec?: number
 }
 
 /**
@@ -52,11 +52,11 @@ export async function flagReport(reportId: string, reason: FlagReason): Promise<
   const { data, error } = await supabase.rpc('flag_report', {
     p_report_id: reportId,
     p_reason: reason,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  const body = (data ?? {}) as unknown as FlagResponse;
+  const body = (data ?? {}) as unknown as FlagResponse
 
   switch (body.status) {
     case 'ok':
@@ -67,21 +67,21 @@ export async function flagReport(reportId: string, reason: FlagReason): Promise<
         flagCount: body.flag_count ?? 0,
         authorFlags24h: body.author_flags_24h ?? 0,
         authorFlaggedReports24h: body.author_flagged_reports_24h ?? 0,
-      };
+      }
     case 'duplicate':
-      return { status: 'duplicate' };
+      return { status: 'duplicate' }
     case 'own_report':
-      return { status: 'own_report' };
+      return { status: 'own_report' }
     case 'rate_limited':
-      return { status: 'rate_limited', retryAfterSec: body.retry_after_sec ?? 3600 };
+      return { status: 'rate_limited', retryAfterSec: body.retry_after_sec ?? 3600 }
     default:
-      throw new AppError('INTERNAL');
+      throw new AppError('INTERNAL')
   }
 }
 
 /** The flag mutation — invalidates the feed so a hidden report disappears. */
 export function useFlagReport() {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({ reportId, reason }: { reportId: string; reason: FlagReason }) =>
@@ -90,8 +90,8 @@ export function useFlagReport() {
       // The 3-flag threshold removes the report from the public feed, so the
       // feed has to be re-read after every successful flag.
       if (outcome.status === 'ok' && outcome.reportHidden) {
-        void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+        void queryClient.invalidateQueries({ queryKey: ['alerts'] })
       }
     },
-  });
+  })
 }

@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
-import { manualDialGuidance } from '../services/degradation';
+import { StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
+import { manualDialGuidance } from '../services/degradation'
 
 /**
  * The manual-dial guidance.
@@ -27,11 +27,11 @@ import { manualDialGuidance } from '../services/degradation';
  */
 interface ManualDialGuidanceProps {
   /** The number to dial. Rendered in both Bangla numerals and ASCII digits. */
-  number: string;
+  number: string
   /** Whether the power-saver warning should appear alongside the guidance. */
-  showPowerSaveWarning?: boolean;
+  showPowerSaveWarning?: boolean
   /** Whether the device is offline — the guidance then says so explicitly. */
-  showOfflineNotice?: boolean;
+  showOfflineNotice?: boolean
 }
 
 export function ManualDialGuidance({
@@ -39,9 +39,9 @@ export function ManualDialGuidance({
   showPowerSaveWarning = false,
   showOfflineNotice = false,
 }: ManualDialGuidanceProps) {
-  const theme = useTheme();
-  const { t } = useTranslation();
-  const guidance = manualDialGuidance(number);
+  const theme = useTheme()
+  const { t } = useTranslation()
+  const guidance = manualDialGuidance(number)
 
   return (
     <View
@@ -84,7 +84,7 @@ export function ManualDialGuidance({
         ) : null}
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -117,4 +117,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 17,
   },
-});
+})

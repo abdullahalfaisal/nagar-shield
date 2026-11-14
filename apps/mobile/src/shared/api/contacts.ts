@@ -1,8 +1,8 @@
-import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { AppError, emergencyContactSchema, type EmergencyContact } from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import type { Database } from '@/shared/api/database.types';
-import { fromSupabaseError } from '@/shared/api/errors';
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
+import { AppError, emergencyContactSchema, type EmergencyContact } from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import type { Database } from '@/shared/api/database.types'
+import { fromSupabaseError } from '@/shared/api/errors'
 
 /**
  * The user's emergency contacts — the whole CRUD surface.
@@ -32,7 +32,7 @@ import { fromSupabaseError } from '@/shared/api/errors';
  */
 
 /** The query key. Invalidated after every write. */
-export const CONTACTS_QUERY_KEY = ['contacts'] as const;
+export const CONTACTS_QUERY_KEY = ['contacts'] as const
 
 function toContact(row: Record<string, unknown>): EmergencyContact {
   return {
@@ -44,7 +44,7 @@ function toContact(row: Record<string, unknown>): EmergencyContact {
     groupName: row.group_name as EmergencyContact['groupName'],
     sortOrder: row.sort_order as number,
     createdAt: row.created_at as string,
-  };
+  }
 }
 
 /**
@@ -59,11 +59,11 @@ export async function fetchContacts(): Promise<EmergencyContact[]> {
     .select('*')
     .order('is_primary', { ascending: false })
     .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  return (data ?? []).map((row) => toContact(row as Record<string, unknown>));
+  return (data ?? []).map((row) => toContact(row as Record<string, unknown>))
 }
 
 export function useContacts(): UseQueryResult<EmergencyContact[], Error> {
@@ -73,7 +73,7 @@ export function useContacts(): UseQueryResult<EmergencyContact[], Error> {
     // A failed query (no backend configured yet) resolves to an empty list
     // at the screen level rather than crashing the app.
     retry: 1,
-  });
+  })
 }
 
 /**
@@ -87,12 +87,12 @@ async function nextSortOrder(): Promise<number> {
     .from('contacts')
     .select('sort_order')
     .order('sort_order', { ascending: false })
-    .limit(1);
+    .limit(1)
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  const highest = (data ?? [])[0] as { sort_order?: number } | undefined;
-  return (highest?.sort_order ?? -1) + 1;
+  const highest = (data ?? [])[0] as { sort_order?: number } | undefined
+  return (highest?.sort_order ?? -1) + 1
 }
 
 /**
@@ -116,14 +116,14 @@ export async function createContact(
     isPrimary: input.isPrimary ?? false,
     groupName: input.groupName ?? 'other',
     sortOrder: input.sortOrder ?? 0,
-  });
+  })
 
   if (!parsed.success) {
-    throw new AppError('VALIDATION_FAILED', { field: 'phone' });
+    throw new AppError('VALIDATION_FAILED', { field: 'phone' })
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user.id;
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user.id
 
   // `contacts.user_id` is NOT NULL, and the INSERT policy's `WITH CHECK`
   // scopes it to `auth.uid()`. The column carries a database default of
@@ -132,10 +132,10 @@ export async function createContact(
   // an anonymous insert would fail on the NOT NULL constraint, and a typed
   // error is a better answer than a raw database one.
   if (!userId) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
-  const sortOrder = await nextSortOrder();
+  const sortOrder = await nextSortOrder()
 
   const { data, error } = await supabase
     .from('contacts')
@@ -147,11 +147,11 @@ export async function createContact(
       sort_order: sortOrder,
     })
     .select('*')
-    .single();
+    .single()
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  return toContact(data as Record<string, unknown>);
+  return toContact(data as Record<string, unknown>)
 }
 
 /**
@@ -165,16 +165,16 @@ export async function updateContact(
   id: string,
   changes: Partial<Pick<EmergencyContact, 'name' | 'phone' | 'isPrimary' | 'groupName'>>,
 ): Promise<EmergencyContact> {
-  const patch: Database['public']['Tables']['contacts']['Update'] = {};
+  const patch: Database['public']['Tables']['contacts']['Update'] = {}
 
   if (changes.name !== undefined || changes.phone !== undefined) {
-    const current = await fetchContact(id);
+    const current = await fetchContact(id)
 
     // The row may have been deleted between the read and the write. The
     // UPDATE's `USING` clause would refuse it anyway; this makes the refusal
     // explicit instead of silently patching a null.
     if (!current) {
-      throw new AppError('NOT_FOUND');
+      throw new AppError('NOT_FOUND')
     }
 
     const parsed = emergencyContactSchema.safeParse({
@@ -183,43 +183,39 @@ export async function updateContact(
       isPrimary: changes.isPrimary ?? current.isPrimary,
       groupName: changes.groupName ?? current.groupName,
       sortOrder: current.sortOrder,
-    });
+    })
 
     if (!parsed.success) {
-      throw new AppError('VALIDATION_FAILED', { field: 'phone' });
+      throw new AppError('VALIDATION_FAILED', { field: 'phone' })
     }
 
-    patch.name = parsed.data.name;
-    patch.phone = parsed.data.phone;
+    patch.name = parsed.data.name
+    patch.phone = parsed.data.phone
   }
 
-  if (changes.isPrimary !== undefined) patch.is_primary = changes.isPrimary;
-  if (changes.groupName !== undefined) patch.group_name = changes.groupName;
+  if (changes.isPrimary !== undefined) patch.is_primary = changes.isPrimary
+  if (changes.groupName !== undefined) patch.group_name = changes.groupName
 
   const { data, error } = await supabase
     .from('contacts')
     .update(patch)
     .eq('id', id)
     .select('*')
-    .single();
+    .single()
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  return toContact(data as Record<string, unknown>);
+  return toContact(data as Record<string, unknown>)
 }
 
 /** Reads one contact. Returns `null` when it is not the caller's. */
 export async function fetchContact(id: string): Promise<EmergencyContact | null> {
-  const { data, error } = await supabase
-    .from('contacts')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const { data, error } = await supabase.from('contacts').select('*').eq('id', id).maybeSingle()
 
-  if (error) throw fromSupabaseError(error);
-  if (!data) return null;
+  if (error) throw fromSupabaseError(error)
+  if (!data) return null
 
-  return toContact(data as Record<string, unknown>);
+  return toContact(data as Record<string, unknown>)
 }
 
 /**
@@ -235,7 +231,7 @@ export function useContact(id: string | undefined): UseQueryResult<EmergencyCont
     queryKey: [...CONTACTS_QUERY_KEY, id],
     queryFn: () => (id ? fetchContact(id) : Promise.resolve(null)),
     enabled: Boolean(id),
-  });
+  })
 }
 
 /**
@@ -247,11 +243,11 @@ export function useContact(id: string | undefined): UseQueryResult<EmergencyCont
  * auto-promotes a contact on the user's behalf.
  */
 export async function deleteContact(id: string): Promise<void> {
-  const { error } = await supabase.from('contacts').delete().eq('id', id);
+  const { error } = await supabase.from('contacts').delete().eq('id', id)
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  await densifySortOrder();
+  await densifySortOrder()
 }
 
 /**
@@ -262,17 +258,17 @@ export async function deleteContact(id: string): Promise<void> {
  * land after it — the list would look right, but the numbers would not.
  */
 export async function densifySortOrder(): Promise<void> {
-  const contacts = await fetchContacts();
+  const contacts = await fetchContacts()
 
   for (const [index, contact] of contacts.entries()) {
-    if (contact.sortOrder === index) continue;
+    if (contact.sortOrder === index) continue
 
     const { error } = await supabase
       .from('contacts')
       .update({ sort_order: index })
-      .eq('id', contact.id);
+      .eq('id', contact.id)
 
-    if (error) throw fromSupabaseError(error);
+    if (error) throw fromSupabaseError(error)
   }
 }
 
@@ -285,12 +281,9 @@ export async function densifySortOrder(): Promise<void> {
  */
 export async function reorderContacts(orderedIds: string[]): Promise<void> {
   for (const [index, id] of orderedIds.entries()) {
-    const { error } = await supabase
-      .from('contacts')
-      .update({ sort_order: index })
-      .eq('id', id);
+    const { error } = await supabase.from('contacts').update({ sort_order: index }).eq('id', id)
 
-    if (error) throw fromSupabaseError(error);
+    if (error) throw fromSupabaseError(error)
   }
 }
 
@@ -307,26 +300,23 @@ export async function reorderContacts(orderedIds: string[]): Promise<void> {
  * and then calls this would open a window in which two primaries exist.
  */
 export async function makePrimary(id: string): Promise<void> {
-  const contacts = await fetchContacts();
+  const contacts = await fetchContacts()
 
   // Clear every primary except the one being promoted.
   for (const contact of contacts) {
-    if (contact.id === id || !contact.isPrimary) continue;
+    if (contact.id === id || !contact.isPrimary) continue
 
     const { error } = await supabase
       .from('contacts')
       .update({ is_primary: false })
-      .eq('id', contact.id);
+      .eq('id', contact.id)
 
-    if (error) throw fromSupabaseError(error);
+    if (error) throw fromSupabaseError(error)
   }
 
-  const { error } = await supabase
-    .from('contacts')
-    .update({ is_primary: true })
-    .eq('id', id);
+  const { error } = await supabase.from('contacts').update({ is_primary: true }).eq('id', id)
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 }
 
 /**
@@ -341,12 +331,9 @@ export async function makePrimary(id: string): Promise<void> {
  * cannot always know whether the row was primary a moment ago.
  */
 export async function clearPrimary(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('contacts')
-    .update({ is_primary: false })
-    .eq('id', id);
+  const { error } = await supabase.from('contacts').update({ is_primary: false }).eq('id', id)
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 }
 
 /**
@@ -356,9 +343,9 @@ export async function clearPrimary(id: string): Promise<void> {
  * database — the client is never the authority on what is stored.
  */
 export function useInvalidateContacts(): () => Promise<void> {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
 
   return async () => {
-    await queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY });
-  };
+    await queryClient.invalidateQueries({ queryKey: CONTACTS_QUERY_KEY })
+  }
 }

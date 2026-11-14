@@ -1,12 +1,12 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy';
-import { toAppError, type QueueItem } from '@/lib/api';
-import { useModerationQueue } from '@/lib/queries';
-import type { ReportCategory } from '@nagar-shield/shared';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
+import { toAppError, type QueueItem } from '@/lib/api'
+import { useModerationQueue } from '@/lib/queries'
+import type { ReportCategory } from '@nagar-shield/shared'
 import {
   authorAutoHideBadge,
   formatAreaLine,
@@ -18,8 +18,8 @@ import {
   isInAuthorAutoHideGroup,
   maskUploaderIdentity,
   type QueueGroup,
-} from '@/lib/format';
-import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell';
+} from '@/lib/format'
+import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell'
 
 /**
  * The moderation queue.
@@ -50,40 +50,40 @@ import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@
  */
 
 export function QueueClient() {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
-  const router = useRouter();
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
+  const router = useRouter()
 
-  const [group, setGroup] = useState<QueueGroup>('all');
+  const [group, setGroup] = useState<QueueGroup>('all')
 
-  const queue = useModerationQueue();
-  const { data, error: queryError, isLoading, isFetchingNextPage, hasNextPage } = queue;
+  const queue = useModerationQueue()
+  const { data, error: queryError, isLoading, isFetchingNextPage, hasNextPage } = queue
 
   // An expired session is a redirect, not a message. The code is preserved
   // because the query function normalises every throw to an AppError.
   useEffect(() => {
-    if (!queryError) return;
+    if (!queryError) return
     if (toAppError(queryError).code === 'AUTH_REQUIRED') {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [queryError, router]);
+  }, [queryError, router])
 
   const error = queryError
     ? (() => {
-        const appError = toAppError(queryError);
-        return appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric;
+        const appError = toAppError(queryError)
+        return appError.code === 'FORBIDDEN' ? copy.errorForbidden : copy.errorGeneric
       })()
-    : null;
+    : null
 
   // Every page loaded so far, flattened. The rows are appended, never
   // replaced — the cursor guarantees no duplicate and no skipped row.
-  const items: QueueItem[] = (data?.pages ?? []).flatMap((page) => page.items);
+  const items: QueueItem[] = (data?.pages ?? []).flatMap((page) => page.items)
 
   // The group is a slice over the rows already loaded. It never issues a
   // second request — the server returned one page and the group narrows it.
   const visibleItems =
     group === 'author_auto_hide'
       ? items.filter((item) => isInAuthorAutoHideGroup(item.hideReason))
-      : items;
+      : items
 
   return (
     <AdminShell active="queue">
@@ -155,7 +155,7 @@ export function QueueClient() {
         </div>
       </div>
     </AdminShell>
-  );
+  )
 }
 
 /**
@@ -166,22 +166,22 @@ export function QueueClient() {
  * card shadow. It is a **derived** layout, not a port of a prototype screen.
  */
 function QueueRow({ item }: { item: QueueItem }) {
-  const copy = getCopy(DEFAULT_ADMIN_LOCALE);
+  const copy = getCopy(DEFAULT_ADMIN_LOCALE)
 
-  const categoryLabel = formatCategoryLabel(item.category as never);
-  const areaLine = formatAreaLine(item.areaHierarchy);
+  const categoryLabel = formatCategoryLabel(item.category as never)
+  const areaLine = formatAreaLine(item.areaHierarchy)
   const uploader = item.uploader
     ? maskUploaderIdentity({
         fullName: item.uploader.fullName,
         phone: item.uploader.phone,
       })
-    : '—';
+    : '—'
 
-  const flagReasons = Array.from(new Set(item.flags.map((flag) => flag.reason)));
+  const flagReasons = Array.from(new Set(item.flags.map((flag) => flag.reason)))
 
   // The badge the server's `hide_reason` earned. `null` for a report that
   // reached its own 3-flag threshold on its own.
-  const badge = authorAutoHideBadge(item.hideReason);
+  const badge = authorAutoHideBadge(item.hideReason)
 
   return (
     <Link
@@ -268,5 +268,5 @@ function QueueRow({ item }: { item: QueueItem }) {
         {copy.queueUploader}: {uploader}
       </p>
     </Link>
-  );
+  )
 }

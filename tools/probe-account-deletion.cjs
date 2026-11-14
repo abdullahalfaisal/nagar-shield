@@ -35,42 +35,42 @@
  * Usage: node tools/probe-account-deletion.cjs
  */
 
-'use strict';
+'use strict'
 
-const { execFileSync } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { execFileSync } = require('node:child_process')
+const { randomUUID } = require('node:crypto')
 
-const API_URL = 'http://127.0.0.1:54321';
-const DEV_PASSWORD = 'nagar-local-dev';
+const API_URL = 'http://127.0.0.1:54321'
+const DEV_PASSWORD = 'nagar-local-dev'
 
 function localEnv() {
   const output = execFileSync('npx', ['supabase', 'status', '-o', 'env'], {
     encoding: 'utf8',
     shell: true,
-  });
+  })
   const read = (key) => {
-    const match = output.match(new RegExp(`${key}="([^"]+)"`));
-    return match ? match[1] : '';
-  };
-  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') };
+    const match = output.match(new RegExp(`${key}="([^"]+)"`))
+    return match ? match[1] : ''
+  }
+  return { anonKey: read('ANON_KEY'), serviceRoleKey: read('SERVICE_ROLE_KEY') }
 }
 
-const { anonKey, serviceRoleKey } = localEnv();
+const { anonKey, serviceRoleKey } = localEnv()
 
-const results = [];
+const results = []
 
 function record(name, passed, detail = '') {
-  results.push({ name, passed, detail });
-  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
+  results.push({ name, passed, detail })
+  console.log(`${passed ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
 /** Creates a citizen with a phone, and returns their id. */
 async function createCitizen() {
-  const email = `deletion-probe-${randomUUID()}@test.local`;
+  const email = `deletion-probe-${randomUUID()}@test.local`
   // The phone must be a **valid** BD number — the `handle_new_user` trigger
   // requires one, and the `profiles.phone` CHECK would reject a malformed
   // one. The subscriber part is eight digits.
-  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0');
+  const subscriber = String(Math.floor(Math.random() * 100000000)).padStart(8, '0')
   const response = await fetch(`${API_URL}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
@@ -84,9 +84,9 @@ async function createCitizen() {
       email_confirm: true,
       user_metadata: { phone: `+88019${subscriber}` },
     }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return { id: body.id, email, status: response.status };
+  })
+  const body = await response.json().catch(() => ({}))
+  return { id: body.id, email, status: response.status }
 }
 
 async function signIn(email) {
@@ -94,9 +94,9 @@ async function signIn(email) {
     method: 'POST',
     headers: { apikey: anonKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: DEV_PASSWORD }),
-  });
-  const body = await response.json().catch(() => ({}));
-  return { status: response.status, token: body.access_token, body };
+  })
+  const body = await response.json().catch(() => ({}))
+  return { status: response.status, token: body.access_token, body }
 }
 
 /** A PostgREST call as the signed-in user. */
@@ -110,9 +110,9 @@ async function post(table, body, token) {
       Prefer: 'return=representation',
     },
     body: JSON.stringify(body),
-  });
-  const text = await response.text();
-  return { status: response.status, text };
+  })
+  const text = await response.text()
+  return { status: response.status, text }
 }
 
 /** A PostgREST call of a lifecycle RPC. */
@@ -125,24 +125,27 @@ async function rpc(name, token) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({}),
-  });
-  const text = await response.text();
-  let parsed = null;
+  })
+  const text = await response.text()
+  let parsed = null
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text)
   } catch {
-    parsed = null;
+    parsed = null
   }
-  return { status: response.status, text, body: parsed };
+  return { status: response.status, text, body: parsed }
 }
 
 /** Reads the profile row as the signed-in user. */
 async function readProfile(token, userId) {
-  const response = await fetch(`${API_URL}/rest/v1/profiles?id=eq.${userId}&select=id,deleted_at,disabled_at`, {
-    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-  });
-  const body = await response.json().catch(() => []);
-  return { status: response.status, rows: Array.isArray(body) ? body : [] };
+  const response = await fetch(
+    `${API_URL}/rest/v1/profiles?id=eq.${userId}&select=id,deleted_at,disabled_at`,
+    {
+      headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+    },
+  )
+  const body = await response.json().catch(() => [])
+  return { status: response.status, rows: Array.isArray(body) ? body : [] }
 }
 
 /** Removes the probe rows. The service role bypasses the RLS scopes. */
@@ -150,32 +153,32 @@ async function cleanup(userId) {
   await fetch(`${API_URL}/rest/v1/contacts?user_id=eq.${userId}`, {
     method: 'DELETE',
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-  });
+  })
   await fetch(`${API_URL}/rest/v1/auth.users?id=eq.${userId}`, {
     method: 'DELETE',
     headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
-  });
+  })
 }
 
 async function main() {
-  const citizen = await createCitizen();
+  const citizen = await createCitizen()
 
   if (!citizen.id) {
-    console.log(`SKIP: cannot create a probe citizen (HTTP ${citizen.status})`);
-    process.exitCode = 0;
-    return;
+    console.log(`SKIP: cannot create a probe citizen (HTTP ${citizen.status})`)
+    process.exitCode = 0
+    return
   }
 
-  const signInResult = await signIn(citizen.email);
+  const signInResult = await signIn(citizen.email)
 
   if (signInResult.status !== 200 || !signInResult.token) {
-    console.log(`SKIP: cannot sign in as the probe citizen (HTTP ${signInResult.status})`);
-    await cleanup(citizen.id);
-    process.exitCode = 0;
-    return;
+    console.log(`SKIP: cannot sign in as the probe citizen (HTTP ${signInResult.status})`)
+    await cleanup(citizen.id)
+    process.exitCode = 0
+    return
   }
 
-  const token = signInResult.token;
+  const token = signInResult.token
 
   // --- (1) The account can write while it is alive --------------------------
 
@@ -183,52 +186,52 @@ async function main() {
     'contacts',
     { user_id: citizen.id, name: 'a contact', phone: '+8801799000011' },
     token,
-  );
+  )
   record(
     'an active account can create a contact',
     beforeDelete.status === 201,
     `HTTP ${beforeDelete.status}`,
-  );
+  )
 
   // --- (2) The soft delete ---------------------------------------------------
 
-  const softDelete = await rpc('soft_delete_account', token);
+  const softDelete = await rpc('soft_delete_account', token)
   record(
     'the account can soft-delete itself',
     softDelete.status === 200,
     `HTTP ${softDelete.status}`,
-  );
+  )
 
   record(
     'the soft delete returns the moment of deletion',
     Boolean(softDelete.body?.deleted_at),
     `deleted_at=${softDelete.body?.deleted_at}`,
-  );
+  )
 
   record(
     'the soft delete returns the last recoverable moment — the client reads it',
     Boolean(softDelete.body?.recoverable_until),
     `recoverable_until=${softDelete.body?.recoverable_until}`,
-  );
+  )
 
   // The window is exactly 30 days.
   if (softDelete.body?.deleted_at && softDelete.body?.recoverable_until) {
-    const deletedAt = new Date(softDelete.body.deleted_at).getTime();
-    const recoverableUntil = new Date(softDelete.body.recoverable_until).getTime();
-    const days = (recoverableUntil - deletedAt) / (24 * 60 * 60 * 1000);
+    const deletedAt = new Date(softDelete.body.deleted_at).getTime()
+    const recoverableUntil = new Date(softDelete.body.recoverable_until).getTime()
+    const days = (recoverableUntil - deletedAt) / (24 * 60 * 60 * 1000)
     record(
       'the recovery window is exactly 30 days',
       Math.abs(days - 30) < 0.01,
       `${days.toFixed(3)} days`,
-    );
+    )
   }
 
-  const afterDelete = await readProfile(token, citizen.id);
+  const afterDelete = await readProfile(token, citizen.id)
   record(
     'the profile carries the deleted_at',
     Boolean(afterDelete.rows[0]?.deleted_at),
     `deleted_at=${afterDelete.rows[0]?.deleted_at}`,
-  );
+  )
 
   // --- (3) A deleted account may not write (AC #7) ---------------------------
 
@@ -236,29 +239,29 @@ async function main() {
     'contacts',
     { user_id: citizen.id, name: 'another contact', phone: '+8801799000012' },
     token,
-  );
+  )
   record(
     'a deleted account cannot create a contact',
     contactWhileDeleted.status >= 400 && contactWhileDeleted.status < 500,
     `HTTP ${contactWhileDeleted.status}`,
-  );
+  )
 
   record(
     'the refused write names the reason',
     /ACCOUNT_DISABLED/i.test(contactWhileDeleted.text),
     contactWhileDeleted.text.slice(0, 120),
-  );
+  )
 
   const shareWhileDeleted = await post(
     'location_shares',
     { sender_id: citizen.id, lat: 23.7461, lng: 90.3774 },
     token,
-  );
+  )
   record(
     'a deleted account cannot share a location',
     shareWhileDeleted.status >= 400 && shareWhileDeleted.status < 500,
     `HTTP ${shareWhileDeleted.status}`,
-  );
+  )
 
   const reportWhileDeleted = await post(
     'reports',
@@ -273,39 +276,39 @@ async function main() {
       public_visibility: 'anonymous',
     },
     token,
-  );
+  )
   record(
     'a deleted account cannot file a report',
     reportWhileDeleted.status >= 400 && reportWhileDeleted.status < 500,
     `HTTP ${reportWhileDeleted.status}`,
-  );
+  )
 
   // --- (4) The restore inside the window (AC #2) -----------------------------
 
-  const restore = await rpc('restore_account', token);
+  const restore = await rpc('restore_account', token)
   record(
     'a deleted account can restore itself inside the window',
     restore.status === 200,
     `HTTP ${restore.status}`,
-  );
+  )
 
-  const afterRestore = await readProfile(token, citizen.id);
+  const afterRestore = await readProfile(token, citizen.id)
   record(
     'the restore cleared the deleted_at',
     afterRestore.rows[0]?.deleted_at === null,
     `deleted_at=${afterRestore.rows[0]?.deleted_at}`,
-  );
+  )
 
   const afterRestoreWrite = await post(
     'contacts',
     { user_id: citizen.id, name: 'a third contact', phone: '+8801799000013' },
     token,
-  );
+  )
   record(
     'a restored account can write again',
     afterRestoreWrite.status === 201,
     `HTTP ${afterRestoreWrite.status}`,
-  );
+  )
 
   // --- (5) The window is enforced by the database (AC #5) --------------------
 
@@ -323,27 +326,27 @@ async function main() {
     body: JSON.stringify({
       deleted_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
     }),
-  });
+  })
 
-  const expiredRestore = await rpc('restore_account', token);
+  const expiredRestore = await rpc('restore_account', token)
   record(
     'a restore past the 30-day window is refused',
     expiredRestore.status >= 400 && expiredRestore.status < 500,
     `HTTP ${expiredRestore.status}`,
-  );
+  )
 
   record(
     'the expired refusal names VALIDATION_FAILED',
     /VALIDATION_FAILED/i.test(expiredRestore.text),
     expiredRestore.text.slice(0, 120),
-  );
+  )
 
-  const afterExpired = await readProfile(token, citizen.id);
+  const afterExpired = await readProfile(token, citizen.id)
   record(
     'the refused restore did NOT clear the deleted_at',
     Boolean(afterExpired.rows[0]?.deleted_at),
     `deleted_at=${afterExpired.rows[0]?.deleted_at}`,
-  );
+  )
 
   // A window that has not yet closed still restores.
   await fetch(`${API_URL}/rest/v1/profiles?id=eq.${citizen.id}`, {
@@ -356,36 +359,38 @@ async function main() {
     body: JSON.stringify({
       deleted_at: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString(),
     }),
-  });
+  })
 
-  const insideWindow = await rpc('restore_account', token);
+  const insideWindow = await rpc('restore_account', token)
   record(
     'a restore inside the 30-day window still succeeds',
     insideWindow.status === 200,
     `HTTP ${insideWindow.status}`,
-  );
+  )
 
   // --- (6) A restore of an account that is not deleted -----------------------
 
-  const notDeleted = await rpc('restore_account', token);
+  const notDeleted = await rpc('restore_account', token)
   record(
     'restoring an account that is not deleted is refused with CONFLICT',
     notDeleted.status >= 400 && notDeleted.status < 500 && /CONFLICT/i.test(notDeleted.text),
     `HTTP ${notDeleted.status} ${notDeleted.text.slice(0, 80)}`,
-  );
+  )
 
-  await cleanup(citizen.id);
+  await cleanup(citizen.id)
 
-  finish();
+  finish()
 }
 
 function finish() {
-  const failed = results.filter((r) => !r.passed);
-  console.log(`\n${results.length - failed.length}/${results.length} account-deletion probes passed`);
-  process.exitCode = failed.length === 0 ? 0 : 1;
+  const failed = results.filter((r) => !r.passed)
+  console.log(
+    `\n${results.length - failed.length}/${results.length} account-deletion probes passed`,
+  )
+  process.exitCode = failed.length === 0 ? 0 : 1
 }
 
 main().catch((error) => {
-  console.error('ERROR', error);
-  process.exitCode = 2;
-});
+  console.error('ERROR', error)
+  process.exitCode = 2
+})

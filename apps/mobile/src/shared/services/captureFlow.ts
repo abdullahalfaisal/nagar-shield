@@ -1,13 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react'
 import {
   AppError,
   CAPTURE_DESCRIPTION_MAX_LENGTH,
   type PublicVisibility,
-} from '@nagar-shield/shared';
-import { newClientRequestId, type PreparedMedia } from './mediaPipeline';
-import { prepareFile, preparePhoto, prepareVideo, type PickedAsset } from './prepareMedia';
-import { enqueueUploadBounded } from './uploadQueue';
-import { submitCapture, type CaptureResult } from './submitCapture';
+} from '@nagar-shield/shared'
+import { newClientRequestId, type PreparedMedia } from './mediaPipeline'
+import { prepareFile, preparePhoto, prepareVideo, type PickedAsset } from './prepareMedia'
+import { enqueueUploadBounded } from './uploadQueue'
+import { submitCapture, type CaptureResult } from './submitCapture'
 
 /**
  * The capture orchestration.
@@ -27,21 +27,21 @@ import { submitCapture, type CaptureResult } from './submitCapture';
 export type CaptureOutcome =
   | { status: 'sent'; result: CaptureResult }
   | { status: 'queued'; droppedOldest: boolean }
-  | { status: 'cancelled' };
+  | { status: 'cancelled' }
 
 export interface CaptureDraft {
-  description: string | null;
-  publicVisibility: PublicVisibility;
-  lat: number;
-  lng: number;
-  capturedAt: string;
+  description: string | null
+  publicVisibility: PublicVisibility
+  lat: number
+  lng: number
+  capturedAt: string
   /**
    * The area the citizen typed by hand, when the location permission was
    * denied. It is a **hint**, not the report's location: the server resolves
    * `area_hierarchy` from the coordinates, and that resolution stays
    * authoritative.
    */
-  areaHint?: string | null;
+  areaHint?: string | null
 }
 
 /**
@@ -53,7 +53,7 @@ export interface CaptureDraft {
  * description keeps them visible to the moderation console and to whoever
  * reads the report, while the resolved hierarchy is untouched.
  */
-const AREA_HINT_PREFIX = 'Area: ';
+const AREA_HINT_PREFIX = 'Area: '
 
 /**
  * Folds a manually-entered area into the description.
@@ -75,42 +75,42 @@ export function composeDescription(
   description: string | null,
   areaHint: string | null | undefined,
 ): string | null {
-  const trimmed = (description ?? '').trim();
-  const hint = (areaHint ?? '').trim();
+  const trimmed = (description ?? '').trim()
+  const hint = (areaHint ?? '').trim()
 
   if (hint.length === 0) {
-    return trimmed.length > 0 ? trimmed : null;
+    return trimmed.length > 0 ? trimmed : null
   }
 
-  const suffix = `${AREA_HINT_PREFIX}${hint}`;
+  const suffix = `${AREA_HINT_PREFIX}${hint}`
 
   if (trimmed.length === 0) {
-    return suffix.length <= CAPTURE_DESCRIPTION_MAX_LENGTH ? suffix : null;
+    return suffix.length <= CAPTURE_DESCRIPTION_MAX_LENGTH ? suffix : null
   }
 
-  const room = CAPTURE_DESCRIPTION_MAX_LENGTH - suffix.length - 1; // the space
+  const room = CAPTURE_DESCRIPTION_MAX_LENGTH - suffix.length - 1 // the space
 
   // The hint alone does not fit. There is no room for the description either.
-  if (room <= 0) return null;
+  if (room <= 0) return null
 
   // The description fits as it is — keep every word of it.
   if (trimmed.length <= room) {
-    return `${trimmed} ${suffix}`;
+    return `${trimmed} ${suffix}`
   }
 
   // The description has to give way. It is cut on a **word boundary** so the
   // report does not end in a half-written word — and the cut is only taken
   // when there is a space to cut at, otherwise the partial word is kept
   // rather than losing the whole description.
-  const head = trimmed.slice(0, room);
-  const cut = head.lastIndexOf(' ');
-  const body = cut > 0 ? head.slice(0, cut) : head;
+  const head = trimmed.slice(0, room)
+  const cut = head.lastIndexOf(' ')
+  const body = cut > 0 ? head.slice(0, cut) : head
 
-  return `${body} ${suffix}`;
+  return `${body} ${suffix}`
 }
 
 /** The media kinds the Capture screen offers. */
-export type MediaKind = 'photo' | 'video' | 'file';
+export type MediaKind = 'photo' | 'video' | 'file'
 
 /** Prepares a picked asset for upload. */
 export async function preparePickedMedia(
@@ -119,11 +119,11 @@ export async function preparePickedMedia(
 ): Promise<PreparedMedia> {
   switch (kind) {
     case 'photo':
-      return preparePhoto(asset);
+      return preparePhoto(asset)
     case 'video':
-      return prepareVideo(asset);
+      return prepareVideo(asset)
     case 'file':
-      return prepareFile(asset);
+      return prepareFile(asset)
   }
 }
 
@@ -135,15 +135,15 @@ export async function preparePickedMedia(
  * response never becomes a duplicate report.
  */
 export async function submitDraft(input: {
-  media: PreparedMedia;
-  draft: CaptureDraft;
-  clientRequestId?: string;
+  media: PreparedMedia
+  draft: CaptureDraft
+  clientRequestId?: string
 }): Promise<CaptureOutcome> {
-  const clientRequestId = input.clientRequestId ?? newClientRequestId();
+  const clientRequestId = input.clientRequestId ?? newClientRequestId()
 
   // The manual area hint is folded into the description here — once — so the
   // online path and the queued path carry exactly the same text.
-  const description = composeDescription(input.draft.description, input.draft.areaHint);
+  const description = composeDescription(input.draft.description, input.draft.areaHint)
 
   try {
     const result = await submitCapture({
@@ -155,12 +155,12 @@ export async function submitDraft(input: {
       description,
       publicVisibility: input.draft.publicVisibility,
       category: null,
-    });
+    })
 
-    return { status: 'sent', result };
+    return { status: 'sent', result }
   } catch (error) {
     if (!isTransportFailure(error)) {
-      throw error;
+      throw error
     }
 
     // The upload failed on the network. The payload goes to the device queue
@@ -179,9 +179,9 @@ export async function submitDraft(input: {
       capturedAt: input.draft.capturedAt,
       description,
       publicVisibility: input.draft.publicVisibility,
-    });
+    })
 
-    return { status: 'queued', droppedOldest: dropped !== null };
+    return { status: 'queued', droppedOldest: dropped !== null }
   }
 }
 
@@ -192,44 +192,41 @@ export async function submitDraft(input: {
  * the retry, so it is never queued.
  */
 export function isTransportFailure(error: unknown): boolean {
-  if (!(error instanceof AppError)) return true;
-  return error.code === 'INTERNAL';
+  if (!(error instanceof AppError)) return true
+  return error.code === 'INTERNAL'
 }
 
 export interface UseCaptureSubmitResult {
   /** `true` while a submit is in flight. */
-  isSubmitting: boolean;
+  isSubmitting: boolean
   /** The last failure, mapped to a stable code. */
-  error: AppError | null;
+  error: AppError | null
   /** Submits a draft. */
-  submit: (input: { media: PreparedMedia; draft: CaptureDraft }) => Promise<CaptureOutcome>;
+  submit: (input: { media: PreparedMedia; draft: CaptureDraft }) => Promise<CaptureOutcome>
   /** Clears the last error. */
-  clearError: () => void;
+  clearError: () => void
 }
 
 /** The Capture screen's submit state. */
 export function useCaptureSubmit(): UseCaptureSubmitResult {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<AppError | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<AppError | null>(null)
 
-  const submit = useCallback(
-    async (input: { media: PreparedMedia; draft: CaptureDraft }) => {
-      setIsSubmitting(true);
-      setError(null);
+  const submit = useCallback(async (input: { media: PreparedMedia; draft: CaptureDraft }) => {
+    setIsSubmitting(true)
+    setError(null)
 
-      try {
-        return await submitDraft(input);
-      } catch (caught) {
-        setError(caught instanceof AppError ? caught : new AppError('INTERNAL'));
-        return { status: 'cancelled' } as CaptureOutcome;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [],
-  );
+    try {
+      return await submitDraft(input)
+    } catch (caught) {
+      setError(caught instanceof AppError ? caught : new AppError('INTERNAL'))
+      return { status: 'cancelled' } as CaptureOutcome
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [])
 
-  const clearError = useCallback(() => setError(null), []);
+  const clearError = useCallback(() => setError(null), [])
 
-  return { isSubmitting, error, submit, clearError };
+  return { isSubmitting, error, submit, clearError }
 }

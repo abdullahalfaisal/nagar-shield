@@ -1,6 +1,6 @@
-import { AppError, type ApiErrorCode } from '@nagar-shield/shared';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { getBrowserClient } from './supabase/client';
+import { AppError, type ApiErrorCode } from '@nagar-shield/shared'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getBrowserClient } from './supabase/client'
 
 /**
  * The console's API layer.
@@ -21,104 +21,104 @@ import { getBrowserClient } from './supabase/client';
 // -----------------------------------------------------------------------------
 
 export interface QueueFlag {
-  id: string;
-  reason: string;
-  flaggerId: string;
-  createdAt: string;
+  id: string
+  reason: string
+  flaggerId: string
+  createdAt: string
 }
 
 export interface QueueMedia {
-  id: string;
-  storagePath: string;
-  mediaType: 'photo' | 'video' | 'file';
-  byteSize: number;
-  durationSeconds: number | null;
-  width: number | null;
-  height: number | null;
+  id: string
+  storagePath: string
+  mediaType: 'photo' | 'video' | 'file'
+  byteSize: number
+  durationSeconds: number | null
+  width: number | null
+  height: number | null
 }
 
 export interface QueueUploader {
-  id: string;
-  fullName: string | null;
-  phone: string | null;
-  email: string | null;
-  role: 'citizen' | 'moderator';
-  disabledAt: string | null;
-  createdAt: string;
+  id: string
+  fullName: string | null
+  phone: string | null
+  email: string | null
+  role: 'citizen' | 'moderator'
+  disabledAt: string | null
+  createdAt: string
 }
 
 export interface QueueItem {
-  id: string;
-  category: string | null;
-  description: string | null;
+  id: string
+  category: string | null
+  description: string | null
   areaHierarchy: {
-    division?: string | null;
-    city?: string | null;
-    thana?: string | null;
-    neighborhood?: string | null;
-  } | null;
-  capturedAt: string;
-  publicVisibility: 'anonymous' | 'identified';
-  flagCount: number;
-  authorFlags24h: number;
-  hideReason: 'flag_threshold' | 'author_auto_hide' | 'both' | 'manual';
-  flags: QueueFlag[];
-  media: QueueMedia[];
-  uploader: QueueUploader | null;
+    division?: string | null
+    city?: string | null
+    thana?: string | null
+    neighborhood?: string | null
+  } | null
+  capturedAt: string
+  publicVisibility: 'anonymous' | 'identified'
+  flagCount: number
+  authorFlags24h: number
+  hideReason: 'flag_threshold' | 'author_auto_hide' | 'both' | 'manual'
+  flags: QueueFlag[]
+  media: QueueMedia[]
+  uploader: QueueUploader | null
 }
 
 export interface QueuePage {
-  items: QueueItem[];
-  nextCursor: string | null;
+  items: QueueItem[]
+  nextCursor: string | null
 }
 
 export interface ReportDetail {
-  id: string;
-  category: string | null;
-  description: string | null;
+  id: string
+  category: string | null
+  description: string | null
   areaHierarchy: {
-    division?: string | null;
-    city?: string | null;
-    thana?: string | null;
-    neighborhood?: string | null;
-  } | null;
-  capturedAt: string;
-  publicVisibility: 'anonymous' | 'identified';
-  moderationStatus: 'visible' | 'hidden_pending_review' | 'restored' | 'removed';
-  hideReason: 'flag_threshold' | 'author_auto_hide' | 'both' | 'manual' | null;
-  flagCount: number;
-  flags: QueueFlag[];
-  media: QueueMedia[];
-  uploader: QueueUploader | null;
-  priorActions: AuditAction[];
+    division?: string | null
+    city?: string | null
+    thana?: string | null
+    neighborhood?: string | null
+  } | null
+  capturedAt: string
+  publicVisibility: 'anonymous' | 'identified'
+  moderationStatus: 'visible' | 'hidden_pending_review' | 'restored' | 'removed'
+  hideReason: 'flag_threshold' | 'author_auto_hide' | 'both' | 'manual' | null
+  flagCount: number
+  flags: QueueFlag[]
+  media: QueueMedia[]
+  uploader: QueueUploader | null
+  priorActions: AuditAction[]
 }
 
 export interface AuditAction {
-  id: string;
-  reportId: string | null;
-  moderatorId: string | null;
-  moderatorDisplayName: string | null;
-  targetUserId: string | null;
-  decision: 'restore' | 'remove' | 'disable_user';
-  note: string;
-  createdAt: string;
+  id: string
+  reportId: string | null
+  moderatorId: string | null
+  moderatorDisplayName: string | null
+  targetUserId: string | null
+  decision: 'restore' | 'remove' | 'disable_user'
+  note: string
+  createdAt: string
 }
 
 export interface AuditPage {
-  items: AuditAction[];
-  nextCursor: string | null;
+  items: AuditAction[]
+  nextCursor: string | null
 }
 
 export interface AccountRow {
-  id: string;
-  fullName: string | null;
-  phone: string | null;
-  email: string | null;
-  role: 'citizen' | 'moderator';
-  disabledAt: string | null;
-  deletedAt: string | null;
-  createdAt: string;
-  reportCount: number;
+  id: string
+  fullName: string | null
+  phone: string | null
+  email: string | null
+  role: 'citizen' | 'moderator'
+  disabledAt: string | null
+  deletedAt: string | null
+  createdAt: string
+  reportCount: number
 }
 
 // -----------------------------------------------------------------------------
@@ -126,34 +126,34 @@ export interface AccountRow {
 // -----------------------------------------------------------------------------
 
 interface RawQueueEnvelope {
-  items?: unknown;
-  next_cursor?: string | null;
+  items?: unknown
+  next_cursor?: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
 
 function asString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
+  return typeof value === 'string' ? value : null
 }
 
 function asNumber(value: unknown): number {
-  return typeof value === 'number' ? value : 0;
+  return typeof value === 'number' ? value : 0
 }
 
 function toQueueFlag(raw: unknown): QueueFlag {
-  const record = asRecord(raw);
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     reason: asString(record.reason) ?? 'other',
     flaggerId: asString(record.flagger_id) ?? '',
     createdAt: asString(record.created_at) ?? '',
-  };
+  }
 }
 
 function toQueueMedia(raw: unknown): QueueMedia {
-  const record = asRecord(raw);
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     storagePath: asString(record.storage_path) ?? '',
@@ -162,12 +162,12 @@ function toQueueMedia(raw: unknown): QueueMedia {
     durationSeconds: typeof record.duration_seconds === 'number' ? record.duration_seconds : null,
     width: typeof record.width === 'number' ? record.width : null,
     height: typeof record.height === 'number' ? record.height : null,
-  };
+  }
 }
 
 function toUploader(raw: unknown): QueueUploader | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const record = asRecord(raw);
+  if (!raw || typeof raw !== 'object') return null
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     fullName: asString(record.full_name),
@@ -176,29 +176,30 @@ function toUploader(raw: unknown): QueueUploader | null {
     role: (asString(record.role) as QueueUploader['role']) ?? 'citizen',
     disabledAt: asString(record.disabled_at),
     createdAt: asString(record.created_at) ?? '',
-  };
+  }
 }
 
 function toQueueItem(raw: unknown): QueueItem {
-  const record = asRecord(raw);
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     category: asString(record.category),
     description: asString(record.description),
     areaHierarchy: (asRecord(record.area_hierarchy) as QueueItem['areaHierarchy']) ?? null,
     capturedAt: asString(record.captured_at) ?? '',
-    publicVisibility: (asString(record.public_visibility) as QueueItem['publicVisibility']) ?? 'anonymous',
+    publicVisibility:
+      (asString(record.public_visibility) as QueueItem['publicVisibility']) ?? 'anonymous',
     flagCount: asNumber(record.flag_count),
     authorFlags24h: asNumber(record.author_flags_24h),
     hideReason: (asString(record.hide_reason) as QueueItem['hideReason']) ?? 'flag_threshold',
     flags: Array.isArray(record.flags) ? record.flags.map(toQueueFlag) : [],
     media: Array.isArray(record.media) ? record.media.map(toQueueMedia) : [],
     uploader: toUploader(record.uploader),
-  };
+  }
 }
 
 function toAuditAction(raw: unknown): AuditAction {
-  const record = asRecord(raw);
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     reportId: asString(record.report_id),
@@ -208,11 +209,11 @@ function toAuditAction(raw: unknown): AuditAction {
     decision: (asString(record.decision) as AuditAction['decision']) ?? 'remove',
     note: asString(record.note) ?? '',
     createdAt: asString(record.created_at) ?? '',
-  };
+  }
 }
 
 function toAccountRow(raw: unknown): AccountRow {
-  const record = asRecord(raw);
+  const record = asRecord(raw)
   return {
     id: asString(record.id) ?? '',
     fullName: asString(record.full_name),
@@ -223,7 +224,7 @@ function toAccountRow(raw: unknown): AccountRow {
     deletedAt: asString(record.deleted_at),
     createdAt: asString(record.created_at) ?? '',
     reportCount: asNumber(record.report_count),
-  };
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -237,51 +238,51 @@ function toAccountRow(raw: unknown): AccountRow {
  * and resolves a localized string from it.
  */
 export function toAppError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
+  if (error instanceof AppError) return error
 
-  if (!error) return new AppError('INTERNAL');
+  if (!error) return new AppError('INTERNAL')
 
-  const candidate = error as { code?: string; message?: string; details?: string };
-  const code = candidate.code ?? '';
-  const message = candidate.message ?? '';
+  const candidate = error as { code?: string; message?: string; details?: string }
+  const code = candidate.code ?? ''
+  const message = candidate.message ?? ''
 
   switch (code) {
     case '23505':
-      return new AppError('CONFLICT');
+      return new AppError('CONFLICT')
     case '23503':
     case '23514':
     case '23502':
     case '22023':
-      return new AppError('VALIDATION_FAILED');
+      return new AppError('VALIDATION_FAILED')
     case '42501':
-      return new AppError('FORBIDDEN');
+      return new AppError('FORBIDDEN')
     case 'P0002':
-      return new AppError('NOT_FOUND');
+      return new AppError('NOT_FOUND')
     case 'PGRST116':
-      return new AppError('NOT_FOUND');
+      return new AppError('NOT_FOUND')
     case 'PGRST301':
-      return new AppError('AUTH_REQUIRED');
+      return new AppError('AUTH_REQUIRED')
     default:
-      break;
+      break
   }
 
-  if (/row-level security|permission denied/i.test(message)) return new AppError('FORBIDDEN');
-  if (/not authenticated|jwt/i.test(message)) return new AppError('AUTH_REQUIRED');
-  if (/not found/i.test(message)) return new AppError('NOT_FOUND');
+  if (/row-level security|permission denied/i.test(message)) return new AppError('FORBIDDEN')
+  if (/not authenticated|jwt/i.test(message)) return new AppError('AUTH_REQUIRED')
+  if (/not found/i.test(message)) return new AppError('NOT_FOUND')
 
-  return new AppError('INTERNAL');
+  return new AppError('INTERNAL')
 }
 
 /** Reads the stable code out of an Edge Function's error envelope. */
 export function parseErrorBody(body: unknown): AppError {
   if (body && typeof body === 'object' && 'error' in body) {
-    const envelope = asRecord(asRecord(body).error);
-    const code = asString(envelope.code);
+    const envelope = asRecord(asRecord(body).error)
+    const code = asString(envelope.code)
     if (code) {
-      return new AppError(code as ApiErrorCode, undefined, asString(envelope.message) ?? undefined);
+      return new AppError(code as ApiErrorCode, undefined, asString(envelope.message) ?? undefined)
     }
   }
-  return new AppError('INTERNAL');
+  return new AppError('INTERNAL')
 }
 
 // -----------------------------------------------------------------------------
@@ -296,14 +297,14 @@ export async function fetchModerationQueue(
   const { data, error } = await client.rpc('moderation_queue', {
     p_cursor: options.cursor ?? null,
     p_limit: options.limit ?? 20,
-  });
+  })
 
-  if (error) throw toAppError(error);
+  if (error) throw toAppError(error)
 
-  const envelope = asRecord(data) as RawQueueEnvelope;
-  const items = Array.isArray(envelope.items) ? envelope.items.map(toQueueItem) : [];
+  const envelope = asRecord(data) as RawQueueEnvelope
+  const items = Array.isArray(envelope.items) ? envelope.items.map(toQueueItem) : []
 
-  return { items, nextCursor: envelope.next_cursor ?? null };
+  return { items, nextCursor: envelope.next_cursor ?? null }
 }
 
 /** The full review detail for one report. */
@@ -313,11 +314,11 @@ export async function fetchReportDetail(
 ): Promise<ReportDetail> {
   const { data, error } = await client.rpc('moderation_report_detail', {
     p_report_id: reportId,
-  });
+  })
 
-  if (error) throw toAppError(error);
+  if (error) throw toAppError(error)
 
-  const record = asRecord(data);
+  const record = asRecord(data)
   const detail: ReportDetail = {
     id: asString(record.id) ?? reportId,
     category: asString(record.category),
@@ -336,9 +337,9 @@ export async function fetchReportDetail(
     priorActions: Array.isArray(record.prior_actions)
       ? record.prior_actions.map(toAuditAction)
       : [],
-  };
+  }
 
-  return detail;
+  return detail
 }
 
 /**
@@ -363,15 +364,15 @@ export async function signMediaUrl(
   client: SupabaseClient,
   storagePath: string,
 ): Promise<string | null> {
-  if (!storagePath) return null;
+  if (!storagePath) return null
 
   const { data, error } = await client.storage
     .from('report-media')
-    .createSignedUrl(storagePath, 60 * 10);
+    .createSignedUrl(storagePath, 60 * 10)
 
-  if (error) return null;
+  if (error) return null
 
-  return data?.signedUrl ?? null;
+  return data?.signedUrl ?? null
 }
 
 /** The append-only audit trail, newest first. */
@@ -383,31 +384,28 @@ export async function fetchAuditTrail(
     p_cursor: options.cursor ?? null,
     p_limit: options.limit ?? 20,
     p_decision: options.decision ?? null,
-  });
+  })
 
-  if (error) throw toAppError(error);
+  if (error) throw toAppError(error)
 
-  const envelope = asRecord(data) as RawQueueEnvelope;
-  const items = Array.isArray(envelope.items) ? envelope.items.map(toAuditAction) : [];
+  const envelope = asRecord(data) as RawQueueEnvelope
+  const items = Array.isArray(envelope.items) ? envelope.items.map(toAuditAction) : []
 
-  return { items, nextCursor: envelope.next_cursor ?? null };
+  return { items, nextCursor: envelope.next_cursor ?? null }
 }
 
 /** The exact-match account lookup. */
-export async function searchAccounts(
-  client: SupabaseClient,
-  query: string,
-): Promise<AccountRow[]> {
+export async function searchAccounts(client: SupabaseClient, query: string): Promise<AccountRow[]> {
   const { data, error } = await client.rpc('moderator_search_users', {
     p_query: query.trim(),
-  });
+  })
 
-  if (error) throw toAppError(error);
+  if (error) throw toAppError(error)
 
-  const envelope = asRecord(data);
-  const items = Array.isArray(envelope.items) ? envelope.items.map(toAccountRow) : [];
+  const envelope = asRecord(data)
+  const items = Array.isArray(envelope.items) ? envelope.items.map(toAccountRow) : []
 
-  return items;
+  return items
 }
 
 // -----------------------------------------------------------------------------
@@ -426,17 +424,17 @@ export async function submitDecision(
   client: SupabaseClient,
   input: { reportId: string; decision: 'restore' | 'remove'; note: string },
 ): Promise<void> {
-  const note = input.note.trim();
+  const note = input.note.trim()
 
   if (note.length === 0) {
-    throw new AppError('VALIDATION_FAILED', { field: 'note' });
+    throw new AppError('VALIDATION_FAILED', { field: 'note' })
   }
 
-  const { data: sessionData } = await client.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  const { data: sessionData } = await client.auth.getSession()
+  const accessToken = sessionData.session?.access_token
 
   if (!accessToken) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
   const response = await fetch(`${supabaseUrl()}/functions/v1/moderation-decide`, {
@@ -451,12 +449,12 @@ export async function submitDecision(
       decision: input.decision,
       note,
     }),
-  });
+  })
 
-  const body = await response.json().catch(() => null);
+  const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw parseErrorBody(body);
+    throw parseErrorBody(body)
   }
 }
 
@@ -465,17 +463,17 @@ export async function disableAccount(
   client: SupabaseClient,
   input: { userId: string; note: string },
 ): Promise<void> {
-  const note = input.note.trim();
+  const note = input.note.trim()
 
   if (note.length === 0) {
-    throw new AppError('VALIDATION_FAILED', { field: 'note' });
+    throw new AppError('VALIDATION_FAILED', { field: 'note' })
   }
 
-  const { data: sessionData } = await client.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  const { data: sessionData } = await client.auth.getSession()
+  const accessToken = sessionData.session?.access_token
 
   if (!accessToken) {
-    throw new AppError('AUTH_REQUIRED');
+    throw new AppError('AUTH_REQUIRED')
   }
 
   const response = await fetch(`${supabaseUrl()}/functions/v1/disable-user`, {
@@ -489,28 +487,28 @@ export async function disableAccount(
       user_id: input.userId,
       note,
     }),
-  });
+  })
 
-  const body = await response.json().catch(() => null);
+  const body = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw parseErrorBody(body);
+    throw parseErrorBody(body)
   }
 }
 
 /** The Supabase project URL. Public by design. */
 export function supabaseUrl(): string {
-  const value = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!value) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
-  return value;
+  const value = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!value) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+  return value
 }
 
 /** The Supabase anon key. Public by design — RLS is the boundary. */
 export function supabaseAnonKey(): string {
-  const value = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!value) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set');
-  return value;
+  const value = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!value) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set')
+  return value
 }
 
 /** The browser client. Exported so the routes share one instance. */
-export { getBrowserClient };
+export { getBrowserClient }

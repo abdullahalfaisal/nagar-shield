@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/shared/theme';
-import { Button, WizardScreen } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
-import { restoreAccount } from '@/shared/api/account';
-import { logOut } from '@/shared/auth/authService';
+import { useState } from 'react'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme } from '@/shared/theme'
+import { Button, WizardScreen } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
+import { restoreAccount } from '@/shared/api/account'
+import { logOut } from '@/shared/auth/authService'
 
 /**
  * Screen — Account Deleted.
@@ -26,37 +26,37 @@ import { logOut } from '@/shared/auth/authService';
  * the identity server-side for moderation).
  */
 export default function AccountDeletedScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>()
 
   const onRestore = async () => {
-    setBusy(true);
-    setError(undefined);
+    setBusy(true)
+    setError(undefined)
     try {
-      await restoreAccount();
-      router.replace('/(app)/home');
+      await restoreAccount()
+      router.replace('/(app)/home')
     } catch {
       // The RPC raises CONFLICT when there is nothing to restore — the
       // window has closed and the purge job has taken the row.
-      setError(t('errors.internal'));
-      setBusy(false);
+      setError(t('errors.internal'))
+      setBusy(false)
     }
-  };
+  }
 
   const onSignOut = async () => {
-    setBusy(true);
+    setBusy(true)
     try {
-      await logOut();
-      router.replace('/(auth)/welcome');
+      await logOut()
+      router.replace('/(auth)/welcome')
     } catch {
-      setError(t('errors.internal'));
-      setBusy(false);
+      setError(t('errors.internal'))
+      setBusy(false)
     }
-  };
+  }
 
   return (
     <WizardScreen
@@ -105,7 +105,7 @@ export default function AccountDeletedScreen() {
         <Text style={[styles.error, { color: theme.palette.red[600] }]}>{error}</Text>
       ) : null}
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -134,4 +134,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
-});
+})

@@ -1,8 +1,8 @@
-import * as Camera from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
-import { AppError, MEDIA_MAX_VIDEO_SECONDS } from '@nagar-shield/shared';
-import type { PickedAsset } from './prepareMedia';
+import * as Camera from 'expo-camera'
+import * as ImagePicker from 'expo-image-picker'
+import * as DocumentPicker from 'expo-document-picker'
+import { AppError, MEDIA_MAX_VIDEO_SECONDS } from '@nagar-shield/shared'
+import type { PickedAsset } from './prepareMedia'
 
 /**
  * The three media entry points.
@@ -24,10 +24,10 @@ import type { PickedAsset } from './prepareMedia';
 export async function pickFromGallery(
   mediaTypes: ImagePicker.MediaType[] = ['images'],
 ): Promise<PickedAsset | null> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
 
   if (permission.status !== 'granted') {
-    throw new AppError('FORBIDDEN', { permission: 'mediaLibrary' });
+    throw new AppError('FORBIDDEN', { permission: 'mediaLibrary' })
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -36,12 +36,12 @@ export async function pickFromGallery(
     // The EXIF block is never read on the device — the re-encode is what
     // strips it, and the picker does not need to hand it over.
     exif: false,
-  });
+  })
 
-  if (result.canceled) return null;
+  if (result.canceled) return null
 
-  const asset = result.assets[0];
-  if (!asset) return null;
+  const asset = result.assets[0]
+  if (!asset) return null
 
   return {
     uri: asset.uri,
@@ -51,7 +51,7 @@ export async function pickFromGallery(
     width: asset.width ?? null,
     height: asset.height ?? null,
     duration: asset.duration ?? null,
-  };
+  }
 }
 
 /**
@@ -61,22 +61,22 @@ export async function pickFromGallery(
  * entry point, never at app open.
  */
 export async function capturePhoto(): Promise<PickedAsset | null> {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  const permission = await ImagePicker.requestCameraPermissionsAsync()
 
   if (permission.status !== 'granted') {
-    throw new AppError('FORBIDDEN', { permission: 'camera' });
+    throw new AppError('FORBIDDEN', { permission: 'camera' })
   }
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
     quality: 1,
     exif: false,
-  });
+  })
 
-  if (result.canceled) return null;
+  if (result.canceled) return null
 
-  const asset = result.assets[0];
-  if (!asset) return null;
+  const asset = result.assets[0]
+  if (!asset) return null
 
   return {
     uri: asset.uri,
@@ -86,7 +86,7 @@ export async function capturePhoto(): Promise<PickedAsset | null> {
     width: asset.width ?? null,
     height: asset.height ?? null,
     duration: null,
-  };
+  }
 }
 
 /**
@@ -104,26 +104,26 @@ export async function captureVideo(): Promise<PickedAsset | null> {
   const [camera, microphone] = await Promise.all([
     ImagePicker.requestCameraPermissionsAsync(),
     Camera.Camera.requestMicrophonePermissionsAsync(),
-  ]);
+  ])
 
   if (camera.status !== 'granted') {
-    throw new AppError('FORBIDDEN', { permission: 'camera' });
+    throw new AppError('FORBIDDEN', { permission: 'camera' })
   }
 
   if (microphone.status !== 'granted') {
-    throw new AppError('FORBIDDEN', { permission: 'microphone' });
+    throw new AppError('FORBIDDEN', { permission: 'microphone' })
   }
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['videos'],
     quality: 1,
     videoMaxDuration: MEDIA_MAX_VIDEO_SECONDS,
-  });
+  })
 
-  if (result.canceled) return null;
+  if (result.canceled) return null
 
-  const asset = result.assets[0];
-  if (!asset) return null;
+  const asset = result.assets[0]
+  if (!asset) return null
 
   return {
     uri: asset.uri,
@@ -133,7 +133,7 @@ export async function captureVideo(): Promise<PickedAsset | null> {
     width: asset.width ?? null,
     height: asset.height ?? null,
     duration: asset.duration ?? null,
-  };
+  }
 }
 
 /**
@@ -146,12 +146,12 @@ export async function pickDocument(): Promise<PickedAsset | null> {
     type: ['application/pdf', 'application/msword'],
     copyToCacheDirectory: true,
     multiple: false,
-  });
+  })
 
-  if (result.canceled) return null;
+  if (result.canceled) return null
 
-  const asset = result.assets[0];
-  if (!asset) return null;
+  const asset = result.assets[0]
+  if (!asset) return null
 
   return {
     uri: asset.uri,
@@ -161,5 +161,5 @@ export async function pickDocument(): Promise<PickedAsset | null> {
     width: null,
     height: null,
     duration: null,
-  };
+  }
 }

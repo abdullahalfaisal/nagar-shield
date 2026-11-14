@@ -1,13 +1,13 @@
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native'
 import {
   REPORT_CATEGORY_ACCENTS,
   REPORT_CATEGORY_ICONS,
   REPORT_CATEGORY_LABELS,
   type PublicReport,
   type ReportCategory,
-} from '@nagar-shield/shared';
-import { useTheme } from '../theme';
-import { Icon } from './Icon';
+} from '@nagar-shield/shared'
+import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 /**
  * The Alerts feed card.
@@ -26,22 +26,22 @@ import { Icon } from './Icon';
  * affordance. The prototype's duplicated area-chip row is NOT ported.
  */
 interface AlertCardProps {
-  report: PublicReport;
-  relativeTime: string;
-  onPress?: () => void;
-  onFlag?: () => void;
+  report: PublicReport
+  relativeTime: string
+  onPress?: () => void
+  onFlag?: () => void
 }
 
 export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardProps) {
-  const theme = useTheme();
-  const category = report.category as ReportCategory | null;
-  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400];
-  const icon = category ? REPORT_CATEGORY_ICONS[category] : 'help';
+  const theme = useTheme()
+  const category = report.category as ReportCategory | null
+  const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
+  const icon = category ? REPORT_CATEGORY_ICONS[category] : 'help'
 
-  const areaLine = formatArea(report);
+  const areaLine = formatArea(report)
   const categoryLabel = category
     ? `${REPORT_CATEGORY_LABELS[category].bn} — ${REPORT_CATEGORY_LABELS[category].en}`
-    : '—';
+    : '—'
 
   return (
     <View
@@ -106,7 +106,7 @@ export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardPr
         <Icon name="flag" size={20} color={theme.colors.ink[500]} />
       </Pressable>
     </View>
-  );
+  )
 }
 
 /**
@@ -114,23 +114,23 @@ export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardPr
  * Falls back to the neighbourhood, then to an em dash.
  */
 export function formatArea(report: PublicReport): string {
-  const area = report.areaHierarchy;
-  if (!area) return '—';
+  const area = report.areaHierarchy
+  if (!area) return '—'
 
-  const english = area.neighborhood ?? area.thana ?? area.city ?? area.division;
-  const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division;
+  const english = area.neighborhood ?? area.thana ?? area.city ?? area.division
+  const bangla = area.neighborhood ?? area.thana ?? area.city ?? area.division
 
-  if (english === bangla) return english;
-  return `${english} · ${bangla}`;
+  if (english === bangla) return english
+  return `${english} · ${bangla}`
 }
 
 /** Converts a hex colour to an `rgba()` string with the given alpha. */
 export function withAlpha(hex: string, alpha: number): string {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 const styles = StyleSheet.create({
@@ -185,4 +185,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
-});
+})

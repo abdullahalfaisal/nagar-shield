@@ -1,22 +1,22 @@
-import { Children, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { useTheme, useThemeControls } from '@/shared/theme';
-import { Button, Icon, ListRow, PermissionRow, Screen, Toggle } from '@/shared/ui';
-import { BottomSheet } from '@/shared/ui/BottomSheet';
-import { setLocale } from '@/shared/i18n';
-import { logOut } from '@/shared/auth/authService';
-import { softDeleteAccount } from '@/shared/api/account';
-import { loadProfile, updateProfile } from '@/shared/api/profile';
-import { isBiometricAvailable } from '@/shared/auth/biometricService';
-import { useAuthSession } from '@/shared/auth/useAuthSession';
-import { usePermissions } from '@/shared/services/usePermissions';
+import { Children, useEffect, useState, type ReactNode } from 'react'
+import { StyleSheet, Text, View, Alert } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { useTheme, useThemeControls } from '@/shared/theme'
+import { Button, Icon, ListRow, PermissionRow, Screen, Toggle } from '@/shared/ui'
+import { BottomSheet } from '@/shared/ui/BottomSheet'
+import { setLocale } from '@/shared/i18n'
+import { logOut } from '@/shared/auth/authService'
+import { softDeleteAccount } from '@/shared/api/account'
+import { loadProfile, updateProfile } from '@/shared/api/profile'
+import { isBiometricAvailable } from '@/shared/auth/biometricService'
+import { useAuthSession } from '@/shared/auth/useAuthSession'
+import { usePermissions } from '@/shared/services/usePermissions'
 import {
   RECOVERABLE_PERMISSIONS,
   type PermissionName,
   type PermissionSnapshot,
-} from '@/shared/services/permissions';
+} from '@/shared/services/permissions'
 
 /**
  * Screen 16 — Settings.
@@ -31,53 +31,53 @@ import {
  *    provider, which is persisted.
  */
 export default function SettingsScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const { toggleTheme, setTheme } = useThemeControls();
-  const { session } = useAuthSession();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t, i18n } = useTranslation()
+  const { toggleTheme, setTheme } = useThemeControls()
+  const { session } = useAuthSession()
 
   // The live permission state. It is read — never prompted for — and it is
   // re-read on every foreground, so a permission revoked while the app was
   // backgrounded is reflected here too.
-  const { permissions, refresh } = usePermissions();
+  const { permissions, refresh } = usePermissions()
 
-  const [biometric, setBiometric] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | undefined>();
+  const [biometric, setBiometric] = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | undefined>()
 
-  const isBangla = i18n.language === 'bn';
+  const isBangla = i18n.language === 'bn'
 
   // The biometric preference is server-side: `profiles.biometric_opt_in` is
   // what the gate reads on the next launch, and it is what the failure
   // accounting clears when the user fails five times. A local-only toggle
   // would be a promise the app cannot keep.
   useEffect(() => {
-    let active = true;
+    let active = true
 
     void (async () => {
-      const available = await isBiometricAvailable();
-      if (!active) return;
-      setBiometricAvailable(available);
+      const available = await isBiometricAvailable()
+      if (!active) return
+      setBiometricAvailable(available)
 
-      const userId = session?.user?.id;
-      if (!userId) return;
+      const userId = session?.user?.id
+      if (!userId) return
 
       try {
-        const profile = await loadProfile(userId);
-        if (active) setBiometric(profile.biometric_opt_in);
+        const profile = await loadProfile(userId)
+        if (active) setBiometric(profile.biometric_opt_in)
       } catch {
         // Leave the toggle off. Opting in is the user's action, and
         // failing to read the current value must not silently turn it on.
       }
-    })();
+    })()
 
     return () => {
-      active = false;
-    };
-  }, [session?.user?.id]);
+      active = false
+    }
+  }, [session?.user?.id])
 
   /**
    * Turns biometric re-auth on or off.
@@ -86,20 +86,20 @@ export default function SettingsScreen() {
    * accounting agree with what the user sees here.
    */
   const onToggleBiometric = async (next: boolean) => {
-    const userId = session?.user?.id;
-    if (!userId) return;
+    const userId = session?.user?.id
+    if (!userId) return
 
-    setBiometric(next);
+    setBiometric(next)
 
     try {
-      await updateProfile(userId, { biometric_opt_in: next });
+      await updateProfile(userId, { biometric_opt_in: next })
     } catch {
       // The write failed, so the server still holds the old value. The
       // toggle is put back to match, rather than leaving the screen
       // claiming something the app does not actually do.
-      setBiometric(!next);
+      setBiometric(!next)
     }
-  };
+  }
 
   /**
    * Soft-deletes the account, then ends the local session.
@@ -110,17 +110,17 @@ export default function SettingsScreen() {
    * within the window restores the account.
    */
   const onConfirmDelete = async () => {
-    setDeleting(true);
-    setDeleteError(undefined);
+    setDeleting(true)
+    setDeleteError(undefined)
     try {
-      await softDeleteAccount();
-      await logOut();
-      router.replace('/(auth)/welcome');
+      await softDeleteAccount()
+      await logOut()
+      router.replace('/(auth)/welcome')
     } catch {
-      setDeleteError(t('errors.internal'));
-      setDeleting(false);
+      setDeleteError(t('errors.internal'))
+      setDeleting(false)
     }
-  };
+  }
 
   return (
     <Screen title={t('settings.title')} onBack={() => router.back()} scroll>
@@ -153,12 +153,7 @@ export default function SettingsScreen() {
       {/* Account */}
       <Section title={t('more.accountHeader')}>
         <ListRow icon="account_circle" tone="purple" title={t('settings.profileEdit')} />
-        <ListRow
-          icon="badge"
-          tone="purple"
-          title={t('settings.changeIdentity')}
-          showArrow
-        />
+        <ListRow icon="badge" tone="purple" title={t('settings.changeIdentity')} showArrow />
       </Section>
 
       {/* Preferences */}
@@ -173,7 +168,7 @@ export default function SettingsScreen() {
             color: theme.palette.violet[700],
           }}
           onPress={() => {
-            void setLocale(isBangla ? 'en' : 'bn');
+            void setLocale(isBangla ? 'en' : 'bn')
           }}
         />
         <ListRow
@@ -230,7 +225,10 @@ export default function SettingsScreen() {
             {RECOVERABLE_PERMISSIONS.map((name) => (
               <View
                 key={name}
-                style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.ink[100] }}
+                style={{
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: theme.colors.ink[100],
+                }}
               >
                 <PermissionRow
                   name={name}
@@ -276,8 +274,8 @@ export default function SettingsScreen() {
           title={t('settings.deleteAccount')}
           subtitle={t('settings.deleteWarning')}
           onPress={() => {
-            setDeleteError(undefined);
-            setConfirmDelete(true);
+            setDeleteError(undefined)
+            setConfirmDelete(true)
           }}
         />
       </Section>
@@ -285,22 +283,20 @@ export default function SettingsScreen() {
       <Text
         accessibilityRole="button"
         onPress={async () => {
-          const { discardedUploads } = await logOut();
+          const { discardedUploads } = await logOut()
 
           // Unsent reports are discarded on sign-out — they are scoped to the
           // session and must never be uploaded under another account. The user
           // is told, because evidence that never landed is evidence they still
           // need to know about.
           if (discardedUploads > 0) {
-            Alert.alert(
-              t('settings.discardQueueWarning', { count: discardedUploads }),
-              undefined,
-              [{ text: t('common.done'), onPress: () => router.replace('/(auth)/welcome') }],
-            );
-            return;
+            Alert.alert(t('settings.discardQueueWarning', { count: discardedUploads }), undefined, [
+              { text: t('common.done'), onPress: () => router.replace('/(auth)/welcome') },
+            ])
+            return
           }
 
-          router.replace('/(auth)/welcome');
+          router.replace('/(auth)/welcome')
         }}
         style={[
           styles.logoutRow,
@@ -327,7 +323,7 @@ export default function SettingsScreen() {
         title={t('settings.deleteAccount')}
         helper={t('settings.deleteWarning')}
         onClose={() => {
-          if (!deleting) setConfirmDelete(false);
+          if (!deleting) setConfirmDelete(false)
         }}
       >
         <Text style={[styles.deleteBody, { color: theme.colors.ink[600] }]}>
@@ -356,32 +352,32 @@ export default function SettingsScreen() {
         </View>
       </BottomSheet>
     </Screen>
-  );
+  )
 }
 
 /** Whether every permission the app reads has been granted. */
 function everyGranted(permissions: PermissionSnapshot): boolean {
-  return RECOVERABLE_PERMISSIONS.every((name) => permissions[name] === 'granted');
+  return RECOVERABLE_PERMISSIONS.every((name) => permissions[name] === 'granted')
 }
 
 /** What a permission would unlock, in the user's language. */
 function unlocksFor(name: PermissionName, t: (key: string) => string): string {
   switch (name) {
     case 'camera':
-      return t('permissions.cameraUnlocks');
+      return t('permissions.cameraUnlocks')
     case 'microphone':
-      return t('permissions.microphoneUnlocks');
+      return t('permissions.microphoneUnlocks')
     case 'mediaLibrary':
-      return t('permissions.mediaLibraryUnlocks');
+      return t('permissions.mediaLibraryUnlocks')
     case 'location':
-      return t('permissions.locationUnlocks');
+      return t('permissions.locationUnlocks')
   }
 }
 
 /** A `.list-section` card with an uppercase header. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  const theme = useTheme();
-  const rows = Children.toArray(children);
+  const theme = useTheme()
+  const rows = Children.toArray(children)
 
   return (
     <View
@@ -405,7 +401,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
         </View>
       ))}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -494,7 +490,8 @@ const styles = StyleSheet.create({
   },
   logoutRow: {
     marginHorizontal: 20,
-    marginTop: 8,    marginBottom: 32,
+    marginTop: 8,
+    marginBottom: 32,
     padding: 16,
     textAlign: 'center',
     borderRadius: 18,
@@ -506,4 +503,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-});
+})

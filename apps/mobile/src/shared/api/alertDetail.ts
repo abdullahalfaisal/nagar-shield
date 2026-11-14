@@ -1,13 +1,13 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type {
   AreaHierarchy,
   MediaType,
   PublicVisibility,
   ReportCategory,
-} from '@nagar-shield/shared';
-import { supabase } from '@/shared/api/supabase';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { signMediaUrl } from '@/shared/api/reportDetail';
+} from '@nagar-shield/shared'
+import { supabase } from '@/shared/api/supabase'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { signMediaUrl } from '@/shared/api/reportDetail'
 
 /**
  * The **public** alert detail.
@@ -33,14 +33,14 @@ import { signMediaUrl } from '@/shared/api/reportDetail';
  * field. A type that carried one would be a field waiting to be rendered.
  */
 export interface PublicAlertMedia {
-  id: string;
-  reportId: string;
-  storagePath: string;
-  mediaType: MediaType;
-  byteSize: number;
-  durationSeconds: number | null;
-  width: number | null;
-  height: number | null;
+  id: string
+  reportId: string
+  storagePath: string
+  mediaType: MediaType
+  byteSize: number
+  durationSeconds: number | null
+  width: number | null
+  height: number | null
 }
 
 /**
@@ -51,49 +51,49 @@ export interface PublicAlertMedia {
  * named `author_id`, and a type that named it would invite a render.
  */
 export interface PublicAlertDetail {
-  id: string;
-  category: ReportCategory | null;
-  description: string | null;
-  areaHierarchy: AreaHierarchy | null;
-  capturedAt: string;
-  publicVisibility: PublicVisibility;
+  id: string
+  category: ReportCategory | null
+  description: string | null
+  areaHierarchy: AreaHierarchy | null
+  capturedAt: string
+  publicVisibility: PublicVisibility
   /** Present only when the author explicitly chose `identified`. */
-  authorDisplayName: string | null;
-  lat: number | null;
-  lng: number | null;
-  media: PublicAlertMedia[];
+  authorDisplayName: string | null
+  lat: number | null
+  lng: number | null
+  media: PublicAlertMedia[]
 }
 
 interface AlertDetailRow {
-  id: string;
-  category: ReportCategory | null;
-  description: string | null;
-  area_hierarchy: Partial<AreaHierarchy> | null;
-  captured_at: string;
-  public_visibility: PublicVisibility;
-  author_display_name: string | null;
-  lat: number | null;
-  lng: number | null;
+  id: string
+  category: ReportCategory | null
+  description: string | null
+  area_hierarchy: Partial<AreaHierarchy> | null
+  captured_at: string
+  public_visibility: PublicVisibility
+  author_display_name: string | null
+  lat: number | null
+  lng: number | null
   media: Array<{
-    id: string;
-    report_id: string;
-    storage_path: string;
-    media_type: MediaType;
-    byte_size: number;
-    duration_seconds: number | null;
-    width: number | null;
-    height: number | null;
-  }>;
+    id: string
+    report_id: string
+    storage_path: string
+    media_type: MediaType
+    byte_size: number
+    duration_seconds: number | null
+    width: number | null
+    height: number | null
+  }>
 }
 
 function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | null {
-  if (!raw) return null;
+  if (!raw) return null
   return {
     division: raw.division ?? '',
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
-  };
+  }
 }
 
 /**
@@ -104,18 +104,16 @@ function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | nu
  * The three are indistinguishable from outside, which is the point: a client
  * cannot use this read to discover which reports exist but are hidden.
  */
-export async function fetchPublicAlertDetail(
-  reportId: string,
-): Promise<PublicAlertDetail | null> {
+export async function fetchPublicAlertDetail(reportId: string): Promise<PublicAlertDetail | null> {
   const { data, error } = await supabase.rpc('alert_detail', {
     p_report_id: reportId,
-  });
+  })
 
-  if (error) throw fromSupabaseError(error);
+  if (error) throw fromSupabaseError(error)
 
-  if (!data) return null;
+  if (!data) return null
 
-  const row = data as unknown as AlertDetailRow;
+  const row = data as unknown as AlertDetailRow
 
   return {
     id: row.id,
@@ -137,7 +135,7 @@ export async function fetchPublicAlertDetail(
       width: media.width,
       height: media.height,
     })),
-  };
+  }
 }
 
 export function usePublicAlertDetail(
@@ -147,7 +145,7 @@ export function usePublicAlertDetail(
     queryKey: ['alert-detail', reportId],
     queryFn: () => (reportId ? fetchPublicAlertDetail(reportId) : Promise.resolve(null)),
     enabled: Boolean(reportId),
-  });
+  })
 }
 
 /**
@@ -165,16 +163,14 @@ export function usePublicAlertDetail(
 export async function signAlertMediaUrls(
   media: PublicAlertMedia[],
 ): Promise<Record<string, string>> {
-  if (media.length === 0) return {};
+  if (media.length === 0) return {}
 
   const pairs = await Promise.all(
     media.map(async (item) => {
-      const url = await signMediaUrl(item.storagePath);
-      return [item.storagePath, url] as const;
+      const url = await signMediaUrl(item.storagePath)
+      return [item.storagePath, url] as const
     }),
-  );
+  )
 
-  return Object.fromEntries(
-    pairs.filter(([, url]) => Boolean(url)) as Array<[string, string]>,
-  );
+  return Object.fromEntries(pairs.filter(([, url]) => Boolean(url)) as Array<[string, string]>)
 }

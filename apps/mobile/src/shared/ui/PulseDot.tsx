@@ -1,10 +1,10 @@
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from '../theme';
+import { StyleSheet, View } from 'react-native'
+import { useTheme } from '../theme'
 
 interface PulseDotProps {
   /** Pauses the animation — the battery / offline quiet indicator. */
-  paused?: boolean;
-  color?: string;
+  paused?: boolean
+  color?: string
 }
 
 /**
@@ -15,8 +15,8 @@ interface PulseDotProps {
  * auto-refresh is paused.
  */
 export function PulseDot({ paused = false, color }: PulseDotProps) {
-  const theme = useTheme();
-  const dotColor = color ?? theme.palette.red[500];
+  const theme = useTheme()
+  const dotColor = color ?? theme.palette.red[500]
 
   return (
     <View
@@ -25,11 +25,9 @@ export function PulseDot({ paused = false, color }: PulseDotProps) {
       style={styles.wrap}
     >
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
-      {paused ? null : (
-        <View style={[styles.halo, { borderColor: dotColor }]} />
-      )}
+      {paused ? null : <View style={[styles.halo, { borderColor: dotColor }]} />}
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -52,4 +50,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     opacity: 0.35,
   },
-});
+})

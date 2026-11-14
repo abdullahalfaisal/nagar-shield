@@ -21,44 +21,44 @@
  * to the private Storage bucket and passes only the metadata here.
  */
 
-import { checkMediaCaps, finalizeCaptureSchema } from '../_shared/contracts.ts';
-import { resolveArea } from '../_shared/area.ts';
-import { authenticateCaller, CallerError } from '../_shared/auth.ts';
-import { authorToken } from '../_shared/vendor/storage/index.ts';
+import { checkMediaCaps, finalizeCaptureSchema } from '../_shared/contracts.ts'
+import { resolveArea } from '../_shared/area.ts'
+import { authenticateCaller, CallerError } from '../_shared/auth.ts'
+import { authorToken } from '../_shared/vendor/storage/index.ts'
 import {
   databaseErrorResponse,
   errorResponse,
   preflightResponse,
   successResponse,
-} from '../_shared/http.ts';
-import { logEvent } from '../_shared/logger.ts';
-import { newRequestId } from '../_shared/job-runner.ts';
-import { createServiceClient, createUserClient } from '../_shared/supabase.ts';
+} from '../_shared/http.ts'
+import { logEvent } from '../_shared/logger.ts'
+import { newRequestId } from '../_shared/job-runner.ts'
+import { createServiceClient, createUserClient } from '../_shared/supabase.ts'
 
 /** The storage-path prefix the client must use for its own uploads. */
-const STORAGE_PATH_PREFIX = 'reports/';
+const STORAGE_PATH_PREFIX = 'reports/'
 
 Deno.serve(async (request) => {
-  const requestId = newRequestId();
+  const requestId = newRequestId()
 
-  if (request.method === 'OPTIONS') return preflightResponse();
+  if (request.method === 'OPTIONS') return preflightResponse()
 
   if (request.method !== 'POST') {
-    return errorResponse('VALIDATION_FAILED', 'Only POST is accepted.');
+    return errorResponse('VALIDATION_FAILED', 'Only POST is accepted.')
   }
 
   try {
-    const serviceClient = createServiceClient();
-    const caller = await authenticateCaller(serviceClient, request);
+    const serviceClient = createServiceClient()
+    const caller = await authenticateCaller(serviceClient, request)
 
     // The write RPC reads `auth.uid()`, so it must carry the **caller's** JWT.
     // The service client carries no user identity, and the RPC would reject the
     // call with AUTH_REQUIRED — so the capture is written as the citizen, under
     // the citizen's own RLS and identity.
-    const callerClient = createUserClient(callerToken(request));
+    const callerClient = createUserClient(callerToken(request))
 
-    const body = await request.json().catch(() => null);
-    const parsed = finalizeCaptureSchema.safeParse(body);
+    const body = await request.json().catch(() => null)
+    const parsed = finalizeCaptureSchema.safeParse(body)
 
     if (!parsed.success) {
       return errorResponse('VALIDATION_FAILED', undefined, {
@@ -66,10 +66,10 @@ Deno.serve(async (request) => {
           path: issue.path.join('.'),
           message: issue.message,
         })),
-      });
+      })
     }
 
-    const input = parsed.data;
+    const input = parsed.data
 
     // The media caps are re-checked on the server. A modified client cannot
     // bypass them.
@@ -79,10 +79,10 @@ Deno.serve(async (request) => {
       durationSeconds: input.duration_seconds,
       width: input.width,
       height: input.height,
-    });
+    })
 
     if (!caps.ok) {
-      return errorResponse(caps.code ?? 'MEDIA_TOO_LARGE');
+      return errorResponse(caps.code ?? 'MEDIA_TOO_LARGE')
     }
 
     // The storage path must belong to the caller. The path prefix is the
@@ -95,21 +95,21 @@ Deno.serve(async (request) => {
     // client can mint a short-lived signed URL. A path carrying the author's
     // uuid would hand every reader a stable handle on the author, which
     // FR-DATA-3 and `006-alerts / 009-alert-detail-screen` forbid.
-    const expectedPrefix = `${STORAGE_PATH_PREFIX}${await authorToken(caller.id)}/`;
+    const expectedPrefix = `${STORAGE_PATH_PREFIX}${await authorToken(caller.id)}/`
     if (!input.storage_path.startsWith(expectedPrefix)) {
       logEvent('warn', {
         requestId,
         action: 'finalize_capture_rejected',
         reason: 'storage_path_owner_mismatch',
-      });
-      return errorResponse('FORBIDDEN');
+      })
+      return errorResponse('FORBIDDEN')
     }
 
     // The idempotency check comes before the area resolution: a retry must
     // not pay for a geocode it does not need.
-    const existing = await findExistingReport(serviceClient, caller.id, input.client_request_id);
+    const existing = await findExistingReport(serviceClient, caller.id, input.client_request_id)
     if (existing) {
-      return successResponse(existing, 200, true);
+      return successResponse(existing, 200, true)
     }
 
     // The area is resolved server-side. The online backup is attempted at
@@ -119,7 +119,7 @@ Deno.serve(async (request) => {
       serviceClient,
       input.lat,
       input.lng,
-    );
+    )
 
     const { data, error } = await callerClient.rpc('finalize_capture', {
       p_client_request_id: input.client_request_id,
@@ -136,57 +136,57 @@ Deno.serve(async (request) => {
       p_public_visibility: input.public_visibility,
       p_category: input.category,
       p_area_hierarchy: resolution.area,
-    });
+    })
 
     if (error) {
       logEvent('warn', {
         requestId,
         action: 'finalize_capture_rejected',
         reason: 'rpc_error',
-      });
-      return databaseErrorResponse(error, true);
+      })
+      return databaseErrorResponse(error, true)
     }
 
     logEvent('info', {
       requestId,
       action: 'finalize_capture_completed',
       geocodeSource: resolution.source,
-    });
+    })
 
-    const reportId = typeof data === 'string' ? data : String(data ?? '');
+    const reportId = typeof data === 'string' ? data : String(data ?? '')
 
     const payload = {
       report_id: reportId,
       area_hierarchy: resolution.area,
       moderation_status: 'visible',
-    };
+    }
 
     // A degraded resolve is a **successful** submit. The non-fatal
     // `GEOCODE_UNAVAILABLE` code rides along in the details so the client
     // can show the area as unknown without treating the submit as an error.
     if (resolution.source === 'degraded') {
-      return successResponse(payload, 200, true);
+      return successResponse(payload, 200, true)
     }
 
-    return successResponse(payload, 200, true);
+    return successResponse(payload, 200, true)
   } catch (error) {
     if (error instanceof CallerError) {
       logEvent('warn', {
         requestId,
         action: 'finalize_capture_rejected',
         reason: error.code,
-      });
-      return errorResponse(error.code, undefined, undefined, true);
+      })
+      return errorResponse(error.code, undefined, undefined, true)
     }
 
     logEvent('error', {
       requestId,
       action: 'finalize_capture_failed',
-    });
+    })
 
-    return errorResponse('INTERNAL', undefined, undefined, true);
+    return errorResponse('INTERNAL', undefined, undefined, true)
   }
-});
+})
 
 /** Looks up an existing report for the `(author_id, client_request_id)` key. */
 async function findExistingReport(
@@ -199,21 +199,21 @@ async function findExistingReport(
     .select('id, area_hierarchy, moderation_status')
     .eq('author_id', authorId)
     .eq('client_request_id', clientRequestId)
-    .maybeSingle();
+    .maybeSingle()
 
-  if (error || !data) return null;
+  if (error || !data) return null
 
-  const row = data as { id: string; area_hierarchy: unknown; moderation_status: string };
+  const row = data as { id: string; area_hierarchy: unknown; moderation_status: string }
   return {
     report_id: row.id,
     area_hierarchy: row.area_hierarchy,
     moderation_status: row.moderation_status,
-  };
+  }
 }
 
 /** The caller's bearer token, re-read for the user-scoped RPC call. */
 function callerToken(request: Request): string {
-  const header = request.headers.get('authorization') ?? '';
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() ?? '';
+  const header = request.headers.get('authorization') ?? ''
+  const match = header.match(/^Bearer\s+(.+)$/i)
+  return match?.[1]?.trim() ?? ''
 }

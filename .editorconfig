@@ -1,0 +1,26 @@
+# The editor contract for the repository.
+#
+# Bangla copy requires UTF-8, and a CRLF checkout would show up as a
+# whitespace diff in every file that carries Bangla text. `end_of_line = lf`
+# is therefore not a preference — it is a correctness requirement.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.sql]
+indent_size = 2
+
+[*.{json,jsonc}]
+indent_size = 2

@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { ContactCaptureScreen, clearWizardContacts } from '@/shared/wizard/ContactCaptureScreen';
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { ContactCaptureScreen, clearWizardContacts } from '@/shared/wizard/ContactCaptureScreen'
 
 /**
  * Screen 7 — S-04c, Contact 3 of 3.
@@ -21,8 +21,8 @@ import { ContactCaptureScreen, clearWizardContacts } from '@/shared/wizard/Conta
  * permission.
  */
 export default function WizardContact3Screen() {
-  const router = useRouter();
-  const { t } = useTranslation();
+  const router = useRouter()
+  const { t } = useTranslation()
 
   return (
     <ContactCaptureScreen
@@ -37,9 +37,9 @@ export default function WizardContact3Screen() {
         // The wizard's captures are done. The module's memory is cleared so a
         // later onboarding run starts from empty slots rather than replaying
         // this run's contacts.
-        clearWizardContacts();
-        router.replace('/(auth)/location-permission');
+        clearWizardContacts()
+        router.replace('/(auth)/location-permission')
       }}
     />
-  );
+  )
 }

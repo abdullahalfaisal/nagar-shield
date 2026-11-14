@@ -1,4 +1,4 @@
-import { Linking } from 'react-native';
+import { Linking } from 'react-native'
 
 /**
  * Opens the device dialler for a number.
@@ -12,18 +12,18 @@ import { Linking } from 'react-native';
  * caller can show a fallback.
  */
 export async function openDialer(number: string): Promise<boolean> {
-  const normalized = number.replace(/[^\d+]/g, '');
+  const normalized = number.replace(/[^\d+]/g, '')
   try {
-    const supported = await Linking.canOpenURL(`tel:${normalized}`);
-    if (!supported) return false;
-    await Linking.openURL(`tel:${normalized}`);
-    return true;
+    const supported = await Linking.canOpenURL(`tel:${normalized}`)
+    if (!supported) return false
+    await Linking.openURL(`tel:${normalized}`)
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
 /** Emergency numbers are dialled as bare digits — `tel:999`, not `tel:+880999`. */
 export function dialTarget(number: string): string {
-  return number.replace(/[^\d+]/g, '');
+  return number.replace(/[^\d+]/g, '')
 }

@@ -1,18 +1,18 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { AppError, type EmergencyContact } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { ContactAvatar, EmptyState, Icon, PrimaryStar, RelationshipPill, Screen } from '@/shared/ui';
+import { useCallback, useMemo, useState } from 'react'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { AppError, type EmergencyContact } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { ContactAvatar, EmptyState, Icon, PrimaryStar, RelationshipPill, Screen } from '@/shared/ui'
 import {
   deleteContact,
   makePrimary,
   useContacts,
   useInvalidateContacts,
-} from '@/shared/api/contacts';
-import { fromSupabaseError } from '@/shared/api/errors';
-import { errorCopy } from '@/shared/i18n/errorCopy';
+} from '@/shared/api/contacts'
+import { fromSupabaseError } from '@/shared/api/errors'
+import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
  * Screen 20 — Emergency Contacts.
@@ -49,25 +49,25 @@ import { errorCopy } from '@/shared/i18n/errorCopy';
  * rendered as a live count.
  */
 export default function ContactsScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
-  const invalidate = useInvalidateContacts();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
+  const invalidate = useInvalidateContacts()
 
-  const { data, isLoading } = useContacts();
-  const contacts = useMemo(() => data ?? [], [data]);
+  const { data, isLoading } = useContacts()
+  const contacts = useMemo(() => data ?? [], [data])
 
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const groups = useMemo(() => {
-    const order: Array<EmergencyContact['groupName']> = ['family', 'friend', 'colleague', 'other'];
+    const order: Array<EmergencyContact['groupName']> = ['family', 'friend', 'colleague', 'other']
     return order
       .map((group) => ({
         group,
         items: contacts.filter((contact) => contact.groupName === group),
       }))
-      .filter((entry) => entry.items.length > 0);
-  }, [contacts]);
+      .filter((entry) => entry.items.length > 0)
+  }, [contacts])
 
   /**
    * Promotes a contact to the primary one.
@@ -78,21 +78,21 @@ export default function ContactsScreen() {
    */
   const onTogglePrimary = useCallback(
     async (contact: EmergencyContact) => {
-      if (contact.isPrimary) return;
+      if (contact.isPrimary) return
 
-      setBusyId(contact.id);
+      setBusyId(contact.id)
       try {
-        await makePrimary(contact.id);
-        await invalidate();
+        await makePrimary(contact.id)
+        await invalidate()
       } catch (error) {
-        const appError = error instanceof AppError ? error : fromSupabaseError(error);
-        Alert.alert(t('common.error'), errorCopy(t, appError.code));
+        const appError = error instanceof AppError ? error : fromSupabaseError(error)
+        Alert.alert(t('common.error'), errorCopy(t, appError.code))
       } finally {
-        setBusyId(null);
+        setBusyId(null)
       }
     },
     [invalidate, t],
-  );
+  )
 
   /**
    * Removes a contact.
@@ -109,26 +109,26 @@ export default function ContactsScreen() {
           text: t('contacts.deleteCta'),
           style: 'destructive',
           onPress: async () => {
-            setBusyId(contact.id);
+            setBusyId(contact.id)
             try {
-              await deleteContact(contact.id);
-              await invalidate();
+              await deleteContact(contact.id)
+              await invalidate()
             } catch (error) {
-              const appError = error instanceof AppError ? error : fromSupabaseError(error);
-              Alert.alert(t('common.error'), errorCopy(t, appError.code));
+              const appError = error instanceof AppError ? error : fromSupabaseError(error)
+              Alert.alert(t('common.error'), errorCopy(t, appError.code))
             } finally {
-              setBusyId(null);
+              setBusyId(null)
             }
           },
         },
-      ]);
+      ])
     },
     [invalidate, t],
-  );
+  )
 
   // A contact may be primary, and the prompt appears only when the list is
   // loaded and has no primary at all — the state the story calls out.
-  const hasPrimary = contacts.some((contact) => contact.isPrimary);
+  const hasPrimary = contacts.some((contact) => contact.isPrimary)
 
   return (
     <Screen
@@ -144,7 +144,9 @@ export default function ContactsScreen() {
       </Text>
 
       {isLoading ? (
-        <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>{t('common.loading')}</Text>
+        <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+          {t('common.loading')}
+        </Text>
       ) : contacts.length === 0 ? (
         <EmptyState
           icon="contact_emergency"
@@ -207,7 +209,7 @@ export default function ContactsScreen() {
         <Icon name="add" size={28} color="#FFFFFF" filled />
       </Pressable>
     </Screen>
-  );
+  )
 }
 
 function ContactRow({
@@ -220,17 +222,17 @@ function ContactRow({
   onTogglePrimary,
   onDelete,
 }: {
-  contact: EmergencyContact;
-  primaryLabel: string;
-  editLabel: string;
-  deleteLabel: string;
-  busy: boolean;
-  onPress: () => void;
-  onTogglePrimary: () => void;
-  onDelete: () => void;
+  contact: EmergencyContact
+  primaryLabel: string
+  editLabel: string
+  deleteLabel: string
+  busy: boolean
+  onPress: () => void
+  onTogglePrimary: () => void
+  onDelete: () => void
 }) {
-  const theme = useTheme();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const { t } = useTranslation()
 
   return (
     <View
@@ -282,34 +284,34 @@ function ContactRow({
         </View>
       </View>
     </View>
-  );
+  )
 }
 
 function groupLabel(group: EmergencyContact['groupName'], t: (key: string) => string): string {
   switch (group) {
     case 'family':
-      return t('contacts.groupFamily');
+      return t('contacts.groupFamily')
     case 'friend':
-      return t('contacts.groupFriend');
+      return t('contacts.groupFriend')
     case 'colleague':
-      return t('contacts.groupColleague');
+      return t('contacts.groupColleague')
     default:
-      return t('contacts.groupOther');
+      return t('contacts.groupOther')
   }
 }
 
-const BENGALI_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+const BENGALI_DIGITS = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯']
 
 export function toBengaliDigits(input: string): string {
-  return input.replace(/[0-9]/g, (digit) => BENGALI_DIGITS[Number(digit)] ?? digit);
+  return input.replace(/[0-9]/g, (digit) => BENGALI_DIGITS[Number(digit)] ?? digit)
 }
 
 /** Formats `+8801712345678` as the prototype's `০১৭১২-৩৪৫৬৭৮`. */
 export function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '').replace(/^880/, '');
-  if (digits.length !== 10) return phone;
-  const national = `0${digits.slice(1)}`;
-  return toBengaliDigits(`${national.slice(0, 5)}-${national.slice(5)}`);
+  const digits = phone.replace(/\D/g, '').replace(/^880/, '')
+  if (digits.length !== 10) return phone
+  const national = `0${digits.slice(1)}`
+  return toBengaliDigits(`${national.slice(0, 5)}-${national.slice(5)}`)
 }
 
 const styles = StyleSheet.create({
@@ -408,4 +410,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+})

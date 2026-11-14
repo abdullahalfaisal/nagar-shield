@@ -41,14 +41,14 @@
  * Usage: node tools/reconcile-story-index.cjs [--write]
  */
 
-'use strict';
+'use strict'
 
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require('node:fs')
+const path = require('node:path')
 
-const ROOT = path.resolve(__dirname, '..');
-const INDEX_PATH = path.join(ROOT, 'memory-bank', 'story-index.md');
-const INTENTS_ROOT = path.join(ROOT, 'memory-bank', 'intents');
+const ROOT = path.resolve(__dirname, '..')
+const INDEX_PATH = path.join(ROOT, 'memory-bank', 'story-index.md')
+const INTENTS_ROOT = path.join(ROOT, 'memory-bank', 'intents')
 
 /**
  * The intent directories.
@@ -63,7 +63,7 @@ function findIntentDirs() {
     .readdirSync(INTENTS_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(INTENTS_ROOT, entry.name))
-    .filter((dir) => fs.existsSync(path.join(dir, 'units')));
+    .filter((dir) => fs.existsSync(path.join(dir, 'units')))
 }
 
 /**
@@ -84,13 +84,13 @@ function findIntentDirs() {
  *
  * `planned` — not built.
  */
-const STATES = ['complete', 'partial', 'planned'];
+const STATES = ['complete', 'partial', 'planned']
 
 /** Maps a story's `implemented` frontmatter to its index status. */
 function statusFor(story) {
-  if (story.implemented === 'true' || story.implemented === 'complete') return 'complete';
-  if (story.implemented === 'partial') return 'partial';
-  return 'planned';
+  if (story.implemented === 'true' || story.implemented === 'complete') return 'complete'
+  if (story.implemented === 'partial') return 'partial'
+  return 'planned'
 }
 
 /**
@@ -101,41 +101,39 @@ function statusFor(story) {
  * move between them without the tool reporting drift. `complete` and `true`
  * likewise both mean "built".
  */
-const IMPLEMENTED_VALUES = ['true', 'false', 'partial', 'planned', 'complete'];
+const IMPLEMENTED_VALUES = ['true', 'false', 'partial', 'planned', 'complete']
 
 /** Reads every story file's `id` and `implemented` frontmatter. */
 function readStories() {
-  const stories = [];
+  const stories = []
   /** Story files whose `implemented:` value is not in the vocabulary. */
-  const unknownValues = [];
+  const unknownValues = []
 
   for (const intentDir of findIntentDirs()) {
-    const unitsRoot = path.join(intentDir, 'units');
-    const units = fs.readdirSync(unitsRoot, { withFileTypes: true });
+    const unitsRoot = path.join(intentDir, 'units')
+    const units = fs.readdirSync(unitsRoot, { withFileTypes: true })
 
     for (const unit of units) {
-      if (!unit.isDirectory()) continue;
+      if (!unit.isDirectory()) continue
 
-      const storiesDir = path.join(unitsRoot, unit.name, 'stories');
-      if (!fs.existsSync(storiesDir)) continue;
+      const storiesDir = path.join(unitsRoot, unit.name, 'stories')
+      if (!fs.existsSync(storiesDir)) continue
 
       for (const file of fs.readdirSync(storiesDir)) {
-        if (!file.endsWith('.md')) continue;
+        if (!file.endsWith('.md')) continue
 
-        const full = path.join(storiesDir, file);
-        const text = fs.readFileSync(full, 'utf8');
+        const full = path.join(storiesDir, file)
+        const text = fs.readFileSync(full, 'utf8')
         // The story files are CRLF on Windows, so the frontmatter is read with
         // the carriage returns stripped — a regex anchored at `$` would never
         // match `implemented: true\r`.
-        const frontmatter = text.slice(0, text.indexOf('\n---', 3) + 4).replace(/\r/g, '');
+        const frontmatter = text.slice(0, text.indexOf('\n---', 3) + 4).replace(/\r/g, '')
 
-        const id = frontmatter.match(/^id:\s*(.+)$/m);
-        const implementedRaw = frontmatter.match(/^implemented:\s*(.+)$/m);
-        const implemented = implementedRaw
-          ? implementedRaw[1].trim()
-          : 'false';
+        const id = frontmatter.match(/^id:\s*(.+)$/m)
+        const implementedRaw = frontmatter.match(/^implemented:\s*(.+)$/m)
+        const implemented = implementedRaw ? implementedRaw[1].trim() : 'false'
 
-        if (!id) continue;
+        if (!id) continue
 
         // An unrecognised value must be a **hard error**, never a silent
         // default. The vocabulary once accepted only `true`/`false`/
@@ -152,7 +150,7 @@ function readStories() {
             id: id[1].trim(),
             value: implemented,
             file: path.relative(ROOT, full),
-          });
+          })
         }
 
         stories.push({
@@ -160,24 +158,26 @@ function readStories() {
           implemented,
           unit: unit.name,
           file: path.relative(ROOT, full),
-        });
+        })
       }
     }
   }
 
-  return { stories, unknownValues };
+  return { stories, unknownValues }
 }
 
 /** The index's rows, parsed. */
 function readIndexRows() {
-  const text = fs.readFileSync(INDEX_PATH, 'utf8');
-  const rows = [];
+  const text = fs.readFileSync(INDEX_PATH, 'utf8')
+  const rows = []
 
   for (const line of text.split('\n')) {
-    const match = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/);
-    if (!match) continue;
+    const match = line.match(
+      /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/,
+    )
+    if (!match) continue
     // The header and the separator row do not have a sixth column.
-    if (match[1] === 'Story' || match[1].startsWith('---')) continue;
+    if (match[1] === 'Story' || match[1].startsWith('---')) continue
 
     rows.push({
       id: match[1],
@@ -187,10 +187,10 @@ function readIndexRows() {
       priority: match[5],
       status: match[6],
       line,
-    });
+    })
   }
 
-  return { text, rows };
+  return { text, rows }
 }
 
 /**
@@ -204,21 +204,21 @@ function readIndexRows() {
  * when every story it lists is `complete`.
  */
 function readBolts() {
-  const boltsRoot = path.join(ROOT, 'memory-bank', 'bolts');
-  const bolts = [];
+  const boltsRoot = path.join(ROOT, 'memory-bank', 'bolts')
+  const bolts = []
 
-  if (!fs.existsSync(boltsRoot)) return bolts;
+  if (!fs.existsSync(boltsRoot)) return bolts
 
   for (const dir of fs.readdirSync(boltsRoot, { withFileTypes: true })) {
-    if (!dir.isDirectory()) continue;
-    const boltFile = path.join(boltsRoot, dir.name, 'bolt.md');
-    if (!fs.existsSync(boltFile)) continue;
+    if (!dir.isDirectory()) continue
+    const boltFile = path.join(boltsRoot, dir.name, 'bolt.md')
+    if (!fs.existsSync(boltFile)) continue
 
-    const text = fs.readFileSync(boltFile, 'utf8');
-    const frontmatter = text.slice(0, text.indexOf('\n---', 3) + 4).replace(/\r/g, '');
-    const status = (frontmatter.match(/^status:\s*(.+)$/m) || [])[1];
-    const storyIds = (frontmatter.match(/^stories:\s*\[(.+)\]$/m) || [])[1];
-    if (!storyIds) continue;
+    const text = fs.readFileSync(boltFile, 'utf8')
+    const frontmatter = text.slice(0, text.indexOf('\n---', 3) + 4).replace(/\r/g, '')
+    const status = (frontmatter.match(/^status:\s*(.+)$/m) || [])[1]
+    const storyIds = (frontmatter.match(/^stories:\s*\[(.+)\]$/m) || [])[1]
+    if (!storyIds) continue
 
     bolts.push({
       id: dir.name,
@@ -229,19 +229,19 @@ function readBolts() {
         .filter(Boolean),
       file: path.relative(ROOT, boltFile),
       text,
-    });
+    })
   }
 
-  return bolts;
+  return bolts
 }
 
 function main() {
-  const write = process.argv.includes('--write');
-  const { stories, unknownValues } = readStories();
-  const { text, rows } = readIndexRows();
+  const write = process.argv.includes('--write')
+  const { stories, unknownValues } = readStories()
+  const { text, rows } = readIndexRows()
 
-  const byId = new Map(stories.map((story) => [story.id, story]));
-  const drift = [];
+  const byId = new Map(stories.map((story) => [story.id, story]))
+  const drift = []
 
   // 0. A story whose `implemented:` value the tool does not understand is a
   //    **vocabulary gap**, not a `planned` story. It is reported first,
@@ -250,30 +250,28 @@ function main() {
   for (const unknown of unknownValues) {
     drift.push(
       `${unknown.id}: the story file says "implemented: ${unknown.value}", which is not one of ${IMPLEMENTED_VALUES.join(', ')}`,
-    );
+    )
   }
 
   // 1. Every row's status must match its story file.
   for (const row of rows) {
-    const story = byId.get(row.id);
+    const story = byId.get(row.id)
     if (!story) {
-      drift.push(`the index lists "${row.id}", which has no story file`);
-      continue;
+      drift.push(`the index lists "${row.id}", which has no story file`)
+      continue
     }
 
-    const expected = statusFor(story);
+    const expected = statusFor(story)
     if (row.status !== expected) {
-      drift.push(
-        `${row.id}: the index says "${row.status}", the story file says "${expected}"`,
-      );
+      drift.push(`${row.id}: the index says "${row.status}", the story file says "${expected}"`)
     }
   }
 
   // 2. Every story file must have a row.
-  const rowIds = new Set(rows.map((row) => row.id));
+  const rowIds = new Set(rows.map((row) => row.id))
   for (const story of stories) {
     if (!rowIds.has(story.id)) {
-      drift.push(`${story.id}: the story file has no row in the index`);
+      drift.push(`${story.id}: the story file has no row in the index`)
     }
   }
 
@@ -281,48 +279,48 @@ function main() {
   //    the story file names what is missing — otherwise "partial" is just a
   //    softer way of saying "planned".
   for (const story of stories) {
-    if (story.implemented !== 'partial') continue;
+    if (story.implemented !== 'partial') continue
 
-    const body = fs.readFileSync(path.join(ROOT, story.file), 'utf8');
+    const body = fs.readFileSync(path.join(ROOT, story.file), 'utf8')
     if (!/^##\s+Implementation\s*$/m.test(body)) {
       drift.push(
         `${story.id}: is marked "partial" but has no "## Implementation" section naming the gaps`,
-      );
+      )
     }
   }
 
   // 4. The story's own `status:` must agree with its `implemented:`. The two
   //    fields used to drift apart: a story could say `status: complete` with
   //    `implemented: false`, which is the same lie the index told.
-  const storyUpdates = [];
+  const storyUpdates = []
 
   for (const story of stories) {
     const wantStatus =
-      story.implemented === 'true' || story.implemented === 'complete' ? 'complete' : 'ready';
-    const body = fs.readFileSync(path.join(ROOT, story.file), 'utf8');
-    const frontmatter = body.slice(0, body.indexOf('\n---', 3) + 4).replace(/\r/g, '');
-    const currentStatus = (frontmatter.match(/^status:\s*(.+)$/m) || [])[1];
+      story.implemented === 'true' || story.implemented === 'complete' ? 'complete' : 'ready'
+    const body = fs.readFileSync(path.join(ROOT, story.file), 'utf8')
+    const frontmatter = body.slice(0, body.indexOf('\n---', 3) + 4).replace(/\r/g, '')
+    const currentStatus = (frontmatter.match(/^status:\s*(.+)$/m) || [])[1]
 
-    if (!currentStatus || currentStatus === wantStatus) continue;
+    if (!currentStatus || currentStatus === wantStatus) continue
 
     drift.push(
       `${story.id}: the story file says "status: ${currentStatus}" but "implemented: ${story.implemented}"`,
-    );
+    )
 
     storyUpdates.push({
       file: path.join(ROOT, story.file),
       text: body.replace(/^status:\s*.+$/m, `status: ${wantStatus}`),
-    });
+    })
   }
 
   // 5. The header count must match the files.
-  const counts = { complete: 0, partial: 0, planned: 0 };
-  for (const story of stories) counts[statusFor(story)] += 1;
+  const counts = { complete: 0, partial: 0, planned: 0 }
+  for (const story of stories) counts[statusFor(story)] += 1
 
-  const countPattern = /\*\*(\d+) complete · (\d+) partial · (\d+) planned\.\*\*/;
-  const countMatch = text.match(countPattern);
+  const countPattern = /\*\*(\d+) complete · (\d+) partial · (\d+) planned\.\*\*/
+  const countMatch = text.match(countPattern)
   if (!countMatch) {
-    drift.push('the index header has no "N complete · N partial · N planned." count');
+    drift.push('the index header has no "N complete · N partial · N planned." count')
   } else if (
     Number(countMatch[1]) !== counts.complete ||
     Number(countMatch[2]) !== counts.partial ||
@@ -330,110 +328,111 @@ function main() {
   ) {
     drift.push(
       `the index header says "${countMatch[1]} complete · ${countMatch[2]} partial · ${countMatch[3]} planned", the story files say "${counts.complete} complete · ${counts.partial} partial · ${counts.planned} planned"`,
-    );
+    )
   }
 
   // 6. Every bolt's checkbox must agree with its story files, and a bolt may
   //    only claim `complete` when every story it lists is `complete`.
-  const bolts = readBolts();
-  const boltUpdates = [];
+  const bolts = readBolts()
+  const boltUpdates = []
 
   for (const bolt of bolts) {
-    let boltText = bolt.text;
-    let touched = false;
+    let boltText = bolt.text
+    let touched = false
 
     for (const storyId of bolt.storyIds) {
-      const story = byId.get(storyId);
+      const story = byId.get(storyId)
       if (!story) {
-        drift.push(`the bolt "${bolt.id}" lists "${storyId}", which has no story file`);
-        continue;
+        drift.push(`the bolt "${bolt.id}" lists "${storyId}", which has no story file`)
+        continue
       }
 
       const pattern = new RegExp(
         `^(- )\\[( |x)\\]\\s*(\\*\\*${storyId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*\\*)`,
         'm',
-      );
-      const match = boltText.match(pattern);
-      if (!match) continue;
+      )
+      const match = boltText.match(pattern)
+      if (!match) continue
 
-      const wantChecked = statusFor(story) !== 'planned';
-      const hasChecked = match[2] === 'x';
+      const wantChecked = statusFor(story) !== 'planned'
+      const hasChecked = match[2] === 'x'
 
       if (wantChecked !== hasChecked) {
-        boltText = boltText.replace(pattern, wantChecked ? '- [x]$3' : '- [ ]$3');
-        touched = true;
+        boltText = boltText.replace(pattern, wantChecked ? '- [x]$3' : '- [ ]$3')
+        touched = true
         drift.push(
           `the bolt "${bolt.id}" ${hasChecked ? 'ticks' : 'does not tick'} "${storyId}", but the story file says "${statusFor(story)}"`,
-        );
+        )
       }
     }
 
     const allComplete = bolt.storyIds.every((id) => {
-      const story = byId.get(id);
-      return story && statusFor(story) === 'complete';
-    });
-    const wantStatus = allComplete ? 'complete' : 'planned';
+      const story = byId.get(id)
+      return story && statusFor(story) === 'complete'
+    })
+    const wantStatus = allComplete ? 'complete' : 'planned'
 
     if (bolt.status && bolt.status !== wantStatus) {
-      boltText = boltText.replace(/^status:\s*.+$/m, `status: ${wantStatus}`);
-      touched = true;
-      drift.push(
-        `the bolt "${bolt.id}" says "${bolt.status}", but its stories say "${wantStatus}"`,
-      );
+      boltText = boltText.replace(/^status:\s*.+$/m, `status: ${wantStatus}`)
+      touched = true
+      drift.push(`the bolt "${bolt.id}" says "${bolt.status}", but its stories say "${wantStatus}"`)
     }
 
-    if (touched) boltUpdates.push({ file: path.join(ROOT, bolt.file), text: boltText });
+    if (touched) boltUpdates.push({ file: path.join(ROOT, bolt.file), text: boltText })
   }
 
   if (write && drift.length > 0) {
-    let updated = text;
+    let updated = text
 
     for (const story of stories) {
-      const expected = statusFor(story);
+      const expected = statusFor(story)
       updated = updated.replace(
-        new RegExp(`^(\\|\\s*${story.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\|[^\\n]*?\\|\\s*)(complete|partial|planned)(\\s*\\|\\s*)$`, 'm'),
+        new RegExp(
+          `^(\\|\\s*${story.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\|[^\\n]*?\\|\\s*)(complete|partial|planned)(\\s*\\|\\s*)$`,
+          'm',
+        ),
         `$1${expected}$3`,
-      );
+      )
     }
 
     updated = updated.replace(
       countPattern,
       `**${counts.complete} complete · ${counts.partial} partial · ${counts.planned} planned.**`,
-    );
+    )
 
-    fs.writeFileSync(INDEX_PATH, updated, 'utf8');
-    console.log(`✓ the index was rewritten from the story files`);
+    fs.writeFileSync(INDEX_PATH, updated, 'utf8')
+    console.log(`✓ the index was rewritten from the story files`)
     console.log(
       `✓ ${counts.complete} complete · ${counts.partial} partial · ${counts.planned} planned`,
-    );
+    )
 
     for (const bolt of boltUpdates) {
-      fs.writeFileSync(bolt.file, bolt.text, 'utf8');
+      fs.writeFileSync(bolt.file, bolt.text, 'utf8')
     }
     if (boltUpdates.length > 0) {
-      console.log(`✓ ${boltUpdates.length} bolt file(s) rewritten from the story files`);
+      console.log(`✓ ${boltUpdates.length} bolt file(s) rewritten from the story files`)
     }
 
     for (const story of storyUpdates) {
-      fs.writeFileSync(story.file, story.text, 'utf8');
+      fs.writeFileSync(story.file, story.text, 'utf8')
     }
     if (storyUpdates.length > 0) {
-      console.log(`✓ ${storyUpdates.length} story file(s) rewritten from their own state`);
+      console.log(`✓ ${storyUpdates.length} story file(s) rewritten from their own state`)
     }
-    return;
+    return
   }
 
   if (drift.length === 0) {
     console.log(
       `✓ the index matches the story files — ${counts.complete} complete · ${counts.partial} partial · ${counts.planned} planned`,
-    );
-    console.log(`✓ every bolt agrees with its stories`);
-    return;
+    )
+    console.log(`✓ every bolt agrees with its stories`)
+    return
   }
 
-  console.log(`✗ the index has drifted from the story files:`);
-  for (const item of drift) console.log(`  - ${item}`);
-  process.exitCode = 1;
+  console.log(`✗ the index has drifted from the story files:`)
+  for (const item of drift) console.log(`  - ${item}`)
+  process.exitCode = 1
 }
 
-main();
+main()

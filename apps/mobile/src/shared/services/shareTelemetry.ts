@@ -1,5 +1,5 @@
-import { Directory, File, Paths } from 'expo-file-system';
-import type { ShareChannel } from './snapshotPayload';
+import { Directory, File, Paths } from 'expo-file-system'
+import type { ShareChannel } from './snapshotPayload'
 
 /**
  * The `location_share_intent_ms` telemetry.
@@ -23,7 +23,7 @@ import type { ShareChannel } from './snapshotPayload';
  */
 
 /** The maximum number of buffered events. */
-export const TELEMETRY_MAX_EVENTS = 100;
+export const TELEMETRY_MAX_EVENTS = 100
 
 /**
  * One telemetry event.
@@ -33,35 +33,35 @@ export const TELEMETRY_MAX_EVENTS = 100;
  */
 export interface ShareIntentEvent {
   /** The measured elapsed milliseconds. */
-  elapsedMs: number;
+  elapsedMs: number
   /** The channel the share went out over. */
-  channel: ShareChannel;
+  channel: ShareChannel
   /** How many recipients the share reached. */
-  recipientCount: number;
+  recipientCount: number
 }
 
 /** The telemetry buffer file. A JSON document in the app sandbox. */
 function telemetryFile(): File {
-  const directory = new Directory(Paths.cache, 'nagar-shield-media');
+  const directory = new Directory(Paths.cache, 'nagar-shield-media')
   if (!directory.exists) {
-    directory.create({ intermediates: true });
+    directory.create({ intermediates: true })
   }
-  return new File(directory, 'share-telemetry.json');
+  return new File(directory, 'share-telemetry.json')
 }
 
 /** Reads the buffer. A missing or corrupt file reads as an empty buffer. */
 export async function readTelemetryBuffer(): Promise<ShareIntentEvent[]> {
-  const file = telemetryFile();
+  const file = telemetryFile()
 
-  if (!file.exists) return [];
+  if (!file.exists) return []
 
   try {
-    const raw = file.textSync();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as ShareIntentEvent[];
+    const raw = file.textSync()
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as ShareIntentEvent[]
   } catch {
-    return [];
+    return []
   }
 }
 
@@ -74,15 +74,15 @@ export async function readTelemetryBuffer(): Promise<ShareIntentEvent[]> {
  */
 export async function bufferShareIntent(event: ShareIntentEvent): Promise<void> {
   try {
-    const events = await readTelemetryBuffer();
+    const events = await readTelemetryBuffer()
 
-    events.push(event);
+    events.push(event)
 
     // The newest first, so the oldest is the tail and the eviction is a
     // simple slice.
-    const trimmed = events.slice(Math.max(0, events.length - TELEMETRY_MAX_EVENTS));
+    const trimmed = events.slice(Math.max(0, events.length - TELEMETRY_MAX_EVENTS))
 
-    telemetryFile().write(JSON.stringify(trimmed));
+    telemetryFile().write(JSON.stringify(trimmed))
   } catch {
     // The buffer is a convenience. A device that cannot write it still
     // shares fine.
@@ -97,18 +97,18 @@ export async function bufferShareIntent(event: ShareIntentEvent): Promise<void> 
  * would be worse than a missing one.
  */
 export async function takeBufferedEvents(): Promise<ShareIntentEvent[]> {
-  const events = await readTelemetryBuffer();
+  const events = await readTelemetryBuffer()
 
   if (events.length > 0) {
     try {
-      telemetryFile().write('[]');
+      telemetryFile().write('[]')
     } catch {
       // The events are returned anyway; a failure to clear the file means
       // they may be sent twice, which the flush must tolerate.
     }
   }
 
-  return events;
+  return events
 }
 
 /**
@@ -123,26 +123,26 @@ export async function takeBufferedEvents(): Promise<ShareIntentEvent[]> {
  */
 export async function recordShareIntent(input: {
   /** The epoch millisecond of the user's confirm tap. */
-  startedAt: number;
+  startedAt: number
   /** The channel the share went out over. */
-  channel: ShareChannel;
+  channel: ShareChannel
   /** How many recipients the share reached. */
-  recipientCount: number;
+  recipientCount: number
   /** The epoch millisecond the intent fired. Defaults to now. */
-  finishedAt?: number;
+  finishedAt?: number
 }): Promise<ShareIntentEvent> {
-  const finishedAt = input.finishedAt ?? Date.now();
-  const elapsedMs = Math.max(0, Math.round(finishedAt - input.startedAt));
+  const finishedAt = input.finishedAt ?? Date.now()
+  const elapsedMs = Math.max(0, Math.round(finishedAt - input.startedAt))
 
   const event: ShareIntentEvent = {
     elapsedMs,
     channel: input.channel,
     recipientCount: input.recipientCount,
-  };
+  }
 
-  await bufferShareIntent(event);
+  await bufferShareIntent(event)
 
-  return event;
+  return event
 }
 
 /**
@@ -153,17 +153,17 @@ export async function recordShareIntent(input: {
  * distribution is the honest number.
  */
 export function medianElapsedMs(events: ShareIntentEvent[]): number | null {
-  if (events.length === 0) return null;
+  if (events.length === 0) return null
 
-  const sorted = events.map((event) => event.elapsedMs).sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
+  const sorted = events.map((event) => event.elapsedMs).sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
 
   // An even count averages the two middle values.
   if (sorted.length % 2 === 0) {
-    const lower = sorted[middle - 1] ?? 0;
-    const upper = sorted[middle] ?? lower;
-    return Math.round((lower + upper) / 2);
+    const lower = sorted[middle - 1] ?? 0
+    const upper = sorted[middle] ?? lower
+    return Math.round((lower + upper) / 2)
   }
 
-  return sorted[middle] ?? null;
+  return sorted[middle] ?? null
 }

@@ -1,5 +1,5 @@
-import { AppError } from '@nagar-shield/shared';
-import { submitCapture, type CaptureSubmission } from './submitCapture';
+import { AppError } from '@nagar-shield/shared'
+import { submitCapture, type CaptureSubmission } from './submitCapture'
 
 /**
  * The capture submit path's **response contract**.
@@ -29,45 +29,45 @@ import { submitCapture, type CaptureSubmission } from './submitCapture';
  * So the contract is asserted here, at the seam, rather than trusted.
  */
 
-const mockSession = { access_token: 'test-token', user: { id: 'author-uuid' } };
+const mockSession = { access_token: 'test-token', user: { id: 'author-uuid' } }
 
 jest.mock('@/shared/api/supabase', () => ({
   supabase: {
     auth: { getSession: jest.fn() },
     storage: { from: jest.fn() },
   },
-}));
+}))
 
 jest.mock('./mediaPipeline', () => ({
   buildStoragePath: jest.fn(() => 'reports/token/client-request/file.png'),
   newClientRequestId: jest.fn(() => 'client-request'),
-}));
+}))
 
 jest.mock('expo-file-system', () => ({
   File: class {
     async arrayBuffer() {
-      return new ArrayBuffer(8);
+      return new ArrayBuffer(8)
     }
   },
-}));
+}))
 
-import { supabase } from '@/shared/api/supabase';
+import { supabase } from '@/shared/api/supabase'
 
 const mockedSupabase = supabase as unknown as {
-  auth: { getSession: jest.Mock };
-  storage: { from: jest.Mock };
-};
+  auth: { getSession: jest.Mock }
+  storage: { from: jest.Mock }
+}
 
 function stubSession() {
-  mockedSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession } });
+  mockedSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession } })
 }
 
 function stubUpload(ok = true) {
   mockedSupabase.storage.from.mockReturnValue({
-    upload: jest.fn().mockResolvedValue(
-      ok ? { error: null } : { error: { message: 'upload failed' } },
-    ),
-  });
+    upload: jest
+      .fn()
+      .mockResolvedValue(ok ? { error: null } : { error: { message: 'upload failed' } }),
+  })
 }
 
 /** Stubs `fetch` with one answer. */
@@ -76,7 +76,7 @@ function stubFetch(status: number, body: unknown) {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
-  }) as unknown as typeof fetch;
+  }) as unknown as typeof fetch
 }
 
 const submission: CaptureSubmission = {
@@ -97,16 +97,16 @@ const submission: CaptureSubmission = {
   description: 'a report',
   publicVisibility: 'anonymous',
   category: null,
-};
+}
 
 describe('submitCapture — the response contract', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    stubSession();
-    stubUpload();
-    process.env.EXPO_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321';
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';
-  });
+    jest.clearAllMocks()
+    stubSession()
+    stubUpload()
+    process.env.EXPO_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321'
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
+  })
 
   it('reads `report_id` — the snake_case key the function actually sends', async () => {
     stubFetch(200, {
@@ -115,12 +115,12 @@ describe('submitCapture — the response contract', () => {
         area_hierarchy: { division: 'Dhaka', city: 'Dhaka', thana: null, neighborhood: null },
         moderation_status: 'visible',
       },
-    });
+    })
 
-    const result = await submitCapture(submission);
+    const result = await submitCapture(submission)
 
-    expect(result.reportId).toBe('a-real-report-id');
-  });
+    expect(result.reportId).toBe('a-real-report-id')
+  })
 
   it('does not read a camelCase `reportId` — the function never sends one', async () => {
     // A response that carries ONLY the snake_case key must still resolve.
@@ -131,10 +131,10 @@ describe('submitCapture — the response contract', () => {
         area_hierarchy: null,
         moderation_status: 'visible',
       },
-    });
+    })
 
-    await expect(submitCapture(submission)).resolves.toBeDefined();
-  });
+    await expect(submitCapture(submission)).resolves.toBeDefined()
+  })
 
   it('maps the area hierarchy and the moderation status across', async () => {
     stubFetch(200, {
@@ -148,44 +148,44 @@ describe('submitCapture — the response contract', () => {
         },
         moderation_status: 'visible',
       },
-    });
+    })
 
-    const result = await submitCapture(submission);
+    const result = await submitCapture(submission)
 
     expect(result.areaHierarchy).toEqual({
       division: 'Dhaka',
       city: 'Dhaka',
       thana: 'Gulshan',
       neighborhood: null,
-    });
-    expect(result.moderationStatus).toBe('visible');
-  });
+    })
+    expect(result.moderationStatus).toBe('visible')
+  })
 
   it('throws INTERNAL when the response carries no report id at all', async () => {
-    stubFetch(200, { data: { area_hierarchy: null, moderation_status: 'visible' } });
+    stubFetch(200, { data: { area_hierarchy: null, moderation_status: 'visible' } })
 
-    await expect(submitCapture(submission)).rejects.toThrow(AppError);
-  });
+    await expect(submitCapture(submission)).rejects.toThrow(AppError)
+  })
 
   it('throws INTERNAL when the response has no data envelope', async () => {
-    stubFetch(200, {});
+    stubFetch(200, {})
 
-    await expect(submitCapture(submission)).rejects.toThrow(AppError);
-  });
+    await expect(submitCapture(submission)).rejects.toThrow(AppError)
+  })
 
   it('does not upload anything when there is no session', async () => {
-    mockedSupabase.auth.getSession.mockResolvedValue({ data: { session: null } });
+    mockedSupabase.auth.getSession.mockResolvedValue({ data: { session: null } })
 
-    await expect(submitCapture(submission)).rejects.toThrow(AppError);
+    await expect(submitCapture(submission)).rejects.toThrow(AppError)
 
-    expect(mockedSupabase.storage.from).not.toHaveBeenCalled();
-  });
+    expect(mockedSupabase.storage.from).not.toHaveBeenCalled()
+  })
 
   it('does not call the Edge Function when the upload fails', async () => {
-    stubUpload(false);
+    stubUpload(false)
 
-    await expect(submitCapture(submission)).rejects.toThrow(AppError);
+    await expect(submitCapture(submission)).rejects.toThrow(AppError)
 
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-});
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+})

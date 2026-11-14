@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import { alternatePhoneSchema, phoneSchema } from '@nagar-shield/shared';
-import { useTheme } from '@/shared/theme';
-import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui';
-import { Icon } from '@/shared/ui/Icon';
+import { useState } from 'react'
+import { StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import { alternatePhoneSchema, phoneSchema } from '@nagar-shield/shared'
+import { useTheme } from '@/shared/theme'
+import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui'
+import { Icon } from '@/shared/ui/Icon'
 
 /**
  * Screen 3 — S-02 Alternate Phone.
@@ -33,19 +33,19 @@ import { Icon } from '@/shared/ui/Icon';
  *      rule could be evaded.
  */
 export default function AlternatePhoneScreen() {
-  const theme = useTheme();
-  const router = useRouter();
-  const { t } = useTranslation();
+  const theme = useTheme()
+  const router = useRouter()
+  const { t } = useTranslation()
   const params = useLocalSearchParams<{
-    phone?: string;
-    email?: string;
-    password?: string;
-  }>();
+    phone?: string
+    email?: string
+    password?: string
+  }>()
 
-  const [alternatePhone, setAlternatePhone] = useState('');
-  const [error, setError] = useState<string | undefined>();
+  const [alternatePhone, setAlternatePhone] = useState('')
+  const [error, setError] = useState<string | undefined>()
 
-  const primary = params.phone ?? '';
+  const primary = params.phone ?? ''
 
   /**
    * Validates the alternate number.
@@ -55,35 +55,35 @@ export default function AlternatePhoneScreen() {
    * step is not mandatory.
    */
   const validate = (): string | null | undefined => {
-    const trimmed = alternatePhone.trim();
+    const trimmed = alternatePhone.trim()
 
     if (!trimmed) {
       // No alternate number. Not an error — the user may not have one.
-      setError(undefined);
-      return null;
+      setError(undefined)
+      return null
     }
 
-    const parsed = alternatePhoneSchema.safeParse(trimmed);
+    const parsed = alternatePhoneSchema.safeParse(trimmed)
     if (!parsed.success) {
-      setError(t('errors.validationFailed'));
-      return undefined;
+      setError(t('errors.validationFailed'))
+      return undefined
     }
 
     // The primary arrives normalised from `phone.tsx`, but normalising it
     // again costs nothing and makes this screen correct on its own terms.
-    const parsedPrimary = phoneSchema.safeParse(primary);
+    const parsedPrimary = phoneSchema.safeParse(primary)
     if (parsedPrimary.success && parsed.data === parsedPrimary.data) {
-      setError(t('errors.alternatePhoneSameAsPrimary'));
-      return undefined;
+      setError(t('errors.alternatePhoneSameAsPrimary'))
+      return undefined
     }
 
-    setError(undefined);
-    return parsed.data;
-  };
+    setError(undefined)
+    return parsed.data
+  }
 
   const onContinue = () => {
-    const validated = validate();
-    if (validated === undefined) return;
+    const validated = validate()
+    if (validated === undefined) return
 
     router.push({
       pathname: '/(auth)/register',
@@ -94,8 +94,8 @@ export default function AlternatePhoneScreen() {
         // Empty means "no alternate phone" — the register screen stores NULL.
         alternatePhone: validated ?? '',
       },
-    });
-  };
+    })
+  }
 
   return (
     <WizardScreen
@@ -106,12 +106,7 @@ export default function AlternatePhoneScreen() {
       subtitle={t('auth.alternatePhoneSubtitle')}
       footer={
         <>
-          <Button
-            label={t('common.continue')}
-            variant="primary"
-            size="lg"
-            onPress={onContinue}
-          />
+          <Button label={t('common.continue')} variant="primary" size="lg" onPress={onContinue} />
           <EscapeLink label={t('common.back')} onPress={() => router.back()} />
         </>
       }
@@ -120,10 +115,10 @@ export default function AlternatePhoneScreen() {
         label={t('auth.alternatePhoneLabel')}
         value={alternatePhone}
         onChangeText={(next) => {
-          setAlternatePhone(next);
+          setAlternatePhone(next)
           // Clear a stale error as soon as the user edits the field, so the
           // message does not describe the previous input.
-          if (error) setError(undefined);
+          if (error) setError(undefined)
         }}
         placeholder={t('auth.phonePlaceholder')}
         keyboardType="phone-pad"
@@ -141,7 +136,7 @@ export default function AlternatePhoneScreen() {
         </Text>
       </View>
     </WizardScreen>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -156,4 +151,4 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
-});
+})
