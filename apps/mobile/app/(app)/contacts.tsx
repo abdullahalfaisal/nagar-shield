@@ -12,6 +12,7 @@ import {
   useInvalidateContacts,
 } from '@/shared/api/contacts';
 import { fromSupabaseError } from '@/shared/api/errors';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 20 — Emergency Contacts.
@@ -85,7 +86,7 @@ export default function ContactsScreen() {
         await invalidate();
       } catch (error) {
         const appError = error instanceof AppError ? error : fromSupabaseError(error);
-        Alert.alert(t('common.error'), t(`errors.${appError.code.toLowerCase()}`));
+        Alert.alert(t('common.error'), errorCopy(t, appError.code));
       } finally {
         setBusyId(null);
       }
@@ -114,7 +115,7 @@ export default function ContactsScreen() {
               await invalidate();
             } catch (error) {
               const appError = error instanceof AppError ? error : fromSupabaseError(error);
-              Alert.alert(t('common.error'), t(`errors.${appError.code.toLowerCase()}`));
+              Alert.alert(t('common.error'), errorCopy(t, appError.code));
             } finally {
               setBusyId(null);
             }

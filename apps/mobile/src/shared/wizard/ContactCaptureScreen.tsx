@@ -15,6 +15,7 @@ import {
   useInvalidateContacts,
 } from '@/shared/api/contacts';
 import { fromSupabaseError } from '@/shared/api/errors';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * The three onboarding contact steps — S-04a, S-04b and S-04c.
@@ -216,7 +217,7 @@ export function ContactCaptureScreen({
         setErrors({ phone: t('errors.validationFailed') });
         setFormError(undefined);
       } else {
-        setFormError(t(`errors.${appError.code.toLowerCase()}`));
+        setFormError(errorCopy(t, appError.code));
       }
 
       setSubmitting(false);

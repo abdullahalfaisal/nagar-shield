@@ -6,7 +6,7 @@
 > The Status column is derived from each story file's `implemented`
 > frontmatter, which is the authoritative source.
 >
-> **31 complete · 22 partial · 1 planned.** The index is reconciled against the
+> **36 complete · 17 partial · 1 planned.** The index is reconciled against the
 > story files on disk: 54 files, 54 rows, no duplicates, no orphans.
 >
 > **`partial`** means the feature ships and works, but at least one acceptance
@@ -57,12 +57,12 @@
 | 007-history-filters | History filters | 006-alerts | 020-alerts | must | complete |
 | 008-history-map | History map | 006-alerts | 021-alerts | should | complete |
 | 009-alert-detail-screen | Alert detail screen | 006-alerts | 021-alerts | must | complete |
-| 001-moderator-login-and-queue | Moderator login + queue | 007-moderation | 022-moderation | must | partial |
-| 002-report-review-detail | Report review detail | 007-moderation | 022-moderation | must | partial |
-| 003-restore-remove-decision | Restore / remove decision | 007-moderation | 023-moderation | must | partial |
-| 004-disable-a-user | Disable a user | 007-moderation | 023-moderation | must | partial |
+| 001-moderator-login-and-queue | Moderator login + queue | 007-moderation | 022-moderation | must | complete |
+| 002-report-review-detail | Report review detail | 007-moderation | 022-moderation | must | complete |
+| 003-restore-remove-decision | Restore / remove decision | 007-moderation | 023-moderation | must | complete |
+| 004-disable-a-user | Disable a user | 007-moderation | 023-moderation | must | complete |
 | 005-author-auto-hide-queue | Author-auto-hidden queue group | 007-moderation | 024-moderation | should | complete |
-| 006-moderator-action-audit-log | Moderator action audit log | 007-moderation | 024-moderation | must | partial |
+| 006-moderator-action-audit-log | Moderator action audit log | 007-moderation | 024-moderation | must | complete |
 | 001-media-purge-job | Media purge job (90-day) | 008-jobs-operations | 025-jobs-operations | must | complete |
 | 002-deleted-account-pii-purge | Deleted-account PII purge (30-day) | 008-jobs-operations | 025-jobs-operations | must | complete |
 | 003-geocode-cache-cleanup | Geocode cache cleanup | 008-jobs-operations | 025-jobs-operations | should | complete |

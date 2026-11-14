@@ -11,6 +11,7 @@ import {
   sendPasswordResetOtp,
   stagePasswordReset,
 } from '@/shared/auth/passwordResetService';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 13b — the reset-code entry step.
@@ -180,7 +181,7 @@ export default function VerifyOtpScreen() {
     } catch (error) {
       const appError = error instanceof AppError ? error : null;
       setFormError(
-        appError ? t(`errors.${appError.code.toLowerCase()}`) : t('errors.internal'),
+        appError ? errorCopy(t, appError.code) : t('errors.internal'),
       );
     } finally {
       setSending(false);

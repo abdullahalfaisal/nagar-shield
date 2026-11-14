@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/shared/theme';
@@ -12,7 +12,7 @@ import {
   Screen,
   type AreaChip,
 } from '@/shared/ui';
-import { useAlerts } from '@/shared/api/alerts';
+import { alertsItems, useAlerts } from '@/shared/api/alerts';
 import { useRefreshGuard } from '@/shared/services/refreshGuard';
 import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime';
 
@@ -42,9 +42,21 @@ export default function AlertsScreen() {
 
   // The polling interval is the shared 60 s, and it only runs while the guard
   // says the refresh may run.
-  const { data, isLoading, isRefetching, refetch } = useAlerts(chip.value ?? {}, {
+  const {
+    data,
+    isLoading,
+    isRefetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAlerts(chip.value ?? {}, {
     enabled: !guard.isPaused,
   });
+
+  // The feed is cursor-paginated, so the rows are **every loaded page**
+  // flattened — not the first page alone.
+  const items = alertsItems(data);
 
   const chips: AreaChip[] = useMemo(
     () => [
@@ -88,18 +100,36 @@ export default function AlertsScreen() {
 
         {isLoading ? (
           <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>{t('common.loading')}</Text>
-        ) : data && data.items.length > 0 ? (
-          data.items.map((report) => (
-            <AlertCard
-              key={report.id}
-              report={report}
-              relativeTime={formatRelativeTimeForLocale(report.capturedAt, i18n.language)}
-              onPress={() =>
-                router.push({ pathname: '/(app)/alert-detail', params: { id: report.id } })
-              }
-              onFlag={() => setFlagTarget(report.id)}
-            />
-          ))
+        ) : items.length > 0 ? (
+          <>
+            {items.map((report) => (
+              <AlertCard
+                key={report.id}
+                report={report}
+                relativeTime={formatRelativeTimeForLocale(report.capturedAt, i18n.language)}
+                onPress={() =>
+                  router.push({ pathname: '/(app)/alert-detail', params: { id: report.id } })
+                }
+                onFlag={() => setFlagTarget(report.id)}
+              />
+            ))}
+
+            {/* The feed is paginated — the next page is reachable, not
+                truncated away. */}
+            {hasNextPage ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('alerts.loadMore')}
+                disabled={isFetchingNextPage}
+                onPress={() => void fetchNextPage()}
+                style={[styles.loadMore, { borderColor: theme.colors.ink[200] }]}
+              >
+                <Text style={[styles.loadMoreText, { color: theme.palette.violet[600] }]}>
+                  {isFetchingNextPage ? t('common.loading') : t('alerts.loadMore')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
         ) : (
           <EmptyState
             icon="notifications_off"
@@ -152,5 +182,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 24,
     fontSize: 13,
+  },
+  loadMore: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

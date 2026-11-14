@@ -10,6 +10,7 @@ import { logIn } from '@/shared/auth/authService';
 import { markPasswordSignIn } from '@/shared/auth/useBiometricGate';
 import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService';
 import { fromSupabaseError } from '@/shared/api/errors';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 11 — Login.
@@ -58,9 +59,9 @@ export default function LoginScreen() {
     } catch (error) {
       const appError = error instanceof AppError ? error : fromSupabaseError(error);
       setErrors({
-        password: t(`errors.${appError.code.toLowerCase()}`),
+        password: errorCopy(t, appError.code),
       });
-      setFormError(t(`errors.${appError.code.toLowerCase()}`));
+      setFormError(errorCopy(t, appError.code));
       setSubmitting(false);
     }
   };

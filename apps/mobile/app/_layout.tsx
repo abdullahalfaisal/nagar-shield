@@ -9,6 +9,8 @@ import { ThemeProvider, useTheme } from '@/shared/theme';
 import { appFonts } from '@/shared/theme/fonts';
 import { loadStoredLocale } from '@/shared/i18n';
 import '@/shared/i18n';
+import { isSupabaseConfigured } from '@/shared/api/supabase';
+import { ConfigErrorView } from '@/shared/ui/ConfigErrorView';
 
 /**
  * Root layout. Owns the font loading gate, the theme provider, the query
@@ -44,6 +46,24 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) {
     return null;
+  }
+
+  // A build without its Supabase credentials cannot reach the API. The
+  // Supabase module used to throw at import time, which crashed the app on
+  // every route before a single screen rendered. The failure is now
+  // **localised**: the app boots and shows the explanation instead.
+  if (!isSupabaseConfigured) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+              <ConfigErrorView />
+            </ThemeProvider>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
   }
 
   return (

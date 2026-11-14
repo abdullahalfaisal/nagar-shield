@@ -1,4 +1,8 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  type UseInfiniteQueryResult,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { ALERTS_REFRESH_INTERVAL_MS } from '@nagar-shield/shared';
 import type {
   AreaFilter,
@@ -22,9 +26,18 @@ import { fromSupabaseError } from '@/shared/api/errors';
  * the projection level, not nulled.
  */
 export interface AlertsQuery extends AreaFilter {
-  cursor?: string | null;
   limit?: number;
 }
+
+/**
+ * The **area filter** half of the query — the part that identifies the feed.
+ *
+ * The cursor is deliberately **not** part of it. The cursor is the page
+ * parameter of the infinite query, not a filter: including it in the query
+ * key would make every page its own query, and the feed would reset to page
+ * one on every request.
+ */
+export type AlertsFilter = AreaFilter;
 
 /** The shape the RPC returns for one feed row. */
 interface FeedRow {
@@ -69,13 +82,16 @@ function toPublicReport(row: FeedRow): PublicReport {
   };
 }
 
-export async function fetchAlerts(query: AlertsQuery): Promise<Paginated<PublicReport>> {
+export async function fetchAlerts(
+  query: AlertsQuery,
+  cursor: string | null = null,
+): Promise<Paginated<PublicReport>> {
   const { data, error } = await supabase.rpc('alerts_feed', {
     p_division: query.division ?? null,
     p_city: query.city ?? null,
     p_thana: query.thana ?? null,
     p_neighborhood: query.neighborhood ?? null,
-    p_cursor: query.cursor ?? null,
+    p_cursor: cursor,
     p_limit: query.limit ?? 20,
   });
 
@@ -87,16 +103,47 @@ export async function fetchAlerts(query: AlertsQuery): Promise<Paginated<PublicR
   return { items, nextCursor: envelope.next_cursor ?? null };
 }
 
+/** The accumulated feed: every page, in order, flattened. */
+export type AlertsFeedData = InfiniteData<Paginated<PublicReport>, string | null>;
+
+/**
+ * The Alerts feed query.
+ *
+ * The feed is **cursor-paginated** (`alerts_feed` orders by
+ * `captured_at DESC, id DESC` and hands back a `next_cursor`). It is read
+ * through `useInfiniteQuery` so that page two is reachable: the previous
+ * `useQuery` received the `next_cursor` and **discarded it**, so a feed longer
+ * than one page silently truncated at the limit and the user could never scroll
+ * further.
+ *
+ * The **cursor is the page parameter**, not part of the query key. The key
+ * carries the area filter alone, so changing the chip starts a new feed at
+ * page one while scrolling forward appends to the accumulated pages.
+ */
 export function useAlerts(
-  query: AlertsQuery,
+  query: AlertsFilter,
   options?: { enabled?: boolean },
-): UseQueryResult<Paginated<PublicReport>, Error> {
-  return useQuery({
+): UseInfiniteQueryResult<AlertsFeedData, Error> {
+  return useInfiniteQuery({
     queryKey: ['alerts', query],
-    queryFn: () => fetchAlerts(query),
+    queryFn: ({ pageParam }) => fetchAlerts(query, pageParam ?? null),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: options?.enabled ?? true,
     // Auto-refresh every 60 s in the foreground (FR-ALERTS-2).
     refetchInterval: ALERTS_REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });
+}
+
+/**
+ * The feed's rows, flattened across every loaded page.
+ *
+ * This is the **only** way the screens read the feed. A screen that read
+ * `data.pages[0].items` would be back to showing one page, so the flattening
+ * lives here and is the shape the screens consume.
+ */
+export function alertsItems(data: AlertsFeedData | undefined): PublicReport[] {
+  if (!data) return [];
+  return data.pages.flatMap((page) => page.items);
 }

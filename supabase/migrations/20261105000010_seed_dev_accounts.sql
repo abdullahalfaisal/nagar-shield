@@ -64,7 +64,7 @@ values
     crypt('nagar-local-dev', gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}',
-    '{"phone":"+8801711000001","full_name":"Local Citizen"}',
+    '{"phone":"+8801911000001","full_name":"Local Citizen"}',
     now(),
     now(),
     '',
@@ -106,7 +106,7 @@ values
     crypt('nagar-local-dev', gen_salt('bf')),
     now(),
     '{"provider":"email","providers":["email"]}',
-    '{"phone":"+8801711000003","full_name":"Second Citizen"}',
+    '{"phone":"+8801911000003","full_name":"Second Citizen"}',
     now(),
     now(),
     '',
@@ -126,6 +126,18 @@ on conflict (id) do nothing;
 --
 -- `auth.users.encrypted_password` uses the bcrypt variant GoTrue expects, so
 -- the seeded accounts can sign in through the normal password path.
+--
+-- **The `phone` in the auth metadata and the `phone` in the profile MUST
+-- agree.** The trigger reads `raw_user_meta_data->>'phone'` to populate
+-- `profiles.phone`, so for a real signup the metadata *is* the source of
+-- truth — and a seeded account whose metadata disagrees with its profile
+-- describes a user that could never exist. The two citizens' metadata
+-- carried `+8801711000001` / `+8801711000003` while their profiles carried
+-- `+8801911000001` / `+8801911000003`; the `...191...` form is the one the
+-- moderator and every other seeded account uses, so the metadata was the
+-- typo. `tools/probe-moderation-console.cjs` reads the profile phone, so the
+-- disagreement was invisible until the probe asked Auth and the database the
+-- same question and got two answers.
 
 insert into public.profiles (id, email, phone, full_name, role)
 values

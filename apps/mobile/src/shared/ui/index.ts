@@ -4,6 +4,7 @@ export { AreaChipRow, type AreaChip } from './AreaChipRow';
 export { BottomSheet } from './BottomSheet';
 export { Button, type ButtonVariant, type ButtonSize } from './Button';
 export { Card, HelpCard, HELP_CARD_VARIANTS, type HelpCardVariant } from './Card';
+export { ConfigErrorView } from './ConfigErrorView';
 export {
   ContactAvatar,
   PrimaryStar,

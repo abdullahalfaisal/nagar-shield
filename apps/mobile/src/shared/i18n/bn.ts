@@ -315,6 +315,7 @@ export const bn = {
     noHistorySub: 'রেডিয়াস বা সময় বাড়িয়ে আবার দেখুন।',
     mapComingSoon: 'বিস্তারিত ম্যাপ শীঘ্রই আসছে',
     autoRefresh: 'অটো-রিফ্রেশ প্রতি ৬০ সেকেন্ড',
+    loadMore: 'আরও অ্যালার্ট দেখুন',
     pausedBattery: 'ব্যাটারি কম — রিফ্রেশ বন্ধ',
     pausedOffline: 'ইন্টারনেট নেই',
     pausedBackground: 'অ্যাপ ব্যাকগ্রাউন্ডে',
@@ -389,8 +390,20 @@ export const bn = {
     distributionNote: 'শুধু সংখ্যা — কোনো চার্ট বা হিটম্যাপ নেই।',
     viewOnMap: 'ম্যাপে দেখুন',
   },
+  config: {
+    // The build is missing its Supabase credentials. This is a **build**
+    // fault, not a user error — the copy says so plainly, and it does not
+    // blame the person holding the phone.
+    title: 'অ্যাপটি ঠিকভাবে সেট হয়নি',
+    message: 'এই বিল্ডে সার্ভারের সেটিংস নেই, তাই সেবার সাথে যোগাযোগ করা যাচ্ছে না। অ্যাপটি আপডেট করুন।',
+    detail: 'এটি বারবার দেখা গেলে অ্যাপটি পুনরায় ইনস্টল বা আপডেট করতে হবে।',
+  },
   disabled: {
     title: 'অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে',
+    // FR-AUTH-7 names this exact string. It is a **fixed** message — it never
+    // embeds the moderator's reason, the disabling timestamp, or any
+    // identifier — and it points the user at the support path.
+    message: 'আপনার অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে। সাপোর্টে যোগাযোগ করুন।',
     subtitle: 'এই অ্যাকাউন্টটি নিষ্ক্রিয় করা হয়েছে, তাই এখন আর রিপোর্ট পাঠানো বা অবস্থান শেয়ার করা যাবে না।',
     whatYouCanDo: 'যা করতে পারেন',
     deleteTitle: 'অ্যাকাউন্ট মুছে ফেলুন',

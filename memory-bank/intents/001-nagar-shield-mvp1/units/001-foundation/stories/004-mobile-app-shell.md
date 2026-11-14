@@ -92,37 +92,25 @@ implemented: partial
 
 ## Implementation
 
-**The router groups, the i18n runtime, the Supabase client, and the theme provider all ship. The story is not `complete` because the startup guards it names were never built — and one of them is a live defect.**
+**The router groups, the i18n runtime, the Supabase client, and the theme provider all ship. The story is not `complete` because the startup guards it names were never built — the live defect among them is now fixed, and the rest are missing proofs.**
 
 ### What ships
 
 - The router groups exist: `apps/mobile/app/(auth)/` holds `welcome`, `login`, `register`, `phone`, `alternate-phone`, `contact-1..3`, `verify-otp`, `forgot-password`, `reset-password`, `biometric-gate`, `location-permission`, `account-deleted`, `account-disabled`; `apps/mobile/app/(app)/` holds `home`, `alerts`, `alert-detail`, `capture`, `contacts`, `contact-editor`, `history`, `history-map`, `help-alert`, `more-help`, `station-map`, `thana-line`, `report-detail`, `location-sharing`, `more`, `settings`. Both have a `_layout.tsx`.
 - The i18n runtime resolves `en` and `bn` from `apps/mobile/src/shared/i18n/index.ts`.
 - The theme provider and the Supabase client are wired into the tree.
+- **The configuration error is a screen, not a crash.** `apps/mobile/src/shared/api/supabase.ts` no longer throws at module scope; it exports `isSupabaseConfigured`, and `apps/mobile/app/_layout.tsx` renders `apps/mobile/src/shared/ui/ConfigErrorView.tsx` when the build is unconfigured. The copy explains what happened and what to do, in **both** bundles, and it does **not** blame the person holding the phone or leak the environment variable names. A call that somehow gets through fails with a clear message rather than a `TypeError` about a missing method.
 
 ### The gaps
 
-- **The Supabase client throws at module load instead of showing a localized configuration error.** `apps/mobile/src/shared/api/supabase.ts:21-27`:
+- **No boot test.** Nothing asserts that the app's **root** renders the router groups without throwing. `apps/mobile/src/shared/api/supabase.test.ts` (**10 tests**) proves the module imports cleanly under missing, half-present and fully-present credentials, and that the configuration-error copy exists in both bundles — but it does **not** mount `app/_layout.tsx` and assert the two branches it renders.
 
-  ```ts
-  if (!supabaseUrl || !supabaseAnonKey) {
-    // Fail loudly at startup rather than at the first network call.
-    throw new Error(
-      'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.',
-    );
-  }
-  ```
+- **Session tokens fall back to AsyncStorage.** `apps/mobile/src/shared/api/supabase.ts` falls back to AsyncStorage when a value exceeds SecureStore's 2048-byte limit. The story treats SecureStore as the session store; the fallback means a refresh token can land in unencrypted storage on Android with no test pinning the behaviour or the size threshold.
 
-  The story's contract is a *screen*, not a crash. On a device with a missing or malformed `app.json` extra, the app dies with a raw English stack message instead of the localized configuration error the story names. This is a **live user-facing defect**, not a missing test.
-
-- **Session tokens fall back to AsyncStorage.** `apps/mobile/src/shared/api/supabase.ts:32-54` falls back to AsyncStorage when a value exceeds SecureStore's 2048-byte limit. The story treats SecureStore as the session store; the fallback means a refresh token can land in unencrypted storage on Android with no test pinning the behaviour or the size threshold.
-
-- **No i18n key-parity gate.** See story `003-mobile-design-system` — nothing asserts `en` and `bn` carry the same keys, so the shell's copy can drift between the two languages without any gate noticing.
-
-- **No boot test.** Nothing asserts that the app's entry point renders the router groups without throwing, which is why the module-load throw above was able to ship.
+- **No i18n key-parity gate.** See story `003-mobile-design-system` — nothing asserts `en` and `bn` carry the same keys, so the shell's copy can drift between the two languages without any gate noticing. The new `config` section ships in both bundles, but nothing *keeps* them in step.
 
 ### What closing this needs
 
-1. The Supabase client to return a *localized configuration error state* instead of throwing at module scope — a boot screen that explains the misconfiguration in the user's language.
-2. A boot test that mounts the app root and asserts it renders.
-3. A decision on the AsyncStorage fallback, recorded either way: either the refresh token is sized to fit SecureStore, or the fallback is documented and tested.
+1. A boot test that mounts the app root and asserts it renders — and, for an unconfigured build, asserts it renders the configuration screen rather than crashing.
+2. A decision on the AsyncStorage fallback, recorded either way: either the refresh token is sized to fit SecureStore, or the fallback is documented and tested.
+

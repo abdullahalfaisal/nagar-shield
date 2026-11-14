@@ -709,4 +709,107 @@ $$;
 select 'Test 8d: a whitespace-only note is rejected' as test,
        (select count(*) from public.moderation_actions where note = '   ') = 0 as passed;
 
+-- =============================================================================
+-- Test 9 — moderation_audit_feed
+--
+-- Story `007-moderation / 006-moderator-action-audit-log`, criterion 10:
+--
+--   > "Given the trail renders a row, When its payload is inspected, Then it
+--   > contains **no raw GPS coordinates and no media payloads** — it references
+--   > report ids, user ids, the decision, the note, and the timestamp, and
+--   > never the report's `lat` / `lng`, description, or media"
+--
+-- The rule was stated in the migration's comment and honoured by the query,
+-- but **nothing asserted it**. A later column addition — a `description`, a
+-- `lat` — would widen the payload silently, and the trail would start
+-- duplicating report contents. This test pins the **exact** key set: not
+-- "does not contain lat", but "contains these nine keys and no others".
+-- -----------------------------------------------------------------------------
+
+-- A CITIZEN calling the audit feed gets FORBIDDEN.
+do $$
+begin
+  begin
+    perform pg_temp.exec_as_user(
+      '11111111-1111-1111-1111-111111111102',
+      $q$select public.moderation_audit_feed(null, 20)$q$
+    );
+    raise exception 'a citizen should have been forbidden';
+  exception when others then
+    if sqlerrm not like '%FORBIDDEN%' then
+      raise;
+    end if;
+  end;
+end
+$$;
+
+select 'Test 9a: a citizen calling moderation_audit_feed gets FORBIDDEN' as test,
+       true as passed;
+
+-- A MODERATOR gets the trail.
+select pg_temp.as_user(
+  '11111111-1111-1111-1111-111111111105',
+  $$select public.moderation_audit_feed(null, 20)$$
+) as audit \gset
+
+-- The exact key set. Nine keys — no more, no fewer.
+--
+-- The comparison is on the **sorted key array**, so a renamed key fails, a
+-- dropped key fails, and an added key fails. `?&` (contains-all) would only
+-- catch a dropped key; `<@` (contained-by) would only catch an added one.
+-- Both together are the exact set.
+select 'Test 9b: the audit payload carries exactly the specified keys' as test,
+       (
+         select array_agg(k order by k) = array[
+           'created_at', 'decision', 'id', 'moderator_display_name', 'moderator_id',
+           'note', 'report_id', 'target_user_id'
+         ]::text[]
+         from (
+           select jsonb_object_keys((:'audit'::jsonb -> 'items' -> 0)) as k
+         ) keys
+       ) as passed;
+
+-- The payload carries no report contents: no coordinates, no description, no
+-- media, and no area hierarchy.
+select 'Test 9c: the audit payload carries no report contents' as test,
+       not exists (
+         select 1
+         from jsonb_object_keys((:'audit'::jsonb -> 'items' -> 0)) as k
+         where k in (
+           'lat', 'lng', 'latitude', 'longitude', 'description', 'media',
+           'area_hierarchy', 'public_visibility', 'storage_path'
+         )
+       ) as passed;
+
+-- The note is carried **as written** — trimmed, but never redacted,
+-- summarised, or truncated.
+select 'Test 9d: the note is carried as written' as test,
+       exists (
+         select 1
+         from jsonb_array_elements(:'audit'::jsonb -> 'items') item
+         where item ->> 'note' = 'Restore test'
+       ) as passed;
+
+-- The trail is newest-first.
+select 'Test 9e: the trail is newest-first' as test,
+       not exists (
+         select 1
+         from (
+           select
+             (item ->> 'created_at')::timestamptz as ts,
+             row_number() over (order by (item ->> 'created_at')::timestamptz desc) as rn
+           from jsonb_array_elements(:'audit'::jsonb -> 'items') item
+         ) ordered
+         where ordered.rn > 1 and ordered.ts > (
+           select (prev_item ->> 'created_at')::timestamptz
+           from jsonb_array_elements(:'audit'::jsonb -> 'items') prev_item
+           where (prev_item ->> 'id') = (
+             select (item ->> 'id')
+             from jsonb_array_elements(:'audit'::jsonb -> 'items') item
+             where (item ->> 'created_at')::timestamptz = ordered.ts
+             limit 1
+           )
+         )
+       ) as passed;
+
 rollback;

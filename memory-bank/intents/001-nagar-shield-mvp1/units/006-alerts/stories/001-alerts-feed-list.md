@@ -94,27 +94,27 @@ implemented: partial
 
 ## Implementation
 
-**The alerts feed ships, renders, and refreshes. The story is not `complete` because pagination is unreachable — the server returns a cursor the client never follows.**
+**The alerts feed ships, renders, refreshes and now paginates. The story is still not `complete`: the pagination and the uncategorized placeholder are fixed, and the remaining gaps are guards.**
 
 ### What ships
 
-- The feed screen exists at `apps/mobile/app/(app)/alerts.tsx` and reads through `useAlerts` (`alerts.tsx:45`).
-- The API layer is real: `apps/mobile/src/shared/api/alerts.ts` defines the envelope with `next_cursor` (`alerts.ts:43`), maps it to `nextCursor` (`alerts.ts:87`), and runs a `useQuery` with `refetchInterval: ALERTS_REFRESH_INTERVAL_MS` and `refetchIntervalInBackground: false` (`alerts.ts:94-100`).
+- The feed screen exists at `apps/mobile/app/(app)/alerts.tsx` and reads through `useAlerts`.
+- The API layer is real: `apps/mobile/src/shared/api/alerts.ts` defines the envelope with `next_cursor`, maps it to `nextCursor`, and runs a **`useInfiniteQuery`** with `refetchInterval: ALERTS_REFRESH_INTERVAL_MS` and `refetchIntervalInBackground: false`. The **cursor is the page parameter** (`initialPageParam` / `getNextPageParam`) and the **area filter alone** is in the query key.
+- `alertsItems(data)` flattens the pages and is the **only** way the screens read the feed — a screen that read `data.pages[0].items` would be back to one page. Both `alerts.tsx` and `home.tsx` use it.
+- The Alerts screen grew a **"load more"** control (`alerts.loadMore`), disabled while the next page is in flight.
 - The alerts table is served by a cursor-paginated RPC, and the public read path is proven live: `tools/probe-public-alert.cjs` reports **14/14** assertions.
 - An alert detail screen exists at `apps/mobile/app/(app)/alert-detail.tsx`.
 
 ### The gaps
 
-- **Page 2 is unreachable.** `alerts.ts:94` uses `useQuery`, not `useInfiniteQuery`. The hook computes `nextCursor` (`alerts.ts:87`) and returns it — and then **nothing consumes it**. The feed therefore always shows the first page and the cursor the server hands back is discarded. A citizen with more alerts than fit in one page simply never sees the rest, and the UI has no "load more" affordance because there is no second page to load.
+- **No test on the feed's *rendering*.** The pagination is now covered by `apps/mobile/src/shared/api/alerts.dom.test.ts` (**12 tests**: the envelope, the cursor round-trip, the flattened items, and the query key's shape). What is **not** covered is the card itself: nothing asserts the prototype's box model, the pulsing dot, the single chip row, or the relative-time rendering. The story's own Testing note asks for a screenshot comparison against the prototype; that does not exist.
 
-  This is the same class of defect the moderation stories hit: the pagination contract is implemented on the server and the client stops one step short of using it.
+- **The alert card renders a placeholder for an uncategorized alert.** `apps/mobile/src/shared/ui/AlertCard.tsx` renders the string `'—'` rather than the localized "uncategorized" copy. The bundle has the right copy; the card does not use it.
 
-- **No test on the feed's pagination.** Nothing asserts that a `next_cursor` in the response leads to a second request.
-
-- **The alert card renders a placeholder for an uncategorized alert.** `apps/mobile/src/shared/ui/AlertCard.tsx:42-44` renders the string `'—'` rather than the localized "uncategorized" copy. The bundle has the right copy; the card does not use it.
+- **The offline behaviour is not implemented.** The story says *"when the network is down the feed renders the last cached page with an offline indication; it never blanks the list."* The query does cache, so the last page survives a refetch failure — but there is **no offline indication** on the feed, and a cold start with no network renders an empty feed rather than a cached one.
 
 ### What closing this needs
 
-1. `useAlerts` to use `useInfiniteQuery` and pass `nextCursor` as the cursor for the next page, with a "load more" affordance on the feed.
-2. A test asserting that a feed response carrying `next_cursor` triggers a second request with that cursor — the guard that makes page 2 reachable rather than merely possible.
-3. `AlertCard.tsx` to render the localized uncategorized label instead of `'—''.
+1. `AlertCard.tsx` to render the localized uncategorized label instead of `'—'`.
+2. A test on the card's rendering — the box model, the accent map's single source, the uncategorized placeholder, the empty-description gap, and the Bangla / English pair.
+3. An offline indication on the feed when the query is in an error state and a cached page exists.

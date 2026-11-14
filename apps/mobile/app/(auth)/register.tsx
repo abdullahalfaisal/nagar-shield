@@ -8,6 +8,7 @@ import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui';
 import { signUp } from '@/shared/auth/authService';
 import { setAlternatePhone } from '@/shared/api/profile';
 import { fromSupabaseError } from '@/shared/api/errors';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 12 — Registration.
@@ -107,7 +108,7 @@ export default function RegisterScreen() {
         }));
         setFormError(undefined);
       } else {
-        setFormError(t(`errors.${appError.code.toLowerCase()}`));
+        setFormError(errorCopy(t, appError.code));
       }
 
       setSubmitting(false);

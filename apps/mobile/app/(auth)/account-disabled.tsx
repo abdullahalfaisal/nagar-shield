@@ -70,7 +70,7 @@ export default function AccountDisabledScreen() {
     <WizardScreen
       eyebrow={t('errors.authDisabled')}
       title={t('disabled.title')}
-      subtitle={t('disabled.subtitle')}
+      subtitle={t('disabled.message')}
       footer={
         <>
           <Button

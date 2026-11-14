@@ -6,6 +6,7 @@ import { AppError } from '@nagar-shield/shared';
 import { useTheme } from '@/shared/theme';
 import { AppBar, Button, InputField } from '@/shared/ui';
 import { sendPasswordResetOtp, stagePasswordReset } from '@/shared/auth/passwordResetService';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 13 — Forgot Password.
@@ -69,7 +70,7 @@ export default function ForgotPasswordScreen() {
     } catch (error) {
       const appError = error instanceof AppError ? error : null;
       setFormError(
-        appError ? t(`errors.${appError.code.toLowerCase()}`) : t('errors.internal'),
+        appError ? errorCopy(t, appError.code) : t('errors.internal'),
       );
     } finally {
       setSubmitting(false);

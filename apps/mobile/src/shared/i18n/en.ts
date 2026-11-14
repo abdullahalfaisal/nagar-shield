@@ -322,6 +322,7 @@ export const en: TranslationSchema = {
     noHistorySub: 'Try widening the radius or the time window.',
     mapComingSoon: 'Detailed map coming soon',
     autoRefresh: 'Auto-refreshes every 60s',
+    loadMore: 'Load more alerts',
     pausedBattery: 'Low battery — refresh paused',
     pausedOffline: 'You are offline',
     pausedBackground: 'The app is in the background',
@@ -397,8 +398,20 @@ export const en: TranslationSchema = {
     distributionNote: 'Counts only — no charts and no heatmaps.',
     viewOnMap: 'View on map',
   },
+  config: {
+    // The build is missing its Supabase credentials. This is a **build**
+    // fault, not a user error — the copy says so plainly, and it does not
+    // blame the person holding the phone.
+    title: 'App not set up correctly',
+    message: 'This build is missing its server settings, so it cannot reach the service. Please update the app.',
+    detail: 'If you keep seeing this, the app needs to be reinstalled or updated.',
+  },
   disabled: {
     title: 'Account disabled',
+    // FR-AUTH-7 names this exact string. It is a **fixed** message — it never
+    // embeds the moderator's reason, the disabling timestamp, or any
+    // identifier — and it points the user at the support path.
+    message: 'Your account has been disabled. Contact support.',
     subtitle: 'This account has been disabled, so it can no longer send reports or share your location.',
     whatYouCanDo: 'What you can still do',
     deleteTitle: 'Delete your account',

@@ -14,6 +14,7 @@ import {
   takePendingReset,
   verifyPasswordResetOtp,
 } from '@/shared/auth/passwordResetService';
+import { errorCopy } from '@/shared/i18n/errorCopy';
 
 /**
  * Screen 13c — the new-password step.
@@ -166,7 +167,7 @@ export default function ResetPasswordScreen() {
       }
 
       setFormError(
-        appError ? t(`errors.${appError.code.toLowerCase()}`) : t('errors.internal'),
+        appError ? errorCopy(t, appError.code) : t('errors.internal'),
       );
     } finally {
       setSubmitting(false);

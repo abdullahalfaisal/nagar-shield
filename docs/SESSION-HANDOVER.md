@@ -5,6 +5,7 @@
 >
 > Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
+> Gate: `pnpm verify` → **0** · 626 unit tests · 462 SQL assertions · 37/37 console probes
 
 ---
 
@@ -13,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 31 `complete`, 22
+**The stories are now counted three ways, not two: 36 `complete`, 17
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -45,6 +46,13 @@ anonymous report, a missing polymorphic integrity trigger, and a `status`
 vocabulary that did not match the story — all fixed by forward-only migrations
 031–033. See §4.3.
 
+**The three mobile-side defects are closed.** The feed silently truncated at one page
+(the client received `next_cursor` and discarded it), the login screen showed the
+literal word *"undefined"* instead of an error message (a hand-built i18n key at
+**ten** call sites), and a missing build setting **crashed the whole app** at import
+time. Each is fixed, each has a test, and each fix was proved by a **causal check**
+that failed when the defect was put back. See §3 M1.
+
 **One pre-existing quirk worth knowing.** After `pnpm db:reset`, the
 `alerts_feed` read model returns **zero items** — the seeded reports fall
 outside the feed's own window. This is not a regression: it reproduces on
@@ -64,7 +72,7 @@ Every command below was run green against the local Supabase stack.
 | Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **84 unit tests** |
 | Database | **36 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, and the **30-day restore window** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
-| SQL test suites | **457 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (52), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
+| SQL test suites | **462 assertions pass** — `schema_contract` (22), `business_rules` (35), `read_models` (57), `write_guards` (103), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
 | REST smoke | `tools/smoke-rpc.cjs` — **11/11** |
 | Disabled-write guard | `tools/probe-disabled-write.cjs` — **8/8** over the real PostgREST path |
 | Biometric gate | `tools/probe-biometric-gate.cjs` — **10/10** over the real PostgREST path |
@@ -74,8 +82,9 @@ Every command below was run green against the local Supabase stack.
 | Contacts CRUD | `tools/probe-contacts-crud.cjs` — **26/26** over the real GoTrue + PostgREST path |
 | Report category | `tools/probe-report-category.cjs` — **22/22** over the real GoTrue + PostgREST path |
 | Public alert | `tools/probe-public-alert.cjs` — **14/14** over the real GoTrue + PostgREST + Storage path |
+| Moderator console | `tools/probe-moderation-console.cjs` — **37/37** over the real GoTrue + PostgREST path, with the moderator's own session |
 | Edge Functions | 8 functions — purge-media, purge-deleted-accounts, cleanup-geocode-cache, keep-project-awake, moderation-decide, disable-user, finalize-capture, password-reset |
-| Function smoke | `tools/smoke-functions.cjs` — **32/32** (auth gates, idempotency, audit trail, dry run) |
+| Function smoke | `tools/smoke-functions.cjs` — **36/36** (auth gates, idempotency, audit trail, dry run) |
 | Mobile screens | auth wizard, home, more, settings, capture, help-alert, location-sharing, contacts, alerts, report detail — 1:1 ported from `prototype ui.html`. The **location-sharing** screen's CTA now performs a real share. |
 | Help-seek surfaces | the shared `MoreHelpSheet`, the hotline list (`more-help`), the thana line (`thana-line`), the find-a-station map (`station-map`), and the wrong-number report sheet — all four stories of the unit's help surfaces land. |
 | History + alert detail | `app/(app)/history.tsx` (four tabs, one filter object, one query key), `history-map.tsx` (one shared wrapper), `alert-detail.tsx` (the projection omits `author_id` **entirely**) |
@@ -85,6 +94,10 @@ Every command below was run green against the local Supabase stack.
 | Location sharing | `apps/mobile/src/shared/services/` — the just-in-time fix, the snapshot payload, the OS share sheet, the fan-out, the intent telemetry, and the app-user lookup. **67 new unit tests** across four suites, plus 37 SQL assertions. |
 | Admin console | Next.js — login, queue, report detail, users (disable), audit log — **builds clean, 8 routes** |
 | i18n | `bn` primary + `en`, full error-code mapping incl. `AUTH_DISABLED` |
+| Alerts feed | `useInfiniteQuery` with the **cursor as the page parameter** and the area filter alone in the query key; `alertsItems()` flattens the pages and is the only way the screens read the feed. **12 unit tests** (`alerts.dom.test.ts`). |
+| Error copy | `errorCopy()` — one place that consults the shared `API_ERROR_I18N_KEYS` map, with an `errors.internal` fallback for an unknown code. **7 unit tests**, against the **real** bundles. |
+| Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
+| Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
 | Nightly build | `.github/workflows/build.yml` — preview APK + emulator smoke (`maestro/panic-path.yaml`) |
 | EAS profiles | `eas.json` — dev / preview / production, APK, cert-pinning, SMS flag off |
@@ -96,8 +109,8 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 517 tests (385 mobile, 84 shared, 48 admin)
-pnpm db:test          # 457 SQL assertions
+pnpm test             # 626 tests (420 mobile, 84 shared, 122 admin)
+pnpm db:test          # 462 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
 pnpm guard:check      # 8 disabled-write probes (live PostgREST)
@@ -108,7 +121,8 @@ pnpm reset:check      # 30 password-reset probes (live GoTrue + mailbox)
 pnpm contacts:check   # 26 contacts-CRUD probes (live GoTrue + PostgREST)
 pnpm category:check   # 22 report-category probes (live GoTrue + PostgREST)
 pnpm alert:check      # 14 public-alert probes (live GoTrue + PostgREST + Storage)
-pnpm fn:smoke         # 32 Edge Function checks
+pnpm console:check    # 37 moderator-console probes (live GoTrue + PostgREST)
+pnpm fn:smoke         # 36 Edge Function checks
 pnpm fn:typecheck     # Deno
 pnpm data:check       # reference-data mirror
 pnpm shared:check     # Edge Functions mirror
@@ -350,7 +364,214 @@ are applied and recorded now — the gate reports **36** migrations, matching
 
 ---
 
-## 4. What is NOT DONE — 22 `partial`, 1 `planned`
+### ✅ B5 — The story-record gate was blind to its own vocabulary — FIXED
+
+**The defect.** `tools/reconcile-story-index.cjs` maps a story's
+`implemented:` frontmatter to an index status. Its mapping accepted
+`'true'` → `complete`, `'partial'` → `partial`, and *everything else* →
+`planned`. The five moderation stories were written with the **explicit**
+spelling `implemented: complete`, which the tool's accepted-values list did
+not contain — so the frontmatter regex never matched, the story fell back to
+the default `'false'`, and it was reported as **`planned`**.
+
+**Why it matters.** This is the same failure mode the whole records system
+was built to prevent, one level down. The tool's job is to catch a story
+file that disagrees with the index; instead it **agreed with itself** —
+the index said `planned`, the tool computed `planned` from the same broken
+parse, and `pnpm story:index:check` printed *"✓ the index matches the story
+files."* A gate that derives both sides from the same mistake cannot catch
+the mistake. Worse, the headline count was **wrong**: the real total was
+**36 `complete` · 17 `partial` · 1 `planned`**, and the gate reported
+**31 · 17 · 6** — five `complete` stories silently demoted to `planned`.
+
+**The fix.** `statusFor()` now accepts `'complete'` alongside `'true'`, and
+`IMPLEMENTED_VALUES` lists both spellings. The tool's two other
+`implemented:` reads (the `status:` derivation and the drift check) were
+fixed with it.
+
+**The stronger fix.** The parse no longer *defaults* an unrecognised value
+to `'false'`. A story whose `implemented:` is not in the vocabulary is now
+a **hard error** naming the value and the file, reported before any count
+is computed — because every count below is derived from the same parse and
+would be wrong for the same reason. The vocabulary is therefore the thing
+that is checked, not just the thing that is consumed.
+
+**The proof.** With the fix in place the check immediately reported the
+five stories it had been blind to:
+
+```
+✗ the index has drifted from the story files:
+  - 001-moderator-login-and-queue: the index says "planned", the story file says "complete"
+  ...
+  - the index header says "31 complete · 17 partial · 6 planned", the story files say "36 complete · 17 partial · 1 planned"
+```
+
+`--write` then corrected the index, the three bolt files and the five
+story files' own `status:`, and the check now passes at
+**36 `complete` · 17 `partial` · 1 `planned`**.
+
+The new hard error was proved by **causal check**: writing
+`implemented: shipped` into a story file makes the tool fail with
+
+```
+- 004-disable-a-user: the story file says "implemented: shipped", which is not one of true, false, partial, planned, complete
+```
+
+and the file was restored afterwards.
+
+**The lesson worth keeping.** A derived record is only as trustworthy as
+the parser that derives it. The gate proved the *index* and the *story
+files* agreed — which is exactly the wrong thing to prove when the
+agreement comes from one shared bug. The counter that would have caught it
+is the one that does not exist in the tool: **a check that the accepted
+vocabulary covers every value the corpus actually uses.** A story file that
+says `implemented: complete` is now a first-class value, and a value the
+tool does not understand is a reported error rather than a silent default.
+
+---
+
+### ✅ B6 — The console had no live probe, and the seed disagreed with itself — FIXED
+
+**Story:** unit `007-moderation`, all six — the coverage gap the stories'
+own "Out of Scope" sections left open.
+
+**The gap.** The console was proven in three places that did **not** meet:
+the Edge Functions over the wire (`tools/smoke-functions.cjs`, 36/36), the
+four read models from **inside Postgres** (`supabase/tests/read_models.sql`),
+and the console's own parsing (the component tests). What none of them could
+see is the thing that joins the last two: **the JSON shape the browser
+actually receives** from `moderation_queue`, `moderation_report_detail`,
+`moderator_search_users` and `moderation_audit_feed`. Those four are called
+by the browser over PostgREST with the moderator's **own** session — a
+different door, a different credential, and a different authorisation path
+from the service-role functions the smoke run proves. A payload that dropped
+a key the console renders would produce an empty row, not a failure.
+
+**The fix.** `tools/probe-moderation-console.cjs` — **37/37**, wired into
+`pnpm verify` (`console:check`) and into the CI `rls-integration` job.
+
+- The **negative** assertions are the ones that earn their keep: a citizen
+  is refused the queue, the detail, the account search and the audit trail.
+  That refusal is what makes the console moderator-only.
+- The account lookup must stay an **exact** match: an empty query, an
+  unmatched query and a **partial** phone prefix must all return nothing.
+  The moment it became a fuzzy list, the console would be a user-database
+  browser rather than a targeted tool (FR-NG-3).
+- The audit row must carry **exactly** the eight specified keys — a dropped
+  key, a renamed key and an added key all fail — and **no** report
+  contents.
+- The **fixture is built, not borrowed.** The probe files its own report
+  through the real `finalize-capture`, flags it three times as three
+  distinct citizens so the **product's own** threshold moves it into the
+  queue, and decides it so the trail has a row. A probe that read whatever
+  happened to be in the database would pass on a dirty instance and fail on
+  a clean one.
+
+**The defect it found.** The seeded dev accounts disagreed with themselves.
+`auth.users.raw_user_meta_data->>'phone'` said `+8801711000001` while
+`profiles.phone` said `+8801911000001` — for **both** citizens. The
+`handle_new_user` trigger reads the metadata to populate the profile, so the
+metadata is the source of truth for a real signup: the seeded account
+described a user that could never exist. The `...191...` form is the one the
+moderator and every other seeded account use, so the metadata was the typo.
+Fixed in `20261105000010_seed_dev_accounts.sql`.
+
+This was invisible until the probe asked Auth and the database the same
+question and got two answers. Nothing else in the repository reads the
+seeded citizen's phone — the SQL suite and the shared unit test use their
+**own** fixtures (`author@test.local`) — so nothing else could have noticed.
+
+**The causal check.** Injecting `'author_id', author_id` into the queue
+payload's `jsonb_build_object` makes the probe fail with *"the queue row
+does not carry the raw author id"*; the injection was then reverted and the
+probe returned to 37/37. The **first** attempt at this check edited the
+*detail* function's payload rather than the queue's, and the probe passed —
+which is the check's own lesson: a causal check that does not fail has not
+proved anything, and the wrong target is as silent as no check at all.
+
+---
+
+### ✅ M1 — Three live mobile defects: a truncated feed, "undefined", and a crash — FIXED
+
+**Story:** unit `006-alerts` (the feed) and the mobile shell (the other two) —
+the three defects the audit found on the citizen side.
+
+#### 1. The feed silently truncated at one page
+
+`apps/mobile/src/shared/api/alerts.ts` read the feed through `useQuery`. The
+`alerts_feed` **RPC** is cursor-paginated — it orders by
+`(captured_at DESC, id DESC)` and hands back a `next_cursor` whenever another
+page exists — but the client **received the cursor and discarded it**. A feed
+longer than one page stopped at the limit, with no indication that more
+existed and no way to reach it. The user saw a short feed and no error.
+
+**The fix.** `useInfiniteQuery`, with the **cursor as the page parameter** and
+the **area filter alone** in the query key. That split is the whole trick: a
+cursor in the key would make every page its own query, and the feed would
+reset to page one on every request. `alertsItems()` flattens the pages and is
+the only way the screens read the feed — a screen that read
+`data.pages[0].items` would be back to one page. The Alerts screen grew a
+"load more" control.
+
+#### 2. The user saw the word "undefined" instead of an error message
+
+Ten call sites built the i18n key by hand:
+
+```ts
+t(`errors.${appError.code.toLowerCase()}`)   // → "errors.authrequired"
+```
+
+while the bundle's key is `errors.authRequired` (camelCase). The key did not
+exist, i18next fell back to rendering **the key itself**, and the login screen
+showed the literal word *"undefined"* where the error message should have
+been. The same bug sat in `forgot-password`, `register`, `reset-password`,
+`verify-otp`, `contact-editor`, `contacts` (×2) and `ContactCaptureScreen`.
+
+**The fix.** The correct mapping **already existed** — `API_ERROR_I18N_KEYS`
+in `packages/shared`, mapping every code to its bundle key. The screens were
+re-deriving it wrongly, ten times. `errorCopy()` in
+`apps/mobile/src/shared/i18n/errorCopy.ts` is now the one place that consults
+the map, with a fallback to `errors.internal` for a code the app does not know
+— a server that grew a code before the app shipped it must still produce a
+readable message, not a raw key.
+
+#### 3. A missing build setting crashed the whole app
+
+`apps/mobile/src/shared/api/supabase.ts` **threw at import time** when
+`EXPO_PUBLIC_SUPABASE_URL` was missing. That is a *build* fault, not a user
+error, and the crash it caused was total: a red screen on **every** route,
+before a single screen rendered, because twenty-two modules import that one.
+
+**The fix.** The module no longer throws. It exports `isSupabaseConfigured`,
+and the root layout renders `ConfigErrorView` when the build is unconfigured.
+The copy says what happened and what to do, and it does **not** blame the
+person holding the phone or leak the environment variable names — a build
+detail a user cannot act on. A call that somehow gets through fails with a
+clear message rather than a `TypeError` about a missing method.
+
+**The causal checks.** Each of the three has one, and each **failed** when the
+defect was put back:
+
+| The defect, reintroduced | The guard that failed |
+|---|---|
+| `queryFn: () => fetchAlerts(query, null)`, `getNextPageParam: () => undefined` | 3 tests — *"follows the cursor and puts the second page into the feed"*, *"reports that there is a next page"*, *"keeps the cursor out of the query key"* |
+| `return t(`errors.${code.toLowerCase()}`)` | 3 tests — *"resolves every error code to a message that exists in the bundle"*, *"resolves the code the old template got wrong"*, *"gives the disabled account its own message"* |
+| the module-level `throw` | 6 tests — every one in *"the Supabase module"* |
+
+**The test environment had to be split to make this possible.** A React hook
+test (`renderHook`) needs a `document`, which the React Native **node**
+environment does not have; but the capture and dial tests need `TextEncoder`
+and `crypto.subtle`, which **jsdom** does not have. Neither environment could
+be turned on for the other: `testEnvironment: 'jsdom'` over the RN preset
+fails with *"Cannot redefine property: window"*, and `jest-expo/web` globally
+strips the Node globals jsdom omits. So the mobile suite now runs as **two
+Jest projects** — `node` and `jsdom` — and a test opts into jsdom by its
+**name** (`*.dom.test.ts`). `apps/mobile/jest.dom.setup.js` gives the jsdom
+project back the Node globals it lacks.
+
+---
+
+## 4. What is NOT DONE — 17 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -362,25 +583,44 @@ Ordered by dependency. Bolt numbers in brackets.
 >
 > **A `partial` story is not a missing screen.** In every case the feature
 > ships and works, and the gap is a *guard* — the test, boundary check,
-> reserved CI job, or invalidation the acceptance criterion names. The one
-> exception is `002-personal-emergency-picker`, which is `planned` because
-> nothing of it exists.
+> reserved CI job, or invalidation the acceptance criterion names.
 >
-> The most consequential single fact: **`apps/admin` declares
-> `@tanstack/react-query` and never imports it.** The admin hand-rolls its
-> fetching with `useState` + `useEffect`, so no query is ever invalidated —
-> which is the single reason **all five** `partial` moderation stories fail
-> their "the queries are invalidated" criterion. Fixing it once fixes all
-> five.
+> **Every number in this section is derived, not typed.** Run
+> `node tools/reconcile-story-index.cjs` to recompute them; `pnpm
+> story:index:check` fails the build on any drift. (Note: the tool's own
+> vocabulary bug of §3 B5 meant it once reported **31 · 17 · 6** instead of
+> **36 · 17 · 1** — five `complete` stories silently demoted to `planned`
+> because the parse did not know the word `complete`. It is fixed, and an
+> unrecognised value is now a hard error rather than a silent default.)
 >
-> The three other user-facing defects worth naming here, because they are
-> behaviour rather than a missing guard:
+> **The moderation unit is now closed.** All six of unit `007-moderation`'s
+> stories are `complete`. `apps/admin` used to declare
+> `@tanstack/react-query` and **never import it** — the console hand-rolled
+> its fetching, so no query was ever invalidated, and that single omission
+> was the reason all five moderation stories failed their "the queries are
+> invalidated" criterion. The console now runs on a `QueryClientProvider`
+> with a query-key registry (`apps/admin/lib/queries.ts`); the decision and
+> disable mutations invalidate the queue, the detail, the users and the audit
+> queries **by key**, and a test proves the invalidation actually reaches the
+> audit query — because a key-shape mismatch fails *silently* and no error
+> message would reveal it. Building it surfaced **four real defects**: the
+> dead role guard (`readModeratorRole()` was written and never called — every
+> page hardcoded `role="moderator"`), the login screen's promised
+> access-only state (which did not exist — a citizen was routed to the queue
+> and met a generic error banner), a signed media URL that **no code in the
+> console ever requested** (the bucket was private and the detail screen
+> rendered the storage path as *text*), and the FR-AUTH-7 message literal,
+> which **appeared nowhere in the repository** — the citizen app said
+> something else entirely.
 >
-> | Where | What |
-> |---|---|
-> | `apps/mobile/src/shared/api/alerts.ts:94` | The feed computes `next_cursor` and **discards it** — `useQuery`, not `useInfiniteQuery`, so page 2 is unreachable. |
-> | `apps/mobile/src/shared/api/supabase.ts:21-27` | The Supabase client **throws at module load** instead of showing a localized configuration error. On a device with a missing `app.json` extra the app dies with a raw English stack message. |
-> | `apps/mobile/app/(app)/login.tsx:61-63` | `t(\`errors.${appError.code.toLowerCase()}\`)` renders **`undefined`** — the bundle key is `errors.authRequired`, camelCase. A live user-facing bug. |
+> The three user-facing defects worth naming here, because they are
+> behaviour rather than a missing guard — **all three are now FIXED (§3 M1)**:
+>
+> | Where | What | State |
+> |---|---|---|
+> | `apps/mobile/src/shared/api/alerts.ts:94` | The feed computed `next_cursor` and **discarded it** — `useQuery`, not `useInfiniteQuery`, so page 2 was unreachable. | ✅ **FIXED** — `useInfiniteQuery` with the cursor as the page parameter; `alertsItems()` flattens the pages. |
+> | `apps/mobile/src/shared/api/supabase.ts:21-27` | The Supabase client **threw at module load** instead of showing a localized configuration error. On a device with a missing `app.json` extra the app died with a raw English stack message. | ✅ **FIXED** — `isSupabaseConfigured` + `ConfigErrorView`; the module never throws. |
+> | `apps/mobile/app/(app)/login.tsx:61-63` | `t(\`errors.${appError.code.toLowerCase()}\`)` rendered **`undefined`** — the bundle key is `errors.authRequired`, camelCase. A live user-facing bug, in **ten** call sites. | ✅ **FIXED** — `errorCopy()` consults the shared `API_ERROR_I18N_KEYS` map. |
 >
 > **By unit**, the shape of the remaining work is uneven:
 >
@@ -392,16 +632,14 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `004-capture` | 3 | 4 | 0 |
 > | `005-location` | 5 | 0 | 0 |
 > | `006-alerts` | 5 | 4 | 0 |
-> | `007-moderation` | 1 | 5 | 0 |
+> | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
 > `001-foundation` is the unit to pick up if you want **cheap** wins: all five
 > of its stories are `partial`, and their gaps are mostly **missing tests and
-> CI jobs** rather than missing behaviour. `007-moderation` is the unit with
-> the **most** remaining work but the **best** leverage — one TanStack Query
-> wiring closes five stories.
+> CI jobs** rather than missing behaviour.
 
-### 4.0 The 23 stories that are not `complete`
+### 4.0 The 17 stories that are not `complete`
 
 Each row's story file carries an `## Implementation` section naming the exact
 gap. **Open the story file, not this table, when you pick one up.**
@@ -411,7 +649,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `001-monorepo-workspace` | 001-foundation | partial | no test that the three workspaces share one strict TypeScript base |
 | `002-shared-contracts` | 001-foundation | partial | the boundary test that no Zod schema is duplicated locally — **does not exist** |
 | `003-mobile-design-system` | 001-foundation | partial | no token-parity test against `design-tokens.md`; no i18n key-parity gate; no tap-target test |
-| `004-mobile-app-shell` | 001-foundation | partial | the Supabase client **throws at module load** instead of showing a localized error |
+| `004-mobile-app-shell` | 001-foundation | partial | the Supabase client **throws at module load** instead of showing a localized error — ✅ **FIXED in §3 M1**; the remaining gap is the **test** |
 | `005-admin-skeleton-and-ci` | 001-foundation | partial | no reserved `build` job in `ci.yml`; no bundle-scan **test**; the `@shared/*` alias is unused |
 | `002-dual-identifier-login` | 002-identity | partial | no component test on the login screen; Remember-me's effect on the session is untested |
 | `007-account-deletion-and-recovery` | 002-identity | partial | an expired restore is reported as `errors.internal`; `recoverableUntil` is fetched but never read |
@@ -422,15 +660,10 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `002-area-hierarchy-extraction` | 004-capture | partial | `areaHierarchySchema` does not exist; the resolution is cache-first, contradicting the story |
 | `004-exif-strip-and-media-caps` | 004-capture | partial | the video path copies the original bytes — no trim, no metadata strip; the cap is 1080, not 1920 |
 | `007-storage-upload-and-finalize` | 004-capture | partial | no unit test ties the client's storage path to the server's |
-| `001-alerts-feed-list` | 006-alerts | partial | `next_cursor` is computed and **discarded** — page 2 is unreachable |
+| `001-alerts-feed-list` | 006-alerts | partial | `next_cursor` was computed and **discarded** — page 2 was unreachable — ✅ **FIXED in §3 M1** (`useInfiniteQuery` + `alertsItems()`); the remaining gap is the **test** |
 | `002-auto-refresh-and-pull-to-refresh` | 006-alerts | partial | neither the interval nor pull-to-refresh is tested |
 | `003-area-filter-chips` | 006-alerts | partial | the row uses a plain `View` and **clips** the chips; needs a horizontal `ScrollView` |
 | `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
-| `001-moderator-login-and-queue` | 007-moderation | partial | no TanStack Query → nothing is invalidated; no live probe for the console |
-| `002-report-review-detail` | 007-moderation | partial | no TanStack Query; no live probe; no test on the decision panel |
-| `003-restore-remove-decision` | 007-moderation | partial | no TanStack Query; the console path has no live probe |
-| `004-disable-a-user` | 007-moderation | partial | no TanStack Query; the error branches at `users/page.tsx:146-159` are untested |
-| `006-moderator-action-audit-log` | 007-moderation | partial | no TanStack Query; the "no report contents" rule is convention, not a test |
 
 **Unit `001-foundation` is all five `partial`.** It has no subsection below
 because it has no "defect that was found and fixed" history — its gaps are
@@ -439,6 +672,12 @@ boundary test, no token-parity test against `design-tokens.md`, no i18n
 key-parity gate, no tap-target test, no reserved `build` job in `ci.yml`, no
 bundle-scan **test**, and an unused `@shared/*` alias. The features themselves
 are there; the proofs are not. This is the **cheapest** unit to close.
+
+**One of the five has moved since this was written.** `004-mobile-app-shell`
+named the Supabase client's module-load `throw` as its gap; that is now
+**fixed** (§3 M1) and the story's remaining gap is the **test** — the story
+file still records the old gap, and §4.0's row above is the corrected one.
+The four others are untouched.
 
 ### 4.1 Identity — unit `002-identity`
 
@@ -505,7 +744,8 @@ are there; the proofs are not. This is the **cheapest** unit to close.
 ### 4.6 Alerts — unit `006-alerts`
 
 > Four of this unit's nine stories are still `partial`: `001-alerts-feed-list`
-> (`next_cursor` is computed and **discarded**), `002-auto-refresh-and-pull-to-refresh`
+> (the `next_cursor` **discard** is fixed — §3 M1 — so what remains is the
+> **test**), `002-auto-refresh-and-pull-to-refresh`
 > (neither the interval nor pull-to-refresh is tested),
 > `003-area-filter-chips` (the row uses a plain `View` and clips the chips)
 > and `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
@@ -523,13 +763,23 @@ are there; the proofs are not. This is the **cheapest** unit to close.
 | # | Gap | Where |
 |---|---|---|
 | M1 | ✅ **FIXED** — the author-auto-hide queue group is live. `apps/admin/app/queue/page.tsx` gained an **All pending / Author auto-hidden** filter with `aria-pressed`, a derived badge that separates the two causes (`author` / `both`), and the author's 24 h flag count **labelled apart from** the report's own flag count — a context number is not a verdict. The server already carried `hide_reason` and `author_flags_24h`, so **no migration and no new RPC** were needed; the gap was purely in the rendering. The queue offers **no bulk actions** at MVP (FR-MOD-3) — no "restore all", no multi-select, no shared note — and a **source scan** (`apps/admin/lib/noBulkActions.test.ts`) fails the build if one appears. | [024] story 005 |
+| M2 | ✅ **FIXED** — the console runs on TanStack Query. `apps/admin/app/providers.tsx` holds a module-scope `QueryClient` (so the cache survives navigation) and `apps/admin/lib/queries.ts` owns the key registry: `['admin','queue']`, `['admin','report-detail']`, `['admin','audit']`, `['admin','users']`. The **decision** and **disable** mutations invalidate by key — the queue, the detail, the users and the audit queries — and `apps/admin/lib/queries.test.tsx` proves the invalidation actually **reaches** the audit query. That test seeds the cache with **literal** keys rather than the constants, so a key-shape drift cannot make the test self-consistent: breaking `AUDIT_QUERY_KEY` to `['audit']` fails three tests, and dropping the audit invalidation fails the mutation test. | [022–024] |
+| M3 | ✅ **FIXED** — the moderation **detail** screen shows the media. `apps/admin/lib/api.ts` gained `signMediaUrl(client, storagePath)`, which asks Supabase Storage for a **ten-minute** signed read URL on the private `report-media` bucket with the **moderator's own session** — never a service-role key, and never a persisted URL. The URL lives in component state only; a preview that cannot be signed (or that fails mid-session) degrades to a neutral placeholder, never a broken image, and a "Try again" control requests a **fresh** URL. The *database* already permitted the read (`report_media_select_moderator`); only the console never asked. | [023] story 002 |
+| M4 | ✅ **FIXED** — the FR-AUTH-7 message is the PRD's literal. "Your account has been disabled. Contact support." **appeared nowhere in the repository** — the citizen app said *"This account has been disabled, so it can no longer send reports or share your location."* The PRD's string is now a single fixed i18n key (`apps/mobile/src/shared/i18n/en.ts` + `bn.ts`), the disable screen renders it, and `apps/mobile/src/shared/i18n/disabledAccountCopy.test.ts` pins it — no reason, no identifier, no timestamp, and never a claim that the account was deleted. | [024] story 004 |
+| M5 | ✅ **FIXED** — the console's **role guard** is live. `readModeratorRole()` was written and **never called**: every page hardcoded `role="moderator"` on `<AdminShell>`, so the shell's guard was dead code. A `ModeratorGate` server component now resolves the role from the session, and a scan test fails the build if a page hardcodes it again. The **login** screen's promised access-only state did not exist either — a citizen was routed to the queue and met a generic error banner — so the citizen branch now renders the access-only card, extracted so the login page and the shell render the **identical** card. | [022] story 001 |
+| M6 | ✅ **FIXED** — the console's **read models** are proven over the wire. `tools/probe-moderation-console.cjs` calls the four moderator-only RPCs the browser calls — `moderation_queue`, `moderation_report_detail`, `moderator_search_users`, `moderation_audit_feed` — with a moderator's **own** session, and asserts the JSON **shape** the browser receives. It is wired into `pnpm verify` (`console:check`) and into the CI `rls-integration` job. **37/37**. See §3 B6. | [022–024] |
 
-> The admin console's queue, report detail, restore/remove decision, disable-user
-> and audit log **all exist and work** — but only the author-auto-hide group
-> (M1) is `complete`. The other five moderation stories are `partial`: the
-> screens are there, and what is missing is the **guard** — chiefly the query
-> invalidation, because `apps/admin` never imports `@tanstack/react-query`.
-> See the §4.0 table for each one's exact gap.
+> **All six of unit `007-moderation`'s stories are `complete`.** The queue,
+> report detail, restore/remove decision, disable-user, author-auto-hide
+> group and audit log all ship, and each acceptance criterion now has the
+> guard it names — a test, a scan, or a SQL assertion.
+>
+> The console now also has a **live probe** (`pnpm console:check`, 37/37),
+> which closes the gap the stories' own "Out of Scope" sections left: the
+> Edge Functions were proven over the wire, the SQL suites proved the read
+> models from inside Postgres, and the component tests proved the console's
+> own parsing — but nothing joined the last two, so the **JSON shape the
+> browser actually receives** was unproven. The probe joins them.
 
 ---
 
@@ -650,39 +900,63 @@ are there; the proofs are not. This is the **cheapest** unit to close.
     the reserved CI job). A `partial` story now **must** carry an
     `## Implementation` section naming its exact gaps, and the tooling
     rejects it if it does not — otherwise `partial` would decay into a
-    softer way of saying "planned". Result: **31 `complete` · 22
+    softer way of saying "planned". Result: **36 `complete` · 17
     `partial` · 1 `planned`**, every number derived from the story files
     by `tools/reconcile-story-index.cjs`, and the index's Status column,
     the header count, the bolt checkboxes, the bolt `status:` and each
     story's own `status:` are all **derived, not typed**. A `partial`
     story's `## Implementation` section says **which guard is missing**,
     not that the screen is missing.
-13. **Close the `partial` stories, highest leverage first.** The order
-    below is by *number of stories closed per unit of work*:
-    1. **Add TanStack Query to `apps/admin`** and wire the post-decision
-       invalidation for the queue, detail and audit queries. The package is
-       **already a dependency** and is **never imported** — this single
-       change closes the invalidation criterion of **all five** `partial`
-       moderation stories at once (`001`, `002`, `003`, `004`, `006`).
-    2. **`apps/mobile/src/shared/api/alerts.ts:94` — `useQuery` →
-       `useInfiniteQuery`.** The list query receives `next_cursor` and
-       **discards it**, so page 2 is unreachable and the feed silently
-       truncates. This is the most user-visible defect in the audit.
-    3. **`apps/mobile/app/(app)/login.tsx:61-63` — the error key.**
-       The template `t(`errors.${appError.code.toLowerCase()}`)` renders
-       `undefined` because the bundle key is `errors.authRequired`
-       (camelCase). A live bug: the user sees the word "undefined"
-       instead of a message.
-    4. **`apps/mobile/src/shared/api/supabase.ts:21-27`** — a module-level
-       `throw` on a missing URL takes the **whole app** down at import time.
-       It should be a localized configuration-error screen.
-    5. The remaining `partial` stories, one at a time, each against its own
+13. ~~**S2 — wire the moderator console onto TanStack Query.**~~ ✅ **DONE.**
+    `apps/admin` declared `@tanstack/react-query` and **never imported it**;
+    the console hand-rolled its fetching with `useState` + `useEffect` and
+    reloaded through per-call-site callbacks, so **no query was ever
+    invalidated** — the single reason all five moderation stories failed
+    their "the queries are invalidated" criterion. The console now runs on a
+    `QueryClientProvider` with a key registry (`apps/admin/lib/queries.ts`),
+    and the decision and disable mutations invalidate the queue, the detail,
+    the users and the audit queries **by key**. Building it surfaced **four
+    real defects**: the dead role guard, the missing access-only state on
+    the login screen, the signed media URL that **no console code ever
+    requested**, and the FR-AUTH-7 message literal, which appeared nowhere
+    in the repository. Unit `007-moderation` is now **6/6 `complete`**.
+    Result: **36 `complete` · 17 `partial` · 1 `planned`**.
+14. ~~**S3 — write a live probe for the moderator console.**~~ ✅ **DONE.**
+    `tools/probe-moderation-console.cjs` — **37/37**, wired into `pnpm verify`
+    (`console:check`) and into the CI `rls-integration` job. It calls the
+    four moderator-only RPCs the **browser** calls, with the moderator's own
+    session, and asserts the JSON shape the browser receives — the join
+    between the SQL suites (which cannot see the payload) and the component
+    tests (which cannot see the wire). The fixture is **built**, not
+    borrowed, so the probe is re-runnable and cannot be satisfied by another
+    run's leftovers. It found a real defect: the seeded dev accounts'
+    `auth.users` metadata and `profiles` rows carried **different** phone
+    numbers — see §3 B6.
+15. ~~**The three mobile-side defects.**~~ ✅ **ALL THREE DONE.** See §3 M1
+    for the full account.
+    1. ~~**`apps/mobile/src/shared/api/alerts.ts:94` — `useQuery` →
+       `useInfiniteQuery`.**~~ ✅ **DONE.** The list query received
+       `next_cursor` and **discarded it**, so page 2 was unreachable and the
+       feed silently truncated. Now `useInfiniteQuery`, with the cursor as
+       the **page parameter** and the area filter alone in the query key.
+    2. ~~**`apps/mobile/app/(app)/login.tsx:61-63` — the error key.**~~ ✅
+       **DONE.** The template `t(`errors.${appError.code.toLowerCase()}`)`
+       rendered `undefined` because the bundle key is `errors.authRequired`
+       (camelCase). The mapping already existed — `API_ERROR_I18N_KEYS` in
+       `packages/shared` — and **ten** call sites were re-deriving it wrongly.
+    3. ~~**`apps/mobile/src/shared/api/supabase.ts:21-27`** — a module-level
+       `throw` on a missing URL took the **whole app** down at import
+       time.~~ ✅ **DONE.** The failure is now localized to a
+       configuration-error screen.
+16. **Close the remaining `partial` stories, highest leverage first.** The
+    order below is by *number of stories closed per unit of work*:
+    1. The remaining `partial` stories, one at a time, each against its own
        `## Implementation` section. The stories of unit `001-foundation`
        are cheap: their gaps are mostly **missing tests and CI jobs**, not
        missing features.
-    6. **`002-personal-emergency-picker`** — the only genuinely unbuilt
-       story. It has no route, no component and no action.
-14. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
+    2. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
+       stories. It has no route, no component and no action.
+17. **B4, and the git remote.** ~~**B4** — fill the `eas.json`
     placeholders.~~ 🟡 **PARTIALLY DONE.** The `dev` profile now carries the
     real local stack's URL and anon key. The `preview` and `production`
     profiles still need five hosted-project values — the staging ref and
@@ -695,7 +969,7 @@ are there; the proofs are not. This is the **cheapest** unit to close.
     `preview`, and the certificate-pinning assertion counted
     `<sha256-pin-set>` as one valid pin. See §3 for the full account.
     **The git remote is still unset** — the push needs the remote URL.
-15. Final `pnpm verify` → **one** commit → push.
+18. Final `pnpm verify` → **one** commit → push.
 
 ---
 
@@ -711,6 +985,16 @@ The fix was not to hand-edit the records again — it was to make the records
 Everything else — the index's Status column, the index's header count, each
 bolt's story checkboxes, each bolt's `status:`, and each story's own
 `status:` — is computed from it by `tools/reconcile-story-index.cjs`.
+
+**But a derived record is only as good as the parser that derives it.**
+The tool once accepted only `true`/`false`/`partial`/`planned` in the
+`implemented:` field, so a story written as `implemented: complete` fell
+through to the default and was reported as **`planned`** — and because the
+index was derived from the *same* parse, the gate agreed with itself and
+reported no drift. Five `complete` stories were demoted and the headline
+count was wrong by exactly five. The parse no longer defaults silently: an
+unrecognised value is a **hard error** naming the value and the file. See
+§3 B5 for the full account and the causal check.
 
 - ~~`memory-bank/bolts/001`–`024` still say `status: planned` with no stage
   artifacts, although the code for their stories **is built**.~~ — **FIXED,
@@ -732,13 +1016,13 @@ bolt's story checkboxes, each bolt's `status:`, and each story's own
   column and the header count are rewritten from the story files by
   `node tools/reconcile-story-index.cjs --write`, and
   `pnpm story:index:check` fails the build on any drift. The counts are
-  **31 `complete` · 22 `partial` · 1 `planned`** — 54 files, 54 rows, no
+  **36 `complete` · 17 `partial` · 1 `planned`** — 54 files, 54 rows, no
   duplicates, no orphans, **0 mismatches**.
 - ~~55 of 62 story files still say `implemented: false`; only the 7 stories of
   unit `008-jobs-operations` say `true`.~~ — **FIXED.** The "62" figure was
   itself stale (the index carries 54 rows). All **54** story files now carry a
-  state that is true: **31 `implemented: true`**, **22 `implemented: partial`**,
-  **1 `implemented: planned`**. The binary flag was replaced by a three-state
+  state that is true: **31 `implemented: true`**, **17 `implemented: partial`**,
+  **6 `implemented: planned`**. The binary flag was replaced by a three-state
   one because it could not carry the truth — see §6 item 12.
 - ~~A story's own `status:` could contradict its own `implemented:`.~~ —
   **FIXED.** `004-graceful-degradation` said `status: ready` with
