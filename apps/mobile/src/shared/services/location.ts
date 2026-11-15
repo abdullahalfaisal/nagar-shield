@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as Location from 'expo-location'
+import { currentPositionWithin } from './positionWithin'
+import { LAST_KNOWN_MAX_AGE_MS } from './locationFix'
 
 /**
  * The single foreground GPS fix.
@@ -25,6 +27,33 @@ export type FixState =
 export interface UseCurrentFixOptions {
   /** Requests the fix as soon as the hook mounts. */
   enabled?: boolean
+  /**
+   * `precise` asks for the GPS (`Accuracy.High`). The default, `Balanced`, is
+   * answered on Android from Wi-Fi and cell towers, which can be a kilometre or
+   * more off — near enough to sort a list by distance, not to name the area a
+   * report is filed in.
+   */
+  precise?: boolean
+  /**
+   * Asks the system for the location permission when it has not been decided.
+   * Home passes `false`: it only names the area when the permission is already
+   * granted, and never raises a prompt of its own. Defaults to `true`.
+   */
+  requestPermission?: boolean
+}
+
+/** Two readings closer than this are the same place for a list sorted by distance. */
+const SAME_PLACE_M = 150
+
+/** The distance in metres between two points, on a sphere. Good to a few metres at city scale. */
+function distanceMetres(a: Fix, b: Fix): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h))
 }
 
 /**
@@ -38,6 +67,8 @@ export function useCurrentFix(options: UseCurrentFixOptions = {}): {
   refresh: () => void
 } {
   const enabled = options.enabled ?? true
+  const precise = options.precise ?? false
+  const requestPermission = options.requestPermission ?? true
   const [state, setState] = useState<FixState>({ status: 'idle' })
   const [nonce, setNonce] = useState(0)
 
@@ -54,7 +85,9 @@ export function useCurrentFix(options: UseCurrentFixOptions = {}): {
       setState({ status: 'loading' })
 
       try {
-        const permission = await Location.requestForegroundPermissionsAsync()
+        const permission = requestPermission
+          ? await Location.requestForegroundPermissionsAsync()
+          : await Location.getForegroundPermissionsAsync()
 
         if (cancelled) return
 
@@ -63,22 +96,54 @@ export function useCurrentFix(options: UseCurrentFixOptions = {}): {
           return
         }
 
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+        // A list sorted by distance does not need the exact spot, so the
+        // phone's last known position is used at once and the fresh reading only
+        // replaces it when the phone has really moved. A fresh GPS reading can
+        // take many seconds; waiting for it left every screen on "locating".
+        // A screen that files a report (`precise`) still waits for the real fix.
+        let shown: Fix | null = null
+        if (!precise) {
+          try {
+            const known = await Location.getLastKnownPositionAsync({
+              maxAge: LAST_KNOWN_MAX_AGE_MS,
+              requiredAccuracy: 500,
+            })
+            if (cancelled) return
+            if (known) {
+              shown = {
+                lat: known.coords.latitude,
+                lng: known.coords.longitude,
+                accuracyM: known.coords.accuracy ?? null,
+              }
+              setState({ status: 'ready', fix: shown })
+            }
+          } catch {
+            // No stand-in: wait for the fresh reading.
+          }
+        }
+
+        const position = await currentPositionWithin({
+          accuracy: precise ? Location.Accuracy.High : Location.Accuracy.Balanced,
         })
 
         if (cancelled) return
 
-        setState({
-          status: 'ready',
-          fix: {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            accuracyM: position.coords.accuracy ?? null,
-          },
-        })
+        const fresh: Fix = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracyM: position.coords.accuracy ?? null,
+        }
+
+        // The same place, give or take: keep what is on screen, so the lists
+        // built from it are not fetched twice.
+        if (shown && distanceMetres(shown, fresh) < SAME_PLACE_M) return
+
+        setState({ status: 'ready', fix: fresh })
       } catch {
-        if (!cancelled) setState({ status: 'unavailable' })
+        // A fresh reading that failed after a last known position was shown
+        // leaves that position in place.
+        if (!cancelled)
+          setState((current) => (current.status === 'ready' ? current : { status: 'unavailable' }))
       }
     }
 
@@ -87,7 +152,7 @@ export function useCurrentFix(options: UseCurrentFixOptions = {}): {
     return () => {
       cancelled = true
     }
-  }, [enabled, nonce])
+  }, [enabled, nonce, precise, requestPermission])
 
   return { state, refresh }
 }

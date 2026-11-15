@@ -44,6 +44,12 @@ export default function withConfig(config: ConfigContext): ExpoConfig {
       eas: {
         projectId: easProjectId,
       },
+      // TEMPORARY (phone session): a dev client — Expo Go — reads
+      // `process.env.EXPO_PUBLIC_*` from the manifest's `extra` bag at
+      // runtime, not from the transform-time inline (which only happens in
+      // production builds). Without these the app resolves no URL at all.
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     },
     plugins: [...(base.plugins ?? []), withCertPinning],
   } as ExpoConfig

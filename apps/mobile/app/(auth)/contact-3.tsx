@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
-import { ContactCaptureScreen, clearWizardContacts } from '@/shared/wizard/ContactCaptureScreen'
+import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen'
 
 /**
  * Screen 7 — S-04c, Contact 3 of 3.
@@ -33,11 +33,12 @@ export default function WizardContact3Screen() {
       subtitle={t('wizardContacts.step3Subtitle')}
       cta={t('wizardContacts.saveCta')}
       onBack={() => router.back()}
+      onSkip={() => router.replace('/(auth)/location-permission')}
       onComplete={() => {
-        // The wizard's captures are done. The module's memory is cleared so a
-        // later onboarding run starts from empty slots rather than replaying
-        // this run's contacts.
-        clearWizardContacts()
+        // The captures are **not** cleared here: Back from the location step
+        // returns to contact 2, which must still find its saved contact and
+        // update it rather than create a duplicate. A later onboarding run
+        // clears the module's memory when its signup succeeds (register).
         router.replace('/(auth)/location-permission')
       }}
     />

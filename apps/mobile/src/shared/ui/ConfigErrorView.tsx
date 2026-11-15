@@ -57,7 +57,7 @@ export function ConfigErrorView() {
 
       <Text
         style={{
-          color: theme.colors.ink[400],
+          color: theme.colors.textMuted,
           fontSize: 12,
           lineHeight: 18,
           marginTop: 18,

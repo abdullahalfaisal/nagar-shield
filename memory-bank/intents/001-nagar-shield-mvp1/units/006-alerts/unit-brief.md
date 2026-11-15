@@ -109,7 +109,7 @@ queue, the restore / remove decision, and the moderator's note.
 | FR-ALERTS-9 | Moderator remove — a removed report never appears in the public feed | Must |
 | FR-ALERTS-10 | Flag rate limit — at most 10 flags per hour per user; the 11th is rejected with `FLAG_RATE_LIMIT` and `retry_after_sec` | Must |
 | FR-ALERTS-11 | Author auto-hide — 5+ flagged reports in 24 h hides all of that author's reports from the last 24 h | **Should** |
-| FR-HIST-1 | History defaults to 1 km and a 24-hour window | Must |
+| FR-HIST-1 | History opens at the widest offered radius (15 km) and a 24-hour window | Must |
 | FR-HIST-2 | History filters — radius, time window, and category; each changes the result set | Must |
 | FR-HIST-3 | Immediate visibility — a submitted report appears in the author's History with no moderation gate | Must |
 | FR-HIST-4 | Fast load — the default History view loads in < 2 s on a warm session, with a skeleton while loading | Must |
@@ -390,7 +390,8 @@ Ported from `docs/design/screen-history-overview.html` (the prototype's
   <description>`** (FR-ALERTS-5), rendered as the prototype's **Bangla / English
   pair** — the area as `Mirpur · মিরপুর` and the category as `চুরি — Theft`.
   The description is shown **as written** (plain text, never HTML).
-- **History defaults to 1 km / 24 h** (FR-HIST-1) and the default view loads in
+- **History opens at 15 km / 24 h** (FR-HIST-1 — the widest offered radius, so a
+  cold launch shows the full local picture) and the default view loads in
   **< 2 s** on a warm session with a skeleton while loading (FR-HIST-4).
 - **A newly submitted report appears in History immediately, with no moderation
   gate** (FR-HIST-3). The History query includes the caller's own reports

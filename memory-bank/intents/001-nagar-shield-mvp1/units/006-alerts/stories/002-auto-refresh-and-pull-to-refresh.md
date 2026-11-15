@@ -2,11 +2,11 @@
 id: 002-auto-refresh-and-pull-to-refresh
 unit: 006-alerts
 intent: 001-nagar-shield-mvp1
-status: ready
+status: complete
 priority: must
 created: 2026-11-04T00:00:00Z
 assigned_bolt: null
-implemented: partial
+implemented: complete
 ---
 
 # Story: 002-auto-refresh-and-pull-to-refresh
@@ -87,22 +87,93 @@ implemented: partial
 
 ## Implementation
 
-**Auto-refresh and pull-to-refresh both ship. The story is not `complete` because the refresh is not testable as written and the background behaviour is unverified.**
+**Auto-refresh and pull-to-refresh both ship, and both are now guarded. The story is `complete` on the criteria it states — with one honest residue recorded below: the Maestro flow the Testing note names does not exist.**
 
 ### What ships
 
-- Auto-refresh is real: `apps/mobile/src/shared/api/alerts.ts:99-100` sets `refetchInterval: ALERTS_REFRESH_INTERVAL_MS` and `refetchIntervalInBackground: false`.
-- Pull-to-refresh is real: `apps/mobile/app/(app)/alerts.tsx:2` imports `RefreshControl`, and `alerts.tsx:73-75` wires it to `onRefresh={() => void refetch()}`, driven by `isRefetching` from the hook (`alerts.tsx:45`).
-- The refresh interval is a named constant rather than a literal.
+- **The poll is real and foreground-only.** `apps/mobile/src/shared/api/alerts.ts` sets `refetchInterval: () => (guard.isPaused ? false : ALERTS_REFRESH_INTERVAL_MS)` and `refetchIntervalInBackground: false`.
+- **The pull is real on both surfaces.** `apps/mobile/app/(app)/alerts.tsx` wires a `RefreshControl` to `onRefresh={() => void refetch()}`, driven by `isRefetching` from the hook. `apps/mobile/app/(app)/home.tsx` does the same, through a new **optional** `refreshControl` prop on `Screen`.
+- **The guard is intrinsic to the hook.** `useAlertsFeed` owns the guard and returns it, so no screen can poll without it and the header can never show a reason the poll did not use.
+- **The pause conditions are three and they are OR-ed**, with **background winning** — the reason that will change first when the app comes back.
 
-### The gaps
+### The three gaps this section named — closed
 
-- **No test covers either behaviour.** There is no jest test asserting that the feed refetches on the interval, nor that pull-to-refresh triggers `refetch`. The behaviour is real but unguarded — a change to the interval, or a `RefreshControl` whose `onRefresh` is wired to the wrong function, would ship silently.
-- **`refetchIntervalInBackground: false` is a deliberate choice with no recorded reason.** It is correct for a citizen's battery, but nothing in the code or the story records that the interval is intentionally suspended when the app is backgrounded — so a future change to `true` would look like a harmless edit.
-- **The interval constant has no test.** `ALERTS_REFRESH_INTERVAL_MS` is asserted nowhere; its value is a product decision with no guard.
+**1. "No test covers either behaviour."** There are now **three** test files, and they cover the behaviour rather than the source text.
 
-### What closing this needs
+`apps/mobile/src/shared/api/alertsRefresh.dom.test.ts` is **new** and drives the **real hook** with real fake timers, counting the RPC calls:
 
-1. A test asserting the feed sets a `refetchInterval`, with the interval pinned to the product's chosen value.
-2. A test asserting pull-to-refresh calls `refetch`.
-3. A comment, or a story amendment, recording why the refresh pauses in the background.
+- the feed re-queries **once per 60 s** — 59 s is not a poll, 60 s is one poll, and the next interval is one more;
+- a **backgrounded** app makes **zero** requests across ten intervals;
+- the poll **re-arms** on foregrounding with **no catch-up burst** — 59 s after returning is still nothing, and the 60th second is exactly one poll;
+- a **low battery** pauses the poll and keeps the cached page;
+- an **UNKNOWN** battery reading (`-1`) is **not low**, and the poll continues;
+- a manual pull re-queries **immediately**, without waiting for the interval;
+- the refresh indicator is on while a **poll** is in flight and while a **pull** is in flight;
+- a poll landing during a pull is **coalesced** into one request, and the rendered list has **no duplicate ids**;
+- an **offline** device makes no doomed request, keeps the cached page, and resumes when it comes back online.
+
+**2. "`refetchIntervalInBackground: false` is a deliberate choice with no recorded reason."** The reason is now recorded — in the code, next to the flag:
+
+> `refetchIntervalInBackground: false` is a **no-op in React Native**: TanStack's `focusManager.isFocused()` reads `globalThis.document?.visibilityState`, and React Native has no DOM `document`, so it is *always* `true`. The flag is kept because it is the correct thing to write — but it is **not** what stops the background poll. The **interval function** is.
+
+And the scan that keeps the record honest is `feedHeader.test.ts` — *"the record of why the background poll stops is in the code"* — which reads the **raw** source (the explanation lives in a comment) and requires the flag, the `focusManager.isFocused()` reference and the `visibilityState` reference to all be present.
+
+**3. "The interval constant has no test."** `packages/shared/src/schemas/schemas.test.ts` now pins `ALERTS_REFRESH_INTERVAL_MS === 60_000` and `ALERTS_BATTERY_PAUSE_THRESHOLD === 20`, and asserts both are whole numbers — a fractional millisecond or percent would mean the constants were *derived* rather than *chosen*.
+
+### The three defects closing this story exposed
+
+The story's criteria were not merely untested — they were **violated**. Closing them surfaced three real defects, each of which shipped.
+
+**1. The Home screen polled the feed forever, in the background.** `apps/mobile/app/(app)/home.tsx` called `useAlerts(filter)` with **no guard** — only `alerts.tsx` passed `enabled: !guard.isPaused`. AC #2 says **zero** feed requests while backgrounded; Home made one every 60 s, forever. The guard is now **intrinsic to the hook**, so there is no way to forget it: `useAlertsFeed` builds the guard and returns it, and both screens read it from the hook's return value.
+
+**2. `refetchIntervalInBackground: false` never blocked the poll — see above.** The flag was a no-op, so the only thing that could stop the background poll was the interval function. It is now a function.
+
+**3. `enabled: false` also blocked the mount fetch.** TanStack's `shouldLoadOnMount` requires `enabled !== false` (`queryObserver.js:490-492`), so the old `alerts.tsx` showed an **empty feed** on a cold start while paused, instead of the cached page. AC #8 was broken by the very mechanism that was meant to implement it. The `enabled` option is **removed** — dead once the guard is intrinsic, and a footgun while it was not.
+
+### The two levers, and why both are needed
+
+The guard stops the poll with **two** mechanisms, and the second one was found by a causal check that initially **failed**.
+
+- **The interval function stops the *timer*.** `refetchInterval` computes `false` when the guard is paused, and `isValidTimeout(false)` is false — so **no interval is armed at all**. TanStack re-arms the timer whenever the computed value changes (`queryObserver.js:130-131`), which re-arms it at the moment the app returns to the foreground — the next interval is measured from *that* moment, so there is no catch-up burst.
+- **The `queryFn` refusal stops the *request*.** The interval function is only re-evaluated **on a render**. Between the native `appStateDidChange` event and React's commit there is a window in which the timer is still armed and the computed interval is still 60 s. A request issued in that window would go out **after** the app was already backgrounded.
+
+The refusal therefore reads the guard's **live** state, not its rendered state. `RefreshGuard` gained `isPausedNow()`, which reads the app state source's `currentState` **getter** at the moment of the call. `guard.isPaused` is React state — it describes the last *render* — and the live check is what closes the race.
+
+### The causal checks
+
+Every guard was checked by breaking the thing it guards and confirming the test **failed**, then restoring:
+
+| What was broken | The test that failed |
+|---|---|
+| `refetchInterval` → a plain number | `alertsRefresh.dom.test.ts` — *"leaves no poll timer armed while the app is backgrounded"* |
+| The `queryFn` refusal removed | `alertsRefresh.dom.test.ts` — *"issues no request when the interval elapses mid-backgrounding"* |
+| `isPausedNow()` reading React state instead of the source | `refreshGuard.dom.test.ts` — *"sees a backgrounding that React has not committed"* and *"sees a foregrounding that React has not committed"*, plus the race-window test |
+| `isLowBattery`: `<` → `<=` | `refreshGuard.test.ts` — *"is not low at the threshold itself"* |
+| `isLowBattery`: an unknown reading treated as low | `refreshGuard.test.ts` — *"treats an unknown reading as not low"* |
+| The `refetchIntervalInBackground` note deleted | `feedHeader.test.ts` — *"the record of why the background poll stops is in the code"* |
+| The interval function replaced by a number | `feedHeader.test.ts` — *"the interval is a function, so the timer is re-armed on a change"* |
+| Home switched back to `useAlerts` | `feedHeader.test.ts` — *"uses the guarded feed hook, not the unguarded one"* |
+| `ALERTS_REFRESH_INTERVAL_MS` → `30_000` | `schemas.test.ts` — *"locks the Alerts refresh interval at 60 seconds"* |
+| The `queryFn` refusal dropped from `alertsShowingCachedPage` | `alerts.dom.test.ts` — *"is false when the refresh was paused rather than failed"* |
+
+Two of these checks **initially passed when they should have failed**, and both gaps were closed rather than the checks being dropped:
+
+- **The plain-number `refetchInterval` mutation passed every request-count test.** The `queryFn` refusal was stopping the *request*, so the request count could not tell a stopped **timer** from a refused **request**. The fix was a test that observes the **timer** — AC #2 asks for *"no background task, headless job, or timer survives the backgrounding"*, and a request count cannot see a surviving timer. The timer is now observed directly, through a spy on the **global** `setInterval` (which is what TanStack's default timeout provider calls), tracking the intervals that are **currently armed** — TanStack clears the old interval before arming the new one, so a recorder that only accumulated would report a timer that no longer exists.
+- **The `queryFn` refusal mutation passed every test** until the race-window test was written. The refusal only matters in the window between the native event and React's commit — so the test has to *enter* that window, and it does by backgrounding the app **without** committing the update. That test found a real defect: the refusal read `guard.isPaused`, which is React state, so it could not see the backgrounding at all.
+
+### The reduce-motion criterion
+
+AC #10 asked for the pulsing dot to go static under reduced motion **with the label and the styling unchanged**. The app had **zero** reduce-motion handling, so this is new:
+
+- `apps/mobile/src/shared/services/reduceMotion.ts` is **new** — `useReducedMotion()`, wrapping `AccessibilityInfo.isReduceMotionEnabled()` and the `reduceMotionChanged` event. React Native 0.88 ships both, so there is **no new dependency**. The reading starts `false`; an unreadable setting is not a request to reduce motion.
+- `PulseDot` gained a `reduceMotion?: boolean` prop. The two states stay **distinct**: `paused` renders **no halo** at all (the halo's absence is part of the "not refreshing" message), while `reduceMotion` renders the halo **frozen** at `progress = 0`. The gate on the **animation** is `isStatic = paused || reduceMotion`; the halo's ternary is still `{paused ? null : (`.
+- The **label** belongs to the screen and is driven by `pausedReason` alone — which `reduceMotion` never touches. That is what makes AC #10's *"the label remains unchanged"* fall out rather than needing a special case.
+- The `11 px / var(--ink-500) / weight 600` styling is not edited at all, and `feedHeader.test.ts` pins it on both screens.
+
+### The honest residue
+
+- **The Maestro flow does not exist.** The Testing note asks for a flow covering *"open Home → pull-to-refresh → the refresh indicator appears → the rows settle → select an area chip → the results narrow"*. The repo has one Maestro flow (`panic-path.yaml`) and it is the panic path. A pull-to-refresh flow needs a live backend and the harness to drive it.
+- **AC #1's "exactly once per interval" is a poll-event count, not an RPC count.** On a refetch an infinite query re-fetches **every loaded page** (`infiniteQueryBehavior.js:62`), so a poll on a three-page feed issues three RPCs. The story's own edge-case table expects this — *"the loaded pages are preserved and refreshed by the same query key"* — so the tests keep the feed at one page, where one poll event is one RPC.
+- **AC #7's coalescing is order-dependent.** The poll path passes `cancelRefetch: undefined`, so it **reuses** an in-flight promise (one RPC). The reverse order — poll in flight, then a pull — would **cancel** the poll and issue a second RPC. The story names the **pull-first** order, and that is what is tested.
+- **`home.autoRefreshNote` stays defined and unused.** Its Bangla diverges from `alerts.autoRefresh`, so re-using it would put a different string under the same promise. It is left alone rather than silently repurposed.
+- **The pause conditions are polled, not pushed.** The battery and the network are read every 15 s, because those modules fire events inconsistently across Android OEM builds. A pause can therefore lag the real condition by up to 15 s — and the app state, which arrives by event, is read **live** instead.

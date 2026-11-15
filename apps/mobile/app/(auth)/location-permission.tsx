@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import * as Location from 'expo-location'
 import { LinearGradient } from 'expo-linear-gradient'

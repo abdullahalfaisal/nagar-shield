@@ -1,5 +1,4 @@
 import {
-  HISTORY_DEFAULT_RADIUS_KM,
   HISTORY_DEFAULT_WINDOW_HOURS,
   REPORT_CATEGORIES,
   type ReportCategory,
@@ -31,25 +30,39 @@ export interface HistoryFilters {
   windowHours: number
   /** `null` means "no category filter", which is **not** the same as `'other'`. */
   category: ReportCategory | null
+  /**
+   * An area the person chose to look at, by its `area_lookup` id. `null` means
+   * "around my location". An area replaces the phone's position as the centre of
+   * the radius, so the same radius, window and type filters apply to it.
+   */
+  areaId: string | null
 }
+
+/** The radius options — 500 m, 1 km, 2 km, 5 km, 10 km, 15 km. */
+export const HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5, 10, 15] as const
+
+/** The window options — 1 h, 24 h, 7 d, 30 d. */
+export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const
 
 /**
  * The filter set a cold launch uses.
  *
- * FR-HIST-1 — 1 km, 24 h, no category. The reset action restores exactly
- * these values; an empty filter set is not a legal configuration (AC #7).
+ * The radius opens at the **widest option the sheet offers**, not the shared
+ * `HISTORY_DEFAULT_RADIUS_KM` (which stays the *server's* fallback for a
+ * caller that omits the parameter). A 1 km cold launch over a quiet hour
+ * reads as "nothing is happening anywhere"; the widest radius opens on the
+ * full picture the data can give, and narrowing is one tap away in the
+ * sheet. The window stays the shared 24 h default.
+ *
+ * The reset action restores exactly these values; an empty filter set is not
+ * a legal configuration (AC #7).
  */
 export const DEFAULT_HISTORY_FILTERS: HistoryFilters = {
-  radiusKm: HISTORY_DEFAULT_RADIUS_KM,
+  radiusKm: Math.max(...HISTORY_RADIUS_OPTIONS),
   windowHours: HISTORY_DEFAULT_WINDOW_HOURS,
   category: null,
+  areaId: null,
 }
-
-/** The radius options — 500 m, 1 km, 2 km, 5 km. */
-export const HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5] as const
-
-/** The window options — 1 h, 24 h, 7 d, 30 d. */
-export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const
 
 /**
  * The category options — the fixed 11-value enum.
@@ -59,6 +72,25 @@ export const HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720] as const
  * "accident" means.
  */
 export const HISTORY_CATEGORY_OPTIONS = REPORT_CATEGORIES
+
+/**
+ * The order the incident types are shown in, in the filter sheet and in the
+ * summary: everyday crimes, then emergencies, then the rest. Fixed, so the two
+ * places never disagree and the grid does not reshuffle with the data.
+ */
+export const HISTORY_TYPE_ORDER = [
+  'theft',
+  'robbery',
+  'assault',
+  'harassment',
+  'fraud',
+  'vandalism',
+  'fire',
+  'medical',
+  'accident',
+  'suspicious',
+  'other',
+] as const satisfies readonly (typeof REPORT_CATEGORIES)[number][]
 
 /** Restores the defaults. The reset action, and the cold-launch state. */
 export function resetHistoryFilters(): HistoryFilters {
@@ -73,7 +105,12 @@ export function resetHistoryFilters(): HistoryFilters {
  * without re-querying, and the result set is identical").
  */
 export function historyFiltersEqual(a: HistoryFilters, b: HistoryFilters): boolean {
-  return a.radiusKm === b.radiusKm && a.windowHours === b.windowHours && a.category === b.category
+  return (
+    a.radiusKm === b.radiusKm &&
+    a.windowHours === b.windowHours &&
+    a.category === b.category &&
+    a.areaId === b.areaId
+  )
 }
 
 /**

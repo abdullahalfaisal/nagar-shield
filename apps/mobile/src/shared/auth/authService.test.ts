@@ -40,6 +40,15 @@ import { AppError } from '@nagar-shield/shared'
 const calls: string[] = []
 const signInResult: { error: { message: string } | null } = { error: null }
 
+/**
+ * What `getSession()` finds.
+ *
+ * `null` means "the store holds no session" — the state a device whose
+ * SecureStore write was refused is in, and the state that used to sign the
+ * user out the moment `refreshSession()` ran.
+ */
+let mockSessionPresent = true
+
 jest.mock('@/shared/api/supabase', () => ({
   supabase: {
     auth: {
@@ -47,6 +56,16 @@ jest.mock('@/shared/api/supabase', () => ({
         calls.push('signInWithPassword')
         mockSequence.push('signInWithPassword')
         return { data: { user: { id: 'u1' } }, error: signInResult.error }
+      }),
+      getSession: jest.fn(async () => {
+        calls.push('getSession')
+        mockSequence.push('getSession')
+        return {
+          data: {
+            session: mockSessionPresent ? { user: { id: 'u1' } } : null,
+          },
+          error: null,
+        }
       }),
       refreshSession: jest.fn(async () => {
         calls.push('refreshSession')
@@ -70,8 +89,9 @@ jest.mock('@/shared/api/supabase', () => ({
 jest.mock('@/shared/services/uploadQueue', () => ({
   clearQueue: jest.fn(async () => {
     calls.push('clearQueue')
-    return 0
+    return 2
   }),
+  ownQueueCount: jest.fn(async () => 3),
 }))
 
 /**
@@ -125,10 +145,12 @@ import {
   SESSION_GRACE_WINDOW_MS,
   sessionPersistencePolicy,
 } from '@/shared/api/session-storage'
-import { logIn, logOut } from '@/shared/auth/authService'
+import { isInvalidCredentials, logIn, logOut } from '@/shared/auth/authService'
+import { clearQueue } from '@/shared/services/uploadQueue'
 
 const mockedAuth = supabase.auth as unknown as {
   signInWithPassword: jest.Mock
+  getSession: jest.Mock
   refreshSession: jest.Mock
   signOut: jest.Mock
 }
@@ -139,6 +161,7 @@ beforeEach(() => {
   mockSequence.length = 0
   mockRecordedPolicy = undefined
   signInResult.error = null
+  mockSessionPresent = true
   jest.clearAllMocks()
 })
 
@@ -209,6 +232,37 @@ describe('the Remember-me choice reaches the session write', () => {
     expect(mockedAuth.refreshSession).not.toHaveBeenCalled()
   })
 
+  it('does not refresh when the store holds no session to refresh', async () => {
+    // **This is the regression.** The device's SecureStore could not hold the
+    // session, so the store is empty while the client holds one in memory.
+    //
+    // `supabase-js`'s `refreshSession` reads the session from **storage**.
+    // A session it cannot find is treated as invalid: `auth-js` calls
+    // `_removeSession()`, which emits `SIGNED_OUT` and clears the session the
+    // sign-in had just created. The app bounced the user straight back to the
+    // welcome screen after a **successful** sign-in, with no error shown.
+    //
+    // So the refresh is only attempted when there is a session to refresh.
+    // The 30-day window cannot be honoured without a stored refresh token,
+    // and losing the sign-in is far worse than losing the window.
+    mockSessionPresent = false
+
+    await logIn({ identifier: 'citizen@example.com', password: 'pw', rememberMe: true })
+
+    expect(mockedAuth.getSession).toHaveBeenCalled()
+    expect(mockedAuth.refreshSession).not.toHaveBeenCalled()
+  })
+
+  it('still signs the user in when the store holds no session', async () => {
+    // The point of the guard above: the sign-in succeeds either way. The
+    // window is what degrades, not the authentication.
+    mockSessionPresent = false
+
+    await expect(
+      logIn({ identifier: 'citizen@example.com', password: 'pw', rememberMe: true }),
+    ).resolves.toBeUndefined()
+  })
+
   it('leaves no policy behind when the sign-in fails', async () => {
     signInResult.error = { message: 'Invalid login credentials' }
 
@@ -230,6 +284,47 @@ describe('the Remember-me choice reaches the session write', () => {
 
     // The next session must not inherit this one's window.
     expect(sessionPersistencePolicy()).toBeUndefined()
+  })
+})
+
+describe('signing out', () => {
+  it("keeps the user's unsent reports and says how many", async () => {
+    const result = await logOut()
+
+    // They stay for their author: another account cannot send or see them.
+    expect(clearQueue).not.toHaveBeenCalled()
+    expect(result).toEqual({ keptUploads: 3, discardedUploads: 0 })
+  })
+
+  it("discards the user's reports when the account is deleted", async () => {
+    const result = await logOut({ discardUploads: true })
+
+    expect(clearQueue).toHaveBeenCalledWith('u1')
+    expect(result).toEqual({ keptUploads: 0, discardedUploads: 2 })
+  })
+
+  it('counts an offline sign-out as a sign-out once the session is gone', async () => {
+    // The phone drops the session first and then fails to revoke it on the
+    // server. That used to throw, leaving the user on a signed-in screen.
+    mockedAuth.signOut.mockImplementationOnce(async () => {
+      mockSessionPresent = false
+      return { error: { message: 'Failed to fetch' } }
+    })
+
+    await expect(logOut()).resolves.toEqual({ keptUploads: 3, discardedUploads: 0 })
+    expect(sessionPersistencePolicy()).toBeUndefined()
+  })
+
+  it('still fails when the sign-out error leaves the session in place', async () => {
+    mockedAuth.signOut.mockImplementationOnce(async () => ({ error: { message: 'boom' } }))
+
+    await expect(logOut()).rejects.toBeDefined()
+  })
+
+  it('has nothing to keep when nobody was signed in', async () => {
+    mockSessionPresent = false
+
+    await expect(logOut()).resolves.toEqual({ keptUploads: 0, discardedUploads: 0 })
   })
 })
 
@@ -286,6 +381,11 @@ describe('the sign-in identifier reaches the server unchanged', () => {
     expect((unknown as AppError).code).toBe((wrongPassword as AppError).code)
     expect((unknown as AppError).code).toBe('AUTH_REQUIRED')
     expect((unknown as AppError).message).toBe((wrongPassword as AppError).message)
+    // Both are marked as bad credentials so the login screen can say so, while
+    // the code stays AUTH_REQUIRED for the queue drain's retry rule.
+    expect(isInvalidCredentials(unknown as AppError)).toBe(true)
+    expect(isInvalidCredentials(wrongPassword as AppError)).toBe(true)
+    expect(isInvalidCredentials(new AppError('AUTH_REQUIRED'))).toBe(false)
   })
 
   it('never sends the raw phone to signInWithPassword', async () => {

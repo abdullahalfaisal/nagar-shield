@@ -263,3 +263,58 @@ export async function clearLocalBiometricState(): Promise<void> {
     // Nothing to do.
   }
 }
+
+/**
+ * The device-side mirror of `profiles.biometric_opt_in`.
+ *
+ * The gate has to decide whether to lock the app on every launch, and it used
+ * to ask the server each time. Offline, the question failed and the app
+ * opened without the lock — the one moment a lost phone is most likely to be
+ * in a stranger's hands. The mirror is the last answer the server gave, so the
+ * decision can be made without the network.
+ *
+ * Like the failure mirror above, it is a cache and never the authority: it is
+ * only ever written with the server's answer, and the gate replaces it with a
+ * fresh answer whenever the server can be reached.
+ *
+ * The value carries the user id it belongs to. Two people can sign in on the
+ * same phone, and one person's "not opted in" must never stand in for the
+ * other's "opted in".
+ */
+const OPT_IN_KEY = 'nagar-shield.biometric-opt-in'
+
+/**
+ * The last known opt-in for `userId`, or `null` when there is none — never
+ * recorded on this device, recorded for a different account, or unreadable.
+ */
+export async function readBiometricOptInMirror(userId: string): Promise<boolean | null> {
+  try {
+    const raw = await secureStore.getItem(OPT_IN_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as { userId?: unknown; optIn?: unknown }
+    if (parsed.userId !== userId || typeof parsed.optIn !== 'boolean') return null
+    return parsed.optIn
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Records the server's answer for `userId`.
+ *
+ * The write is skipped when the stored value already says the same thing. The
+ * store records the outcome of every write to report a session that cannot be
+ * persisted, and rewriting an unchanged flag on every foreground would keep
+ * overwriting that record for no gain.
+ */
+export async function mirrorBiometricOptIn(userId: string, optIn: boolean): Promise<void> {
+  try {
+    if ((await readBiometricOptInMirror(userId)) === optIn) return
+    await secureStore.setItem(OPT_IN_KEY, JSON.stringify({ userId, optIn }))
+  } catch {
+    // A failed write costs only the offline decision. Without a stored value
+    // the gate falls back to the password screen when it cannot reach the
+    // server, which is the safe direction.
+  }
+}

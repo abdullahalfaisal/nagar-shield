@@ -1,11 +1,19 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { AppError } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { AppBar, Button, InputField } from '@/shared/ui'
-import { sendPasswordResetOtp, stagePasswordReset } from '@/shared/auth/passwordResetService'
+import { AppBar, Button, InputField, KeyboardScroll } from '@/shared/ui'
+import {
+  isRateLimited,
+  isResetNetworkError,
+  isValidResetIdentifier,
+  sendPasswordResetOtp,
+  stagePasswordReset,
+} from '@/shared/auth/passwordResetService'
 import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
@@ -38,24 +46,40 @@ import { errorCopy } from '@/shared/i18n/errorCopy'
 export default function ForgotPasswordScreen() {
   const theme = useTheme()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+
+  const params = useLocalSearchParams<{ notice?: string }>()
 
   const [identifier, setIdentifier] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [formError, setFormError] = useState<string | undefined>()
+  // A screen that sent the user back here (the code step, after the app was
+  // restored mid-flow) says why, by key, so the message is in their language.
+  const [formError, setFormError] = useState<string | undefined>(() =>
+    params.notice === 'sessionLost' ? t('auth.resetSessionLost') : undefined,
+  )
   const [submitting, setSubmitting] = useState(false)
+  // The cooldown rejection: the user cannot ask for another code, but may
+  // already hold one — so the screen offers to go straight to entering it.
+  const [rateLimited, setRateLimited] = useState(false)
 
   const onSendCode = async () => {
     const trimmed = identifier.trim()
 
-    if (trimmed.length === 0) {
-      setErrors({ identifier: t('errors.validationFailed') })
+    // The button stays enabled so a press always answers; the message under
+    // the field says what is wrong.
+    if (!isValidResetIdentifier(trimmed)) {
+      setErrors({
+        identifier:
+          trimmed.length === 0 ? t('errors.validationFailed') : t('auth.identifierInvalid'),
+      })
       return
     }
 
     setErrors({})
     setSubmitting(true)
     setFormError(undefined)
+    setRateLimited(false)
 
     try {
       await sendPasswordResetOtp(trimmed)
@@ -65,21 +89,38 @@ export default function ForgotPasswordScreen() {
       //
       // The identifier travels in **memory**, not in the route params: it is
       // PII, and a route param is part of a URL.
-      stagePasswordReset(trimmed, '')
+      stagePasswordReset(trimmed, '', Date.now())
       router.push('/(auth)/verify-otp')
     } catch (error) {
       const appError = error instanceof AppError ? error : null
-      setFormError(appError ? errorCopy(t, appError.code) : t('errors.internal'))
+
+      if (isRateLimited(error)) setRateLimited(true)
+
+      setFormError(
+        isResetNetworkError(error)
+          ? t('errors.network')
+          : appError
+            ? errorCopy(t, appError.code)
+            : t('errors.internal'),
+      )
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // The code the user already holds was issued by an earlier request, so its
+  // issue time is unknown; the code step then counts from now and the server
+  // remains the judge of expiry.
+  const onHaveCode = () => {
+    stagePasswordReset(identifier.trim(), '')
+    router.push('/(auth)/verify-otp')
   }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
       <AppBar title={t('auth.accountRecovery')} onBack={() => router.back()} />
 
-      <View style={styles.content}>
+      <KeyboardScroll contentStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}>
         <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
           {t('auth.forgotTitle')}
         </Text>
@@ -89,7 +130,13 @@ export default function ForgotPasswordScreen() {
 
         {formError ? (
           <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
-            <Text style={{ color: theme.palette.red[600], fontSize: 13 }}>{formError}</Text>
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={{ color: theme.palette.red[600], fontSize: 13 }}
+            >
+              {formError}
+            </Text>
           </View>
         ) : null}
 
@@ -97,10 +144,14 @@ export default function ForgotPasswordScreen() {
           label={t('auth.identifierLabel')}
           value={identifier}
           onChangeText={setIdentifier}
-          placeholder={t('auth.phonePlaceholder')}
+          placeholder={t('auth.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          returnKeyType="send"
+          onSubmitEditing={() => {
+            if (!submitting) void onSendCode()
+          }}
           icon="mail"
           error={errors.identifier}
           testID="forgot-identifier"
@@ -110,19 +161,35 @@ export default function ForgotPasswordScreen() {
           label={submitting ? t('capture.submitting') : t('auth.resetCta')}
           variant="primary"
           size="lg"
-          disabled={identifier.trim().length === 0 || submitting}
+          disabled={submitting}
           onPress={onSendCode}
           style={styles.cta}
         />
 
-        <Text
+        {rateLimited ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onHaveCode}
+            hitSlop={8}
+            style={styles.haveCodeHit}
+          >
+            <Text style={[styles.haveCode, { color: theme.palette.violet[700] }]}>
+              {t('auth.haveCode')}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
           accessibilityRole="button"
           onPress={() => router.replace('/(auth)/login')}
-          style={[styles.backToLogin, { color: theme.colors.ink[500] }]}
+          hitSlop={8}
+          style={styles.backToLoginHit}
         >
-          ← {t('auth.backToLogin')}
-        </Text>
-      </View>
+          <Text style={[styles.backToLogin, { color: theme.colors.ink[500] }]}>
+            ← {t('auth.backToLogin')}
+          </Text>
+        </Pressable>
+      </KeyboardScroll>
     </View>
   )
 }
@@ -132,7 +199,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 28,
   },
@@ -155,9 +222,21 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: 20,
   },
-  backToLogin: {
+  haveCodeHit: {
     alignSelf: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  haveCode: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  backToLoginHit: {
+    alignSelf: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  backToLogin: {
     fontSize: 13,
-    paddingVertical: 14,
   },
 })

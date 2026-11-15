@@ -211,6 +211,8 @@ export const staticColors = {
   white: '#FFFFFF',
   transparent: 'transparent',
   scrim: 'rgba(0,0,0,0.55)',
+  /** The full-screen media viewer: photos and video sit on black in both themes. */
+  black: '#000000',
   helpCardIconBg: 'rgba(255,255,255,0.20)',
   helpCardSub: 'rgba(255,255,255,0.85)',
   mapPinGlow: 'rgba(124,58,237,0.16)',
@@ -238,6 +240,13 @@ export interface ThemeColors {
     outline: string
   }
   appBarBg: string
+  /**
+   * Secondary and placeholder **text**. The ink ramp's 400 step is for icons
+   * and dividers: as text it is about 3:1 on white in the light theme and
+   * about 2:1 in the dark theme, both under the 4.5:1 minimum. This token
+   * meets it on every surface in both themes (`textContrast.test.ts`).
+   */
+  textMuted: string
   isDark: boolean
 }
 
@@ -262,6 +271,7 @@ export const lightColors: ThemeColors = {
     outline: '#E2E2EE',
   },
   appBarBg: 'rgba(255,255,255,0.86)',
+  textMuted: '#6B6B85',
   isDark: false,
 }
 
@@ -286,6 +296,7 @@ export const darkColors: ThemeColors = {
     outline: '#3A3A52',
   },
   appBarBg: 'rgba(11,11,26,0.86)',
+  textMuted: '#9090A8',
   isDark: true,
 }
 

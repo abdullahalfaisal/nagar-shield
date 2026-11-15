@@ -20,12 +20,12 @@ implemented: true
 ## Acceptance Criteria
 
 - [ ] **Given** the user taps the trailing `keyboard_arrow_down` on the History location pill, **When** the sheet opens, **Then** the filter sheet renders the three filter groups — **radius**, **time window**, and **category** — with the current values pre-selected
-- [ ] **Given** the radius filter is offered, **When** the options are listed, **Then** they are **500 m**, **1 km**, **2 km**, and **5 km**, and selecting one applies it as the `radius_km` query parameter (FR-HIST-2)
+- [ ] **Given** the radius filter is offered, **When** the options are listed, **Then** they are **500 m**, **1 km**, **2 km**, **5 km**, **10 km**, and **15 km**, and selecting one applies it as the `radius_km` query parameter (FR-HIST-2)
 - [ ] **Given** the time-window filter is offered, **When** the options are listed, **Then** they are **1 h**, **24 h**, **7 d**, and **30 d**, and selecting one applies it as the `window_hours` query parameter (FR-HIST-2)
 - [ ] **Given** the category filter is offered, **When** the options are listed, **Then** they are the fixed **11-value** enum — `theft`, `assault`, `harassment`, `robbery`, `accident`, `fire`, `medical`, `fraud`, `vandalism`, `suspicious`, `other` — plus an explicit **no category** option, and selecting one applies it as the `category` query parameter (FR-HIST-2)
 - [ ] **Given** any one of the three filters is changed, **When** the query re-runs, **Then** the returned result set **changes** — the filtered set is a strict subset of the unfiltered set and is not the same page served from a stale cache
-- [ ] **Given** the user opens the sheet with no filter applied before, **When** it renders, **Then** the pre-selected values are the defaults — **radius 1 km**, **window 24 h**, and **no category**
-- [ ] **Given** the user invokes the **reset** action in the sheet, **When** it completes, **Then** the radius is restored to **1 km**, the window to **24 h**, and the category to **no category**, and the result set returns to the default view
+- [ ] **Given** the user opens the sheet with no filter applied before, **When** it renders, **Then** the pre-selected values are the defaults — **radius 15 km** (the widest offered radius), **window 24 h**, and **no category**
+- [ ] **Given** the user invokes the **reset** action in the sheet, **When** it completes, **Then** the radius is restored to **15 km**, the window to **24 h**, and the category to **no category**, and the result set returns to the default view
 - [ ] **Given** the filter state changes, **When** the query key is inspected, **Then** the radius, the window, and the category are all part of the **query key**, so a different filter combination produces a different cache entry and the cache never serves the wrong page
 - [ ] **Given** the sheet is open and the user changes one filter, **When** they confirm, **Then** the sheet closes, the new values are applied, and the list re-queries exactly once — the filter is not applied twice or applied on every intermediate change
 - [ ] **Given** the sheet is open, **When** the user dismisses it without confirming (cancel, scrim tap, or back), **Then** the active filters, the applied query, and the rendered list are all unchanged
@@ -37,15 +37,15 @@ implemented: true
 - **The filter state lives in one place.** A single `HistoryFilters` object `{ radiusKm: number; windowHours: number; category: ReportCategory | null }` is the source of truth for the sheet, the query key, and the RPC arguments. The sheet edits a draft copy and commits it on confirm, so a cancelled sheet changes nothing.
 - **The filter state is part of the query key.** `useHistoryNearby` is keyed by `{ lat, lng, radiusKm, windowHours, category }`. Changing any one of them produces a distinct cache entry; the previous filter's cached page is never served for the new filter, and the previous entry is still cached for a back-navigation.
 - **The values are sent as query parameters to the RPC, never applied client-side.** `radius_km`, `window_hours`, and `category` go to `history_nearby`; the PostGIS `ST_DWithin` and the window predicate run server-side against the GiST index. Filtering locally would require fetching the unfiltered set and would break the 2 s budget.
-- **The radius options map to metres.** 500 m → `0.5`, 1 km → `1`, 2 km → `2`, 5 km → `5` (the RPC takes `radius_km` as a numeric kilometres value).
+- **The radius options map to metres.** 500 m → `0.5`, 1 km → `1`, 2 km → `2`, 5 km → `5`, 10 km → `10`, 15 km → `15` (the RPC takes `radius_km` as a numeric kilometres value).
 - **The window options map to hours.** 1 h → `1`, 24 h → `24`, 7 d → `168`, 30 d → `720`. The unit is hours on the wire; the label is the human one.
 - **The category list is the shared 11-value enum.** It renders from the shared `ReportCategory` parser and the shared Bangla labels, and it is exactly the list the author can set from the report detail — one vocabulary, no second list.
 - **A null category is a first-class filter value.** "No category" is not the same as "the category named `other`"; the RPC treats a null `category` as "do not filter by category", while `other` filters to reports explicitly categorised as `other`.
 - **The author's own reports are still included regardless of the filters.** The RPC's own-reports branch is independent of radius, window, and category — the filters narrow the nearby set, not the author's own submissions.
-- **The reset action restores the defaults, not an empty state.** An empty filter set is not a legal configuration: the sheet always has a radius, a window, and a category-or-none. The reset action sets exactly the defaults (1 km / 24 h / no category) — the same values the screen opens with on a cold launch.
+- **The reset action restores the defaults, not an empty state.** An empty filter set is not a legal configuration: the sheet always has a radius, a window, and a category-or-none. The reset action sets exactly the defaults (15 km / 24 h / no category) — the same values the screen opens with on a cold launch.
 - **The filter summary is visible outside the sheet.** The pill (or a summary line under it) reflects the active filters so the user can see what the list is showing without reopening the sheet.
 - **The 2 s budget survives a filter change.** The filtered query is the same index-backed query with a narrower predicate, so it is no slower than the default view; the skeleton is shown for the filtered load as well.
-- **Testing.** Jest covers the option → parameter mapping (all four radii, all four windows, the 11 categories plus none), the draft / commit / cancel semantics of the sheet, and the reset action. A Supabase-local integration test covers `history_nearby` with each radius, each window, and a category filter, and asserts the result set changes. A Maestro flow covers: open History → open the filter sheet → change the radius → the result set changes → reset → the default result set returns.
+- **Testing.** Jest covers the option → parameter mapping (all six radii, all four windows, the 11 categories plus none), the draft / commit / cancel semantics of the sheet, and the reset action. A Supabase-local integration test covers `history_nearby` with each radius, each window, and a category filter, and asserts the result set changes. A Maestro flow covers: open History → open the filter sheet → change the radius → the result set changes → reset → the default result set returns.
 
 ## Implementation
 
@@ -56,12 +56,13 @@ driven by `apps/mobile/src/shared/services/historyFilters.ts`.
   windowHours: number; category: ReportCategory | null }` — the sheet's draft, the
   query key, and the RPC arguments all read the same shape. The sheet edits a
   **draft** and commits it on confirm, so a cancelled sheet changes nothing.
-- **The defaults come from the shared constants.** `DEFAULT_HISTORY_FILTERS` is
-  `{ radiusKm: HISTORY_DEFAULT_RADIUS_KM, windowHours: HISTORY_DEFAULT_WINDOW_HOURS,
-  category: null }` — 1 km and 24 h (FR-HIST-1). `resetHistoryFilters()` returns a
-  **fresh object** each time, so a caller cannot corrupt the default by mutating
-  the result.
-- **The options are fixed.** `HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5]`,
+- **The defaults are the widest radius and the shared window.** `DEFAULT_HISTORY_FILTERS` is
+  `{ radiusKm: Math.max(...HISTORY_RADIUS_OPTIONS), windowHours: HISTORY_DEFAULT_WINDOW_HOURS,
+  category: null }` — **15 km** (the widest offered radius) and 24 h. The shared
+  `HISTORY_DEFAULT_RADIUS_KM` (1 km) stays only as the *server's* fallback for a caller that
+  omits the parameter. `resetHistoryFilters()` returns a **fresh object** each time, so a caller
+  cannot corrupt the default by mutating the result.
+- **The options are fixed.** `HISTORY_RADIUS_OPTIONS = [0.5, 1, 2, 5, 10, 15]`,
   `HISTORY_WINDOW_OPTIONS = [1, 24, 168, 720]`, and `HISTORY_CATEGORY_OPTIONS`
   is the **shared** `REPORT_CATEGORIES` — the same list the author can set from
   the report detail. One vocabulary; a second list is how two screens start

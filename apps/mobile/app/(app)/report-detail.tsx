@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import {
   REPORT_CATEGORIES,
@@ -18,11 +12,17 @@ import {
   type ReportCategory,
 } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
+import { EmptyState } from '@/shared/ui/EmptyState'
 import { AppBar } from '@/shared/ui/AppBar'
 import { BottomSheet } from '@/shared/ui/BottomSheet'
 import { Icon } from '@/shared/ui/Icon'
-import { formatAreaHierarchy } from '@/shared/ui/AlertCard'
+import { MediaStrip } from '@/shared/ui/MediaStrip'
+import { alertCategoryLabel, formatAreaHierarchy } from '@/shared/ui/AlertCard'
+import { useAreaName } from '@/shared/api/areas'
+import { errorCopy } from '@/shared/i18n/errorCopy'
+import { fromSupabaseError } from '@/shared/api/errors'
 import { useAuthSession } from '@/shared/auth/useAuthSession'
+import { SIGNED_URL_RENEW_MS } from '@/shared/api/alertDetail'
 import {
   signMediaUrl,
   updateCategory,
@@ -71,12 +71,13 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 export default function ReportDetailScreen() {
   const theme = useTheme()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
   const params = useLocalSearchParams<{ reportId?: string }>()
   const reportId = params.reportId
 
   const { session } = useAuthSession()
-  const { data: report, isLoading, error } = useOwnedReport(reportId)
+  const { data: report, isLoading, isError, refetch } = useOwnedReport(reportId)
   const invalidate = useInvalidateReport()
 
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -101,33 +102,47 @@ export default function ReportDetailScreen() {
       return
     }
 
-    void Promise.all(
-      report.media.map(async (media) => {
-        const url = await signMediaUrl(media.storagePath)
-        return [media.storagePath, url] as const
-      }),
-    ).then((pairs) => {
-      if (!active) return
-      setMediaUrls(
-        Object.fromEntries(pairs.filter(([, url]) => Boolean(url))) as Record<string, string>,
-      )
-    })
+    // `allSettled`: one image that fails to sign leaves its own placeholder
+    // icon and does not drop the others.
+    const sign = () =>
+      void Promise.allSettled(
+        report.media.map(async (media) => {
+          const url = await signMediaUrl(media.storagePath)
+          return [media.storagePath, url] as const
+        }),
+      ).then((results) => {
+        if (!active) return
+        const pairs = results.flatMap((result) =>
+          result.status === 'fulfilled' ? [result.value] : [],
+        )
+        setMediaUrls(
+          Object.fromEntries(pairs.filter(([, url]) => Boolean(url))) as Record<string, string>,
+        )
+      })
+
+    sign()
+
+    // The links last ten minutes. A screen left open longer renews them
+    // before they lapse, so a photo opened later is not a blank frame.
+    const timer = setInterval(sign, SIGNED_URL_RENEW_MS)
 
     return () => {
       active = false
+      clearInterval(timer)
     }
   }, [report])
 
   const category = report?.category ?? null
-  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
+  const categoryLabel = alertCategoryLabel(category, t('alerts.uncategorised'), i18n.language)
   const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
   // The area line is the **card's** rule, not a second copy of it — the same
   // place, named the same way, on both surfaces.
+  const areaName = useAreaName()
   const areaLine = useMemo(() => {
     if (!report) return null
-    return formatAreaHierarchy(report.areaHierarchy)
-  }, [report])
+    return formatAreaHierarchy(report.areaHierarchy, areaName)
+  }, [report, areaName])
 
   const capturedAt = report ? formatRelativeTimeForLocale(report.capturedAt, i18n.language) : ''
 
@@ -144,7 +159,7 @@ export default function ReportDetailScreen() {
     } catch (caught) {
       // The row keeps its previous category — the save is pessimistic, so the
       // user is never shown a category the database rejected.
-      setSaveError(caught instanceof Error ? caught.message : String(caught))
+      setSaveError(errorCopy(t, fromSupabaseError(caught).code))
     } finally {
       setPending(false)
     }
@@ -156,15 +171,34 @@ export default function ReportDetailScreen() {
   // this session.
   if (isLoading) {
     return (
-      <View
-        style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}
-      >
-        <ActivityIndicator color={theme.palette.violet[600]} />
+      <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
+        <AppBar title={t('alerts.reportDetailTitle')} onBack={() => router.back()} />
+        <View style={[styles.root, styles.centered]}>
+          <ActivityIndicator color={theme.palette.violet[600]} />
+        </View>
       </View>
     )
   }
 
-  if (error || !report) {
+  // A read that **failed** says nothing about the report: it may be there.
+  // Only a successful read that returned nothing is "not found".
+  if (isError && !report) {
+    return (
+      <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
+        <AppBar title={t('alerts.reportDetailTitle')} onBack={() => router.back()} />
+        <View style={styles.centered} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <EmptyState
+            icon="cloud_off"
+            title={t('alerts.detailLoadFailed')}
+            description={t('alerts.loadFailedSub')}
+            action={{ label: t('common.retry'), onPress: () => void refetch() }}
+          />
+        </View>
+      </View>
+    )
+  }
+
+  if (!report) {
     return (
       <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
         <AppBar title={t('alerts.reportDetailTitle')} onBack={() => router.back()} />
@@ -183,30 +217,20 @@ export default function ReportDetailScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* The media block. A report whose media upload failed renders the
             rest of the detail without a media block — never a broken image
             frame. */}
         {report.media.length > 0 ? (
-          <View style={styles.mediaStrip}>
-            {report.media.map((media) => {
-              const url = mediaUrls[media.storagePath]
-              return (
-                <View
-                  key={media.id}
-                  style={[styles.mediaTile, { backgroundColor: theme.colors.ink[100] }]}
-                >
-                  {url ? (
-                    <Image source={{ uri: url }} style={styles.mediaImage} resizeMode="cover" />
-                  ) : (
-                    <Icon name="image" size={28} color={theme.colors.ink[400]} />
-                  )}
-                </View>
-              )
-            })}
-          </View>
+          <MediaStrip
+            items={report.media.map((media) => ({
+              id: media.id,
+              kind: media.mediaType,
+              url: mediaUrls[media.storagePath] ?? null,
+            }))}
+          />
         ) : null}
 
         {/* The description. */}
@@ -229,12 +253,15 @@ export default function ReportDetailScreen() {
             accessibilityRole={isAuthor ? 'button' : 'text'}
             accessibilityLabel={
               isAuthor
-                ? `${t('alerts.editCategory')}. ${categoryLabel ? categoryLabel.bn : t('alerts.uncategorised')}`
+                ? `${t('alerts.editCategory')}. ${categoryLabel}`
                 : t('alerts.categoryReadOnly')
             }
             accessibilityState={{ disabled: !isAuthor }}
             disabled={!isAuthor}
-            onPress={() => setSheetOpen(true)}
+            onPress={() => {
+              setSaveError(null)
+              setSheetOpen(true)
+            }}
             style={({ pressed }) => [
               styles.categoryRow,
               pressed && isAuthor && { backgroundColor: theme.palette.violet[25] },
@@ -254,16 +281,14 @@ export default function ReportDetailScreen() {
                 {t('alerts.categoryLabel')}
               </Text>
               <Text style={[styles.categoryValue, { color: theme.colors.ink[950] }]}>
-                {categoryLabel
-                  ? `${categoryLabel.bn} — ${categoryLabel.en}`
-                  : t('alerts.uncategorised')}
+                {categoryLabel}
               </Text>
             </View>
 
             {isAuthor ? (
               <Icon name="chevron_right" size={20} color={theme.colors.ink[400]} />
             ) : (
-              <Text style={[styles.readOnly, { color: theme.colors.ink[400] }]}>
+              <Text style={[styles.readOnly, { color: theme.colors.textMuted }]}>
                 {t('alerts.readOnly')}
               </Text>
             )}
@@ -278,10 +303,6 @@ export default function ReportDetailScreen() {
             {t('alerts.categoryReadOnly')}
           </Text>
         ) : null}
-
-        {saveError ? (
-          <Text style={[styles.saveError, { color: theme.palette.red[600] }]}>{saveError}</Text>
-        ) : null}
       </ScrollView>
 
       {/* The category sheet — exactly the 11 values, each with its Bangla
@@ -290,11 +311,33 @@ export default function ReportDetailScreen() {
         visible={sheetOpen}
         title={t('alerts.editCategory')}
         helper={t('alerts.categorySheetHelper')}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => {
+          setSheetOpen(false)
+          setSaveError(null)
+        }}
       >
+        {/* The save's outcome belongs here, in front of the person who tapped:
+            on the page behind the sheet it was never seen. */}
+        {pending ? (
+          <View style={styles.sheetStatus} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={theme.palette.violet[600]} />
+            <Text style={[styles.sheetStatusText, { color: theme.colors.ink[500] }]}>
+              {t('alerts.categorySaving')}
+            </Text>
+          </View>
+        ) : null}
+        {saveError ? (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={[styles.saveError, { color: theme.palette.red[600] }]}
+          >
+            {saveError}
+          </Text>
+        ) : null}
         <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
           {REPORT_CATEGORIES.map((value) => {
-            const label = REPORT_CATEGORY_LABELS[value]
+            const label = REPORT_CATEGORY_LABELS[value][i18n.language === 'bn' ? 'bn' : 'en']
             const selected = category === value
 
             return (
@@ -302,7 +345,7 @@ export default function ReportDetailScreen() {
                 key={value}
                 accessibilityRole="radio"
                 accessibilityState={{ selected, disabled: pending }}
-                accessibilityLabel={`${label.bn} — ${label.en}`}
+                accessibilityLabel={label}
                 disabled={pending}
                 onPress={() => void choose(value)}
                 style={({ pressed }) => [
@@ -332,12 +375,7 @@ export default function ReportDetailScreen() {
                 </View>
 
                 <View style={styles.sheetText}>
-                  <Text style={[styles.sheetTitle, { color: theme.colors.ink[950] }]}>
-                    {label.bn}
-                  </Text>
-                  <Text style={[styles.sheetSubtitle, { color: theme.colors.ink[500] }]}>
-                    {label.en}
-                  </Text>
+                  <Text style={[styles.sheetTitle, { color: theme.colors.ink[950] }]}>{label}</Text>
                 </View>
 
                 {selected ? (
@@ -387,24 +425,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,
-  },
-  mediaStrip: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
-  },
-  mediaTile: {
-    width: 104,
-    height: 104,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
   },
   card: {
     borderRadius: 18,
@@ -479,7 +499,17 @@ const styles = StyleSheet.create({
   saveError: {
     fontSize: 12,
     paddingHorizontal: 4,
-    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  sheetStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingBottom: 10,
+  },
+  sheetStatusText: {
+    fontSize: 12,
   },
   sheetScroll: {
     marginBottom: 8,

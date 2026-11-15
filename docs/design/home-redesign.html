@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nagar Shield — Home redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+/* ------------------------------------------------------------------
+   Design tokens. Values come from the app's own palette
+   (apps/mobile/src/shared/theme/tokens.ts) so the approved design maps
+   onto the existing theme. New names are marked "new".
+------------------------------------------------------------------- */
+:root {
+  --violet-950:#1E0B47; --violet-900:#3B1E91; --violet-800:#4C2BB5; --violet-700:#6D28D9;
+  --violet-600:#7C3AED; --violet-500:#8B5CF6; --violet-400:#A78BFA; --violet-300:#C4B5FD;
+  --violet-200:#DDD6FE; --violet-100:#EDE9FE; --violet-50:#F5F3FF; --violet-25:#FAF8FF;
+  --red-700:#B91C1C; --red-600:#DC2626; --red-100:#FEE2E2;
+  --amber-600:#D97706; --amber-100:#FEF3C7;
+  --green-700:#047857; --green-600:#059669; --green-500:#10B981; --green-100:#D1FAE5;
+  --sky-600:#0284C7; --sky-100:#E0F2FE;
+  --pink-600:#DB2777; --pink-100:#FCE7F3;
+  --font-latin:'Inter',system-ui,sans-serif;
+  --font-bn:'Noto Sans Bengali','Inter',system-ui,sans-serif;
+}
+
+/* Light theme */
+.phone[data-theme="light"] {
+  --bg:#F6F4FC;            /* surface.lavender */
+  --card:#FFFFFF;
+  --card-border:rgba(30,11,71,.07);
+  --ink:#0B0B1A;           /* ink.950 */
+  --ink-2:#3A3A52;         /* body text, 10:1 */
+  --muted:#5B5B73;         /* secondary text, 6.4:1 on bg (new: replaces ink.500) */
+  --hairline:rgba(30,11,71,.09);
+  --chip-bg:#FFFFFF;
+  --chip-border:rgba(30,11,71,.14);
+  --chip-active-bg:#4C2BB5; --chip-active-ink:#FFFFFF;
+  --link:#6D28D9;          /* 6.1:1 on white */
+  --shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07);
+  --well-violet:#EDE9FE; --well-green:#D1FAE5; --well-amber:#FEF3C7; --well-sky:#E0F2FE;
+  --ic-violet:#6D28D9; --ic-green:#047857; --ic-amber:#B45309; --ic-sky:#0369A1;
+  --live-bg:#ECFDF5; --live-ink:#047857;
+  --thumb-a:#C4B5FD; --thumb-b:#8B5CF6;
+  --status:#1E0B47;
+}
+/* Dark theme (follows the phone's setting) */
+.phone[data-theme="dark"] {
+  --bg:#0E0A1F;
+  --card:#181331;
+  --card-border:rgba(196,181,253,.10);
+  --ink:#F4F2FF;
+  --ink-2:#D5D0EC;
+  --muted:#A9A3C8;         /* 7.4:1 on bg */
+  --hairline:rgba(196,181,253,.14);
+  --chip-bg:#181331;
+  --chip-border:rgba(196,181,253,.28);
+  --chip-active-bg:#A78BFA; --chip-active-ink:#1E0B47;
+  --link:#C4B5FD;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 28px rgba(0,0,0,.45);
+  --well-violet:rgba(167,139,250,.16); --well-green:rgba(16,185,129,.16);
+  --well-amber:rgba(245,158,11,.16); --well-sky:rgba(56,189,248,.16);
+  --ic-violet:#C4B5FD; --ic-green:#6EE7B7; --ic-amber:#FCD34D; --ic-sky:#7DD3FC;
+  --live-bg:rgba(16,185,129,.14); --live-ink:#6EE7B7;
+  --thumb-a:#4C2BB5; --thumb-b:#2A1766;
+  --status:#F4F2FF;
+}
+
+* { box-sizing:border-box; margin:0; }
+html { color-scheme: light dark; }
+body {
+  font-family:var(--font-latin);
+  background:#E9E5F5; color:#1A1A2E;
+  min-height:100vh; padding:28px 16px 64px;
+}
+body[data-lang="bn"] { font-family:var(--font-bn); }
+
+/* ---- Review page chrome (not part of the app design) ---- */
+.page { max-width:1180px; margin:0 auto; }
+.head { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; margin-bottom:24px; }
+.head h1 { font-size:22px; font-weight:800; letter-spacing:-.3px; color:#1E0B47; }
+.head p { margin-top:4px; font-size:14px; color:#4A4A63; max-width:560px; line-height:1.5; }
+.seg { display:inline-flex; background:#fff; border:1px solid rgba(30,11,71,.12); border-radius:12px; padding:3px; }
+.seg button { font:inherit; font-size:13px; font-weight:600; padding:8px 14px; border:0; background:transparent; color:#4A4A63; border-radius:9px; cursor:pointer; min-height:36px; }
+.seg button[aria-pressed="true"] { background:#4C2BB5; color:#fff; }
+.controls { display:flex; gap:10px; flex-wrap:wrap; }
+.stage { display:flex; flex-wrap:wrap; gap:32px; justify-content:center; align-items:flex-start; }
+.stage figure { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.stage figcaption { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#5B5B73; }
+.notes { margin-top:40px; background:#fff; border-radius:20px; padding:24px 28px; box-shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07); }
+.notes h2 { font-size:16px; font-weight:800; color:#1E0B47; margin-bottom:12px; }
+.notes ul { padding-left:18px; display:grid; gap:8px; font-size:14px; line-height:1.55; color:#34344A; }
+.notes li b { color:#1E0B47; }
+.notes .grid { display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+
+/* ---- Phone frame ---- */
+.phone {
+  width:390px; height:844px; border-radius:46px; background:var(--bg);
+  border:10px solid #14102A; box-shadow:0 30px 70px rgba(30,11,71,.30);
+  position:relative; overflow:hidden; display:flex; flex-direction:column;
+  color:var(--ink); font-family:inherit;
+}
+.statusbar { height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 28px; font-size:14px; font-weight:700; color:var(--status); }
+.statusbar .notch { position:absolute; left:50%; top:10px; transform:translateX(-50%); width:92px; height:26px; border-radius:20px; background:#14102A; }
+.statusbar .right { display:flex; gap:6px; align-items:center; }
+.scroll { flex:1; overflow-y:auto; padding-bottom:28px; scrollbar-width:none; }
+.scroll::-webkit-scrollbar { display:none; }
+
+.ico { display:inline-block; line-height:1; flex:0 0 auto; width:1em; height:1em; }
+button, .tap { font:inherit; color:inherit; background:none; border:0; cursor:pointer; text-align:inherit; }
+button:focus-visible, .tap:focus-visible { outline:3px solid var(--violet-500); outline-offset:2px; }
+
+/* Header */
+.top { padding:6px 20px 0; display:flex; align-items:center; gap:12px; }
+.brand { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; color:#fff; font-size:22px;
+  background:linear-gradient(135deg,#4C2BB5,#7C3AED 60%,#8B5CF6); box-shadow:0 6px 16px rgba(76,43,181,.35); flex:0 0 auto; }
+.hello { flex:1; min-width:0; }
+.date { font-size:12.5px; font-weight:500; color:var(--muted); line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.greet { display:flex; align-items:center; gap:7px; font-size:23px; line-height:30px; font-weight:800; letter-spacing:-.4px; color:var(--ink); }
+body[data-lang="bn"] .greet { font-weight:700; line-height:34px; }
+.greet .ico { font-size:22px; color:var(--ic-violet); }
+.iconbtn { width:48px; height:48px; border-radius:15px; display:grid; place-items:center; font-size:22px; color:var(--ink-2);
+  background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); flex:0 0 auto; }
+
+.where { margin:14px 20px 0; display:inline-flex; align-items:center; gap:7px; padding:0 14px 0 11px; min-height:36px; border-radius:999px;
+  background:var(--card); border:1px solid var(--card-border); font-size:13px; font-weight:600; color:var(--ink-2); box-shadow:var(--shadow); }
+.where .ico { color:var(--ic-green); font-size:16px; }
+.where .acc { color:var(--muted); font-weight:500; }
+
+/* Emergency banner: the same one the app has today (HelpBanner) */
+.sos { display:flex; align-items:center; gap:14px; width:calc(100% - 40px); min-height:72px; margin:16px 20px 0; padding:14px 16px; border-radius:18px; color:#fff;
+  background:#DC2626; box-shadow:0 6px 14px rgba(220,38,38,.28); text-align:left; }
+.sos-tile { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; background:rgba(255,255,255,.2); border:1.5px solid rgba(255,255,255,.45); flex:0 0 auto; }
+.sos .txt { flex:1; min-width:0; }
+.sos h2 { font-size:17px; line-height:23px; font-weight:800; }
+body[data-lang="bn"] .sos h2 { font-weight:700; line-height:26px; }
+.sos p { font-size:13px; line-height:18px; font-weight:500; margin-top:2px; }
+.sos .go { width:32px; height:32px; border-radius:50%; background:#fff; display:grid; place-items:center; flex:0 0 auto; }
+
+/* Primary + shortcut tiles */
+.section-label { margin:22px 20px 10px; font-size:12px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+body[data-lang="bn"] .section-label { letter-spacing:0; font-size:13px; text-transform:none; }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0 20px; }
+.report { grid-column:1 / -1; position:relative; overflow:hidden; display:flex; align-items:center; gap:14px; min-height:78px; padding:14px 16px; border-radius:22px; color:#fff;
+  background:linear-gradient(135deg,#4C2BB5 0%,#6D28D9 55%,#7C3AED 100%); box-shadow:0 12px 26px rgba(76,43,181,.32); }
+.report::after { content:""; position:absolute; right:-30px; bottom:-60px; width:170px; height:170px; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,0) 70%); }
+.report .tile { width:48px; height:48px; border-radius:16px; display:grid; place-items:center; font-size:24px; background:rgba(255,255,255,.18); border:1.5px solid rgba(255,255,255,.38); flex:0 0 auto; }
+.report b { display:block; font-size:17px; line-height:23px; font-weight:800; letter-spacing:-.2px; }
+body[data-lang="bn"] .report b { font-weight:700; line-height:26px; }
+.report span.sub { display:block; font-size:13px; line-height:18px; font-weight:500; opacity:.95; }
+.report .go { margin-left:auto; position:relative; z-index:1; font-size:20px; }
+.tileact { display:flex; flex-direction:column; align-items:flex-start; gap:10px; min-height:112px; padding:14px; border-radius:20px; background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); }
+.tileact .well { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; font-size:22px; }
+.tileact b { display:block; font-size:14.5px; line-height:20px; font-weight:700; color:var(--ink); }
+.tileact small { display:block; font-size:12.5px; line-height:17px; color:var(--muted); font-weight:500; margin-top:1px; }
+.tileact.wide { grid-column:1 / -1; flex-direction:row; align-items:center; min-height:72px; gap:14px; }
+.tileact.wide .txt { flex:1; min-width:0; }
+.tileact .chev { margin-left:auto; color:var(--muted); font-size:18px; }
+.well.violet { background:var(--well-violet); color:var(--ic-violet); }
+.well.green  { background:var(--well-green);  color:var(--ic-green); }
+.well.amber  { background:var(--well-amber);  color:var(--ic-amber); }
+.well.sky    { background:var(--well-sky);    color:var(--ic-sky); }
+
+
+/* Shortcuts: one card, four icons side by side */
+.qa { display:grid; grid-template-columns:repeat(4,1fr); margin:0 20px; padding:14px 6px 12px; border-radius:24px; background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); }
+.qa button { display:flex; flex-direction:column; align-items:center; gap:9px; min-height:48px; padding:0 3px; text-align:center; }
+.qi { width:56px; height:56px; border-radius:18px; display:grid; place-items:center; font-size:28px;
+  background:color-mix(in srgb, var(--a) 13%, var(--card)); color:color-mix(in srgb, var(--a) 88%, var(--ink)); }
+.phone[data-theme="dark"] .qi { background:color-mix(in srgb, var(--a) 24%, var(--card)); color:color-mix(in srgb, var(--a) 45%, #fff); }
+.qi.primary { background:#6D28D9; color:#fff; }
+.phone[data-theme="dark"] .qi.primary { background:#8B5CF6; color:#1E0B47; }
+.qa b { font-size:12px; line-height:16px; font-weight:700; color:var(--ink); min-height:32px; display:block; }
+body[data-lang="bn"] .qa b { line-height:19px; }
+
+/* Alerts feed */
+.feed-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:26px 20px 4px; }
+.feed-head h3 { font-size:19px; line-height:26px; font-weight:800; letter-spacing:-.2px; }
+body[data-lang="bn"] .feed-head h3 { font-weight:700; line-height:30px; }
+.seeall { min-height:48px; display:flex; align-items:center; gap:2px; padding:0 4px 0 10px; font-size:14px; font-weight:700; color:var(--link); }
+.seeall .ico { font-size:16px; }
+.live { margin:0 20px 12px; display:inline-flex; align-items:center; gap:8px; padding:5px 11px; border-radius:999px; background:var(--live-bg); color:var(--live-ink); font-size:12px; font-weight:600; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--green-500); box-shadow:0 0 0 0 rgba(16,185,129,.5); animation:pulse 2s infinite; }
+@keyframes pulse { 70% { box-shadow:0 0 0 7px rgba(16,185,129,0); } 100% { box-shadow:0 0 0 0 rgba(16,185,129,0); } }
+@media (prefers-reduced-motion: reduce) { .dot { animation:none; } }
+
+.chips { display:flex; gap:8px; overflow-x:auto; padding:0 20px 6px; scrollbar-width:none; }
+.chips::-webkit-scrollbar { display:none; }
+.chip { flex:0 0 auto; min-height:44px; padding:0 16px; border-radius:999px; background:var(--chip-bg); border:1.5px solid var(--chip-border); color:var(--ink-2); font-size:13.5px; font-weight:600; display:flex; align-items:center; }
+.chip[aria-pressed="true"] { background:var(--chip-active-bg); border-color:var(--chip-active-bg); color:var(--chip-active-ink); }
+
+.cards { display:grid; gap:12px; padding:8px 20px 0; }
+.alert { background:var(--card); border:1px solid var(--card-border); border-radius:22px; box-shadow:var(--shadow); padding:14px 14px 0; position:relative; }
+.alert-top { display:flex; gap:12px; align-items:center; padding-right:48px; }
+.cat { width:46px; height:46px; border-radius:15px; display:grid; place-items:center; font-size:25px; flex:0 0 auto; }
+.alert-top .t { min-width:0; }
+.alert-top b { display:block; font-size:15.5px; line-height:21px; font-weight:700; color:var(--ink); }
+.alert-top .place { display:flex; align-items:center; gap:4px; font-size:12.5px; line-height:17px; color:var(--muted); font-weight:500; }
+.alert-top .place .ico { font-size:13px; }
+.flag { position:absolute; right:6px; top:6px; width:48px; height:48px; display:grid; place-items:center; color:var(--muted); font-size:19px; border-radius:14px; }
+.desc { margin:10px 0 0; font-size:14px; line-height:21px; color:var(--ink-2); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.media { margin-top:12px; height:112px; border-radius:16px; position:relative; overflow:hidden; display:grid; place-items:center; color:#fff;
+  background:linear-gradient(135deg,var(--thumb-b),var(--thumb-a)); }
+.media::before { content:""; position:absolute; inset:0; background:
+  radial-gradient(120px 60px at 25% 110%,rgba(255,255,255,.28),transparent 70%),
+  radial-gradient(90px 90px at 85% -10%,rgba(255,255,255,.22),transparent 70%); }
+.media .badge { position:absolute; left:10px; bottom:10px; display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; background:rgba(14,10,31,.62); font-size:12px; font-weight:600; color:#fff; }
+.media .play { width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.9); color:#4C2BB5; display:grid; place-items:center; font-size:18px; position:relative; }
+.media .play .ico { margin-left:2px; }
+.media .photo { font-size:34px; opacity:.85; position:relative; }
+.alert-foot { display:flex; align-items:center; justify-content:space-between; margin:12px -14px 0; padding:0 14px; border-top:1px solid var(--hairline); min-height:48px; }
+.alert-foot .when { display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:500; color:var(--muted); }
+.alert-foot .when .ico { font-size:14px; }
+.alert-foot .more { display:flex; align-items:center; gap:2px; font-size:13.5px; font-weight:700; color:var(--link); }
+.alert-foot .more .ico { font-size:15px; }
+.cat { background:color-mix(in srgb, var(--a) 13%, var(--card)); color:var(--a); }
+.phone[data-theme="dark"] .cat { background:color-mix(in srgb, var(--a) 26%, var(--card)); color:color-mix(in srgb, var(--a) 40%, #fff); }
+.endnote { text-align:center; margin:18px 20px 0; font-size:12.5px; color:var(--muted); }
+
+/* Small meta icons use the body text colour so they stay readable */
+.alert-top .place .ico, .alert-foot .when .ico, .flag, .where .acc { color:var(--ink-2); }
+.where .ico { color:var(--ic-green); }
+
+/* Incident type legend (review page only) */
+.legend { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+.legend .item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:16px; border:1px solid rgba(30,11,71,.08); background:#fff; }
+.legend .item .cat { width:44px; height:44px; border-radius:14px; display:grid; place-items:center; font-size:24px; background:color-mix(in srgb, var(--a) 13%, #fff); color:var(--a); }
+.legend .item span.n { font-size:14px; font-weight:600; color:#1E0B47; }
+.legend.dark { background:#0E0A1F; padding:14px; border-radius:20px; margin-top:14px; }
+.legend.dark .item { background:#181331; border-color:rgba(196,181,253,.14); }
+.legend.dark .item .cat { background:color-mix(in srgb, var(--a) 26%, #181331); color:color-mix(in srgb, var(--a) 40%, #fff); }
+.legend.dark .item span.n { color:#F4F2FF; }
+
+/* Wrap the phones on small review screens */
+@media (max-width:480px) { .phone { width:100%; max-width:390px; } }
+
+/* ------------------------------------------------------------------
+   Layout system. One grid, one rhythm.
+   - 20 px side gutter everywhere; 16 px padding inside cards
+   - vertical rhythm: 12 between related items, 24 between sections
+   - radii: 18 cards, 14 tiles up to 48 px, 16 for the 56 px shortcut tiles, pill for chips
+   - type: 12 labels, 13 meta, 14 body and links, 16 card titles, 17 banner, 19 section titles
+------------------------------------------------------------------- */
+.phone { --gutter:20px; --r-card:18px; --r-tile:14px; }
+.scroll { padding-bottom:32px; }
+
+/* Header: two 48 px elements on one centre line */
+.top { padding:8px var(--gutter) 0; gap:12px; }
+.brand { width:48px; height:48px; border-radius:var(--r-tile); font-size:24px; }
+.iconbtn { width:48px; height:48px; border-radius:var(--r-tile); }
+.where { margin:12px var(--gutter) 0; min-height:36px; font-size:13px; }
+
+/* Banner (the app's own) */
+.greet .reload .ico { color:var(--muted); }
+.reload { width:28px; height:28px; margin:0 0 0 8px; display:grid; place-items:center; color:var(--muted); font-size:20px; flex:0 0 auto; }
+.greet { white-space:nowrap; } .greet span { overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.greet { font-size:16px; line-height:22px; font-weight:700; gap:5px; } .daterow { display:flex; align-items:center; } .greet .ico { font-size:20px; }
+.sos { margin:16px var(--gutter) 0; width:calc(100% - 2 * var(--gutter)); }
+
+/* Section rhythm */
+.section-label { margin:24px var(--gutter) 12px; font-size:12px; line-height:16px; }
+.qa { margin:16px var(--gutter) 0; padding:16px 8px 12px; border-radius:var(--r-card); }
+.qa button { gap:8px; }
+.qi { width:56px; height:56px; border-radius:16px; }
+.qa b { font-size:12px; line-height:16px; min-height:32px; }
+body[data-lang="bn"] .qa b { line-height:16px; }
+
+.feed-head { margin:20px var(--gutter) 0; }
+.feed-head h3 { font-size:19px; line-height:24px; }
+.seeall { padding:0 0 0 12px; font-size:14px; }
+.live { margin:0 var(--gutter) 12px; padding:6px 12px; font-size:12px; line-height:16px; }
+.chips { padding:0 var(--gutter) 12px; gap:8px; }
+.chip { min-height:44px; padding:0 16px; font-size:14px; }
+
+/* Cards */
+.cards { padding:0 var(--gutter); gap:12px; }
+.alert { padding:16px 16px 0; border-radius:var(--r-card); }
+.alert-top { gap:12px; padding-right:48px; }
+.cat { width:48px; height:48px; border-radius:var(--r-tile); font-size:26px; }
+.alert-top b { font-size:16px; line-height:22px; }
+.alert-top .place { font-size:13px; line-height:18px; gap:4px; }
+.alert-top .place .ico { font-size:14px; }
+.flag { right:8px; top:8px; border-radius:var(--r-tile); }
+.desc { margin:12px 0 0; font-size:14px; line-height:21px; }
+.media { margin-top:12px; border-radius:var(--r-tile); }
+.alert-foot { margin:12px -16px 0; padding:0 16px; }
+.alert-foot .when { font-size:13px; }
+.alert-foot .more { font-size:14px; }
+.endnote { margin:20px var(--gutter) 0; font-size:13px; }
+</style>
+</head>
+<body data-lang="en">
+
+<div class="page">
+  <div class="head">
+    <div>
+      <h1>Nagar Shield — Home redesign</h1>
+      <p>Review preview only. The app is unchanged. Light and dark show the same layout; the phone's own setting picks the theme. Scroll inside each phone.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="bn" aria-pressed="false">বাংলা</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <figure><div id="phone-light"></div><figcaption>Light</figcaption></figure>
+    <figure><div id="phone-dark"></div><figcaption>Dark</figcaption></figure>
+  </div>
+
+  <div class="notes" id="legend">
+    <h2>Incident type icons</h2>
+    <div class="legend" id="legend-grid"></div>
+  </div>
+
+  <div class="notes">
+    <h2>What changed and why</h2>
+    <div class="grid">
+      <ul>
+        <li><b>One clear order.</b> Who and where you are, then Emergency help, then Report, then shortcuts, then the live feed.</li>
+        <li><b>Emergency banner is the app's own.</b> Same line siren, same flat red, size, radius and shadow as the banner in the app today. It opens the help screen and never dials by itself.</li>
+        <li><b>All four shortcuts in one row.</b> Report, Location, History and Contacts sit together in a single card. Report has a solid violet icon, so it reads as the main action.</li>
+        <li><b>Clear names.</b> Report Crime, Location Sharing, Crime History, Emergency Contact.</li>
+        <li><b>Plain, serious icons.</b> Filled Fluent and Material Design icons on flat tinted tiles. Precise and neutral, not playful. No gloss and no gradients.</li>
+        <li><b>Incident icons show the event.</b> A masked person for theft, a person kicking for assault, a warning chat for harassment, a knife for robbery, a car collision for accident, a flame for fire, a heart-pulse for medical, a person with an exclamation mark for fraud, a hammer for vandalism, an eye for suspicious. Colours are the app's own category accents.</li>
+        <li><b>Current place shown.</b> A pill shows the detected area and GPS accuracy. This reuses the location the app already has.</li>
+      </ul>
+      <ul>
+        <li><b>Feed cards show the evidence.</b> A photo or video preview sits under the description, so a card is worth opening.</li>
+        <li><b>Contrast.</b> White text on both gradients is 4.8:1 or better. Secondary text is 6:1 or better in both themes. Control outlines use a stronger colour than today.</li>
+        <li><b>Tap targets.</b> Every control is 44 to 48 px or taller. Chips are 44. Arrows and flags are 48.</li>
+        <li><b>Bangla.</b> Looser line height for Noto Sans Bengali, and no letter-spaced capitals.</li>
+        <li><b>Not added.</b> No crime statistics, charts, rankings or heatmaps, and no new tab bar. The app keeps its current navigation.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const STR = {
+  en: {
+    date:'Sunday, 15 November', greeting:'Good evening', sun:'moon',
+    place:'Dhanmondi, Dhaka', acc:'GPS ±12 m',
+    sosTitle:'Emergency help', sosSub:'Tap what you need',
+    police:'Police', medical:'Medical', fire:'Fire',
+    quick:'Quick actions', reportShort:'Report Crime', locationShort:'Location Sharing', historyShort:'Crime History', contactsShort:'Emergency Contact',
+    report:'Report an incident', reportSub:'Photo or video, takes a minute',
+    location:'Location sharing', locationSub:'Share where you are',
+    history:'Crime history', historySub:'Incidents nearby',
+    contacts:'Emergency contacts', contactsSub:'3 people saved',
+    feed:'Recent alerts', seeAll:'See all',
+    live:'Auto-refreshes every 60s',
+    chips:['All areas','Dhaka division','Dhaka city','Mirpur','Mohammadpur'],
+    flag:'Report this alert', view:'View details',
+    end:'Showing the 5 newest. See all for more.',
+    cards:[
+      { cat:'theft', icon:'bag', name:'Theft', area:'Dhanmondi 27, Dhaka', desc:'Phone snatched near the Satmasjid Road bus stop by two people on a motorbike. Please keep your phone out of sight here.', media:'photo', badge:'2 photos', when:'12 min ago' },
+      { cat:'accident', icon:'car', name:'Accident', area:'Mirpur 10, Dhaka', desc:'Two vehicles collided at the roundabout. One lane is blocked and traffic is slow towards Kazipara.', media:'video', badge:'Video · 0:24', when:'38 min ago' },
+      { cat:'fire', icon:'flame', name:'Fire', area:'Mohammadpur, Dhaka', desc:'Smoke seen from a shop on the main road. The fire service has been called.', media:null, badge:'', when:'1 hour ago' },
+      { cat:'harassment', area:'Farmgate, Dhaka', desc:'A group is harassing women near the footbridge in the evening. Avoid walking alone here.', media:null, badge:'', when:'2 hours ago' },
+      { cat:'fraud', area:'Uttara Sector 7, Dhaka', desc:'Fake delivery calls asking for an OTP. Do not share any code with callers.', media:null, badge:'', when:'3 hours ago' }
+    ]
+  },
+  bn: {
+    date:'রবিবার, ১৫ নভেম্বর', greeting:'শুভ সন্ধ্যা', sun:'moon',
+    place:'ধানমন্ডি, ঢাকা', acc:'জিপিএস ±১২ মি.',
+    sosTitle:'জরুরি সাহায্য', sosSub:'যা দরকার তাতে ট্যাপ করুন',
+    police:'পুলিশ', medical:'চিকিৎসা', fire:'ফায়ার',
+    quick:'দ্রুত কাজ', reportShort:'অপরাধ রিপোর্ট', locationShort:'লোকেশন শেয়ারিং', historyShort:'অপরাধের ইতিহাস', contactsShort:'জরুরি যোগাযোগ',
+    report:'ঘটনা রিপোর্ট করুন', reportSub:'ছবি বা ভিডিও, এক মিনিটেই',
+    location:'লোকেশন শেয়ার', locationSub:'আপনি কোথায় আছেন জানান',
+    history:'অপরাধের ইতিহাস', historySub:'আশেপাশের ঘটনা',
+    contacts:'জরুরি যোগাযোগ', contactsSub:'৩ জন সংরক্ষিত',
+    feed:'সাম্প্রতিক সতর্কতা', seeAll:'সব দেখুন',
+    live:'প্রতি ৬০ সেকেন্ডে আপডেট হয়',
+    chips:['সব এলাকা','ঢাকা বিভাগ','ঢাকা শহর','মিরপুর','মোহাম্মদপুর'],
+    flag:'এই সতর্কতা রিপোর্ট করুন', view:'বিস্তারিত দেখুন',
+    end:'সবচেয়ে নতুন ৫টি দেখাচ্ছে। আরও দেখতে “সব দেখুন” চাপুন।',
+    cards:[
+      { cat:'theft', icon:'bag', name:'চুরি', area:'ধানমন্ডি ২৭, ঢাকা', desc:'সাতমসজিদ রোডের বাস স্টপের কাছে মোটরসাইকেলে দুইজন একজনের ফোন ছিনিয়ে নিয়েছে। এখানে ফোন লুকিয়ে রাখুন।', media:'photo', badge:'২টি ছবি', when:'১২ মিনিট আগে' },
+      { cat:'accident', icon:'car', name:'দুর্ঘটনা', area:'মিরপুর ১০, ঢাকা', desc:'গোলচত্বরে দুটি গাড়ির সংঘর্ষ হয়েছে। একটি লেন বন্ধ, কাজীপাড়ার দিকে যানজট।', media:'video', badge:'ভিডিও · ০:২৪', when:'৩৮ মিনিট আগে' },
+      { cat:'fire', icon:'flame', name:'আগুন', area:'মোহাম্মদপুর, ঢাকা', desc:'প্রধান সড়কের একটি দোকান থেকে ধোঁয়া দেখা যাচ্ছে। ফায়ার সার্ভিসকে জানানো হয়েছে।', media:null, badge:'', when:'১ ঘণ্টা আগে' },
+      { cat:'harassment', area:'ফার্মগেট, ঢাকা', desc:'সন্ধ্যায় ফুটওভার ব্রিজের কাছে একদল লোক নারীদের উত্যক্ত করছে। এখানে একা হাঁটবেন না।', media:null, badge:'', when:'২ ঘণ্টা আগে' },
+      { cat:'fraud', area:'উত্তরা সেক্টর ৭, ঢাকা', desc:'ডেলিভারির নামে ভুয়া ফোন করে ওটিপি চাওয়া হচ্ছে। কাউকে কোনো কোড দেবেন না।', media:null, badge:'', when:'৩ ঘণ্টা আগে' }
+    ]
+  }
+};
+
+const ICONS = {
+  siren:'fluent:alert-urgent-24-filled', camera:'fluent:camera-24-filled', pin:'fluent:location-24-filled', history:'fluent:history-24-filled',
+  users:'fluent:call-24-filled', sliders:'fluent:settings-24-filled', arrow:'fluent:arrow-right-24-filled', chev:'fluent:chevron-right-24-regular',
+  flag:'fluent:flag-24-filled', clock:'fluent:clock-24-filled', sun:'fluent:weather-sunny-24-filled', moon:'fluent:weather-moon-24-filled',
+  flame:'fluent:fire-24-filled', refresh:'fluent:arrow-sync-24-filled', shield:'fluent:shield-checkmark-24-filled', play:'fluent:play-24-filled', image:'fluent:image-24-filled', wifi:'fluent:wifi-1-24-filled',
+  // Incident types (same eleven as the app). Each glyph shows the event itself.
+  theft:'mdi:robber', assault:'mdi:kickboxing', harassment:'fluent:chat-warning-24-filled', robbery:'mdi:knife',
+  accident:'fluent:vehicle-car-collision-24-filled', fire:'fluent:fire-24-filled', medical:'fluent:heart-pulse-24-filled', fraud:'mdi:account-alert',
+  vandalism:'mdi:hammer', suspicious:'fluent:eye-24-filled', other:'fluent:more-circle-24-filled'
+};
+// The app's own category accents (packages/shared report-category.ts).
+const ACCENT = {
+  theft:'#7B1FA2', assault:'#DC2626', harassment:'#9C27B0', robbery:'#B71C1C', accident:'#5D4037', fire:'#D97706',
+  medical:'#C2185B', fraud:'#00838F', vandalism:'#4E342E', suspicious:'#546E7A', other:'#6B6B85'
+};
+const CAT_NAME = {
+  en:{ theft:'Theft', assault:'Assault', harassment:'Harassment', robbery:'Robbery', accident:'Accident', fire:'Fire', medical:'Medical', fraud:'Fraud', vandalism:'Vandalism', suspicious:'Suspicious', other:'Other' },
+  bn:{ theft:'চুরি', assault:'আক্রমণ', harassment:'উত্যন্ত', robbery:'ডাকাতি', accident:'দুর্ঘটনা', fire:'আগুন', medical:'চিকিৎসা', fraud:'প্রতারণা', vandalism:'ভাঙচোরা', suspicious:'সন্দেহজনক', other:'অন্যান্য' }
+};
+const catTile = (c, cls='cat') => `<span class="${cls}" style="--a:${ACCENT[c]}">${ic(c)}</span>`;
+const ic = (n, extra='') => `<iconify-icon icon="${ICONS[n]}" class="ico ${extra}" aria-hidden="true"></iconify-icon>`;
+
+function phone(theme, s) {
+  const chips = s.chips.map((c,i)=>`<button class="chip" type="button" aria-pressed="${i===0}">${c}</button>`).join('');
+  const cards = s.cards.map(c => `
+    <article class="alert">
+      <div class="alert-top">
+        ${catTile(c.cat)}
+        <div class="t"><b>${CAT_NAME[document.body.dataset.lang][c.cat]}</b><div class="place">${ic('pin')}<span>${c.area}</span></div></div>
+      </div>
+      <button class="flag" type="button" aria-label="${s.flag}">${ic('flag')}</button>
+      <p class="desc">${c.desc}</p>
+      ${c.media ? `<div class="media">${c.media==='video' ? `<span class="play">${ic('play')}</span>` : `<span class="photo">${ic('image')}</span>`}<span class="badge">${ic(c.media==='video'?'play':'image')}${c.badge}</span></div>` : ''}
+      <div class="alert-foot">
+        <span class="when">${ic('clock')}${c.when}</span>
+        <button class="more" type="button">${s.view}${ic('chev')}</button>
+      </div>
+    </article>`).join('');
+
+  return `
+  <div class="phone" data-theme="${theme}">
+    <div class="statusbar"><span>9:41</span><span class="notch"></span><span class="right">${ic('wifi')}<span>82%</span></span></div>
+    <div class="scroll">
+      <header class="top">
+        <div class="brand">${ic('shield')}</div>
+        <div class="hello">
+          <div class="date">${s.date}</div>
+          <div class="greet">${ic('pin')}<span>${s.place}</span><button class="reload" type="button" aria-label="Refresh location and alerts">${ic('refresh')}</button></div>
+        </div>
+        <button class="iconbtn" type="button" aria-label="Settings">${ic('sliders')}</button>
+      </header>
+
+      <button class="sos tap" type="button" aria-label="${s.sosTitle}. ${s.sosSub}">
+        <span class="sos-tile"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/></svg></span>
+        <span class="txt"><h2>${s.sosTitle}</h2><p>${s.sosSub}</p></span>
+        <span class="go"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+      </button>
+
+      <nav class="qa" aria-label="${s.quick}">
+        <button type="button"><span class="qi primary" style="--a:#6D28D9">${ic('camera')}</span><b>${s.reportShort}</b></button>
+        <button type="button"><span class="qi" style="--a:#047857">${ic('pin')}</span><b>${s.locationShort}</b></button>
+        <button type="button"><span class="qi" style="--a:#B45309">${ic('history')}</span><b>${s.historyShort}</b></button>
+        <button type="button"><span class="qi" style="--a:#0369A1">${ic('users')}</span><b>${s.contactsShort}</b></button>
+      </nav>
+
+      <div class="feed-head">
+        <h3>${s.feed}</h3>
+        <button class="seeall" type="button">${s.seeAll}${ic('chev')}</button>
+      </div>
+      <div class="live"><span class="dot"></span>${s.live}</div>
+      <div class="chips">${chips}</div>
+      <div class="cards">${cards}</div>
+      <p class="endnote">${s.end}</p>
+    </div>
+  </div>`;
+}
+
+function render(lang) {
+  document.body.dataset.lang = lang;
+  document.documentElement.lang = lang;
+  const keys = Object.keys(CAT_NAME.en);
+  const grid = (cls) => `<div class="legend ${cls}">` + keys.map(k => `<div class="item">${catTile(k)}<span class="n">${CAT_NAME[lang][k]}</span></div>`).join('') + '</div>';
+  document.getElementById('legend-grid').outerHTML = '<div id="legend-grid">' + grid('') + grid('dark') + '</div>';
+  document.getElementById('phone-light').innerHTML = phone('light', STR[lang]);
+  document.getElementById('phone-dark').innerHTML  = phone('dark',  STR[lang]);
+  if (location.hash === '#feed') document.querySelectorAll('.scroll').forEach(x => x.scrollTop = 700);
+  document.querySelectorAll('.chips').forEach(row => {
+    row.addEventListener('click', e => {
+      const b = e.target.closest('.chip'); if (!b) return;
+      row.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+    });
+  });
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  render(b.dataset.lang);
+}));
+render('en');
+</script>
+</body>
+</html>

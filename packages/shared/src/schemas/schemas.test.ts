@@ -8,6 +8,7 @@ import {
   HISTORY_DEFAULT_WINDOW_HOURS,
   loginSchema,
   moderationDecisionSchema,
+  bnDigitsToAscii,
   normalisePhone,
   phoneSchema,
   signupSchema,
@@ -21,6 +22,8 @@ import {
   BIOMETRIC_FAILS_TO_DISABLE,
   BIOMETRIC_FAILS_TO_PASSWORD,
   REMEMBER_ME_DAYS,
+  ALERTS_REFRESH_INTERVAL_MS,
+  ALERTS_BATTERY_PAUSE_THRESHOLD,
   areaHierarchySchema,
   contactSchema,
   parseAreaHierarchy,
@@ -32,6 +35,13 @@ describe('phone normalisation', () => {
     expect(normalisePhone('+8801712345678')).toBe('+8801712345678')
     expect(normalisePhone('8801712345678')).toBe('+8801712345678')
     expect(normalisePhone('+880 171-234-5678')).toBe('+8801712345678')
+  })
+
+  it('reads Bangla digits as the same number', () => {
+    expect(bnDigitsToAscii('০১৭১২৩৪৫৬৭৮')).toBe('01712345678')
+    expect(normalisePhone('০১৭১২৩৪৫৬৭৮')).toBe('+8801712345678')
+    expect(normalisePhone('+৮৮০ ১৭১২-৩৪৫৬৭৮')).toBe('+8801712345678')
+    expect(phoneSchema.safeParse('০১৭১২৩৪৫৬৭৮').success).toBe(true)
   })
 
   it('rejects a non-Bangladesh number', () => {
@@ -192,6 +202,33 @@ describe('business-rule constants', () => {
 
   it('locks the Remember me window at 30 days (FR-AUTH-2)', () => {
     expect(REMEMBER_ME_DAYS).toBe(30)
+  })
+
+  it('locks the Alerts refresh interval at 60 seconds (FR-ALERTS-2)', () => {
+    // Story `002-auto-refresh-and-pull-to-refresh` names the gap:
+    //
+    // > **The interval constant has no test.** `ALERTS_REFRESH_INTERVAL_MS` is
+    // > asserted nowhere; its value is a product decision with no guard.
+    //
+    // The value is the story's own: the header tells the user the feed
+    // "Auto-refreshes every 60s", so the constant and that label are the same
+    // promise.
+    expect(ALERTS_REFRESH_INTERVAL_MS).toBe(60_000)
+    expect(ALERTS_REFRESH_INTERVAL_MS / 1000).toBe(60)
+  })
+
+  it('locks the Alerts battery pause threshold at 20 % (FR-ALERTS-2)', () => {
+    // The comparison is *strictly less than*, so exactly 20 % still refreshes.
+    // The boundary is pinned in `refreshGuard.test.ts`; the value is pinned
+    // here.
+    expect(ALERTS_BATTERY_PAUSE_THRESHOLD).toBe(20)
+  })
+
+  it('keeps the Alerts refresh constants whole numbers', () => {
+    // A fractional millisecond or a fractional percent would mean the
+    // constants were *derived* rather than chosen.
+    expect(Number.isInteger(ALERTS_REFRESH_INTERVAL_MS)).toBe(true)
+    expect(Number.isInteger(ALERTS_BATTERY_PAUSE_THRESHOLD)).toBe(true)
   })
 })
 

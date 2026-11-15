@@ -151,10 +151,13 @@ describe('the map is one shared component', () => {
   it('reads the attribution from the wrapper itself', () => {
     const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8')
 
-    // The attribution is a condition of using the public OSM tile servers, so
-    // it cannot be opt-in — a consumer that forgets it is the defect.
-    expect(wrapper).toContain('© OpenStreetMap contributors')
-    expect(wrapper).toContain("attribution = '© OpenStreetMap contributors'")
+    // The attribution is a condition of using any tile provider, so it cannot
+    // be opt-in — a consumer that forgets it is the defect. The default comes
+    // from the one tile-source module.
+    expect(wrapper).toContain('attribution = TILE_ATTRIBUTION')
+
+    const source = readFileSync(join(__dirname, 'tileSource.ts'), 'utf8')
+    expect(source).toContain('© OpenStreetMap contributors')
   })
 
   it('has exactly one map wrapper and one map style in the app', () => {
@@ -172,14 +175,22 @@ describe('the map is one shared component', () => {
     expect(localMaps).toEqual([])
   })
 
-  it('uses the OSM raster tile server and no other tile source', () => {
-    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8')
-    const tiles = wrapper.match(/https:\/\/[^'"`]*\{z\}[^'"`]*/g) ?? []
+  it('reads its tiles from the one tile-source module and hardcodes no tile URL', () => {
+    // The public OSM servers block applications, so the source is a single,
+    // configurable module. A tile URL written anywhere else would be a second
+    // source that ignores the setting.
+    const withTileUrl = sourceFiles.filter((path) => {
+      if (path.includes('.test.')) return false
+      const code = readFileSync(join(APP_ROOT, path), 'utf8')
+      return /https:\/\/[^'"`\s]*\{z\}[^'"`\s]*/.test(code)
+    })
 
-    expect(tiles.length).toBeGreaterThan(0)
-    for (const url of tiles) {
-      expect(url).toContain('tile.openstreetmap.org')
-    }
+    // There is no default provider, so no tile URL is written out anywhere:
+    // the URL comes from `EXPO_PUBLIC_MAP_TILE_URL` via `tileSource.ts`.
+    expect(withTileUrl).toEqual([])
+
+    const wrapper = readFileSync(join(__dirname, 'StationMap.tsx'), 'utf8')
+    expect(wrapper).toContain('TILE_URL_TEMPLATE')
   })
 
   it('is consumed by the History map, not a local copy', () => {

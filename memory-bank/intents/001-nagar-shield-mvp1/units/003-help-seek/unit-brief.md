@@ -196,7 +196,7 @@ Notes on the schema:
 | `expo-location` | One foreground GPS fix for the thana lookup and the map centre | Medium — permission may be denied (FR-PERMS-2) and the fix can be slow indoors; the dial path must not wait on it |
 | MapLibre GL (`@maplibre/maplibre-react-native`) + OSM raster tiles | Find-a-station map | Medium — OSM public tile usage policy; attribution is mandatory and the map degrades to a bundled station list with no network |
 | Supabase Postgres + PostgREST | `stations` / `hotlines` reads, `wrong_number_reports` writes, `nearest_thana` RPC | Low — none of these are on the dial path |
-| Android OS power-save mode | Detects battery saver for FR-PERMS-3 | Medium — **no first-class Expo API exposes power-save mode**; expects a thin native module (Expo Modules API) or `react-native-power-manager`. Flagged in Notes |
+| Android OS power-save mode | Detects battery saver for FR-PERMS-3 | Low — `expo-battery` reads it via `isLowPowerModeEnabledAsync()` (`PowerManager.isPowerSaveMode`); a failed read degrades to `'unknown'` and the static copy, never to a claimed `'off'` |
 | npm registry | Expo SDK, MapLibre RN, React Query, i18next | Low |
 
 ---

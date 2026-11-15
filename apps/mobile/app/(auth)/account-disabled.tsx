@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import { Button, WizardScreen } from '@/shared/ui'
@@ -55,6 +55,15 @@ export default function AccountDisabledScreen() {
     }
   }
 
+  // Deleting is destructive, so it asks first. The body says what happens: the
+  // account is kept for 30 days, then removed.
+  const confirmDelete = () => {
+    Alert.alert(t('disabled.deleteTitle'), t('settings.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('settings.deleteConfirm'), style: 'destructive', onPress: () => void onDelete() },
+    ])
+  }
+
   const onSignOut = async () => {
     setBusy(true)
     try {
@@ -74,18 +83,18 @@ export default function AccountDisabledScreen() {
       footer={
         <>
           <Button
-            label={t('disabled.deleteTitle')}
+            label={t('disabled.signOut')}
             variant="primary"
             size="lg"
             disabled={busy}
-            onPress={onDelete}
+            onPress={onSignOut}
           />
           <Button
-            label={t('disabled.signOut')}
+            label={t('disabled.deleteTitle')}
             variant="secondary"
             size="lg"
             disabled={busy}
-            onPress={onSignOut}
+            onPress={confirmDelete}
           />
         </>
       }
@@ -113,7 +122,7 @@ export default function AccountDisabledScreen() {
         </View>
       </View>
 
-      <Text style={[styles.support, { color: theme.colors.ink[400] }]}>
+      <Text style={[styles.support, { color: theme.colors.textMuted }]}>
         {t('disabled.support')}
       </Text>
 

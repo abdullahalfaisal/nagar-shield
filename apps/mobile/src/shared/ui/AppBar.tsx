@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
+import { usePressGuard } from './usePressGuard'
 
 /** `.badge-dot` — the red notification dot on the More Options button. */
 const BADGE_DOT_COLOR = '#EF4444'
@@ -40,6 +41,8 @@ export function AppBar({
   const theme = useTheme()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const pressBack = usePressGuard(onBack)
+  const pressAction = usePressGuard(action?.onPress)
 
   return (
     <View
@@ -60,7 +63,7 @@ export function AppBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('common.back')}
-          onPress={onBack}
+          onPress={pressBack}
           hitSlop={8}
           style={({ pressed }) => [
             styles.iconButton,
@@ -102,7 +105,7 @@ export function AppBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={action.accessibilityLabel}
-          onPress={action.onPress}
+          onPress={pressAction}
           hitSlop={8}
           style={({ pressed }) => [
             styles.iconButton,

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { stageSignupDraft } from '@/shared/auth/signupDraft'
 import { useTranslation } from 'react-i18next'
-import { phoneSchema } from '@nagar-shield/shared'
+import { bnDigitsToAscii, emailSchema, phoneSchema } from '@nagar-shield/shared'
+import { validateSignupFields } from '@/shared/auth/signupValidation'
 import { useTheme } from '@/shared/theme'
 import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui'
 import { Icon } from '@/shared/ui/Icon'
@@ -31,31 +33,27 @@ export default function PhoneScreen() {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // The phone is checked with the shared schema, not a length test: the schema
-  // normalises the number to E.164 and refuses anything that is not a valid
-  // Bangladesh number.
-  const parsedPhone = phoneSchema.safeParse(phone)
-
-  const canContinue = parsedPhone.success && email.includes('@') && password.length >= 8
+  // The button stays enabled and the fields are checked on press: a greyed
+  // button gave no reason, and the per-field messages could never show. The
+  // checks are the shared schemas, which normalise the phone to E.164 and
+  // refuse anything that is not a valid Bangladesh number.
+  const clearError = (field: string) => setErrors((current) => ({ ...current, [field]: '' }))
 
   const onContinue = () => {
+    const found = validateSignupFields({ phone, email, password })
     const nextErrors: Record<string, string> = {}
-    if (!parsedPhone.success) nextErrors.phone = t('errors.validationFailed')
-    if (!email.includes('@')) nextErrors.email = t('errors.validationFailed')
-    if (password.length < 8) nextErrors.password = t('errors.validationFailed')
+    for (const [field, key] of Object.entries(found)) nextErrors[field] = t(key)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    router.push({
-      pathname: '/(auth)/alternate-phone',
-      params: {
-        // The **normalised** number, so the next screen compares like with
-        // like.
-        phone: parsedPhone.data,
-        email,
-        password,
-      },
-    })
+    const parsedPhone = phoneSchema.parse(phone)
+    const parsedEmail = emailSchema.parse(email)
+
+    // The **normalised** number, so the next screen compares like with like.
+    // Held in memory, not in route params: the password must not reach
+    // navigation state or logs.
+    stageSignupDraft({ phone: parsedPhone, email: parsedEmail, password, alternatePhone: '' })
+    router.push('/(auth)/alternate-phone')
   }
 
   return (
@@ -72,13 +70,7 @@ export default function PhoneScreen() {
       subtitle={t('auth.phoneSubtitle')}
       footer={
         <>
-          <Button
-            label={t('common.continue')}
-            variant="primary"
-            size="lg"
-            disabled={!canContinue}
-            onPress={onContinue}
-          />
+          <Button label={t('common.continue')} variant="primary" size="lg" onPress={onContinue} />
           <EscapeLink label={t('common.back')} onPress={() => router.back()} />
         </>
       }
@@ -86,11 +78,15 @@ export default function PhoneScreen() {
       <InputField
         label={t('auth.phoneLabel')}
         value={phone}
-        onChangeText={setPhone}
+        onChangeText={(next) => {
+          setPhone(bnDigitsToAscii(next))
+          clearError('phone')
+        }}
         placeholder={t('auth.phonePlaceholder')}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
-        autoComplete="tel"
+        autoComplete="tel-national"
+        returnKeyType="next"
         icon="phone"
         error={errors.phone}
         testID="wiz-phone-1"
@@ -98,11 +94,15 @@ export default function PhoneScreen() {
       <InputField
         label={t('auth.emailLabel')}
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(next) => {
+          setEmail(next)
+          clearError('email')
+        }}
         placeholder={t('auth.emailPlaceholder')}
         keyboardType="email-address"
         textContentType="emailAddress"
         autoComplete="email"
+        returnKeyType="next"
         icon="mail"
         error={errors.email}
         testID="wiz-email-1"
@@ -110,19 +110,24 @@ export default function PhoneScreen() {
       <InputField
         label={t('auth.passwordLabel')}
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(next) => {
+          setPassword(next)
+          clearError('password')
+        }}
         secureTextEntry
         textContentType="password"
         autoComplete="password-new"
+        returnKeyType="done"
         icon="lock"
         error={errors.password}
+        helper={t('auth.passwordPolicyHint')}
         testID="wiz-password-1"
       />
 
       <View style={styles.lockRow}>
         <Icon name="lock" size={16} color={theme.palette.violet[600]} />
         <Text style={[styles.lockText, { color: theme.colors.ink[500] }]}>
-          {t('auth.welcomeSubtitle')}
+          {t('auth.phonePrivacyNote')}
         </Text>
       </View>
     </WizardScreen>

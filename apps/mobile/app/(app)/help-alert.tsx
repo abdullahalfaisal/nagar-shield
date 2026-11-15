@@ -1,8 +1,15 @@
-import { useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useRef, useState } from 'react'
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ScrollViewInstance,
+} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import { Icon } from '@/shared/ui/Icon'
@@ -11,6 +18,7 @@ import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet'
 import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
 import { useContacts } from '@/shared/api/contacts'
 import { toBengaliDigits } from '@/shared/utils/relativeTime'
+import { haptic } from '@/shared/services/haptics'
 
 /**
  * Screen 18 — Help Alert.
@@ -31,21 +39,35 @@ import { toBengaliDigits } from '@/shared/utils/relativeTime'
 export default function HelpAlertScreen() {
   const theme = useTheme()
   const router = useRouter()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // A number on a tile reads in the tile's language; the dialler gets ASCII.
+  const digits = (value: string) => (i18n.language === 'bn' ? toBengaliDigits(value) : value)
   const insets = useSafeAreaInsets()
 
   const [sheetOpen, setSheetOpen] = useState(false)
 
   const { data: contacts } = useContacts()
-  const contactCount = useMemo(() => contacts?.length ?? 0, [contacts])
+  // Until the list has loaded (or when it failed) there is no count to show:
+  // "0 saved" would tell someone with saved contacts that they have none.
+  const contactCount = contacts ? contacts.length : null
 
   // The degraded-mode flow. The dial path is client-only — the number is
   // bundled and the intent goes straight to the OS — so a phone with no
   // signal, no location, and battery saver on still reaches help.
   const degradedHelp = useDegradedHelp()
 
+  // The guidance renders below the tiles, which on a short screen is off
+  // screen. Its position is kept so a failed dial scrolls it into view.
+  const scrollRef = useRef<ScrollViewInstance>(null)
+  const guidanceY = useRef(0)
+  const revealGuidance = () => scrollRef.current?.scrollTo({ y: guidanceY.current, animated: true })
+
   const dial = async (number: string) => {
+    haptic('tap')
     await degradedHelp.dial(number)
+    // A second failed dial does not re-lay-out the guidance, so `onLayout`
+    // alone would not bring it back after the user scrolled away.
+    requestAnimationFrame(revealGuidance)
   }
 
   return (
@@ -83,40 +105,37 @@ export default function HelpAlertScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
         <HelpTile
           variant="police"
           title={t('help.police')}
           subtitle={t('help.policeSub')}
-          english="Police"
-          number="999"
+          number={digits('999')}
           onPress={() => dial('999')}
         />
         <HelpTile
           variant="medical"
           title={t('help.medical')}
           subtitle={t('help.medicalSub')}
-          english="Medical"
-          number="999"
+          number={digits('999')}
           onPress={() => dial('999')}
         />
         <HelpTile
           variant="fire"
           title={t('help.fire')}
           subtitle={t('help.fireSub')}
-          english="Fire Service"
-          number="102"
+          number={digits('102')}
           onPress={() => dial('102')}
         />
         <HelpTile
           variant="personal"
           title={t('help.personalContacts')}
           subtitle={t('help.personalSub')}
-          english="Personal Contacts"
-          number={`${toBengaliDigits(String(contactCount))} জন`}
+          number={contactCount === null ? null : t('help.peopleCount', { count: contactCount })}
           onPress={() => router.push('/(app)/contacts')}
         />
 
@@ -124,11 +143,18 @@ export default function HelpAlertScreen() {
             number on the tile the user tapped and the guidance about it
             appear together. */}
         {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
-          <ManualDialGuidance
-            number={degradedHelp.guidanceNumber}
-            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
-            showOfflineNotice={degradedHelp.showOfflineNotice}
-          />
+          <View
+            onLayout={(event) => {
+              guidanceY.current = event.nativeEvent.layout.y
+              revealGuidance()
+            }}
+          >
+            <ManualDialGuidance
+              number={degradedHelp.guidanceNumber}
+              showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+              showOfflineNotice={degradedHelp.showOfflineNotice}
+            />
+          </View>
         ) : null}
 
         {/* The dashed "More Help" card. */}
@@ -178,15 +204,14 @@ function HelpTile({
   variant,
   title,
   subtitle,
-  english,
   number,
   onPress,
 }: {
   variant: TileVariant
   title: string
   subtitle: string
-  english: string
-  number: string
+  /** Absent while a count is unknown (loading, or the load failed). */
+  number: string | null
   onPress: () => void
 }) {
   const theme = useTheme()
@@ -217,7 +242,7 @@ function HelpTile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title} ${english} ${number}`}
+      accessibilityLabel={number ? `${title} ${number}` : title}
       onPress={onPress}
       style={({ pressed }) => [
         styles.helpCard,
@@ -247,12 +272,13 @@ function HelpTile({
           <Text style={styles.helpCardSub} numberOfLines={1}>
             {subtitle}
           </Text>
-          <Text style={styles.helpCardEn} numberOfLines={1}>
-            {english}
-          </Text>
         </View>
         <View style={styles.helpCardRight}>
-          <Text style={styles.helpCardPhone}>{number}</Text>
+          {number ? (
+            <Text style={styles.helpCardPhone} numberOfLines={1}>
+              {number}
+            </Text>
+          ) : null}
           <View style={styles.helpCardCircle}>
             <Icon name="call" size={18} color="#FFFFFF" filled />
           </View>
@@ -275,8 +301,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -303,13 +329,15 @@ const styles = StyleSheet.create({
   helpCard: {
     marginHorizontal: 20,
     marginVertical: 12,
-    height: 80,
+    minHeight: 80,
     borderRadius: 22,
     overflow: 'hidden',
   },
   helpCardFill: {
-    flex: 1,
+    flexGrow: 1,
+    minHeight: 80,
     paddingHorizontal: 20,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
@@ -336,13 +364,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.85)',
   },
-  helpCardEn: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    marginTop: 2,
-  },
   helpCardRight: {
+    flexShrink: 0,
     alignItems: 'center',
     gap: 6,
   },

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
-import { Icon } from './Icon'
+import { BottomSheet } from './BottomSheet'
+import { useToast } from './Toast'
 import { Button } from './Button'
 import { RadioGroup } from './RadioGroup'
 import { useReportWrongNumber, type WrongNumberEntryType } from '@/shared/api/wrongNumber'
@@ -48,12 +49,10 @@ export function WrongNumberSheet({
 
   const [reason, setReason] = useState<string | null>(null)
   const [details, setDetails] = useState('')
-  const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const report = useReportWrongNumber()
-
-  if (!visible) return null
+  const toast = useToast()
 
   const reasons = [
     { id: 'not_connecting', label: t('help.wrongReasonNotConnecting') },
@@ -81,11 +80,11 @@ export function WrongNumberSheet({
         reason,
         details: details.trim() || undefined,
       })
-      setSent(true)
       setReason(null)
       setDetails('')
       report.reset()
       onClose()
+      toast.show({ message: t('help.wrongReportSent'), tone: 'success' })
     } catch {
       // The sheet stays open with the entered reason and details intact, and
       // no success toast is shown. A raw server error is never surfaced.
@@ -94,41 +93,23 @@ export function WrongNumberSheet({
   }
 
   return (
-    <View style={styles.scrim}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('common.close')}
-        style={styles.dismissArea}
-        onPress={onClose}
-      />
-
-      <View
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: theme.colors.surface.white,
-            paddingBottom: 20,
-          },
-        ]}
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title={t('help.wrongNumberTitle')}
+      helper={
+        entryName
+          ? t('help.wrongReportForEntry', { name: entryName })
+          : t('help.wrongNumberSubtitle')
+      }
+    >
+      {/* The form scrolls inside the sheet, so a short screen with the keyboard
+          open still reaches the send button. */}
+      <ScrollView
+        style={styles.form}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.handle, { backgroundColor: theme.colors.ink[200] }]} />
-
-        <View style={styles.header}>
-          <View style={[styles.icon, { backgroundColor: theme.palette.amber[100] }]}>
-            <Icon name="report" size={22} color={theme.palette.amber[600]} filled />
-          </View>
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
-              {t('help.wrongNumberTitle')}
-            </Text>
-            <Text style={[styles.helper, { color: theme.colors.ink[500] }]}>
-              {entryName
-                ? t('help.wrongReportForEntry', { name: entryName })
-                : t('help.wrongNumberSubtitle')}
-            </Text>
-          </View>
-        </View>
-
         <Text style={[styles.label, { color: theme.colors.ink[700] }]}>
           {t('help.wrongReasonLabel')}
         </Text>
@@ -185,71 +166,14 @@ export function WrongNumberSheet({
             {t('common.cancel')}
           </Text>
         </Pressable>
-
-        {sent ? (
-          <Text
-            accessibilityRole="alert"
-            style={[styles.sent, { color: theme.palette.green[700] }]}
-          >
-            {t('help.wrongReportSent')}
-          </Text>
-        ) : null}
-      </View>
-    </View>
+      </ScrollView>
+    </BottomSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  dismissArea: {
-    flex: 1,
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    maxHeight: '90%',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 16,
-  },
-  icon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  helper: {
-    fontSize: 12,
-    marginTop: 3,
-    lineHeight: 17,
+  form: {
+    flexGrow: 0,
   },
   label: {
     fontSize: 12,
@@ -285,10 +209,5 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  sent: {
-    fontSize: 12,
-    marginTop: 10,
-    textAlign: 'center',
   },
 })

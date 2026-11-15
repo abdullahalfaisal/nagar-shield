@@ -165,25 +165,33 @@ select 'Test 1d: an unknown identifier is rejected' as test,
 --
 -- The defect this guards: `profiles.phone` was written exactly as the client
 -- sent it, while every reader normalised the number first. A signup that
--- carried the local format — `01712345678`, which is what the app's own
--- placeholder invites — stored `01712345678`, and the resolver looked for
--- `+8801712345678`. The account existed and could never sign in by phone.
+-- carried the local format — `01711000007`, which is what the app's own
+-- placeholder invites — stored `01711000007`, and the resolver looked for
+-- `+8801711000007`. The account existed and could never sign in by phone.
 --
 -- The signup trigger is the writer, so the invariant is asserted on the row
 -- the trigger produced.
+--
+-- **The number lives in the suite's own reserved space.** The fixtures above
+-- take `+8801711` + a six-digit counter, so `01711000007` is the seventh
+-- number in the same series. A fixed, realistic number would collide with a
+-- developer's live account — `profiles.phone` is UNIQUE, and the trigger
+-- fires *during* the insert, so a collision aborts the suite before it can
+-- clean up after itself. The number is picked so it can never be owned
+-- outside this suite.
 
 insert into auth.users (id, email, raw_user_meta_data)
 values ('11111111-1111-1111-1111-111111111107', 'localformat@test.local',
-        json_build_object('phone', '01712345678', 'full_name', 'Local Format'));
+        json_build_object('phone', '01711000007', 'full_name', 'Local Format'));
 
 select 'Test 1e: a local-format signup is stored in E.164' as test,
        (select phone from public.profiles
-         where id = '11111111-1111-1111-1111-111111111107') = '+8801712345678' as passed;
+         where id = '11111111-1111-1111-1111-111111111107') = '+8801711000007' as passed;
 
 -- The account now resolves by either shape.
 select pg_temp.as_user(
   '11111111-1111-1111-1111-111111111107',
-  $q$select public.resolve_login_identifier('01712345678')$q$
+  $q$select public.resolve_login_identifier('01711000007')$q$
 ) as local_shape \gset
 
 select 'Test 1f: the local-format account resolves by phone' as test,
@@ -191,7 +199,7 @@ select 'Test 1f: the local-format account resolves by phone' as test,
 
 select pg_temp.as_user(
   '11111111-1111-1111-1111-111111111107',
-  $q$select public.resolve_login_identifier('+880 171-234-5678')$q$
+  $q$select public.resolve_login_identifier('+880 171-100-0007')$q$
 ) as spaced_shape \gset
 
 select 'Test 1g: a spaced, prefixed number resolves to the same account' as test,
@@ -204,6 +212,9 @@ select 'Test 1h: a non-Bangladesh number does not normalise' as test,
 
 -- The two shapes of one number are the same account: the unique constraint
 -- holds across shapes, not just across identical strings.
+--
+-- The number is the local-format fixture's own, in its E.164 form — the
+-- impostor is claiming the *same* number, not a similar one.
 do $block$
 begin
   begin
@@ -212,7 +223,7 @@ begin
       $q$insert into public.profiles (id, auth_user_id, phone, email)
         values ('11111111-1111-1111-1111-111111111108',
                 '11111111-1111-1111-1111-111111111108',
-                '+8801712345678', 'impostor@test.local')$q$
+                '+8801711000007', 'impostor@test.local')$q$
     );
     raise exception 'the same number in another account must be refused';
   exception when others then
@@ -458,6 +469,46 @@ select 'Test 4f: another user does not see them' as test,
 select 'Test 4g: the total_count matches the filtered result' as test,
        (:'history_tight'::jsonb ->> 'total_count')::int
          = jsonb_array_length(:'history_tight'::jsonb -> 'items') as passed;
+
+-- The caller's own report ignores the radius and the window, but not the
+-- incident type: the Dhanmondi report (theft, user 101) is made 72 h old, then
+-- asked for inside a 24 h window, first with no type, then with a type it does
+-- not have.
+select public.server_side_write(
+  $q$update public.reports set captured_at = now() - interval '72 hours'
+     where id = '22222222-2222-2222-2222-222222222201'$q$
+);
+
+select pg_temp.as_user(
+  '11111111-1111-1111-1111-111111111101',
+  $$select public.history_nearby(23.7461, 90.3774, 1, 24, null, null, 20)$$
+) as history_own_filtered \gset
+
+select 'Test 4h: the caller''s own old report ignores the window' as test,
+       (:'history_own_filtered'::jsonb -> 'items' -> 0) ->> 'id' = '22222222-2222-2222-2222-222222222201'
+       and (:'history_own_filtered'::jsonb ->> 'total_count')::int = 1 as passed;
+
+select pg_temp.as_user(
+  '11111111-1111-1111-1111-111111111101',
+  $$select public.history_nearby(23.7461, 90.3774, 1, 24, 'assault', null, 20)$$
+) as history_own_wrong_type \gset
+
+select 'Test 4j: the incident type filter applies to the caller''s own reports' as test,
+       jsonb_array_length(:'history_own_wrong_type'::jsonb -> 'items') = 0
+       and (:'history_own_wrong_type'::jsonb ->> 'total_count')::int = 0 as passed;
+
+select pg_temp.as_user(
+  '11111111-1111-1111-1111-111111111102',
+  $$select public.history_nearby(23.7461, 90.3774, 1, 24, null, null, 20)$$
+) as history_other_old \gset
+
+select 'Test 4i: another user still does not see that old report' as test,
+       jsonb_array_length(:'history_other_old'::jsonb -> 'items') = 0 as passed;
+
+select public.server_side_write(
+  $q$update public.reports set captured_at = now() - interval '1 hour'
+     where id = '22222222-2222-2222-2222-222222222201'$q$
+);
 
 -- =============================================================================
 -- Test 5 — moderation_queue

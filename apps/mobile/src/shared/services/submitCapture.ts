@@ -1,5 +1,6 @@
 import { File } from 'expo-file-system'
-import { AppError, authorToken, type PublicVisibility } from '@nagar-shield/shared'
+import { sha256Hex } from './sha256'
+import { AppError, type PublicVisibility, type ReportCategory } from '@nagar-shield/shared'
 import { supabase } from '@/shared/api/supabase'
 import { parseErrorBody } from '@/shared/api/errors'
 import { buildStoragePath, newClientRequestId, type PreparedMedia } from './mediaPipeline'
@@ -25,7 +26,12 @@ export interface CaptureSubmission {
   capturedAt: string
   description: string | null
   publicVisibility: PublicVisibility
-  category: null
+  /** The incident type the citizen picked, or null to set it later. */
+  category: ReportCategory | null
+  /** An area chosen from the reference list; the server files the report there. */
+  areaId?: string | null
+  /** A road, shop or landmark the citizen typed with the chosen area. */
+  placeDetail?: string | null
 }
 
 export interface CaptureResult {
@@ -69,6 +75,25 @@ interface CaptureResponseBody {
 const MEDIA_BUCKET = 'report-media'
 
 /**
+ * Whether a failed upload failed only because the object is already there.
+ *
+ * Storage answers HTTP 400 with `statusCode: "409"`, `error: "Duplicate"` and
+ * the message "The resource already exists".
+ */
+function isAlreadyUploaded(error: unknown): boolean {
+  const { message, statusCode, status } = (error ?? {}) as {
+    message?: string
+    statusCode?: string | number
+    status?: number
+  }
+  return (
+    String(statusCode) === '409' ||
+    status === 409 ||
+    /already exists|duplicate/i.test(message ?? '')
+  )
+}
+
+/**
  * Uploads the sanitised media and finalizes the report.
  *
  * The storage path is built from the caller's own id, so the Storage policy
@@ -89,18 +114,25 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
     authorId,
     clientRequestId: submission.clientRequestId,
     fileName,
-    authorToken: await authorToken(authorId),
+    authorToken: await authorTokenOnDevice(authorId),
   })
 
   // (1) The bytes go straight to the bucket.
+  //
+  // Never "replace" (`upsert`). A retry after a lost confirmation uploads the
+  // same path again, and replacing an object is an UPDATE, which the bucket's
+  // policies do not grant: the retry was refused for good and never reached the
+  // idempotent `finalize-capture` call, so a report that had in fact been
+  // filed stayed "saved on device" forever. A plain upload of an object that is
+  // already there answers a duplicate, and that is success — the bytes are in.
   const { error: uploadError } = await supabase.storage
     .from(MEDIA_BUCKET)
     .upload(storagePath, await readFileBytes(submission.media.uri), {
       contentType: submission.media.contentType,
-      upsert: true,
+      upsert: false,
     })
 
-  if (uploadError) {
+  if (uploadError && !isAlreadyUploaded(uploadError)) {
     throw new AppError('INTERNAL', { stage: 'upload' })
   }
 
@@ -126,6 +158,8 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
       description: submission.description,
       public_visibility: submission.publicVisibility,
       category: submission.category,
+      area_id: submission.areaId ?? null,
+      place_detail: submission.placeDetail ?? null,
     }),
   })
 
@@ -161,6 +195,26 @@ export async function submitCapture(submission: CaptureSubmission): Promise<Capt
  * unnoticed. Every other module that touches `expo-file-system` imports it
  * statically for the same reason.
  */
+/**
+ * The author token — the hex SHA-256 of the user id — computed on the phone.
+ *
+ * The shared `authorToken()` uses Web Crypto's `crypto.subtle`, which Hermes
+ * does not have. On a phone it threw a `TypeError`, the submit read that as a
+ * lost connection, and every capture went to the offline queue ("saved on
+ * device") — and failed the same way on every retry.
+ *
+ * The digest comes from the local pure-TypeScript SHA-256 (`./sha256`).
+ * `expo-crypto` had to go: its Android native module stopped being registered
+ * by the Modules API 2.0 migration in 58.0.5, which crashes **every** Expo Go
+ * app that imports it at startup (expo/expo#51198) — and a JS-version pin
+ * cannot help, because the native side ships inside the Expo Go binary. The
+ * output is the same standard lowercase hex digest, so the path still matches
+ * the one the Edge Function checks.
+ */
+export async function authorTokenOnDevice(userId: string): Promise<string> {
+  return sha256Hex(userId)
+}
+
 async function readFileBytes(uri: string): Promise<ArrayBuffer> {
   const file = new File(uri)
   return file.arrayBuffer()

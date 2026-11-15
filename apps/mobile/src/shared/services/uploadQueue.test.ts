@@ -80,9 +80,21 @@ jest.mock('expo-file-system', () => {
     }
 
     async text(): Promise<string> {
+      return this.textSync()
+    }
+
+    textSync(): string {
       const value = store().files.get(this.uri)
       if (value === undefined) throw new Error(`ENOENT: ${this.uri}`)
       return value
+    }
+
+    move(destination: MockFile): void {
+      const value = store().files.get(this.uri)
+      if (value === undefined) throw new Error(`ENOENT: ${this.uri}`)
+      store().files.delete(this.uri)
+      store().files.set(destination.uri, value)
+      this.exists = false
     }
 
     write(contents: string): void {
@@ -119,7 +131,7 @@ jest.mock('expo-file-system', () => {
   return {
     File: MockFile,
     Directory: MockDirectory,
-    Paths: { cache: '/cache' },
+    Paths: { cache: '/cache', document: '/document' },
   }
 })
 
@@ -130,8 +142,11 @@ import {
   QUEUE_MAX_ATTEMPTS,
   QUEUE_MAX_ITEMS,
   backoffDelayMs,
+  SAVED_RETRY_MS,
+  claimUnowned,
   clearQueue,
   dueItems,
+  ownQueueCount,
   enqueueUpload,
   enqueueUploadBounded,
   markAttemptFailed,
@@ -193,7 +208,8 @@ function item(overrides: Partial<QueuedUpload> = {}): QueuedUpload {
   }
 }
 
-const QUEUE_PATH = '/cache/nagar-shield-media/upload-queue.json'
+const QUEUE_PATH = '/document/nagar-shield-queue/upload-queue.json'
+const LEGACY_QUEUE_PATH = '/cache/nagar-shield-media/upload-queue.json'
 
 beforeEach(() => {
   // The maps are **cleared in place** rather than replaced — the mocked
@@ -259,7 +275,7 @@ describe('markAttemptFailed', () => {
     expect(updated?.savedOnDevice).toBe(true)
   })
 
-  it('does not move the next-attempt time once the item is kept on the device', async () => {
+  it('schedules the long retry once the item is kept on the device', async () => {
     await enqueueUpload(input())
 
     const now = 2_000_000
@@ -268,10 +284,10 @@ describe('markAttemptFailed', () => {
 
     const third = await markAttemptFailed('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', now)
 
-    // The item is retained, not rescheduled — it stays visible to the user
-    // rather than vanishing into a backoff. The timestamp is the one the
-    // *second* attempt wrote.
-    expect(third?.nextAttemptAt).toBe(now + backoffDelayMs(2))
+    // Kept is not given up on: the banner says it is sent when the network
+    // returns, so it is tried again — slowly, since the quick retries failed.
+    expect(third?.savedOnDevice).toBe(true)
+    expect(third?.nextAttemptAt).toBe(now + SAVED_RETRY_MS)
   })
 
   it('returns null for an item that is not in the queue', async () => {
@@ -294,10 +310,20 @@ describe('dueItems', () => {
     expect(due).toHaveLength(0)
   })
 
-  it('never offers an item that is kept on the device', () => {
-    const due = dueItems([item({ savedOnDevice: true, nextAttemptAt: 0 })], 1_000)
+  it('offers an item kept on the device again once its long wait is over', () => {
+    const kept = item({ savedOnDevice: true, nextAttemptAt: 10_000 + SAVED_RETRY_MS })
 
-    expect(due).toHaveLength(0)
+    expect(dueItems([kept], 10_000)).toHaveLength(0)
+    expect(dueItems([kept], 10_000 + SAVED_RETRY_MS)).toHaveLength(1)
+  })
+
+  it('releases a kept item whose timestamp is unreachable, as it does any other', () => {
+    const kept = item({
+      savedOnDevice: true,
+      nextAttemptAt: 1_000 + SAVED_RETRY_MS + BACKOFF_CEILING_MS + 1_000,
+    })
+
+    expect(dueItems([kept], 1_000)).toHaveLength(1)
   })
 
   it('releases an item whose timestamp is unreachable — a wrong clock cannot strand a report', () => {
@@ -444,12 +470,104 @@ describe('the queue lifecycle', () => {
 
 // --- The storage contract -----------------------------------------------------
 
+describe('who a queued report belongs to', () => {
+  const ADA = 'aaaaaaaa-0000-4000-8000-00000000000a'
+  const BOB = 'bbbbbbbb-0000-4000-8000-00000000000b'
+
+  it('records the author when the report is queued', async () => {
+    const queued = await enqueueUpload(input({ authorId: ADA }))
+
+    expect(queued.authorId).toBe(ADA)
+    expect((await readQueue())[0]?.authorId).toBe(ADA)
+  })
+
+  it("counts only the signed-in user's reports as waiting or kept", async () => {
+    await enqueueUpload(input({ authorId: ADA }))
+    await enqueueUpload(
+      input({ clientRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', authorId: BOB }),
+    )
+
+    expect(await queueSize(ADA)).toBe(1)
+    expect(await queueSize(BOB)).toBe(1)
+    expect(await ownQueueCount(ADA)).toBe(1)
+
+    for (let i = 0; i < 3; i += 1) {
+      await markAttemptFailed('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+    }
+    expect(await savedOnDeviceItems(ADA)).toHaveLength(0)
+    expect(await savedOnDeviceItems(BOB)).toHaveLength(1)
+  })
+
+  it("discards one user's reports without touching another's", async () => {
+    await enqueueUpload(input({ authorId: ADA }))
+    await enqueueUpload(
+      input({ clientRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', authorId: BOB }),
+    )
+
+    expect(await clearQueue(ADA)).toBe(1)
+
+    const left = await readQueue()
+    expect(left).toHaveLength(1)
+    expect(left[0]?.authorId).toBe(BOB)
+  })
+
+  it('hands reports with no author to the user who claims them, and only those', async () => {
+    fsStore().files.set(
+      QUEUE_PATH,
+      JSON.stringify([item({ authorId: undefined }), item({ authorId: BOB })]),
+    )
+
+    expect(await claimUnowned(ADA)).toBe(1)
+
+    const queue = await readQueue()
+    expect(queue.map((entry) => entry.authorId)).toEqual([ADA, BOB])
+  })
+
+  it('does not lose a report when two changes to the queue arrive together', async () => {
+    // Each change is a read then a write. Unserialised, both read the same
+    // queue and the later write dropped the other's report.
+    await Promise.all([
+      enqueueUpload(input({ clientRequestId: '00000000-0000-4000-8000-000000000001' })),
+      enqueueUpload(input({ clientRequestId: '00000000-0000-4000-8000-000000000002' })),
+      enqueueUploadBounded(input({ clientRequestId: '00000000-0000-4000-8000-000000000003' })),
+    ])
+
+    expect(await readQueue()).toHaveLength(3)
+  })
+})
+
 describe('the storage contract', () => {
   it('keeps the queue in the app sandbox, not in AsyncStorage', async () => {
     await enqueueUpload(input())
 
-    // The queue file lives under the cache directory in the app sandbox.
+    // The queue file lives under the document directory in the app sandbox.
     expect(fsStore().files.has(QUEUE_PATH)).toBe(true)
+  })
+
+  it('keeps the queue out of the cache, which the OS may empty', async () => {
+    await enqueueUpload(input())
+
+    expect(fsStore().files.has(LEGACY_QUEUE_PATH)).toBe(false)
+  })
+
+  it('moves a queued draft out of the cache, so the file survives with its entry', async () => {
+    fsStore().files.set('/cache/nagar-shield-media/photo-1.jpg', 'bytes')
+
+    const queued = await enqueueUpload(
+      input({ media: { ...media, uri: '/cache/nagar-shield-media/photo-1.jpg' } }),
+    )
+
+    expect(queued.mediaUri).toBe('/document/nagar-shield-queue/photo-1.jpg')
+    expect(fsStore().files.get(queued.mediaUri)).toBe('bytes')
+    expect(fsStore().files.has('/cache/nagar-shield-media/photo-1.jpg')).toBe(false)
+  })
+
+  it('carries a queue an earlier build left in the cache over, once', async () => {
+    fsStore().files.set(LEGACY_QUEUE_PATH, JSON.stringify([item()]))
+
+    expect(await readQueue()).toHaveLength(1)
+    expect(fsStore().files.has(QUEUE_PATH)).toBe(true)
+    expect(fsStore().files.has(LEGACY_QUEUE_PATH)).toBe(false)
   })
 
   it('never writes the session token into the queue', async () => {

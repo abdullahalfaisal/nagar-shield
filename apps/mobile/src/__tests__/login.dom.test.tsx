@@ -214,7 +214,8 @@ describe('the login screen is wired to the form state', () => {
     // The `InputField` for the identifier is bound to the state in both
     // directions: the value in, and the change out.
     expect(code).toContain('value={identifier}')
-    expect(code).toContain('onChangeText={setIdentifier}')
+    // The change goes through the Bangla-digit conversion on its way in.
+    expect(code).toMatch(/onChangeText=\{\(next\) => setIdentifier\(bnDigitsToAscii\(next\)\)\}/)
   })
 
   it('passes the identifier, the password and the flag to the sign-in call', () => {

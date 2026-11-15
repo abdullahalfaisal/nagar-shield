@@ -1,16 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
-import {
-  REPORT_CATEGORY_ACCENTS,
-  REPORT_CATEGORY_ICONS,
-  REPORT_CATEGORY_LABELS,
-} from '@nagar-shield/shared'
+import { REPORT_CATEGORY_ACCENTS } from '@nagar-shield/shared'
+import { useAreaName } from '@/shared/api/areas'
 import { useTheme } from '@/shared/theme'
-import { AppBar, Button, EmptyState, FlagSheet, Icon, formatAreaHierarchy } from '@/shared/ui'
-import { signAlertMediaUrls, usePublicAlertDetail } from '@/shared/api/alertDetail'
-import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
+import { appFont, type FontWeightName } from '@/shared/theme/appFont'
+import {
+  AppBar,
+  FlagSheet,
+  SolidIcon,
+  StateCard,
+  alertCategoryLabel,
+  formatAreaHierarchy,
+  withAlpha,
+  type SolidIconName,
+} from '@/shared/ui'
+import { CategoryTile } from '@/shared/ui/CategoryTile'
+import { FormCard } from '@/shared/ui/FormCard'
+import { MediaGallery } from '@/shared/ui/MediaGallery'
+import { TileMapFallback } from '@/shared/ui/TileMapFallback'
+import { TILE_ATTRIBUTION } from '@/shared/ui/tileSource'
+import { surfaceShadow } from '@/shared/ui/surface'
+import {
+  SIGNED_URL_RENEW_MS,
+  signAlertMediaUrls,
+  usePublicAlertDetail,
+} from '@/shared/api/alertDetail'
+import { toBengaliDigits, formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 
 /**
  * The **public** alert detail.
@@ -51,11 +70,12 @@ import { formatRelativeTimeForLocale } from '@/shared/utils/relativeTime'
 export default function AlertDetailScreen() {
   const theme = useTheme()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
   const params = useLocalSearchParams<{ id?: string }>()
   const reportId = params.id
 
-  const { data: alert, isLoading } = usePublicAlertDetail(reportId)
+  const { data: alert, isLoading, isError, refetch } = usePublicAlertDetail(reportId)
 
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({})
   const [flagOpen, setFlagOpen] = useState(false)
@@ -71,30 +91,59 @@ export default function AlertDetailScreen() {
       return
     }
 
-    void signAlertMediaUrls(alert.media).then((urls) => {
-      if (!active) return
-      setMediaUrls(urls)
-    })
+    // A signing failure leaves the placeholder icon in each tile — it never
+    // rejects unhandled and never takes the rest of the detail down.
+    const sign = () =>
+      void signAlertMediaUrls(alert.media)
+        .then((urls) => {
+          if (!active) return
+          setMediaUrls(urls)
+        })
+        // A failed renewal keeps the links already held: they may still work.
+        .catch(() => undefined)
+
+    sign()
+
+    // The links last ten minutes. A screen left open longer renews them
+    // before they lapse, so a photo opened later is not a blank frame.
+    const timer = setInterval(sign, SIGNED_URL_RENEW_MS)
 
     return () => {
       active = false
+      clearInterval(timer)
     }
   }, [alert])
 
   const category = alert?.category ?? null
-  const categoryLabel = category ? REPORT_CATEGORY_LABELS[category] : null
+  const categoryLabel = alertCategoryLabel(category, t('alerts.uncategorized'), i18n.language)
   const accent = category ? REPORT_CATEGORY_ACCENTS[category] : theme.colors.ink[400]
 
   // The area line is the **card's** rule, not a second copy of it: the detail
   // surface is behind the card's detail link, so the two must name the same
   // place the same way — including the fallback when a level is absent.
+  const areaName = useAreaName()
   const areaLine = useMemo(() => {
     if (!alert) return null
-    return formatAreaHierarchy(alert.areaHierarchy)
-  }, [alert])
+    return formatAreaHierarchy(alert.areaHierarchy, areaName)
+  }, [alert, areaName])
 
   const relativeTime = alert ? formatRelativeTimeForLocale(alert.capturedAt, i18n.language) : ''
-  const absoluteTime = alert ? new Date(alert.capturedAt).toLocaleString(i18n.language) : ''
+  const absoluteTime = alert
+    ? new Date(alert.capturedAt).toLocaleString(i18n.language === 'bn' ? 'bn-BD' : 'en-GB')
+    : ''
+
+  const language = i18n.language
+  const font = (weight: FontWeightName) => appFont(weight, language)
+  const violet = theme.palette.violet[theme.colors.isDark ? 400 : 700]
+  const red = theme.palette.red[theme.colors.isDark ? 500 : 700]
+
+  const bar = <AppBar title={t('alerts.detailTitle')} onBack={() => router.back()} />
+  const frame = (content: React.ReactNode) => (
+    <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
+      {bar}
+      {content}
+    </View>
+  )
 
   // A report that does not resolve — because it never existed, because it was
   // removed by moderation, or because it was soft-deleted — renders the "no
@@ -102,121 +151,201 @@ export default function AlertDetailScreen() {
   // indistinguishable from outside, so the state cannot be used to discover
   // which reports were hidden.
   if (isLoading) {
-    return (
+    return frame(
       <View
-        style={[styles.root, styles.centered, { backgroundColor: theme.colors.surface.lavender }]}
+        testID="alert-detail-skeleton"
+        accessibilityLiveRegion="polite"
+        style={styles.skeletons}
       >
+        {[72, 150, 120].map((height) => (
+          <View
+            key={height}
+            style={[styles.skeleton, { height, backgroundColor: theme.colors.ink[100] }]}
+          />
+        ))}
         <ActivityIndicator color={theme.palette.violet[600]} />
-      </View>
+      </View>,
+    )
+  }
+
+  // A read that **failed** says nothing about the report: it may be there.
+  // Only a successful read that returned nothing is "no longer available".
+  if (isError && !alert) {
+    return frame(
+      <View style={styles.stateWrap} accessibilityRole="alert" accessibilityLiveRegion="polite">
+        <StateCard
+          icon="cloudOff"
+          tone="danger"
+          title={t('alerts.detailLoadFailed')}
+          body={t('alerts.loadFailedSub')}
+          action={{ label: t('common.retry'), icon: 'refresh', onPress: () => void refetch() }}
+        />
+      </View>,
     )
   }
 
   if (!alert) {
-    return (
-      <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-        <AppBar title={t('alerts.detailTitle')} onBack={() => router.back()} />
-        <View style={styles.centered}>
-          <EmptyState
-            icon="info"
-            title={t('alerts.detailUnavailableTitle')}
-            description={t('alerts.detailUnavailableBody')}
-          />
-        </View>
-      </View>
+    return frame(
+      <View style={styles.stateWrap}>
+        <StateCard
+          icon="info"
+          title={t('alerts.detailUnavailableTitle')}
+          body={t('alerts.detailUnavailableBody')}
+        />
+      </View>,
     )
   }
 
+  const mediaCount = alert.media.length
+  const mediaCountLabel = t('alerts.mediaFiles', {
+    number: language === 'bn' ? toBengaliDigits(String(mediaCount)) : String(mediaCount),
+  })
+
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-      <AppBar title={t('alerts.detailTitle')} onBack={() => router.back()} />
+      {bar}
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* The media block. A report with no media renders no media block at
-            all — no empty placeholder box, no broken image frame. */}
-        {alert.media.length > 0 ? (
-          <View style={styles.mediaStrip}>
-            {alert.media.map((media) => {
-              const url = mediaUrls[media.storagePath]
-              return (
-                <View
-                  key={media.id}
-                  accessibilityLabel={t('alerts.mediaLabel')}
-                  style={[styles.mediaTile, { backgroundColor: theme.colors.ink[100] }]}
-                >
-                  {url ? (
-                    <Image source={{ uri: url }} style={styles.mediaImage} resizeMode="cover" />
-                  ) : (
-                    <Icon name="image" size={28} color={theme.colors.ink[400]} />
-                  )}
-                </View>
-              )
-            })}
+        {/* What happened: the incident type, how long ago and where, in one
+            compact card. A report with no category shows the neutral tile — the
+            category is never invented. */}
+        <View
+          accessible
+          accessibilityLabel={`${categoryLabel}. ${relativeTime} · ${areaLine ?? ''}`}
+          style={[styles.hero, { backgroundColor: theme.colors.surface.white }]}
+        >
+          <CategoryTile category={category} size={44} />
+          <View style={styles.heroText}>
+            <Text
+              numberOfLines={1}
+              style={[styles.heroTitle, { color: theme.colors.ink[950], fontFamily: font('bold') }]}
+            >
+              {categoryLabel}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.heroSub,
+                { color: theme.colors.textMuted, fontFamily: font('medium') },
+              ]}
+            >
+              {areaLine ? `${relativeTime} · ${areaLine}` : relativeTime}
+            </Text>
           </View>
+        </View>
+
+        {/* The media. A report with no media renders no media block at all —
+            no empty placeholder box, no broken image frame. */}
+        {mediaCount > 0 ? (
+          <FormCard
+            title={t('alerts.mediaCardTitle')}
+            tag={mediaCount > 1 ? mediaCountLabel : undefined}
+            language={language}
+          >
+            <MediaGallery
+              items={alert.media.map((media) => ({
+                id: media.id,
+                kind: media.mediaType,
+                url: mediaUrls[media.storagePath] ?? null,
+              }))}
+            />
+          </FormCard>
         ) : null}
 
         {/* The description. A report with no description renders no
             description block — no empty gap and no empty string. */}
         {alert.description ? (
-          <View style={[styles.card, { backgroundColor: theme.colors.surface.white }]}>
-            <Text style={[styles.description, { color: theme.colors.ink[950] }]}>
+          <FormCard title={t('alerts.whatHappened')} language={language}>
+            <Text
+              style={[
+                styles.description,
+                { color: theme.colors.ink[950], fontFamily: font('regular') },
+              ]}
+            >
               {alert.description}
             </Text>
-          </View>
+          </FormCard>
         ) : null}
 
-        {/* The category. The Bangla / English pair, exactly as the feed card
-            renders it. A report with no category shows the neutral
-            placeholder — the category is never invented. */}
-        <View style={[styles.card, { backgroundColor: theme.colors.surface.white }]}>
-          <View style={styles.categoryRow}>
-            <View style={[styles.categoryIcon, { backgroundColor: `${accent}1A` }]}>
-              <Icon
-                name={category ? REPORT_CATEGORY_ICONS[category] : 'help'}
-                size={20}
-                color={accent}
-                filled
+        {/* Where it happened. A map you can drag and zoom, with a pin on the
+            report's own coordinates, so the pin moves with the map. A report
+            with no coordinates shows no map at all — no empty box. */}
+        <FormCard title={t('alerts.locationCardTitle')} language={language}>
+          {alert.lat !== null && alert.lng !== null ? (
+            <View style={[styles.map, { borderColor: theme.colors.ink[100] }]}>
+              <TileMapFallback
+                center={{ lat: alert.lat, lng: alert.lng }}
+                zoom={16}
+                markers={[]}
+                userLocation={null}
+                placePin={{
+                  lat: alert.lat,
+                  lng: alert.lng,
+                  label: t('alerts.reportedHere'),
+                  color: accent,
+                }}
+                zoomControls
               />
+              {/* The tile provider's attribution is a condition of using its tiles. */}
+              <View pointerEvents="none" style={styles.mapAttribution}>
+                <Text numberOfLines={1} style={styles.mapAttributionText}>
+                  {TILE_ATTRIBUTION}
+                </Text>
+              </View>
             </View>
-            <View style={styles.categoryText}>
-              <Text style={[styles.factLabel, { color: theme.colors.ink[500] }]}>
-                {t('alerts.categoryLabel')}
-              </Text>
-              <Text style={[styles.categoryValue, { color: theme.colors.ink[950] }]}>
-                {categoryLabel
-                  ? `${categoryLabel.bn} — ${categoryLabel.en}`
-                  : t('alerts.uncategorized')}
-              </Text>
+          ) : null}
+          <View style={[styles.where, alert.lat === null && styles.whereAlone]}>
+            <View style={[styles.rowTile, { backgroundColor: withAlpha(violet, 0.12) }]}>
+              <SolidIcon name="pin" size={22} color={violet} />
             </View>
+            <Text
+              numberOfLines={2}
+              style={[styles.whereText, { color: theme.colors.ink[950], fontFamily: font('bold') }]}
+            >
+              {areaLine ?? '—'}
+            </Text>
           </View>
-        </View>
+        </FormCard>
 
-        {/* The facts: the area, the relative time, and the absolute capture
-            time. Both times are shown — the relative one is how fresh the
-            report is, the absolute one places the event precisely. */}
-        <View style={[styles.card, { backgroundColor: theme.colors.surface.white }]}>
-          <FactRow icon="location_on" label={t('alerts.locationLabel')} value={areaLine ?? '—'} />
-          <View style={[styles.hairline, { backgroundColor: theme.colors.ink[100] }]} />
-          <FactRow icon="schedule" label={t('alerts.capturedAtLabel')} value={relativeTime} />
-          <View style={[styles.hairline, { backgroundColor: theme.colors.ink[100] }]} />
-          <FactRow icon="event" label={t('alerts.absoluteTimeLabel')} value={absoluteTime} />
+        {/* The time: how long ago, and the exact moment. */}
+        <View style={[styles.facts, { backgroundColor: theme.colors.surface.white }]}>
+          <FactRow
+            icon="clock"
+            label={t('alerts.reportedLabel')}
+            value={relativeTime}
+            last={false}
+          />
+          <FactRow
+            icon="calendar"
+            label={t('alerts.absoluteTimeLabel')}
+            value={absoluteTime}
+            last
+          />
         </View>
 
         {/* The flag action — the same shared sheet the feed card opens. */}
-        <Button
-          label={t('alerts.flag')}
-          variant="secondary"
-          icon="flag"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('alerts.flagThis')}
           onPress={() => setFlagOpen(true)}
-          style={styles.flagButton}
-        />
+          style={[
+            styles.flag,
+            { backgroundColor: withAlpha(red, theme.colors.isDark ? 0.14 : 0.09) },
+          ]}
+        >
+          <SolidIcon name="flag" size={20} color={red} />
+          <Text style={[styles.flagText, { color: red, fontFamily: font('bold') }]}>
+            {t('alerts.flagThis')}
+          </Text>
+        </Pressable>
 
         {/* The civic-information note. It is not a disclaimer bolted on — it
             is the truth about what a citizen report is. */}
-        <Text style={[styles.note, { color: theme.colors.ink[500] }]}>
+        <Text style={[styles.note, { color: theme.colors.textMuted, fontFamily: font('medium') }]}>
           {t('alerts.detailNote')}
         </Text>
       </ScrollView>
@@ -236,18 +365,52 @@ export default function AlertDetailScreen() {
   )
 }
 
-/** One label/value pair — the area, the relative time, the absolute time. */
-function FactRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+/** One label/value pair — how long ago, and the exact time. */
+function FactRow({
+  icon,
+  label,
+  value,
+  last,
+}: {
+  icon: SolidIconName
+  label: string
+  value: string
+  last: boolean
+}) {
   const theme = useTheme()
+  const { i18n } = useTranslation()
+  const violet = theme.palette.violet[theme.colors.isDark ? 400 : 700]
 
   return (
-    <View style={styles.factRow}>
-      <View style={[styles.factIcon, { backgroundColor: theme.colors.ink[100] }]}>
-        <Icon name={icon} size={18} color={theme.colors.ink[700]} />
+    <View
+      style={[
+        styles.factRow,
+        !last && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.colors.ink[200],
+        },
+      ]}
+    >
+      <View style={[styles.rowTile, { backgroundColor: withAlpha(violet, 0.12) }]}>
+        <SolidIcon name={icon} size={22} color={violet} />
       </View>
       <View style={styles.factText}>
-        <Text style={[styles.factLabel, { color: theme.colors.ink[500] }]}>{label}</Text>
-        <Text style={[styles.factValue, { color: theme.colors.ink[950] }]}>{value}</Text>
+        <Text
+          style={[
+            styles.factLabel,
+            { color: theme.colors.textMuted, fontFamily: appFont('semibold', i18n.language) },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text
+          style={[
+            styles.factValue,
+            { color: theme.colors.ink[950], fontFamily: appFont('bold', i18n.language) },
+          ]}
+        >
+          {value}
+        </Text>
       </View>
     </View>
   )
@@ -257,104 +420,133 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 32,
+    gap: 12,
   },
-  mediaStrip: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
+  stateWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
-  mediaTile: {
-    width: 104,
-    height: 104,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  skeletons: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 12,
   },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
-  },
-  card: {
+  skeleton: {
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 10,
   },
-  description: {
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  categoryRow: {
+  hero: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    ...surfaceShadow,
   },
-  categoryIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryText: {
+  heroText: {
     flex: 1,
     minWidth: 0,
   },
-  categoryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 1,
+  heroTitle: {
+    fontSize: 16,
+    lineHeight: 22,
   },
-  factRow: {
+  heroSub: {
+    marginTop: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  map: {
+    height: 196,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: '#EFE6F8',
+  },
+  mapAttribution: {
+    position: 'absolute',
+    left: 8,
+    bottom: 8,
+    maxWidth: '70%',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.78)',
+  },
+  mapAttributionText: {
+    fontSize: 11,
+    color: '#11112B',
+  },
+  where: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    minHeight: 48,
+    marginTop: 12,
   },
-  factIcon: {
-    width: 36,
-    height: 36,
+  whereAlone: {
+    marginTop: 0,
+  },
+  whereText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  rowTile: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  facts: {
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    ...surfaceShadow,
+  },
+  factRow: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   factText: {
     flex: 1,
     minWidth: 0,
   },
   factLabel: {
-    fontSize: 11,
-    marginBottom: 1,
+    fontSize: 12,
+    lineHeight: 16,
   },
   factValue: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    lineHeight: 21,
   },
-  hairline: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 4,
+  flag: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 18,
   },
-  flagButton: {
-    marginTop: 6,
+  flagText: {
+    fontSize: 15,
+    lineHeight: 21,
   },
   note: {
-    fontSize: 11,
-    lineHeight: 17,
     paddingHorizontal: 4,
-    paddingTop: 14,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
   },
 })

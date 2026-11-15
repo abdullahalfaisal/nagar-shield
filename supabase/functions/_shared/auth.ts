@@ -85,11 +85,19 @@ export function assertModerator(caller: CallerIdentity): void {
  *
  * The scheduled jobs are not client-callable: they have no anon path and no
  * authenticated path. The bearer must be the service-role key itself.
+ *
+ * The key is read from `NAGAR_SERVICE_KEY`, seeded by the operator with
+ * `supabase secrets set`. It cannot use the platform's `SUPABASE_SERVICE_ROLE_KEY`:
+ * hosted projects inject that name themselves and forbid overriding it, and the
+ * injected value does not necessarily equal the legacy JWT the scheduler sends —
+ * proved live: the platform's value rejected the Vault's legacy JWT with 403.
+ * `SUPABASE_SERVICE_ROLE_KEY` stays as the local-stack fallback, where the
+ * platform injects exactly the legacy JWT.
  */
 export function requireServiceRole(request: Request): void {
   const token = readBearerToken(request)
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const serviceKey = Deno.env.get('NAGAR_SERVICE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!serviceKey) throw new CallerError('INTERNAL', 'SUPABASE_SERVICE_ROLE_KEY is not set')
+  if (!serviceKey) throw new CallerError('INTERNAL', 'service key env is not set')
   if (!token || token !== serviceKey) throw new CallerError('FORBIDDEN')
 }

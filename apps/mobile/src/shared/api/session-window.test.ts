@@ -58,18 +58,40 @@ jest.mock('expo-secure-store', () => ({
   }),
 }))
 
+/**
+ * `expo-constants` does not run under Jest.
+ *
+ * The session-store module reads the configured URL from it, because the
+ * storage key is derived from that URL. The mock has no `extra` bag, so the
+ * module falls back to `process.env.EXPO_PUBLIC_SUPABASE_URL`.
+ */
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { extra: {} } },
+}))
+
 import {
   REMEMBERED_WINDOW_MS,
   SESSION_GRACE_WINDOW_MS,
   clearSessionPersistencePolicy,
   isWithinWindow,
+  onSessionWindowExpired,
   secureStore,
+  sessionStorageKey,
   setSessionPersistencePolicy,
   windowForRememberMe,
 } from '@/shared/api/session-storage'
 import * as SecureStore from 'expo-secure-store'
 
-const SESSION_KEY = 'sb-localhost-auth-token'
+/**
+ * The key the session is actually stored under.
+ *
+ * The store scopes the window check to this exact key — it is **derived** from
+ * the configured URL, not hardcoded, because `supabase-js` derives it the same
+ * way. A hardcoded key here would have made these tests agree with a store
+ * that never expires anything.
+ */
+const SESSION_KEY = sessionStorageKey()
 const POLICY_KEY = 'nagar-shield.session-persisted-at'
 
 beforeEach(() => {
@@ -119,6 +141,29 @@ describe('a remembered session is written with its window', () => {
     expect(written.remembered).toBe(true)
     expect(written.windowMs).toBe(REMEMBERED_WINDOW_MS)
     expect(typeof written.persistedAt).toBe('number')
+  })
+
+  it('keeps the time of sign-in when a token refresh writes the session again', async () => {
+    // `supabase-js` writes the session on every token refresh. The window is
+    // measured from the sign-in; rewriting its start each time moved the
+    // 24-hour window forward for as long as the process lived.
+    const signedInAt = Date.now() - 5 * 60 * 60 * 1000
+    setSessionPersistencePolicy({
+      remembered: false,
+      windowMs: SESSION_GRACE_WINDOW_MS,
+      persistedAt: signedInAt,
+    })
+
+    await secureStore.setItem(SESSION_KEY, '{"access_token":"a","refresh_token":"r"}')
+    await secureStore.setItem(SESSION_KEY, '{"access_token":"b","refresh_token":"s"}')
+
+    const policyWrites = secureStoreCalls.filter(
+      (call) => call.op === 'set' && call.key === POLICY_KEY,
+    )
+    expect(policyWrites).toHaveLength(2)
+    for (const write of policyWrites) {
+      expect(JSON.parse(write.value ?? '{}').persistedAt).toBe(signedInAt)
+    }
   })
 
   it('does not write a policy for a value that is not the session', async () => {
@@ -193,6 +238,49 @@ describe('a session past its window reads as no session', () => {
     const removals = secureStoreCalls.filter((call) => call.op === 'remove')
     expect(removals.map((call) => call.key)).toContain(SESSION_KEY)
     expect(removals.map((call) => call.key)).toContain(POLICY_KEY)
+  })
+
+  it('tells the app when a session is found past its window', async () => {
+    // Boot already treated the miss as "signed out". While the app is running
+    // nothing announced it, and the signed-in screens stayed up.
+    const expired = {
+      remembered: false,
+      windowMs: SESSION_GRACE_WINDOW_MS,
+      persistedAt: Date.now() - SESSION_GRACE_WINDOW_MS - 1,
+    }
+    ;(SecureStore.getItemAsync as jest.Mock).mockImplementation(async (key: string) =>
+      key === SESSION_KEY ? '{"access_token":"a"}' : JSON.stringify(expired),
+    )
+    const listener = jest.fn()
+    const stop = onSessionWindowExpired(listener)
+
+    await secureStore.getItem(SESSION_KEY)
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    stop()
+    ;(SecureStore.getItemAsync as jest.Mock).mockImplementation(async (key: string) =>
+      key === SESSION_KEY ? '{"access_token":"a"}' : JSON.stringify(expired),
+    )
+    await secureStore.getItem(SESSION_KEY)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not tell the app about a session that is still inside its window', async () => {
+    const live = {
+      remembered: true,
+      windowMs: REMEMBERED_WINDOW_MS,
+      persistedAt: Date.now() - 1000,
+    }
+    ;(SecureStore.getItemAsync as jest.Mock).mockImplementation(async (key: string) =>
+      key === SESSION_KEY ? '{"access_token":"a"}' : JSON.stringify(live),
+    )
+    const listener = jest.fn()
+    const stop = onSessionWindowExpired(listener)
+
+    await secureStore.getItem(SESSION_KEY)
+
+    expect(listener).not.toHaveBeenCalled()
+    stop()
   })
 
   it('expires an unremembered session once the grace window is up', async () => {

@@ -10,12 +10,15 @@ import { Linking } from 'react-native'
  *
  * If the device has no tel: handler the function resolves `false` so the
  * caller can show a fallback.
+ *
+ * There is no `canOpenURL` pre-check on purpose: on Android 11+ it answers
+ * `false` for `tel:` unless the app declares a package query, which would turn
+ * every 999 tap into the manual-dial note. `openURL` rejects when nothing can
+ * handle the link, and that is the failure we act on.
  */
 export async function openDialer(number: string): Promise<boolean> {
   const normalized = number.replace(/[^\d+]/g, '')
   try {
-    const supported = await Linking.canOpenURL(`tel:${normalized}`)
-    if (!supported) return false
     await Linking.openURL(`tel:${normalized}`)
     return true
   } catch {

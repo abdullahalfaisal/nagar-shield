@@ -1,5 +1,6 @@
 import { AppError } from '@nagar-shield/shared'
-import { capturePhoto, captureVideo, pickDocument, pickFromGallery } from './mediaSources'
+import * as mediaSources from './mediaSources'
+import { capturePhoto, captureVideo, pickFromGallery } from './mediaSources'
 
 /**
  * The media entry points.
@@ -32,13 +33,8 @@ jest.mock('expo-image-picker', () => ({
   launchCameraAsync: jest.fn(),
 }))
 
-jest.mock('expo-document-picker', () => ({
-  getDocumentAsync: jest.fn(),
-}))
-
 import * as Camera from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
-import * as DocumentPicker from 'expo-document-picker'
 
 const mockedMic = Camera.Camera.requestMicrophonePermissionsAsync as jest.MockedFunction<
   typeof Camera.Camera.requestMicrophonePermissionsAsync
@@ -54,9 +50,6 @@ const mockedLaunchLibrary = ImagePicker.launchImageLibraryAsync as jest.MockedFu
 >
 const mockedLaunchCamera = ImagePicker.launchCameraAsync as jest.MockedFunction<
   typeof ImagePicker.launchCameraAsync
->
-const mockedGetDocument = DocumentPicker.getDocumentAsync as jest.MockedFunction<
-  typeof DocumentPicker.getDocumentAsync
 >
 
 const pickedAsset = {
@@ -77,7 +70,6 @@ beforeEach(() => {
   mockedLibrary.mockResolvedValue({ status: 'granted' } as never)
   mockedLaunchLibrary.mockResolvedValue({ canceled: false, assets: [pickedAsset] } as never)
   mockedLaunchCamera.mockResolvedValue({ canceled: false, assets: [pickedAsset] } as never)
-  mockedGetDocument.mockResolvedValue({ canceled: false, assets: [pickedAsset] } as never)
 })
 
 describe('pickFromGallery', () => {
@@ -193,26 +185,42 @@ describe('captureVideo', () => {
   })
 })
 
-describe('pickDocument', () => {
-  // The file path needs no device permission — the document picker is the
-  // OS's own surface.
-  it('does not request any permission', async () => {
-    await pickDocument()
+describe('documents', () => {
+  // Evidence is a photo or a video; there is no document entry point.
+  it('offers no document picker', () => {
+    expect(Object.keys(mediaSources)).not.toContain('pickDocument')
+  })
+})
 
-    expect(mockedCamera).not.toHaveBeenCalled()
-    expect(mockedMic).not.toHaveBeenCalled()
-    expect(mockedLibrary).not.toHaveBeenCalled()
+describe('recoverPendingPick', () => {
+  const picker = ImagePicker as unknown as { getPendingResultAsync?: jest.Mock }
+
+  afterEach(() => {
+    delete picker.getPendingResultAsync
   })
 
-  it('opens the document picker', async () => {
-    await pickDocument()
-
-    expect(mockedGetDocument).toHaveBeenCalledTimes(1)
+  it('returns null where the picker has no pending-result call', async () => {
+    await expect(mediaSources.recoverPendingPick()).resolves.toBeNull()
   })
 
-  it('returns null when the citizen cancels', async () => {
-    mockedGetDocument.mockResolvedValue({ canceled: true, assets: null } as never)
+  it('returns null when nothing is pending, it was cancelled, or it errored', async () => {
+    picker.getPendingResultAsync = jest.fn().mockResolvedValueOnce(null)
+    await expect(mediaSources.recoverPendingPick()).resolves.toBeNull()
+    picker.getPendingResultAsync.mockResolvedValueOnce({ canceled: true, assets: null })
+    await expect(mediaSources.recoverPendingPick()).resolves.toBeNull()
+    picker.getPendingResultAsync.mockResolvedValueOnce({ code: 'E', message: 'x' })
+    await expect(mediaSources.recoverPendingPick()).resolves.toBeNull()
+    picker.getPendingResultAsync.mockRejectedValueOnce(new Error('boom'))
+    await expect(mediaSources.recoverPendingPick()).resolves.toBeNull()
+  })
 
-    await expect(pickDocument()).resolves.toBeNull()
+  it('hands back a recovered video with its kind', async () => {
+    picker.getPendingResultAsync = jest.fn().mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///v.mp4', type: 'video', mimeType: 'video/mp4', duration: 4000 }],
+    })
+    const recovered = await mediaSources.recoverPendingPick()
+    expect(recovered?.kind).toBe('video')
+    expect(recovered?.asset.uri).toBe('file:///v.mp4')
   })
 })

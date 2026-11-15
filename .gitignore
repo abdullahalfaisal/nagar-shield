@@ -47,3 +47,9 @@ scratch/
 # Supabase CLI scratch: generated keys, pre-reset backups, cron probes.
 supabase/.temp/
 
+
+tools/cloudflared/cloudflared.exe
+
+# The EAS build profile holds the Supabase and map keys. Copy `eas.example.json`
+# to `eas.json` and fill them in. It is never committed.
+apps/mobile/eas.json

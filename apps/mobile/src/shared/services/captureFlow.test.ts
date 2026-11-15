@@ -35,10 +35,11 @@ jest.mock('./uploadQueue', () => {
   }
 })
 
+jest.mock('./sessionUser', () => ({ currentUserId: jest.fn().mockResolvedValue('user-1') }))
+
 jest.mock('./prepareMedia', () => ({
   preparePhoto: jest.fn(),
   prepareVideo: jest.fn(),
-  prepareFile: jest.fn(),
 }))
 
 jest.mock('expo-file-system', () => ({
@@ -63,13 +64,12 @@ jest.mock('expo-file-system', () => ({
 
 import { submitCapture } from './submitCapture'
 import { enqueueUploadBounded } from './uploadQueue'
-import { prepareFile, preparePhoto, prepareVideo } from './prepareMedia'
+import { preparePhoto, prepareVideo } from './prepareMedia'
 
 const mockedSubmit = submitCapture as jest.MockedFunction<typeof submitCapture>
 const mockedEnqueue = enqueueUploadBounded as jest.MockedFunction<typeof enqueueUploadBounded>
 const mockedPhoto = preparePhoto as jest.MockedFunction<typeof preparePhoto>
 const mockedVideo = prepareVideo as jest.MockedFunction<typeof prepareVideo>
-const mockedFile = prepareFile as jest.MockedFunction<typeof prepareFile>
 
 /** The prepared media the flow submits. */
 const media = {
@@ -143,6 +143,17 @@ describe('isTransportFailure', () => {
   it('treats an unknown throw as a transport failure', () => {
     expect(isTransportFailure(new Error('socket hang up'))).toBe(true)
   })
+
+  it('treats fetch’s dropped-connection TypeError as a transport failure', () => {
+    expect(isTransportFailure(new TypeError('Network request failed'))).toBe(true)
+  })
+
+  it('does not queue a bug: a TypeError from a missing API is not the network', () => {
+    // The phone has no `crypto.subtle`; this is what the capture threw.
+    expect(isTransportFailure(new TypeError("Cannot read property 'digest' of undefined"))).toBe(
+      false,
+    )
+  })
 })
 
 // --- The submit path ----------------------------------------------------------
@@ -201,6 +212,14 @@ describe('submitDraft', () => {
 
     expect(submitted?.clientRequestId).toBeDefined()
     expect(enqueued?.clientRequestId).toBe(submitted?.clientRequestId)
+  })
+
+  it('records who queued the report, so only their session sends it', async () => {
+    mockedSubmit.mockRejectedValue(new AppError('INTERNAL'))
+
+    await submitDraft({ media, draft })
+
+    expect(mockedEnqueue).toHaveBeenCalledWith(expect.objectContaining({ authorId: 'user-1' }))
   })
 
   it('reports the overflow when the queue evicts its oldest item', async () => {
@@ -309,13 +328,6 @@ describe('preparePickedMedia', () => {
 
     await expect(preparePickedMedia('video', asset)).resolves.toBe(media)
     expect(mockedVideo).toHaveBeenCalled()
-  })
-
-  it('prepares a file', async () => {
-    mockedFile.mockResolvedValue(media)
-
-    await expect(preparePickedMedia('file', asset)).resolves.toBe(media)
-    expect(mockedFile).toHaveBeenCalled()
   })
 })
 

@@ -1,3 +1,4 @@
+import * as Battery from 'expo-battery'
 import * as Network from 'expo-network'
 
 /**
@@ -19,46 +20,36 @@ import * as Network from 'expo-network'
  *
  * ## FR-PERMS-3 — the battery-saver capability
  *
- * There is **no first-class Expo API** that reports Android power-save mode.
- * `expo-battery` reports the *level*, not the *power-save mode*, and the
- * level says nothing about whether the OEM will suppress the dialer.
- *
- * Detecting it needs a native module reading `PowerManager.isPowerSaveMode`.
- * This app ships **no** native module, so the capability is **unavailable**,
- * and the battery-saver warning degrades to its **static copy** — which is
- * what the story requires when the capability is missing:
- *
- *   > "the app shows the static degraded-guidance copy rather than silently
- *   > pretending the device state is known, and the absence of the detection is
- *   > recorded as a known limitation rather than shipped as a silent no-op"
- *
- * The absence is recorded in `BATTERY_SAVER_DETECTION` below and in the
- * story's own Implementation section — it is a **build limitation**, visible
- * in the source, not a hidden gap. The static copy ships either way: a
- * warning that the dialer *may* be suppressed is true whether or not power
- * saving is on, because some OEM ROMs suppress `ACTION_DIAL` in other
- * conditions too.
+ * `expo-battery` **does** read Android power-save mode:
+ * `Battery.isLowPowerModeEnabledAsync()` maps to `PowerManager.isPowerSaveMode`.
+ * An earlier build shipped this module with the capability hard-wired to
+ * `'unavailable'` — the premise was that no first-class Expo API exposed it —
+ * and the always-`'unknown'` reading made `powerSaveWarningIsUseful` true for
+ * **every** user, so the battery-saver line appeared after every dial attempt
+ * and read as a false "battery saver is on" prompt. The capability is real:
+ * the constant below is `'available'`, the read is live, and the warning only
+ * renders when the mode is actually on — or when the read itself fails, which
+ * the copy still covers ("…or this phone does not let the app check").
  */
 
 /**
  * Whether the app can detect Android power-save mode.
  *
- * `'unavailable'` is the honest answer for this build: there is no native
- * module, so the app does not know, and must not pretend it does.
- *
- * The type keeps `'available'` in the vocabulary on purpose — when the native
- * module lands, this becomes a real reading rather than a new concept.
+ * `'available'`: `expo-battery` ships the read, and the app calls it. The
+ * `'unavailable'` member stays in the vocabulary so a future build that loses
+ * the module (or a platform where the read throws, such as web) can express
+ * the degraded state without a new concept.
  */
 export type PowerSaveCapability = 'available' | 'unavailable'
 
 /**
  * The power-save detection capability of **this** build.
  *
- * Kept as a constant rather than a runtime probe so that the limitation is
+ * Kept as a constant rather than a runtime probe so that the capability is
  * visible in one place and in one grep. A reviewer who wants to know whether
  * the battery warning is live reads this line.
  */
-export const BATTERY_SAVER_DETECTION: PowerSaveCapability = 'unavailable'
+export const BATTERY_SAVER_DETECTION: PowerSaveCapability = 'available'
 
 /**
  * Whether power saving is on.
@@ -137,16 +128,23 @@ export function needsManualDialGuidance(state: DegradedState, dialerOpened: bool
 /**
  * Reads the power-save mode.
  *
- * Returns `'unknown'` whenever the capability is unavailable or the read
- * fails. It never returns `'off'` for a failed read: "we could not read the
- * state" is not the same as "power saving is off", and treating them as the
- * same would suppress a warning the user needs.
+ * Reads the real OS state through `expo-battery` (`PowerManager.isPowerSaveMode`
+ * on Android). It returns `'unknown'` whenever the read **fails** — on a
+ * platform without the module, or when the native side throws. It never
+ * returns `'off'` for a failed read: "we could not read the state" is not the
+ * same as "power saving is off", and treating them as the same would suppress
+ * a warning the user needs.
  */
 export async function readPowerSaveState(): Promise<PowerSaveState> {
-  if (BATTERY_SAVER_DETECTION !== 'available') return 'unknown'
-  // The native module would be read here. Until it exists, the state is
-  // unknown — and the code above has already said so.
-  return 'unknown'
+  try {
+    return (await Battery.isLowPowerModeEnabledAsync()) ? 'on' : 'off'
+  } catch (error) {
+    // A failed read is honest — `'unknown'` — but never silent in dev: the
+    // Metro log says exactly why, so "this phone does not let the app check"
+    // in the UI can be checked against a cause.
+    if (__DEV__) console.warn('[degradation] power-save read failed', error)
+    return 'unknown'
+  }
 }
 
 /**

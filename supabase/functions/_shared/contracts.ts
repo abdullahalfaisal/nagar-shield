@@ -30,6 +30,9 @@ export {
   type PasswordResetVerifyBody,
 } from '@shared/schemas/index.ts'
 
+/** The longest place detail (road, shop, landmark) a capture may carry. */
+export const PLACE_DETAIL_MAX_LENGTH = 120
+
 /** The accepted media kinds. */
 export const mediaTypeSchema = z.enum(['photo', 'video', 'file'])
 
@@ -56,6 +59,20 @@ export const finalizeCaptureSchema = z.object({
   description: z.string().max(CAPTURE_DESCRIPTION_MAX_LENGTH).nullable().default(null),
   public_visibility: publicVisibilitySchema.default('anonymous'),
   category: reportCategorySchema.nullable().default(null),
+  /**
+   * An area the citizen chose from the reference list instead of the detected
+   * one. When it is set, the report is filed at that area's centroid with that
+   * area's hierarchy, and `lat` / `lng` are not used.
+   */
+  area_id: z.string().uuid().nullable().default(null),
+  /** A road, shop or landmark the citizen typed, kept with the area. */
+  place_detail: z
+    .string()
+    .trim()
+    .max(PLACE_DETAIL_MAX_LENGTH)
+    .transform((value) => (value.length > 0 ? value : null))
+    .nullable()
+    .default(null),
 })
 
 export type FinalizeCaptureInput = z.infer<typeof finalizeCaptureSchema>
@@ -103,6 +120,12 @@ export function checkMediaCaps(input: {
   width: number | null
   height: number | null
 }): MediaCapResult {
+  // Evidence is a photo or a video. A document cannot show what happened, and
+  // the app no longer offers one.
+  if (input.mediaType !== 'photo' && input.mediaType !== 'video') {
+    return { ok: false, code: 'UNSUPPORTED_MEDIA' }
+  }
+
   if (input.byteSize > MEDIA_MAX_FILE_BYTES) {
     return { ok: false, code: 'MEDIA_TOO_LARGE' }
   }
@@ -113,11 +136,15 @@ export function checkMediaCaps(input: {
     }
   }
 
-  if (input.width !== null && input.width > MEDIA_MAX_DIMENSION) {
-    return { ok: false, code: 'MEDIA_TOO_LARGE' }
-  }
-  if (input.height !== null && input.height > MEDIA_MAX_DIMENSION) {
-    return { ok: false, code: 'MEDIA_TOO_LARGE' }
+  // Only a photo is resized on the device, so only a photo has a dimension
+  // cap. A video is uploaded at its own size and is held by bytes and seconds.
+  if (input.mediaType === 'photo') {
+    if (input.width !== null && input.width > MEDIA_MAX_DIMENSION) {
+      return { ok: false, code: 'MEDIA_TOO_LARGE' }
+    }
+    if (input.height !== null && input.height > MEDIA_MAX_DIMENSION) {
+      return { ok: false, code: 'MEDIA_TOO_LARGE' }
+    }
   }
 
   return { ok: true }

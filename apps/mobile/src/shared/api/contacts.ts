@@ -96,6 +96,28 @@ async function nextSortOrder(): Promise<number> {
 }
 
 /**
+ * Which form fields fail the shared contact schema.
+ *
+ * The editor shows a message under **each** failing field, so it needs every
+ * failure, not just the first one the schema reports.
+ */
+export function failingContactFields(input: { name: string; phone: string }): {
+  name: boolean
+  phone: boolean
+} {
+  const parsed = emergencyContactSchema.safeParse({
+    name: input.name,
+    phone: input.phone,
+    isPrimary: false,
+    groupName: 'other',
+    sortOrder: 0,
+  })
+  const paths = parsed.success ? [] : parsed.error.issues.map((issue) => issue.path[0])
+
+  return { name: paths.includes('name'), phone: paths.includes('phone') }
+}
+
+/**
  * Creates a contact.
  *
  * The input is validated with the **shared** schema, so the phone is
@@ -247,7 +269,15 @@ export async function deleteContact(id: string): Promise<void> {
 
   if (error) throw fromSupabaseError(error)
 
-  await densifySortOrder()
+  // The row is already gone, so a failure to tidy the numbering must not turn a
+  // successful delete into an error: the gap is harmless and the next delete
+  // closes it. (Callers refresh the list in a `finally`, so it reflects the
+  // delete either way.)
+  try {
+    await densifySortOrder()
+  } catch {
+    // Non-fatal, see above.
+  }
 }
 
 /**
@@ -290,33 +320,29 @@ export async function reorderContacts(orderedIds: string[]): Promise<void> {
 /**
  * Makes a contact the primary one.
  *
- * Exactly one primary is kept per action, and the write is **atomic**: the
- * other primaries are cleared in the same pass as the new one is set. A
- * half-applied change would leave two primaries in the list, and the picker
- * in unit 003 would then have to guess which one to dial first.
+ * Exactly one primary is kept per action. The new primary is set **first**
+ * and the others are cleared afterwards, in a single statement: a failure
+ * between the two leaves two primaries (the picker dials the first in list
+ * order), never none, which is the state an emergency cannot afford. The old
+ * order — clear each other primary, then set this one — left zero primaries
+ * if the last write failed, and needed a read plus one write per primary.
  *
  * The promotion is deliberately a **separate** operation from the ordinary
  * update. A caller that writes `is_primary: true` through `updateContact`
  * and then calls this would open a window in which two primaries exist.
  */
 export async function makePrimary(id: string): Promise<void> {
-  const contacts = await fetchContacts()
+  const promote = await supabase.from('contacts').update({ is_primary: true }).eq('id', id)
 
-  // Clear every primary except the one being promoted.
-  for (const contact of contacts) {
-    if (contact.id === id || !contact.isPrimary) continue
+  if (promote.error) throw fromSupabaseError(promote.error)
 
-    const { error } = await supabase
-      .from('contacts')
-      .update({ is_primary: false })
-      .eq('id', contact.id)
+  const clear = await supabase
+    .from('contacts')
+    .update({ is_primary: false })
+    .neq('id', id)
+    .eq('is_primary', true)
 
-    if (error) throw fromSupabaseError(error)
-  }
-
-  const { error } = await supabase.from('contacts').update({ is_primary: true }).eq('id', id)
-
-  if (error) throw fromSupabaseError(error)
+  if (clear.error) throw fromSupabaseError(clear.error)
 }
 
 /**

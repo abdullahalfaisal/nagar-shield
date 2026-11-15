@@ -1,9 +1,16 @@
-import { type ReactNode } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { isValidElement, type ReactElement, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
+import { FlatList, StyleSheet, Text, TurboModuleRegistry, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../theme'
+import { MapZoomButtons } from './MapZoomButtons'
+import { MAX_ZOOM, MIN_ZOOM, TileMapFallback } from './TileMapFallback'
+import { TILE_ATTRIBUTION, TILE_URL_TEMPLATE } from './tileSource'
+import { pinCountLabel } from './tileMap'
 // The type only — the value is required lazily below, so that a missing
 // native module does not take the whole screen down.
 import type * as MapLibreModule from '@maplibre/maplibre-react-native'
+import type { CameraRef } from '@maplibre/maplibre-react-native'
 
 /**
  * The shared MapLibre wrapper.
@@ -12,7 +19,7 @@ import type * as MapLibreModule from '@maplibre/maplibre-react-native'
  * reuses it. The two surfaces must not fork — a fork is how the OSM
  * attribution gets dropped from one of them.
  *
- * The raster style is the OSM tile server. When the tiles are unreachable the
+ * The raster style is the configured tile source (`tileSource.ts`). When the tiles are unreachable the
  * wrapper degrades to the bundled list under the map, never to a blank canvas.
  */
 interface StationMapProps {
@@ -23,10 +30,27 @@ interface StationMapProps {
   markers: StationMarker[]
   /** Rendered under the map — the list of entries, used for the no-tiles fallback. */
   children?: ReactNode
-  /** Shows the OSM attribution. Mandatory whenever the map renders. */
+  /**
+   * The rows of the list, one keyed element each. They are rendered in a
+   * `FlatList`, so a long list (every bundled station) mounts only what is on
+   * screen. `children` becomes the list's header.
+   */
+  items?: ReactElement[]
+  /**
+   * Adds the bottom safe-area inset under the list. A screen that renders its
+   * own footer below the map turns this off so the inset is not counted twice.
+   */
+  insetBottom?: boolean
+  /** Shows the tile attribution. Mandatory whenever the map renders. */
   attribution?: string
   /** The user's own position — drawn as a distinct "you are here" marker. */
   userLocation?: { lat: number; lng: number } | null
+  /**
+   * Shows + / − zoom buttons over the canvas. On by default: every map pinches
+   * and drags, and every map also has the buttons, for one-handed use and for
+   * anyone who cannot pinch.
+   */
+  zoomControls?: boolean
   /** Rendered over the canvas — the empty state, the offline notice. */
   overlay?: ReactNode
   /**
@@ -53,6 +77,15 @@ export interface StationMarker {
    * marker *title*.
    */
   color?: string
+  /**
+   * How many reports share this pin's place. `undefined` for a single report.
+   *
+   * Reports at the same place would otherwise stack into one dot that looks
+   * exactly like a single report's — 21 reports at one corner read as one
+   * report there. With a count the pin says what it covers, and the list
+   * under the map stays the complete, per-report view.
+   */
+  count?: number
   onPress?: () => void
 }
 
@@ -106,12 +139,16 @@ export function StationMap({
   zoom = 12,
   markers,
   children,
-  attribution = '© OpenStreetMap contributors',
+  items,
+  insetBottom = true,
+  attribution = TILE_ATTRIBUTION,
   userLocation = null,
+  zoomControls = true,
   overlay = null,
   overlayAlign = 'center',
 }: StationMapProps) {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
 
   return (
     <View style={styles.root}>
@@ -121,6 +158,7 @@ export function StationMap({
           zoom={zoom}
           markers={capMarkers(markers, center)}
           userLocation={userLocation}
+          zoomControls={zoomControls}
         />
         <View style={styles.attribution}>
           <Text style={styles.attributionText}>{attribution}</Text>
@@ -131,7 +169,18 @@ export function StationMap({
           </View>
         ) : null}
       </View>
-      {children ? <ScrollView style={styles.list}>{children}</ScrollView> : null}
+      {children || items ? (
+        <FlatList
+          style={styles.list}
+          contentContainerStyle={{ paddingBottom: insetBottom ? insets.bottom : 0 }}
+          data={items ?? []}
+          renderItem={({ item }) => item}
+          keyExtractor={(item, index) =>
+            isValidElement(item) && item.key !== null ? String(item.key) : String(index)
+          }
+          ListHeaderComponent={children ? <>{children}</> : undefined}
+        />
+      ) : null}
     </View>
   )
 }
@@ -148,54 +197,101 @@ function MapCanvas({
   zoom,
   markers,
   userLocation,
+  zoomControls,
 }: {
   center: { lat: number; lng: number }
   zoom: number
   markers: StationMarker[]
   userLocation: { lat: number; lng: number } | null
+  zoomControls: boolean
 }) {
   const theme = useTheme()
   const MapLibre = requireMapLibre()
+  // The native map zooms by pinch on its own. These two only feed the buttons:
+  // the camera to move, and the zoom the map is at now.
+  const cameraRef = useRef<CameraRef>(null)
+  const [currentZoom, setCurrentZoom] = useState(zoom)
 
   if (!MapLibre) {
-    return <View style={styles.fallback} />
+    // No native module (Expo Go, CI): draw the tiles in plain views so the
+    // map still shows. The pins stay tappable.
+    return (
+      <TileMapFallback
+        center={center}
+        zoom={zoom}
+        markers={markers}
+        userLocation={userLocation}
+        zoomControls={zoomControls}
+      />
+    )
   }
 
+  const zoomBy = (step: number) =>
+    cameraRef.current?.zoomTo(
+      Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(currentZoom) + step)),
+      {
+        duration: 200,
+      },
+    )
+
   return (
-    <MapLibre.Map
-      mapStyle={OSM_RASTER_STYLE}
-      logo={false}
-      attribution={false}
-      compass={false}
-      style={styles.map}
-    >
-      <MapLibre.Camera center={[center.lng, center.lat]} zoom={zoom} />
-      <MapLibre.RasterSource
-        id="osm"
-        tiles={['https://tile.openstreetmap.org/{z}/{x}/{y}.png']}
-        tileSize={256}
-        maxzoom={19}
-        attribution="© OpenStreetMap contributors"
-      />
-      <MapLibre.Layer id="osm-layer" type="raster" source="osm" />
-      {markers.map((marker) => (
-        <MapLibre.Marker
-          key={marker.id}
-          id={marker.id}
-          lngLat={[marker.lng, marker.lat]}
-          onPress={marker.onPress}
-        >
-          <View
-            style={[styles.pin, { backgroundColor: marker.color ?? theme.palette.violet[600] }]}
-          />
-        </MapLibre.Marker>
-      ))}
-      {userLocation ? (
-        <MapLibre.Marker id="user-location" lngLat={[userLocation.lng, userLocation.lat]}>
-          <View style={[styles.userPin, { backgroundColor: theme.palette.sky[600] }]} />
-        </MapLibre.Marker>
+    <>
+      <MapLibre.Map
+        mapStyle={RASTER_STYLE}
+        logo={false}
+        attribution={false}
+        compass={false}
+        style={styles.map}
+        onRegionDidChange={(event) => setCurrentZoom(event.nativeEvent.zoom)}
+      >
+        <MapLibre.Camera ref={cameraRef} center={[center.lng, center.lat]} zoom={zoom} />
+        {TILE_URL_TEMPLATE ? (
+          <>
+            <MapLibre.RasterSource
+              id="osm"
+              tiles={[TILE_URL_TEMPLATE]}
+              tileSize={256}
+              maxzoom={19}
+              attribution={TILE_ATTRIBUTION}
+            />
+            <MapLibre.Layer id="osm-layer" type="raster" source="osm" />
+          </>
+        ) : null}
+        {markers.map((marker) => (
+          <MapLibre.Marker
+            key={marker.id}
+            id={marker.id}
+            lngLat={[marker.lng, marker.lat]}
+            onPress={marker.onPress}
+          >
+            <View
+              style={[
+                styles.pin,
+                marker.count ? styles.pinStacked : null,
+                { backgroundColor: marker.color ?? theme.palette.violet[600] },
+              ]}
+            >
+              {marker.count ? (
+                <Text style={styles.pinCount}>{pinCountLabel(marker.count)}</Text>
+              ) : null}
+            </View>
+          </MapLibre.Marker>
+        ))}
+        {userLocation ? (
+          <MapLibre.Marker id="user-location" lngLat={[userLocation.lng, userLocation.lat]}>
+            <View style={[styles.userPin, { backgroundColor: theme.palette.sky[600] }]} />
+          </MapLibre.Marker>
+        ) : null}
+      </MapLibre.Map>
+      {zoomControls ? (
+        <MapZoomButtons
+          canZoomIn={Math.round(currentZoom) < MAX_ZOOM}
+          canZoomOut={Math.round(currentZoom) > MIN_ZOOM}
+          onZoomIn={() => zoomBy(1)}
+          onZoomOut={() => zoomBy(-1)}
+        />
       ) : null}
-    </MapLibre.Map>
+    </>
   )
 }
 
@@ -208,6 +304,12 @@ function MapCanvas({
  * nothing into the bundle — while the *value* is still required lazily.
  */
 function requireMapLibre(): typeof MapLibreModule | null {
+  // Ask whether the native modules are registered *before* requiring the
+  // package. Requiring it without them fails, and although the failure is
+  // caught here, React Native's dev mode reports every failed module load as
+  // an error and shows the red error screen on the map screens in Expo Go.
+  if (!hasNativeMapLibre()) return null
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('@maplibre/maplibre-react-native')
@@ -216,24 +318,43 @@ function requireMapLibre(): typeof MapLibreModule | null {
   }
 }
 
-/** The OSM raster style — the only tile source the app uses. */
-const OSM_RASTER_STYLE = {
+/** Whether this binary carries the MapLibre native modules (a dev or release build, not Expo Go). */
+function hasNativeMapLibre(): boolean {
+  try {
+    return (
+      TurboModuleRegistry.get('MLRNMapViewModule') != null &&
+      TurboModuleRegistry.get('MLRNCameraModule') != null
+    )
+  } catch {
+    return false
+  }
+}
+
+/** The raster style — the one tile source the app uses (`tileSource.ts`). */
+interface RasterSourceSpec {
+  type: 'raster'
+  tiles: string[]
+  tileSize: number
+  attribution: string
+}
+
+// No source configured: an empty style, so the native map draws a plain
+// background under the markers and requests nothing.
+const RASTER_STYLE = {
   version: 8 as const,
-  sources: {
-    osm: {
-      type: 'raster' as const,
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [
-    {
-      id: 'osm-layer',
-      type: 'raster' as const,
-      source: 'osm',
-    },
-  ],
+  sources: (TILE_URL_TEMPLATE
+    ? {
+        osm: {
+          type: 'raster' as const,
+          tiles: [TILE_URL_TEMPLATE],
+          tileSize: 256,
+          attribution: TILE_ATTRIBUTION,
+        },
+      }
+    : {}) as Record<string, RasterSourceSpec>,
+  layers: (TILE_URL_TEMPLATE
+    ? [{ id: 'osm-layer', type: 'raster' as const, source: 'osm' }]
+    : []) as Array<{ id: string; type: 'raster'; source: string }>,
 }
 
 const styles = StyleSheet.create({
@@ -248,15 +369,26 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  fallback: {
-    flex: 1,
-  },
   pin: {
     width: 16,
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  pinStacked: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+  },
+  pinCount: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    includeFontPadding: false,
   },
   userPin: {
     width: 18,
@@ -298,7 +430,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.78)',
   },
   attributionText: {
-    fontSize: 9,
+    fontSize: 12,
     color: '#11112B',
   },
   list: {

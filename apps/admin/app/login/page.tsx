@@ -96,6 +96,13 @@ export default function LoginPage() {
     <main className="main">
       <div className="page" style={{ maxWidth: 480, paddingTop: 80 }}>
         <form className="card" style={{ padding: 28 }} onSubmit={handleSubmit}>
+          <img
+            src="/brand/app-icon-128.png"
+            alt=""
+            width={56}
+            height={56}
+            style={{ borderRadius: 14, marginBottom: 16 }}
+          />
           <h1 className="pageTitle" style={{ fontSize: 20 }}>
             {copy.loginTitle}
           </h1>

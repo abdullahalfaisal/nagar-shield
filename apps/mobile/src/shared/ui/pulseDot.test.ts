@@ -115,6 +115,37 @@ describe("the feed header's pulsing dot", () => {
     expect(code).toMatch(/\{paused\s*\?\s*null\s*:\s*\(/)
   })
 
+  it('freezes the animation for either reason — paused or reduced motion', () => {
+    const code = codeOf(DOT_PATH)
+
+    // `isStatic` is the single gate on the **animation**. Both reasons stop
+    // it — the app's own quiet indicator and the user's accessibility
+    // setting.
+    expect(code).toMatch(/const\s+isStatic\s*=\s*paused\s*\|\|\s*reduceMotion/)
+    expect(code).toMatch(/if\s*\(\s*isStatic\s*\)/)
+  })
+
+  it('takes the reduced-motion setting as a prop', () => {
+    const code = codeOf(DOT_PATH)
+
+    expect(code).toMatch(/reduceMotion\?:\s*boolean/)
+    expect(code).toMatch(/paused\s*=\s*false\s*,\s*reduceMotion\s*=\s*false/)
+  })
+
+  it('still renders the halo under reduced motion', () => {
+    const code = codeOf(DOT_PATH)
+
+    // The two states are different on purpose. `paused` says "the feed is
+    // not refreshing", and the halo's absence is part of that message.
+    // Reduced motion says "do not move things" — which does not ask for the
+    // indicator to disappear, so the halo stays and is simply frozen.
+    //
+    // The ternary must therefore still read `paused ? null : (`, **not**
+    // `isStatic ? null : (`.
+    expect(code).toMatch(/\{paused\s*\?\s*null\s*:\s*\(/)
+    expect(code).not.toMatch(/\{isStatic\s*\?\s*null\s*:\s*\(/)
+  })
+
   it('hides the dot from a screen reader', () => {
     const code = codeOf(DOT_PATH)
 

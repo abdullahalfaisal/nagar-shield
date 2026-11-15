@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { clearSessionStoreFailure, sessionPersistenceBroken } from '@/shared/api/session-storage'
 import { StatusBanner } from './StatusBanner'
@@ -27,6 +29,7 @@ import { StatusBanner } from './StatusBanner'
  */
 export function SessionPersistenceNotice() {
   const { t } = useTranslation()
+  const insets = useSafeAreaInsets()
   const [broken, setBroken] = useState(false)
 
   useEffect(() => {
@@ -50,10 +53,12 @@ export function SessionPersistenceNotice() {
   if (!broken) return null
 
   return (
-    <StatusBanner
-      tone="warning"
-      title={t('sessionPersistence.title')}
-      body={`${t('sessionPersistence.message')} ${t('sessionPersistence.detail')}`}
-    />
+    <View style={{ paddingTop: insets.top }}>
+      <StatusBanner
+        tone="warning"
+        title={t('sessionPersistence.title')}
+        body={`${t('sessionPersistence.message')} ${t('sessionPersistence.detail')}`}
+      />
+    </View>
   )
 }

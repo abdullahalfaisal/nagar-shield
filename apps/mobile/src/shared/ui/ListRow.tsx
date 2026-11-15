@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
+import { usePressGuard } from './usePressGuard'
 
 export type IconTone = 'purple' | 'red' | 'green' | 'amber' | 'sky' | 'gray'
 
@@ -37,6 +38,7 @@ export function ListRow({
   accessibilityLabel,
 }: ListRowProps) {
   const theme = useTheme()
+  const press = usePressGuard(onPress)
 
   const content = (
     <>
@@ -61,7 +63,7 @@ export function ListRow({
         </Text>
         {subtitle ? (
           <Text
-            numberOfLines={1}
+            numberOfLines={2}
             style={{
               color: theme.colors.ink[500],
               fontSize: theme.typography.size.md,
@@ -101,7 +103,7 @@ export function ListRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
-      onPress={onPress}
+      onPress={press}
       style={({ pressed }) => [
         styles.row,
         pressed && { backgroundColor: theme.palette.violet[25] },

@@ -26,7 +26,55 @@ export interface ResolvedArea {
   neighborhood: string | null
 }
 
-export type GeocodeSource = 'local' | 'online' | 'degraded'
+export type GeocodeSource = 'local' | 'online' | 'degraded' | 'chosen'
+
+/** An area the citizen chose from `area_lookup`, with its centroid. */
+export interface ChosenArea {
+  area: ResolvedArea
+  lat: number
+  lng: number
+}
+
+/**
+ * Reads one reference area by id.
+ *
+ * Answers `null` for an id that is not in the list, so the caller can refuse
+ * it — the client never gets to invent an area hierarchy.
+ */
+export async function chosenArea(
+  serviceClient: SupabaseClient,
+  areaId: string,
+): Promise<ChosenArea | null> {
+  const { data, error } = await serviceClient
+    .from('area_lookup')
+    .select('name, division, city, thana, neighborhood, centroid')
+    .eq('id', areaId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  const row = data as {
+    name: string
+    division: string
+    city: string
+    thana: string
+    neighborhood: string | null
+    centroid: { coordinates?: [number, number] } | null
+  }
+  const [lng, lat] = row.centroid?.coordinates ?? []
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null
+
+  return {
+    area: {
+      division: row.division,
+      city: row.city,
+      thana: row.thana,
+      neighborhood: row.neighborhood ?? row.name,
+    },
+    lat,
+    lng,
+  }
+}
 
 export interface AreaResolution {
   area: ResolvedArea

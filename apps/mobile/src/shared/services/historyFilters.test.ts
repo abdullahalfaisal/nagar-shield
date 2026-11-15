@@ -1,12 +1,9 @@
-import {
-  HISTORY_DEFAULT_RADIUS_KM,
-  HISTORY_DEFAULT_WINDOW_HOURS,
-  REPORT_CATEGORIES,
-} from '@nagar-shield/shared'
+import { HISTORY_DEFAULT_WINDOW_HOURS, REPORT_CATEGORIES } from '@nagar-shield/shared'
 import {
   DEFAULT_HISTORY_FILTERS,
   HISTORY_CATEGORY_OPTIONS,
   HISTORY_RADIUS_OPTIONS,
+  HISTORY_TYPE_ORDER,
   HISTORY_WINDOW_OPTIONS,
   historyFiltersEqual,
   historyQueryKey,
@@ -21,25 +18,32 @@ import {
  *
  * The filter object is the single source of truth for three things that must
  * never disagree: the sheet's draft, the query key, and the RPC arguments.
- * The tests below pin the mapping, and the two defaults that FR-HIST-1 names.
+ * The tests below pin the mapping, the defaults (the widest offered radius,
+ * the shared 24 h window), and the reset action.
  */
 
 const ORIGIN = { lat: 23.8103, lng: 90.4125 }
 
 describe('the default History filters', () => {
-  it('are 1 km and 24 h with no category', () => {
-    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(1)
+  it('open at the widest radius the sheet offers, with the shared 24 h window', () => {
+    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(Math.max(...HISTORY_RADIUS_OPTIONS))
+    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(15)
     expect(DEFAULT_HISTORY_FILTERS.windowHours).toBe(24)
     expect(DEFAULT_HISTORY_FILTERS.category).toBeNull()
   })
 
-  it('match the shared constants, not a copy of them', () => {
-    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(HISTORY_DEFAULT_RADIUS_KM)
+  it('derive the radius from the option list, not a copy of it', () => {
+    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(Math.max(...HISTORY_RADIUS_OPTIONS))
     expect(DEFAULT_HISTORY_FILTERS.windowHours).toBe(HISTORY_DEFAULT_WINDOW_HOURS)
   })
 
   it('reset restores them', () => {
-    const dirty: HistoryFilters = { radiusKm: 5, windowHours: 720, category: 'fire' }
+    const dirty: HistoryFilters = {
+      radiusKm: 0.5,
+      windowHours: 720,
+      category: 'fire',
+      areaId: 'area-1',
+    }
 
     expect(resetHistoryFilters()).toEqual(DEFAULT_HISTORY_FILTERS)
     expect(resetHistoryFilters()).not.toBe(dirty)
@@ -49,14 +53,14 @@ describe('the default History filters', () => {
     const first = resetHistoryFilters()
     first.radiusKm = 99
 
-    expect(resetHistoryFilters().radiusKm).toBe(1)
-    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(1)
+    expect(resetHistoryFilters().radiusKm).toBe(15)
+    expect(DEFAULT_HISTORY_FILTERS.radiusKm).toBe(15)
   })
 })
 
 describe('the filter options', () => {
-  it('offer four radii, including the 500 m one', () => {
-    expect([...HISTORY_RADIUS_OPTIONS]).toEqual([0.5, 1, 2, 5])
+  it('offer six radii, from the 500 m one to the 15 km one', () => {
+    expect([...HISTORY_RADIUS_OPTIONS]).toEqual([0.5, 1, 2, 5, 10, 15])
   })
 
   it('offer four windows, in hours', () => {
@@ -69,7 +73,12 @@ describe('the filter options', () => {
 })
 
 describe('comparing two filter sets', () => {
-  const base: HistoryFilters = { radiusKm: 1, windowHours: 24, category: null }
+  const base: HistoryFilters = {
+    radiusKm: 1,
+    windowHours: 24,
+    category: null,
+    areaId: null,
+  }
 
   it('says two identical sets are equal', () => {
     expect(historyFiltersEqual(base, { ...base })).toBe(true)
@@ -90,10 +99,22 @@ describe('comparing two filter sets', () => {
   it('distinguishes no category from the "other" category', () => {
     expect(historyFiltersEqual(base, { ...base, category: 'other' })).toBe(false)
   })
+
+  it('treats a chosen area as a different filter set', () => {
+    expect(historyFiltersEqual(base, { ...base, areaId: 'area-1' })).toBe(false)
+    expect(historyFiltersEqual({ ...base, areaId: 'area-1' }, { ...base, areaId: 'area-1' })).toBe(
+      true,
+    )
+  })
 })
 
 describe('the query key', () => {
-  const filters: HistoryFilters = { radiusKm: 2, windowHours: 168, category: 'fire' }
+  const filters: HistoryFilters = {
+    radiusKm: 2,
+    windowHours: 168,
+    category: 'fire',
+    areaId: null,
+  }
 
   it('carries the origin and every filter', () => {
     expect(historyQueryKey(ORIGIN, filters)).toEqual({
@@ -126,5 +147,11 @@ describe('the query key', () => {
 
   it('is structurally comparable — the same filters make the same key', () => {
     expect(historyQueryKey(ORIGIN, { ...filters })).toEqual(historyQueryKey(ORIGIN, { ...filters }))
+  })
+})
+
+describe('HISTORY_TYPE_ORDER', () => {
+  it('lists every incident type once, so the sheet and the summary show the same set', () => {
+    expect([...HISTORY_TYPE_ORDER].sort()).toEqual([...REPORT_CATEGORIES].sort())
   })
 })

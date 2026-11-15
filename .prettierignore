@@ -28,6 +28,8 @@ coverage/
 # Generated artefacts.
 supabase/functions/_shared/vendor/
 supabase/seed.sql
+# Written by Expo on every Metro start or export (and gitignored).
+apps/mobile/expo-env.d.ts
 
 # Lockfiles and other machine-written files.
 pnpm-lock.yaml

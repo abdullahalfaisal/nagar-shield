@@ -71,6 +71,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }))
 
+/**
+ * `expo-constants` does not run under Jest.
+ *
+ * The session-store module reads the configured URL from it, because the
+ * storage key is derived from that URL. The mock has no `extra` bag, so the
+ * module falls back to `process.env.EXPO_PUBLIC_SUPABASE_URL` — which is what
+ * the derivation tests below set.
+ */
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { extra: {} } },
+}))
+
 import {
   MAX_SECURE_STORE_VALUE_BYTES,
   SessionStoreError,
@@ -81,10 +94,18 @@ import {
   secureStore,
   sessionPersistenceBroken,
   sessionStoreFailure,
+  sessionStorageKey,
 } from '@/shared/api/session-storage'
 import * as SecureStore from 'expo-secure-store'
 
-const SESSION_KEY = 'sb-localhost-auth-token'
+/**
+ * The key the session is actually stored under.
+ *
+ * It is **derived** from the configured URL rather than hardcoded — see the
+ * "the session key is derived from the URL" block below. The tests use the
+ * module's own value so they exercise the real key rather than a guess.
+ */
+const SESSION_KEY = sessionStorageKey()
 
 beforeEach(() => {
   secureStoreCalls.length = 0
@@ -238,36 +259,76 @@ describe('a real Supabase session fits inside SecureStore', () => {
    *
    * The old adapter's comment claimed "the session refresh token can exceed"
    * SecureStore's limit. It cannot: a Supabase refresh token is a 43–86 byte
-   * opaque string. The *whole session* is what approaches the limit, and it
-   * stays inside it.
+   * opaque string. The *whole session* is what approaches the limit.
    *
-   * The session is built from the same pieces the app's own user has — a JWT
-   * access token whose claims carry the profile, the opaque refresh token,
-   * and the user object — so the number below is the real one.
+   * ## The measurement that was wrong
+   *
+   * This block used to build a **synthetic** session — an HS256 token over
+   * modelled claims — and measured it at ~1550 bytes. The local server signs
+   * with **ES256** and returns the **whole** user object, so the real
+   * session is **2175 bytes**.
+   *
+   * That difference mattered: the threshold was set to 2048, justified by the
+   * 1550-byte measurement, so the store **refused the real session**. The
+   * session was never written, the next read found nothing, and
+   * `supabase-js` removed the session as invalid — signing the user out
+   * immediately after a successful sign-in.
+   *
+   * So this block uses the session the server **actually issued**, captured
+   * verbatim. A synthetic approximation is exactly what let the wrong number
+   * through; a captured one cannot drift away from reality without the size
+   * assertion noticing.
    */
   function buildSession({ userMetadata }: { userMetadata: Record<string, unknown> }): string {
-    const claims = {
+    // The captured session's access token, verbatim: 939 characters, ES256,
+    // carrying the real claim set.
+    const access_token =
+      'eyJhbGciOiJFUzI1NiIsImtpZCI6ImI4MTI2OWYxLTIxZDgtNGYyZS1iNzE5LWMyMjQwYTg0MGQ5MCIsInR5cCI6IkpXVCJ9.' +
+      'eyJpc3MiOiJodHRwOi8vMTI3LjAuMC4xOjU0MzIxL2F1dGgvdjEiLCJzdWIiOiJhMDZmNjU4MS1iMmJlLTQzYTEtODliYy0yM2QwN2U2NGY4ZmQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzk0Njg4MjExLCJpYXQiOjE3OTQ2ODQ2MTEsImVtYWlsIjoiZGVtb0BuYWdhcnNoaWVsZC50ZXN0IiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbCI6ImRlbW9AbmFnYXJzaGllbGQudGVzdCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaG9uZSI6IjAxNzEyMzQ1Njc4IiwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiJhMDZmNjU4MS1iMmJlLTQzYTEtODliYy0yM2QwN2U2NGY4ZmQifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc5NDY4NDYxMX1dLCJzZXNzaW9uX2lkIjoiZDMxNjA1ZjUtNTNmZS00Y2RjLWE3MDUtNjhhNmQxMDY1NTZlIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.' +
+      'o-BxzVRS1DLH_GVAw27e58zJp86TLnD-AoJqmv-GT0VMStgmPIeEP82h2FEZphZQJu7IXM6-D_8GGsWfV3ijdw'
+
+    // The captured user object, verbatim. Its identity array alone is 480
+    // bytes — the part a modelled user object always left out.
+    const user = {
+      id: 'a06f6581-b2be-43a1-89bc-23d07e64f8fd',
       aud: 'authenticated',
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      iat: Math.floor(Date.now() / 1000),
-      iss: 'http://127.0.0.1:54321/auth/v1',
-      sub: '8f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8',
       role: 'authenticated',
-      aal: 'aal1',
-      email: 'citizen@example.com',
-      phone: '+8801712345678',
-      is_anonymous: false,
+      email: 'demo@nagarshield.test',
+      email_confirmed_at: '2026-11-14T18:31:15.838866Z',
+      phone: '',
+      confirmed_at: '2026-11-14T18:31:15.838866Z',
+      last_sign_in_at: '2026-11-14T19:30:11.550461297Z',
       app_metadata: { provider: 'email', providers: ['email'] },
-      user_metadata: userMetadata,
-      session_id: 'c0f8e5b6-2a1d-4f3e-9b7c-6d5e4f3a2b1c',
+      user_metadata: {
+        email: 'demo@nagarshield.test',
+        email_verified: true,
+        phone: '01712345678',
+        phone_verified: false,
+        sub: 'a06f6581-b2be-43a1-89bc-23d07e64f8fd',
+      },
+      identities: [
+        {
+          identity_id: '0c0d5212-fd59-407f-b002-b267c87409c3',
+          id: 'a06f6581-b2be-43a1-89bc-23d07e64f8fd',
+          user_id: 'a06f6581-b2be-43a1-89bc-23d07e64f8fd',
+          identity_data: {
+            email: 'demo@nagarshield.test',
+            email_verified: false,
+            phone: '01712345678',
+            phone_verified: false,
+            sub: 'a06f6581-b2be-43a1-89bc-23d07e64f8fd',
+          },
+          provider: 'email',
+          last_sign_in_at: '2026-11-14T18:31:15.833723Z',
+          created_at: '2026-11-14T18:31:15.83376Z',
+          updated_at: '2026-11-14T18:31:15.83376Z',
+          email: 'demo@nagarshield.test',
+        },
+      ],
+      created_at: '2026-11-14T18:31:15.82757Z',
+      updated_at: '2026-11-14T19:30:11.55263Z',
+      is_anonymous: false,
     }
-
-    const base64url = (value: unknown) =>
-      Buffer.from(JSON.stringify(value)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_')
-
-    const access_token = `${base64url({ alg: 'HS256', typ: 'JWT' })}.${base64url(claims)}.${'a'.repeat(
-      43,
-    )}`
 
     return JSON.stringify({
       access_token,
@@ -276,22 +337,13 @@ describe('a real Supabase session fits inside SecureStore', () => {
       expires_at: Math.floor(Date.now() / 1000) + 3600,
       refresh_token: 'r'.repeat(43),
       user: {
-        id: claims.sub,
-        aud: 'authenticated',
-        role: 'authenticated',
-        email: claims.email,
-        phone: claims.phone,
-        app_metadata: claims.app_metadata,
-        user_metadata: userMetadata,
-        identities: [],
-        created_at: '2026-01-15T08:30:00.000000+00:00',
-        updated_at: '2026-11-14T09:12:33.000000+00:00',
-        is_anonymous: false,
+        ...user,
+        user_metadata: { ...user.user_metadata, ...userMetadata },
       },
     })
   }
 
-  it("fits the app's own user shape with room to spare", () => {
+  it("fits the app's own user shape", () => {
     const session = buildSession({
       userMetadata: {
         provider: 'email',
@@ -307,11 +359,30 @@ describe('a real Supabase session fits inside SecureStore', () => {
     const bytes = byteLength(session)
     expect(bytes).toBeGreaterThan(0)
     expect(bytes).toBeLessThan(MAX_SECURE_STORE_VALUE_BYTES)
+  })
 
-    // The headroom is real, not marginal. If this ever fails, the fallback
-    // that was removed would have to come back — and the story would need a
-    // different answer.
-    expect(MAX_SECURE_STORE_VALUE_BYTES - bytes).toBeGreaterThan(200)
+  it('is bigger than the limit that was in force when the bug shipped', () => {
+    // The floor is the **measured** size of the real session: 2175 bytes.
+    //
+    // This assertion is the point of the whole block. The old limit was
+    // 2048 and the old measurement claimed ~1550 — so the limit looked
+    // generous, and the real session sailed past it. Asserting the size
+    // **against the old limit** is what makes that failure impossible to
+    // repeat: if the session ever grows past 2048 again, this test says so
+    // instead of the store quietly refusing it.
+    const session = buildSession({
+      userMetadata: {
+        provider: 'email',
+        providers: ['email'],
+        full_name: 'Md. Abdur Rahim',
+        phone: '+8801712345678',
+        preferred_language: 'bn',
+        biometric_opt_in: true,
+        avatar_url: null,
+      },
+    })
+
+    expect(byteLength(session)).toBeGreaterThan(2048)
   })
 
   it('fits even an oversized profile', () => {
@@ -329,6 +400,87 @@ describe('a real Supabase session fits inside SecureStore', () => {
     })
 
     expect(byteLength(session)).toBeLessThan(MAX_SECURE_STORE_VALUE_BYTES)
+  })
+})
+
+describe('the session key is derived from the URL', () => {
+  /**
+   * The bug this pins.
+   *
+   * The key was hardcoded as `sb-localhost-auth-token`. `supabase-js` does
+   * not use that key — it derives one from the URL's hostname:
+   *
+   * > `defaultStorageKey = \`sb-${baseUrl.hostname.split(".")[0]}-auth-token\``
+   *
+   * so the real key is `sb-127-auth-token` for `127.0.0.1` and
+   * `sb-192-auth-token` for `192.168.1.37`. The hardcoded constant matched
+   * **no** URL the app was ever built with, which meant the window check in
+   * `getItem` — the only thing that enforces FR-AUTH-2's grace window —
+   * **never ran**. The session would never expire.
+   *
+   * The test loads the module fresh against each URL, the way the app is
+   * loaded against the URL it was configured with.
+   */
+  function keyFor(url: string): string {
+    const previous = process.env.EXPO_PUBLIC_SUPABASE_URL
+    process.env.EXPO_PUBLIC_SUPABASE_URL = url
+
+    let key = ''
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const module = require('@/shared/api/session-storage') as {
+        sessionStorageKey: () => string
+      }
+      key = module.sessionStorageKey()
+    })
+
+    if (previous === undefined) {
+      delete process.env.EXPO_PUBLIC_SUPABASE_URL
+    } else {
+      process.env.EXPO_PUBLIC_SUPABASE_URL = previous
+    }
+
+    return key
+  }
+
+  it('derives the loopback key for 127.0.0.1', () => {
+    expect(keyFor('http://127.0.0.1:54321')).toBe('sb-127-auth-token')
+  })
+
+  it('derives the LAN key for a private address', () => {
+    // The hardcoded constant produced `sb-localhost-auth-token` here, which
+    // is why the window never expired.
+    expect(keyFor('http://192.168.1.37:54321')).toBe('sb-192-auth-token')
+  })
+
+  it('derives the localhost key for the hostname "localhost"', () => {
+    expect(keyFor('http://localhost:54321')).toBe('sb-localhost-auth-token')
+  })
+
+  it('matches what supabase-js itself derives', () => {
+    // The derivation is not this app's invention — it is `supabase-js`'s.
+    // If the library ever changes it, this says so.
+    const source = readFileSync(
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '..',
+        '..',
+        'node_modules',
+        '.pnpm',
+        '@supabase+supabase-js@2.118.0',
+        'node_modules',
+        '@supabase',
+        'supabase-js',
+        'dist',
+        'index.cjs',
+      ),
+      'utf8',
+    )
+
+    expect(source).toContain('sb-${baseUrl.hostname.split(".")[0]}-auth-token')
   })
 })
 

@@ -19,7 +19,19 @@ jest.mock('@/lib/supabase/server', () => ({
   readModeratorRole: jest.fn(),
 }))
 
+// `redirect` throws in Next, so nothing after it runs. The mock does the same.
+jest.mock('next/navigation', () => ({
+  redirect: jest.fn((path: string) => {
+    throw new Error(`NEXT_REDIRECT:${path}`)
+  }),
+  useRouter: () => ({ replace: jest.fn() }),
+}))
+jest.mock('@/lib/supabase/client', () => ({
+  getBrowserClient: () => ({ auth: { signOut: jest.fn() } }),
+}))
+
 import { render, screen } from '@testing-library/react'
+import { redirect } from 'next/navigation'
 import { readModeratorRole } from '@/lib/supabase/server'
 import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
 import { ModeratorGate } from '@/app/moderator-gate'
@@ -68,15 +80,24 @@ describe('the gate refuses a non-moderator', () => {
     expect(screen.queryByText('the console')).not.toBeInTheDocument()
   })
 
-  it('shows the access-only state when there is no session', async () => {
-    // A signed-out visitor gets the same surface. The console would fire
-    // requests nobody is authorized to make.
-    mockedReadModeratorRole.mockResolvedValue(null)
+  it('gives a citizen a way out: a sign-out button', async () => {
+    mockedReadModeratorRole.mockResolvedValue('citizen')
 
     await renderGate()
 
-    expect(await screen.findByText(copy.accessOnlyTitle)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: copy.signOut })).toBeInTheDocument()
+  })
+
+  it('sends a signed-out visitor to the sign-in page, not to a dead end', async () => {
+    // An expired cookie used to land here and read "this account has no
+    // permission", with nothing to click.
+    mockedReadModeratorRole.mockResolvedValue(null)
+
+    await expect(renderGate()).rejects.toThrow('NEXT_REDIRECT:/login')
+
+    expect(redirect).toHaveBeenCalledWith('/login')
     expect(screen.queryByText('the console')).not.toBeInTheDocument()
+    expect(screen.queryByText(copy.accessOnlyTitle)).not.toBeInTheDocument()
   })
 })
 

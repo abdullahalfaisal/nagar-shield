@@ -68,6 +68,22 @@ built on the shared wrapper at `apps/mobile/src/shared/ui/StationMap.tsx`.
   the cheap planar distance is a *selection* heuristic only.
 - **A report with no coordinates gets no marker** — it is filtered out, so a
   malformed point never crashes the map and the remaining markers still render.
+- **Reports that share a place share one pin, and the pin carries the count.**
+  A 16 dp pin at street zoom covers about a hundred metres, so every capture
+  at the same corner stacked into one dot that read exactly like a single
+  report — forty-seven reports at four places looked like four stray reports.
+  The map groups placeable reports on a ~110 m grid (`toFixed(3)`) and renders
+  one pin with the group's size on it (`21`), sitting on the newest report's
+  coordinate and opening that report's detail. The list under the map stays
+  the complete, per-report view, so no report is hidden by the grouping.
+- **The caller's own out-of-radius reports get no marker either.** The read
+  model always includes the caller's own rows, even outside the radius — that
+  is FR-HIST-3's guarantee to the **list**, so the list is never empty of the
+  user's own reports. On the map those rows are kilometres outside a viewport
+  that is zoomed to the radius window: an invisible marker that also suppresses
+  the empty state, so a map over an empty neighbourhood read as "broken". The
+  map keeps only rows with a computed `distanceM` — exactly the rows inside the
+  current filter — so the empty state appears when the radius holds nothing.
 - **The origin degrades.** The map opens on the caller's fix, or on
   `DHAKA_FALLBACK_ORIGIN` with no "you are here" marker when there is no fix.
   No permission prompt fires from the map.
@@ -78,6 +94,11 @@ built on the shared wrapper at `apps/mobile/src/shared/ui/StationMap.tsx`.
 - **The native module is loaded lazily.** `requireMapLibre` catches a missing
   native binary (Expo Go, a CI runner) and degrades to the list under the map
   instead of crashing the screen.
+- **The fallback gets + / − zoom buttons.** The JS fallback cannot pan or
+  pinch, so a zoomed-in radius is the whole world; the shared wrapper takes a
+  `zoomControls` opt-in (the native map pinch-zooms, so it does not need them)
+  and this screen turns it on. The buttons clamp to the fallback's 10–18 zoom
+  range and announce themselves to a screen reader.
 
 ### Deviations from the story
 
@@ -137,7 +158,8 @@ built on the shared wrapper at `apps/mobile/src/shared/ui/StationMap.tsx`.
 | The device is offline or the OSM tile server times out | The markers render over a plain background with an offline notice; the wrapper retries at most once and never enters a request loop |
 | The OSM tile server returns `429` | The wrapper serves the cached or plain background with the offline notice; it never hammers the public tile server |
 | A report's coordinates are null or malformed | The marker is skipped and the remaining markers still render; a malformed point never crashes the map |
-| Two reports share the same coordinates | Both markers render at the same point and are disambiguated by the detail they open, never by renaming the report |
+| Every loaded row is the caller's own report from outside the radius | No markers and no "Showing X of Y" note; the empty state explains that the radius holds nothing and suggests widening it |
+| Several reports share a place (~110 m grid) | One pin with a count badge renders at the newest report's coordinate; the list under the map still carries every report, and the pin opens the newest report's detail |
 | The user leaves the map and re-enters it | No stale callout is open, the previously selected marker is not auto-reopened, and the camera returns to the user's fix (or the default centre) |
 | The filter is changed while the map is open | The map re-renders against the new filter set using the same query key as the list; the old filter's markers are removed |
 | The user rotates the device | The map re-mounts on the new orientation, the camera is restored to the origin, and no duplicate marker layer is rendered |

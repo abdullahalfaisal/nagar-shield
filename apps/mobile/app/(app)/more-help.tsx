@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { HOTLINES, type HotlineEntry } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
@@ -48,72 +48,79 @@ export default function MoreHelpScreen() {
     i18n.language === 'bn' ? (hotline.nameBn ?? hotline.name) : hotline.name
 
   return (
-    <Screen
-      title={t('help.hotlineListTitle')}
-      subtitle={t('help.hotlineListSubtitle')}
-      onBack={() => router.back()}
-    >
-      <View style={styles.list}>
-        {hotlines.map((hotline) => {
-          const stale = isVerificationStale(hotline.lastVerifiedAt)
-          const label = displayName(hotline)
-
-          return (
-            <View key={hotline.id} style={styles.row}>
-              <ListRow
-                title={label}
-                subtitle={hotline.phone}
-                icon="call"
-                tone="purple"
-                showArrow={false}
-                accessibilityLabel={t('help.hotlineCallLabel', {
-                  name: label,
-                  number: hotline.phone,
-                })}
-                onPress={() => {
-                  void degradedHelp.dial(hotline.phone)
-                }}
-                trailing={
-                  <View style={styles.trailing}>
-                    {stale ? (
-                      <Text style={[styles.stale, { color: theme.palette.amber[600] }]}>
-                        {t('help.hotlineStale')}
-                      </Text>
-                    ) : null}
-                    <Text style={[styles.stamp, { color: theme.colors.ink[400] }]}>
-                      {t('help.hotlineVerifiedOn', {
-                        date: formatVerifiedStamp(hotline.lastVerifiedAt, i18n.language),
-                      })}
-                    </Text>
-                  </View>
-                }
+    <>
+      <Screen
+        title={t('help.hotlineListTitle')}
+        subtitle={t('help.hotlineListSubtitle')}
+        onBack={() => router.back()}
+        footer={
+          // Pinned under the list: with twelve rows the note would otherwise
+          // land below the fold, and a failed dial would look like nothing
+          // happened. The footer pads the sides, the guidance pads itself.
+          degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+            <View style={styles.pinned}>
+              <ManualDialGuidance
+                number={degradedHelp.guidanceNumber}
+                showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+                showOfflineNotice={degradedHelp.showOfflineNotice}
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('help.wrongNumberTitle')}
-                onPress={() => setReporting(hotline)}
-                style={styles.reportLink}
-              >
-                <Icon name="report" size={14} color={theme.palette.amber[600]} />
-                <Text style={[styles.reportText, { color: theme.palette.violet[700] }]}>
-                  {t('help.wrongNumber')}
-                </Text>
-              </Pressable>
             </View>
-          )
-        })}
-      </View>
+          ) : undefined
+        }
+      >
+        <View style={styles.list}>
+          {hotlines.map((hotline) => {
+            const stale = isVerificationStale(hotline.lastVerifiedAt)
+            const label = displayName(hotline)
 
-      {/* The manual-dial guidance — the same component every help entry point
-          renders. */}
-      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
-        <ManualDialGuidance
-          number={degradedHelp.guidanceNumber}
-          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
-          showOfflineNotice={degradedHelp.showOfflineNotice}
-        />
-      ) : null}
+            return (
+              <View key={hotline.id} style={styles.row}>
+                <ListRow
+                  title={label}
+                  subtitle={hotline.phone}
+                  icon="call"
+                  tone="purple"
+                  showArrow={false}
+                  accessibilityLabel={t('help.hotlineCallLabel', {
+                    name: label,
+                    number: hotline.phone,
+                  })}
+                  onPress={() => {
+                    void degradedHelp.dial(hotline.phone)
+                  }}
+                />
+                {/* The stamp sits under the row, not beside the name, so a long
+                  Bengali hotline name keeps the full row width. */}
+                <View style={styles.trailing}>
+                  {stale ? (
+                    <Text style={[styles.stale, { color: theme.palette.amber[600] }]}>
+                      {t('help.hotlineStale')}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.stamp, { color: theme.colors.ink[500] }]}>
+                    {t('help.hotlineVerifiedOn', {
+                      date: formatVerifiedStamp(hotline.lastVerifiedAt, i18n.language),
+                    })}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('help.wrongNumberTitle')}
+                  onPress={() => setReporting(hotline)}
+                  style={styles.reportLink}
+                >
+                  <Icon name="report" size={14} color={theme.palette.amber[600]} />
+                  <Text style={[styles.reportText, { color: theme.palette.violet[700] }]}>
+                    {t('help.wrongNumber')}
+                  </Text>
+                </Pressable>
+              </View>
+            )
+          })}
+        </View>
+      </Screen>
 
+      {/* The sheet is a Modal, so it lives beside the screen, not in its scroll. */}
       <WrongNumberSheet
         visible={reporting !== null}
         onClose={() => setReporting(null)}
@@ -121,11 +128,14 @@ export default function MoreHelpScreen() {
         entryId={reporting?.id ?? ''}
         entryName={reporting ? displayName(reporting) : undefined}
       />
-    </Screen>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
+  pinned: {
+    marginHorizontal: -20,
+  },
   list: {
     paddingHorizontal: 20,
   },
@@ -133,15 +143,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   trailing: {
-    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingBottom: 4,
     gap: 2,
   },
   stale: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
   },
   stamp: {
-    fontSize: 10,
+    fontSize: 12,
   },
   reportLink: {
     flexDirection: 'row',

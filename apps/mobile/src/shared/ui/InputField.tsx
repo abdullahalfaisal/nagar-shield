@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentRef, type Ref } from 'react'
 import {
   StyleSheet,
   Text,
@@ -26,7 +26,10 @@ interface InputFieldProps {
   editable?: boolean
   onSubmitEditing?: () => void
   returnKeyType?: TextInputProps['returnKeyType']
+  maxLength?: number
   testID?: string
+  /** Lets a form move focus to this field from the previous one's "next" key. */
+  inputRef?: Ref<ComponentRef<typeof TextInput>>
 }
 
 /**
@@ -53,7 +56,9 @@ export function InputField({
   editable = true,
   onSubmitEditing,
   returnKeyType,
+  maxLength,
   testID,
+  inputRef,
 }: InputFieldProps) {
   const theme = useTheme()
   const [focused, setFocused] = useState(false)
@@ -91,10 +96,15 @@ export function InputField({
         ) : null}
 
         <TextInput
+          ref={inputRef}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.ink[400]}
+          // The placeholder is only shown once the label has floated up. While
+          // the field is empty and unfocused, the label itself sits in the
+          // field as the hint — rendering the placeholder there too would put
+          // two strings on top of each other.
+          placeholder={floated ? placeholder : undefined}
+          placeholderTextColor={theme.colors.textMuted}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
@@ -105,6 +115,7 @@ export function InputField({
           onBlur={() => setFocused(false)}
           onSubmitEditing={onSubmitEditing}
           returnKeyType={returnKeyType}
+          maxLength={maxLength}
           testID={testID}
           accessibilityLabel={label}
           style={[
@@ -145,7 +156,13 @@ export function InputField({
       </View>
 
       {error ? (
-        <Text style={[styles.helper, { color: theme.palette.red[600] }]}>{error}</Text>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={[styles.helper, { color: theme.palette.red[600] }]}
+        >
+          {error}
+        </Text>
       ) : helper ? (
         <Text style={[styles.helper, { color: theme.colors.ink[500] }]}>{helper}</Text>
       ) : null}

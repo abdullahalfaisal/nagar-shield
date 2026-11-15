@@ -1,13 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
+import { StyleSheet, Text, View, type TextInput } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { AppError, emergencyContactSchema, type EmergencyContact } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { AppBar, Button, InputField, RadioGroup, Toggle } from '@/shared/ui'
+import {
+  AppBar,
+  Button,
+  EmptyState,
+  InputField,
+  KeyboardScroll,
+  RadioGroup,
+  Toggle,
+  useToast,
+} from '@/shared/ui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   clearPrimary,
   createContact,
+  failingContactFields,
   makePrimary,
   updateContact,
   useContact,
@@ -38,6 +50,8 @@ import { errorCopy } from '@/shared/i18n/errorCopy'
  */
 export default function ContactEditorScreen() {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
+  const toast = useToast()
   const router = useRouter()
   const { t } = useTranslation()
   const invalidate = useInvalidateContacts()
@@ -55,7 +69,18 @@ export default function ContactEditorScreen() {
 
   // The contact being edited, if any. The form is pre-filled from it, so an
   // edit never overwrites a contact with a blank form.
-  const { data: existing } = useContact(contactId)
+  const { data: existing, isLoading, isError, refetch } = useContact(contactId)
+
+  // The id of a contact this screen has already created. If a later step (the
+  // primary flag) fails, Save must continue on that contact, not create a
+  // second one with the same name and number.
+  const createdId = useRef<string | null>(null)
+
+  // The form is filled from the stored contact **once**. A later refetch (focus,
+  // reconnect) must not overwrite what the user has typed since.
+  const filled = useRef(false)
+
+  const phoneInput = useRef<ComponentRef<typeof TextInput>>(null)
 
   // Whether the row was primary **before** this edit. The demotion is only
   // worth writing when the flag was set and the user has now turned it off;
@@ -63,7 +88,8 @@ export default function ContactEditorScreen() {
   const wasPrimary = existing?.isPrimary ?? false
 
   useEffect(() => {
-    if (!existing) return
+    if (!existing || filled.current) return
+    filled.current = true
 
     setName(existing.name)
     setPhone(existing.phone)
@@ -91,11 +117,11 @@ export default function ContactEditorScreen() {
       sortOrder: 0,
     })
 
+    // Every failing field is marked, each with its own message.
+    const failing = failingContactFields({ name, phone })
     const nextErrors: Record<string, string> = {}
-    if (!parsed.success) {
-      const field = parsed.error.issues[0]?.path[0]
-      nextErrors[field === 'phone' ? 'phone' : 'name'] = t('errors.validationFailed')
-    }
+    if (failing.name) nextErrors.name = t('contacts.nameRequired')
+    if (failing.phone) nextErrors.phone = t('contacts.phoneInvalid')
     setErrors(nextErrors)
     if (!parsed.success) return
 
@@ -103,7 +129,9 @@ export default function ContactEditorScreen() {
     setFormError(undefined)
 
     try {
-      if (contactId) {
+      const editingId = contactId ?? createdId.current
+
+      if (editingId) {
         // The primary flag is deliberately **not** part of this update.
         //
         // A promotion has to clear every other primary in the same pass, and
@@ -114,16 +142,16 @@ export default function ContactEditorScreen() {
         //
         // A **demotion** is the opposite: it only ever clears this row's own
         // flag, so it is an ordinary update.
-        await updateContact(contactId, {
+        await updateContact(editingId, {
           name: parsed.data.name,
           phone: parsed.data.phone,
           groupName: parsed.data.groupName,
         })
 
         if (parsed.data.isPrimary) {
-          await makePrimary(contactId)
+          await makePrimary(editingId)
         } else if (wasPrimary) {
-          await clearPrimary(contactId)
+          await clearPrimary(editingId)
         }
       } else {
         const created = await createContact({
@@ -132,12 +160,15 @@ export default function ContactEditorScreen() {
           groupName: parsed.data.groupName,
         })
 
+        createdId.current = created.id
+
         if (parsed.data.isPrimary) {
           await makePrimary(created.id)
         }
       }
 
       await invalidate()
+      toast.show({ message: t('contacts.savedToast'), tone: 'success' })
       router.back()
     } catch (error) {
       const appError = error instanceof AppError ? error : fromSupabaseError(error)
@@ -145,7 +176,7 @@ export default function ContactEditorScreen() {
       // A validation failure that names the phone field is shown **on that
       // field**, not as a banner above the form.
       if (appError.code === 'VALIDATION_FAILED' && appError.details?.field === 'phone') {
-        setErrors({ phone: t('errors.validationFailed') })
+        setErrors({ phone: t('contacts.phoneInvalid') })
         setFormError(undefined)
       } else {
         setFormError(errorCopy(t, appError.code))
@@ -153,7 +184,7 @@ export default function ContactEditorScreen() {
 
       setSubmitting(false)
     }
-  }, [contactId, groupName, invalidate, isPrimary, name, phone, router, t, wasPrimary])
+  }, [contactId, groupName, invalidate, isPrimary, name, phone, router, t, toast, wasPrimary])
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
@@ -162,50 +193,89 @@ export default function ContactEditorScreen() {
         onBack={() => router.back()}
       />
 
-      <View style={styles.content}>
-        {formError ? (
-          <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
-            <Text style={{ color: theme.palette.red[600], fontSize: 13 }}>{formError}</Text>
+      {contactId && (isLoading || isError || existing === null) ? (
+        // Editing a contact that has not loaded: a blank, savable form would
+        // overwrite the real contact with whatever gets typed into it.
+        isLoading ? (
+          <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+            {t('common.loading')}
+          </Text>
+        ) : isError ? (
+          <EmptyState
+            icon="error"
+            title={t('contacts.loadFailed')}
+            description={t('contacts.loadFailedSub')}
+            action={{ label: t('common.retry'), onPress: () => void refetch() }}
+          />
+        ) : (
+          <EmptyState
+            icon="contact_emergency"
+            title={t('contacts.notFoundTitle')}
+            description={t('contacts.notFoundSub')}
+            action={{ label: t('common.back'), onPress: () => router.back() }}
+          />
+        )
+      ) : (
+        <KeyboardScroll contentStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}>
+          {formError ? (
+            <View
+              accessibilityRole="alert"
+              style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}
+            >
+              <Text
+                accessibilityLiveRegion="polite"
+                style={{ color: theme.palette.red[600], fontSize: 13 }}
+              >
+                {formError}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.fields}>
+            <InputField
+              label={t('contacts.nameLabel')}
+              value={name}
+              onChangeText={setName}
+              placeholder={t('contacts.namePlaceholder')}
+              autoCapitalize="words"
+              textContentType="name"
+              autoComplete="name"
+              returnKeyType="next"
+              onSubmitEditing={() => phoneInput.current?.focus()}
+              icon="person"
+              error={errors.name}
+              testID="contact-name"
+            />
+
+            <InputField
+              label={t('contacts.phoneLabel')}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder={t('contacts.phonePlaceholder')}
+              keyboardType="phone-pad"
+              // Not the user's own number: autofill would suggest it, and a contact
+              // is somebody else.
+              autoComplete="off"
+              returnKeyType="done"
+              onSubmitEditing={() => void onSave()}
+              inputRef={phoneInput}
+              icon="phone"
+              helper={t('contacts.phoneHelper')}
+              error={errors.phone}
+              testID="contact-phone"
+            />
           </View>
-        ) : null}
 
-        <InputField
-          label={t('contacts.nameLabel')}
-          value={name}
-          onChangeText={setName}
-          placeholder={t('contacts.nameLabel')}
-          autoCapitalize="words"
-          textContentType="name"
-          autoComplete="name"
-          icon="person"
-          error={errors.name}
-          testID="contact-name"
-        />
+          <Text style={[styles.sectionLabel, { color: theme.colors.ink[500] }]}>
+            {t('contacts.groupLabel')}
+          </Text>
+          <RadioGroup
+            options={groupOptions}
+            selectedId={groupName}
+            onSelect={(id) => setGroupName(id as EmergencyContact['groupName'])}
+          />
 
-        <InputField
-          label={t('contacts.phoneLabel')}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder={t('contacts.phonePlaceholder')}
-          keyboardType="phone-pad"
-          textContentType="telephoneNumber"
-          autoComplete="tel"
-          icon="phone"
-          helper={t('contacts.phoneHelper')}
-          error={errors.phone}
-          testID="contact-phone"
-        />
-
-        <Text style={[styles.sectionLabel, { color: theme.colors.ink[500] }]}>
-          {t('contacts.groupLabel')}
-        </Text>
-        <RadioGroup
-          options={groupOptions}
-          selectedId={groupName}
-          onSelect={(id) => setGroupName(id as EmergencyContact['groupName'])}
-        />
-
-        {/*
+          {/*
           The primary toggle.
 
           Turning it **on** is a promotion, not a second flag: the write goes
@@ -215,31 +285,32 @@ export default function ContactEditorScreen() {
           list is left with no primary at all rather than silently promoting
           someone else.
         */}
-        <View style={[styles.primaryRow, { borderColor: theme.colors.ink[100] }]}>
-          <View style={styles.primaryText}>
-            <Text style={[styles.primaryLabel, { color: theme.colors.ink[950] }]}>
-              {t('contacts.primaryLabel')}
-            </Text>
-            <Text style={[styles.primaryHelper, { color: theme.colors.ink[500] }]}>
-              {t('contacts.primaryHelper')}
-            </Text>
+          <View style={[styles.primaryRow, { borderColor: theme.colors.ink[100] }]}>
+            <View style={styles.primaryText}>
+              <Text style={[styles.primaryLabel, { color: theme.colors.ink[950] }]}>
+                {t('contacts.primaryLabel')}
+              </Text>
+              <Text style={[styles.primaryHelper, { color: theme.colors.ink[500] }]}>
+                {t('contacts.primaryHelper')}
+              </Text>
+            </View>
+            <Toggle
+              value={isPrimary}
+              onValueChange={setIsPrimary}
+              accessibilityLabel={t('contacts.primaryLabel')}
+            />
           </View>
-          <Toggle
-            value={isPrimary}
-            onValueChange={setIsPrimary}
-            accessibilityLabel={t('contacts.primaryLabel')}
-          />
-        </View>
 
-        <Button
-          label={submitting ? t('capture.submitting') : t('contacts.saveCta')}
-          variant="primary"
-          size="lg"
-          disabled={submitting}
-          onPress={onSave}
-          style={styles.cta}
-        />
-      </View>
+          <Button
+            label={submitting ? t('capture.submitting') : t('contacts.saveCta')}
+            variant="primary"
+            size="lg"
+            disabled={submitting || (Boolean(contactId) && !existing)}
+            onPress={onSave}
+            style={styles.cta}
+          />
+        </KeyboardScroll>
+      )}
     </View>
   )
 }
@@ -262,30 +333,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingTop: 24,
+  },
+  fields: {
+    gap: 16,
+  },
+  loading: {
+    padding: 24,
+    textAlign: 'center',
   },
   errorBanner: {
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginTop: 18,
-    marginBottom: 6,
+    marginTop: 24,
+    marginBottom: 8,
   },
   primaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginTop: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
   },
@@ -301,6 +379,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cta: {
-    marginTop: 24,
+    marginTop: 32,
   },
 })

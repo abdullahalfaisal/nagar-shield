@@ -28,7 +28,17 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }))
 
-import { alertAccent, alertCategoryLabel, formatArea, styles, withAlpha } from './AlertCard'
+import {
+  CATEGORY_LINE_ICONS,
+  CATEGORY_SOLID_ICONS,
+  DESCRIPTION_LINES,
+  alertAccent,
+  alertCategoryLabel,
+  formatArea,
+  styles,
+  withAlpha,
+} from './AlertCard'
+import { SOLID_GLYPHS } from './solidGlyphs'
 import { en } from '@/shared/i18n/en'
 import { bn } from '@/shared/i18n/bn'
 
@@ -96,7 +106,7 @@ function cardCode(): string {
 const NEUTRAL = '#B8B8CC'
 
 /** The uncategorized placeholder, as the bundles spell it. */
-const UNCATEGORIZED = 'অকার্যনির্দিষ্ট — Uncategorized'
+const UNCATEGORIZED = 'Uncategorized'
 
 /** A report, with the pieces a test cares about overridable. */
 function report(overrides: Partial<PublicReport> = {}): PublicReport {
@@ -161,34 +171,41 @@ describe('the card renders the uncategorized placeholder', () => {
   it('shows the localized placeholder, never a dash', () => {
     // The card used to render the literal `'—'`. A dash is an empty value;
     // an uncategorized report is a named state the citizen can read.
-    expect(alertCategoryLabel(null, UNCATEGORIZED)).toBe(UNCATEGORIZED)
-    expect(alertCategoryLabel(null, UNCATEGORIZED)).not.toBe('—')
+    expect(alertCategoryLabel(null, UNCATEGORIZED, 'en')).toBe(UNCATEGORIZED)
+    expect(alertCategoryLabel(null, UNCATEGORIZED, 'en')).not.toBe('—')
   })
 
-  it('takes the placeholder from the bundle, in both languages', () => {
-    // The copy is localized — the same key in both bundles.
+  it('takes the placeholder from the bundle, one language each', () => {
+    // Each bundle says it in its own language only — no Bangla in the English
+    // copy and no English in the Bangla.
     expect(en.alerts.uncategorized).toBe(UNCATEGORIZED)
-    expect(bn.alerts.uncategorized).toBe(UNCATEGORIZED)
+    expect(bn.alerts.uncategorized).not.toMatch(/[A-Za-z]/)
+    expect(en.alerts.uncategorized).not.toMatch(/[ঀ-৿]/)
   })
 
   it('never invents a category', () => {
     // A null category is null — the card must not fall back to "other" or to
     // any other category that happens to be in the map.
-    expect(alertCategoryLabel(null, UNCATEGORIZED)).not.toContain(REPORT_CATEGORY_LABELS.other.en)
-    expect(alertCategoryLabel(null, UNCATEGORIZED)).not.toContain(REPORT_CATEGORY_LABELS.other.bn)
+    expect(alertCategoryLabel(null, UNCATEGORIZED, 'en')).not.toContain(
+      REPORT_CATEGORY_LABELS.other.en,
+    )
+    expect(alertCategoryLabel(null, UNCATEGORIZED, 'bn')).not.toContain(
+      REPORT_CATEGORY_LABELS.other.bn,
+    )
   })
 })
 
-describe('the card renders the Bangla / English pair', () => {
-  it('pairs the Bangla name with the English one', () => {
-    // The copy contract: `চুরি — Theft`.
-    expect(alertCategoryLabel('theft', UNCATEGORIZED)).toBe('চুরি — Theft')
+describe('the card names the category in the app language only', () => {
+  it('reads Bangla on a Bangla screen and English on an English one', () => {
+    expect(alertCategoryLabel('theft', UNCATEGORIZED, 'bn')).toBe('চুরি')
+    expect(alertCategoryLabel('theft', UNCATEGORIZED, 'en')).toBe('Theft')
   })
 
-  it('pairs every category the map knows', () => {
+  it('never pairs the two languages', () => {
     for (const category of REPORT_CATEGORIES) {
       const label = REPORT_CATEGORY_LABELS[category]
-      expect(alertCategoryLabel(category, UNCATEGORIZED)).toBe(`${label.bn} — ${label.en}`)
+      expect(alertCategoryLabel(category, UNCATEGORIZED, 'bn')).toBe(label.bn)
+      expect(alertCategoryLabel(category, UNCATEGORIZED, 'en')).toBe(label.en)
     }
   })
 })
@@ -251,39 +268,58 @@ describe('the card renders the area line', () => {
   })
 })
 
-describe('the card matches the prototype’s box model', () => {
-  it('uses the prototype’s margins, padding, radius and gap', () => {
-    // `margin: 0 20px 10px; padding: 14px 16px; border-radius: 14px; gap: 12px`
+describe('the card’s box model', () => {
+  it('keeps the feed’s gutters and a hairline-bordered rounded card', () => {
     expect(styles.card.marginHorizontal).toBe(20)
-    expect(styles.card.marginBottom).toBe(10)
-    expect(styles.card.paddingVertical).toBe(14)
-    expect(styles.card.paddingHorizontal).toBe(16)
-    expect(styles.card.borderRadius).toBe(14)
+    expect(styles.card.marginBottom).toBe(12)
+    expect(styles.card.borderRadius).toBe(18)
     expect(styles.card.borderWidth).toBe(1)
-    expect(styles.card.gap).toBe(12)
-    expect(styles.card.flexDirection).toBe('row')
+    expect(styles.body.paddingHorizontal).toBe(16)
   })
 
-  it('uses the prototype’s 40 dp circular icon tile', () => {
-    expect(styles.iconTile.width).toBe(40)
-    expect(styles.iconTile.height).toBe(40)
-    expect(styles.iconTile.borderRadius).toBe(20)
+  it('uses a 48 dp rounded-square icon tile', () => {
+    expect(styles.iconTile.width).toBe(48)
+    expect(styles.iconTile.height).toBe(48)
+    expect(styles.iconTile.borderRadius).toBe(14)
   })
 
-  it('uses the prototype’s 48 dp flag button', () => {
+  it('keeps the media preview short, so a card does not fill the screen', () => {
+    expect(styles.media.height).toBeLessThanOrEqual(128)
+  })
+
+  it('keeps a 48 dp flag button, in the top-right corner', () => {
     expect(styles.flagButton.width).toBe(48)
     expect(styles.flagButton.height).toBe(48)
+    expect(styles.flagButton.position).toBe('absolute')
+    // The header leaves room for it, so a long category never runs under it.
+    expect(styles.header.paddingRight).toBeGreaterThanOrEqual(32)
   })
 
-  it('uses the prototype’s type scale', () => {
-    // area 11 px / 600 · category 15 px / 700 · description 13 px · time 11 px
-    expect(styles.area.fontSize).toBe(11)
-    expect(styles.area.fontWeight).toBe('600')
-    expect(styles.category.fontSize).toBe(15)
-    expect(styles.category.fontWeight).toBe('700')
-    expect(styles.description.fontSize).toBe(13)
-    expect(styles.description.lineHeight).toBe(18)
-    expect(styles.time.fontSize).toBe(11)
+  it('shows at most three lines of the description', () => {
+    expect(DESCRIPTION_LINES).toBe(3)
+    expect(cardCode()).toContain('numberOfLines={DESCRIPTION_LINES}')
+  })
+
+  it('uses the type scale: title 16, description 14 / 21, meta 13', () => {
+    expect(styles.category.fontSize).toBe(16)
+    expect(styles.description.fontSize).toBe(14)
+    expect(styles.description.lineHeight).toBe(21)
+    expect(styles.area.fontSize).toBe(13)
+    expect(styles.time.fontSize).toBe(13)
+  })
+
+  it('gives every category a line icon', () => {
+    for (const category of REPORT_CATEGORIES) {
+      expect(CATEGORY_LINE_ICONS[category]).toBeTruthy()
+    }
+  })
+
+  it('gives every category a solid glyph that exists in the bundled set', () => {
+    for (const category of REPORT_CATEGORIES) {
+      const name = CATEGORY_SOLID_ICONS[category]
+      expect(SOLID_GLYPHS[name].paths.length).toBeGreaterThan(0)
+    }
+    expect(SOLID_GLYPHS.help.paths.length).toBeGreaterThan(0)
   })
 })
 
@@ -332,12 +368,11 @@ describe('the card renders the accent, the icon and the label together', () => {
   it('wires the accent to the border, the tint and the glyph', () => {
     const code = cardCode()
 
-    // The left border.
-    expect(code).toContain('borderLeftColor: accent')
-    // The tinted icon tile.
-    expect(code).toContain('withAlpha(accent, 0.15)')
-    // The glyph.
-    expect(code).toContain('color: accent')
+    // The tinted icon tile: stronger on the dark theme.
+    expect(code).toContain('withAlpha(accent, dark ? 0.26 : 0.13)')
+    // The glyph, lightened on the dark theme and muted when uncategorized.
+    expect(code).toContain('<SolidIcon name={icon} size={26} color={glyph} />')
+    expect(code).toContain('mixHex(accent, theme.staticColors.white, 0.3)')
   })
 
   it('renders the label from the shared lookup, not a literal', () => {
@@ -352,8 +387,9 @@ describe('the card renders the accent, the icon and the label together', () => {
 
     // The accent falls back to the neutral ramp, and the category text is
     // neutral too — an uncategorized card must not be the loudest card on
-    // the feed.
+    // the feed. The text uses `textMuted`, not `ink[300]`: the 300 step is
+    // about 2:1 on white, too faint to read.
     expect(code).toContain('alertAccent(category, theme.colors.ink[300])')
-    expect(code).toContain('category ? theme.colors.ink[950] : theme.colors.ink[300]')
+    expect(code).toContain('category ? theme.colors.ink[950] : theme.colors.textMuted')
   })
 })

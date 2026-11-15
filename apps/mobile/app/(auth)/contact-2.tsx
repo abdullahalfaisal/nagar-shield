@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen'
 
@@ -22,6 +22,7 @@ export default function WizardContact2Screen() {
       subtitle={t('wizardContacts.step2Subtitle')}
       cta={t('wizardContacts.saveCta')}
       onBack={() => router.back()}
+      onSkip={() => router.push('/(auth)/contact-3')}
       onComplete={() => router.push('/(auth)/contact-3')}
     />
   )

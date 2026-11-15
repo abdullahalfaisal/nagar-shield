@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { AppError, emergencyContactSchema, type EmergencyContact } from '@nagar-shield/shared'
+import {
+  AppError,
+  bnDigitsToAscii,
+  emergencyContactSchema,
+  type EmergencyContact,
+} from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
 import { Button, EscapeLink, Icon, InputField, WizardScreen } from '@/shared/ui'
 import {
@@ -12,6 +17,7 @@ import {
 } from '@/shared/api/contacts'
 import { fromSupabaseError } from '@/shared/api/errors'
 import { errorCopy } from '@/shared/i18n/errorCopy'
+import { formatNational } from './formatNational'
 
 /**
  * The three onboarding contact steps — S-04a, S-04b and S-04c.
@@ -93,8 +99,13 @@ interface ContactCaptureScreenProps {
   subtitle: string
   /** The primary CTA's label. */
   cta: string
-  /** Where "Back" goes and where the CTA goes. */
-  onBack: () => void
+  /** Where "Back" goes; omitted, the Back link is not shown. */
+  onBack?: () => void
+  /**
+   * Where "Skip for now" goes. The three contacts are recommended, not
+   * required; omitted, the link is not shown.
+   */
+  onSkip?: () => void
   onComplete: () => void
 }
 
@@ -106,6 +117,7 @@ export function ContactCaptureScreen({
   subtitle,
   cta,
   onBack,
+  onSkip,
   onComplete,
 }: ContactCaptureScreenProps) {
   const theme = useTheme()
@@ -259,7 +271,11 @@ export function ContactCaptureScreen({
             disabled={submitting}
             onPress={isLast && allCaptured ? onComplete : onSave}
           />
-          <EscapeLink label={t('common.back')} onPress={onBack} />
+          {/* Hidden once all three are saved: the CTA above already moves on. */}
+          {onSkip && !(isLast && allCaptured) ? (
+            <EscapeLink label={t('wizardContacts.skipCta')} onPress={onSkip} />
+          ) : null}
+          {onBack ? <EscapeLink label={t('common.back')} onPress={onBack} /> : null}
         </>
       }
     >
@@ -338,10 +354,11 @@ export function ContactCaptureScreen({
             label={t('wizardContacts.nameLabel')}
             value={name}
             onChangeText={setName}
-            placeholder={t('wizardContacts.nameLabel')}
+            placeholder={t('contacts.namePlaceholder')}
             autoCapitalize="words"
             textContentType="name"
             autoComplete="name"
+            returnKeyType="next"
             icon="person"
             error={errors.name}
             testID={`wiz-c${slot}-name`}
@@ -349,11 +366,17 @@ export function ContactCaptureScreen({
           <InputField
             label={t('wizardContacts.phoneLabel')}
             value={phone}
-            onChangeText={setPhone}
+            // Bangla digits are converted as they are typed: the field would
+            // otherwise keep characters the phone check cannot read.
+            onChangeText={(next) => setPhone(bnDigitsToAscii(next))}
             placeholder={t('contacts.phonePlaceholder')}
             keyboardType="phone-pad"
             textContentType="telephoneNumber"
-            autoComplete="tel"
+            autoComplete="tel-national"
+            returnKeyType="done"
+            onSubmitEditing={() => {
+              if (!submitting && !(isLast && allCaptured)) void onSave()
+            }}
             icon="phone"
             error={errors.phone}
             testID={`wiz-c${slot}-phone`}
@@ -363,20 +386,17 @@ export function ContactCaptureScreen({
 
       {formError ? (
         <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
-          <Text style={{ color: theme.palette.red[600], fontSize: 13 }}>{formError}</Text>
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.palette.red[600], fontSize: 13 }}
+          >
+            {formError}
+          </Text>
         </View>
       ) : null}
     </WizardScreen>
   )
-}
-
-/**
- * Formats `+8801712345678` as `01712-345678` — the prototype's slot format.
- */
-function formatNational(phone: string): string {
-  const digits = phone.replace(/\D/g, '').replace(/^880/, '')
-  if (digits.length !== 10) return phone
-  return `0${digits.slice(1, 0 + 5)}-${digits.slice(5)}`
 }
 
 const styles = StyleSheet.create({

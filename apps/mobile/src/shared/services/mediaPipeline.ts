@@ -10,11 +10,13 @@ import {
  *
  * Every rule here is enforced **before** the bytes leave the handset:
  *
- *   * the EXIF block (and with it the embedded GPS) is dropped by the
+ *   * a photo's EXIF block (and with it the embedded GPS) is dropped by the
  *     re-encode, and the app-supplied coordinates are the record (FR-CAPTURE-2)
+ *   * only photos and videos are accepted — evidence is something seen
  *   * photos are re-encoded down to the 1080p cap
- *   * videos are trimmed to the 30 s cap
- *   * files are limited to PDF / DOC and to 10 MB
+ *   * videos are limited to the 30 s cap and are compressed to fit 10 MB
+ *     (in Expo Go, which has no compressor, they must already fit), and their
+ *     metadata boxes (the recorded location) are blanked
  *
  * The server re-checks every cap in `finalize-capture`; this layer is the UX
  * affordance, not the enforcement point.
@@ -34,19 +36,78 @@ export interface PreparedMedia {
   extension: string
 }
 
-/** The MIME types the file entry point accepts. */
-export const ALLOWED_FILE_TYPES = ['application/pdf', 'application/msword'] as const
-
 /** The MIME types the photo / video entry points accept. */
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/webp'] as const
 export const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/3gpp'] as const
+
+/**
+ * The largest photo the app will open, before it is re-encoded.
+ *
+ * The re-encode brings any photo down to 1080p and well under the 10 MB upload
+ * cap, so this limit is about the phone, not the server: decoding a 40 MB RAW
+ * export is slow and can run a low-end phone out of memory.
+ */
+export const MEDIA_MAX_SOURCE_PHOTO_BYTES = 25 * 1024 * 1024
+
+/**
+ * The largest video the app will compress.
+ *
+ * Thirty seconds of 4K from a phone camera is about 200 MB. Past this the
+ * re-encode is slow and the clip is almost certainly not a camera recording.
+ * It applies only where the compressor exists; without it the source itself
+ * must fit the 10 MB upload cap.
+ */
+export const MEDIA_MAX_SOURCE_VIDEO_BYTES = 300 * 1024 * 1024
+
+/** The longest side a compressed video keeps: 720p. */
+export const VIDEO_COMPRESS_MAX_SIDE = 1280
+
+/** The share of the upload cap the video track may fill. The rest is headroom. */
+const VIDEO_BUDGET = 0.8
+const AUDIO_BITS_PER_SECOND = 128_000
+const VIDEO_BITRATE_CEILING = 2_500_000
+const VIDEO_BITRATE_FLOOR = 400_000
+
+/**
+ * The video bitrate, in bits per second, that brings a clip of this length
+ * under the upload cap.
+ *
+ * The budget is the cap less a fifth — an encoder overshoots its target and
+ * the container adds its own bytes — less the sound track. A short clip does
+ * not get more than 720p can use; an unknown length is treated as the longest
+ * the app accepts.
+ */
+export function videoBitrateFor(durationSeconds: number | null): number {
+  const seconds =
+    durationSeconds !== null && durationSeconds > 0
+      ? Math.min(durationSeconds, MEDIA_MAX_VIDEO_SECONDS)
+      : MEDIA_MAX_VIDEO_SECONDS
+  const bitrate = (MEDIA_MAX_FILE_BYTES * 8 * VIDEO_BUDGET) / seconds - AUDIO_BITS_PER_SECOND
+
+  return Math.round(Math.min(VIDEO_BITRATE_CEILING, Math.max(VIDEO_BITRATE_FLOOR, bitrate)))
+}
 
 /** The caps, re-exported so the UI and the pipeline agree on one source. */
 export const MEDIA_CAPS = {
   maxDimension: MEDIA_MAX_DIMENSION,
   maxVideoSeconds: MEDIA_MAX_VIDEO_SECONDS,
   maxFileBytes: MEDIA_MAX_FILE_BYTES,
+  maxSourcePhotoBytes: MEDIA_MAX_SOURCE_PHOTO_BYTES,
 } as const
+
+/** Bytes as whole megabytes, for the messages. */
+export function megabytes(bytes: number): number {
+  return Math.round(bytes / (1024 * 1024))
+}
+
+/**
+ * Why a picked photo or video was refused, for the message the citizen sees.
+ * Carried as the `details` of the `AppError`.
+ */
+export type MediaRejection =
+  | { kind: 'photo' | 'video'; reason: 'format' }
+  | { kind: 'photo' | 'video'; reason: 'size'; maxMb: number }
+  | { kind: 'video'; reason: 'duration'; maxSeconds: number }
 
 /**
  * The 1080p resize.
@@ -88,15 +149,62 @@ export function exceedsVideoCap(durationSeconds: number | null): boolean {
   return durationSeconds > MEDIA_MAX_VIDEO_SECONDS
 }
 
+/**
+ * The image picker's video length, in seconds.
+ *
+ * `expo-image-picker` reports `duration` in **milliseconds**. Read as seconds,
+ * a 5 s clip looked like 5,000 s, so every video was refused as over the 30 s
+ * cap before it left the phone.
+ */
+export function pickerDurationSeconds(milliseconds: number | null | undefined): number | null {
+  if (typeof milliseconds !== 'number' || !Number.isFinite(milliseconds)) return null
+  return Math.round(milliseconds / 100) / 10
+}
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  heic: 'image/heic',
+  heif: 'image/heic',
+  webp: 'image/webp',
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  mov: 'video/quicktime',
+  '3gp': 'video/3gpp',
+}
+
+const MIME_ALIASES: Record<string, string> = {
+  'image/jpg': 'image/jpeg',
+  'image/heif': 'image/heic',
+}
+
+/**
+ * A picked asset's MIME type, made dependable.
+ *
+ * Some Android cameras hand back no `mimeType` at all, and some name a JPEG
+ * `image/jpg` or a HEIC `image/heif`; each of those was refused as an
+ * unsupported file. The type the picker gives is used when it is one of ours,
+ * an alias is mapped to its canonical name, and a missing type is read from the
+ * file's extension. Anything else is left as it is, for the allow-list to
+ * refuse.
+ */
+export function normalizeMimeType(
+  mimeType: string | null | undefined,
+  uri: string,
+  fileName?: string | null,
+): string | null {
+  const given = mimeType ? mimeType.toLowerCase() : null
+  if (given) return MIME_ALIASES[given] ?? given
+
+  const name = (fileName || uri).split('?')[0] ?? ''
+  const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined
+  return (extension && MIME_BY_EXTENSION[extension]) || null
+}
+
 /** Whether a file is within the 10 MB cap. */
 export function exceedsFileCap(byteSize: number): boolean {
   return byteSize > MEDIA_MAX_FILE_BYTES
-}
-
-/** Whether a MIME type may be uploaded as a document. */
-export function isAllowedFileType(contentType: string | null): boolean {
-  if (!contentType) return false
-  return (ALLOWED_FILE_TYPES as readonly string[]).includes(contentType)
 }
 
 /** Whether a MIME type may be uploaded as a photo. */
@@ -114,10 +222,6 @@ export function isAllowedVideoType(contentType: string | null): boolean {
 /** The storage file extension for a MIME type. */
 export function extensionFor(contentType: string | null, mediaType: MediaType): string {
   switch (contentType) {
-    case 'application/pdf':
-      return 'pdf'
-    case 'application/msword':
-      return 'doc'
     case 'image/png':
       return 'png'
     case 'image/heic':

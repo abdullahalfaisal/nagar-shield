@@ -1,11 +1,12 @@
 import * as Camera from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
-import * as DocumentPicker from 'expo-document-picker'
 import { AppError, MEDIA_MAX_VIDEO_SECONDS } from '@nagar-shield/shared'
+import { normalizeMimeType, pickerDurationSeconds } from './mediaPipeline'
 import type { PickedAsset } from './prepareMedia'
 
 /**
- * The three media entry points.
+ * The media entry points: a photo or a video, from the camera or the gallery.
+ * Documents are not evidence and are not offered.
  *
  * Each one returns a **picked asset** — the raw, unsanitised file. The
  * sanitising happens in `prepareMedia`, so the picker state, the permission
@@ -45,12 +46,12 @@ export async function pickFromGallery(
 
   return {
     uri: asset.uri,
-    mimeType: asset.mimeType ?? null,
+    mimeType: normalizeMimeType(asset.mimeType, asset.uri, asset.fileName),
     fileName: asset.fileName ?? null,
     fileSize: asset.fileSize ?? null,
     width: asset.width ?? null,
     height: asset.height ?? null,
-    duration: asset.duration ?? null,
+    duration: pickerDurationSeconds(asset.duration),
   }
 }
 
@@ -80,7 +81,7 @@ export async function capturePhoto(): Promise<PickedAsset | null> {
 
   return {
     uri: asset.uri,
-    mimeType: asset.mimeType ?? null,
+    mimeType: normalizeMimeType(asset.mimeType, asset.uri, asset.fileName),
     fileName: asset.fileName ?? null,
     fileSize: asset.fileSize ?? null,
     width: asset.width ?? null,
@@ -127,39 +128,54 @@ export async function captureVideo(): Promise<PickedAsset | null> {
 
   return {
     uri: asset.uri,
-    mimeType: asset.mimeType ?? null,
+    mimeType: normalizeMimeType(asset.mimeType, asset.uri, asset.fileName),
     fileName: asset.fileName ?? null,
     fileSize: asset.fileSize ?? null,
     width: asset.width ?? null,
     height: asset.height ?? null,
-    duration: asset.duration ?? null,
+    duration: pickerDurationSeconds(asset.duration),
   }
 }
 
 /**
- * Picks a document.
+ * Picks up a capture the system finished while the app was gone.
  *
- * PDF and DOC only — the same MIME allow-list the server enforces.
+ * On a low-memory Android phone the app can be killed while the camera is
+ * open; the photo or video is then held by the picker and handed back only
+ * through `getPendingResultAsync`. Without this the citizen comes back to an
+ * empty form and the recording is lost.
+ *
+ * It returns `null` where there is nothing to recover: on iOS, on a build whose
+ * picker lacks the call, on a cancelled or failed pick.
  */
-export async function pickDocument(): Promise<PickedAsset | null> {
-  const result = await DocumentPicker.getDocumentAsync({
-    type: ['application/pdf', 'application/msword'],
-    copyToCacheDirectory: true,
-    multiple: false,
-  })
+export async function recoverPendingPick(): Promise<{
+  asset: PickedAsset
+  kind: 'photo' | 'video'
+} | null> {
+  if (typeof ImagePicker.getPendingResultAsync !== 'function') return null
 
-  if (result.canceled) return null
+  try {
+    const result = await ImagePicker.getPendingResultAsync()
+    if (!result || !('assets' in result) || result.canceled) return null
 
-  const asset = result.assets[0]
-  if (!asset) return null
+    const asset = result.assets?.[0]
+    if (!asset) return null
 
-  return {
-    uri: asset.uri,
-    mimeType: asset.mimeType ?? null,
-    fileName: asset.name ?? null,
-    fileSize: asset.size ?? null,
-    width: null,
-    height: null,
-    duration: null,
+    const kind = asset.type === 'video' ? 'video' : 'photo'
+    return {
+      kind,
+      asset: {
+        uri: asset.uri,
+        mimeType: normalizeMimeType(asset.mimeType, asset.uri, asset.fileName),
+        fileName: asset.fileName ?? null,
+        fileSize: asset.fileSize ?? null,
+        width: asset.width ?? null,
+        height: asset.height ?? null,
+        duration: kind === 'video' ? pickerDurationSeconds(asset.duration) : null,
+      },
+    }
+  } catch {
+    // Nothing to recover is the common case; a failed look is the same to the user.
+    return null
   }
 }

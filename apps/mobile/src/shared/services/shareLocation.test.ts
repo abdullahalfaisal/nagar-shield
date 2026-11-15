@@ -1,6 +1,7 @@
 import type { EmergencyContact } from '@nagar-shield/shared'
-import { resolveAppUserContactIds, writeLocationShare } from '@/shared/api/locationShares'
+import { writeLocationShare } from '@/shared/api/locationShares'
 import { fireOsShare } from '@/shared/services/osShare'
+import { fireSmsShare } from '@/shared/services/smsShare'
 import { recordShareIntent } from '@/shared/services/shareTelemetry'
 import {
   selectExplicitRecipients,
@@ -14,19 +15,17 @@ import {
  *
  * The rules that matter:
  *
- *   * **One fix for the whole fan-out** — the same snapshot to every
- *     recipient.
- *   * **Routing is per recipient** — an app user gets a `location_shares`
- *     row; everyone else gets the OS share sheet, fired exactly once.
+ *   * **One message** — the phone's composer opens once, with every recipient.
+ *     The share sheet is the fallback, also opened once.
+ *   * **One fix for the whole fan-out** — the same snapshot to every recipient.
  *   * **Deselection wins** — the fan-out is a default selector, not an
  *     override of the user's explicit choice.
- *   * **No duplicates** — a contact reached twice receives one snapshot.
- *   * **Nothing is claimed** — a dismissed sheet is reported as "not sent",
- *     and no receipt is ever fabricated.
+ *   * **No duplicates** — a contact reached twice is in the message once.
+ *   * **Nothing is claimed** — a closed composer is reported as "not sent",
+ *     and no record is written for a share that did not happen.
  */
 
 jest.mock('@/shared/api/locationShares', () => ({
-  resolveAppUserContactIds: jest.fn(),
   writeLocationShare: jest.fn(),
 }))
 
@@ -34,15 +33,17 @@ jest.mock('@/shared/services/osShare', () => ({
   fireOsShare: jest.fn(),
 }))
 
+jest.mock('@/shared/services/smsShare', () => ({
+  fireSmsShare: jest.fn(),
+}))
+
 jest.mock('@/shared/services/shareTelemetry', () => ({
   recordShareIntent: jest.fn(),
 }))
 
-const mockedResolve = resolveAppUserContactIds as jest.MockedFunction<
-  typeof resolveAppUserContactIds
->
 const mockedWrite = writeLocationShare as jest.MockedFunction<typeof writeLocationShare>
 const mockedFire = fireOsShare as jest.MockedFunction<typeof fireOsShare>
+const mockedSms = fireSmsShare as jest.MockedFunction<typeof fireSmsShare>
 const mockedRecord = recordShareIntent as jest.MockedFunction<typeof recordShareIntent>
 
 /** Builds a contact. */
@@ -66,11 +67,11 @@ const position = { lat: 23.7806, lng: 90.4066, accuracyM: 12 }
 beforeEach(() => {
   jest.clearAllMocks()
 
-  mockedResolve.mockResolvedValue([])
+  mockedSms.mockResolvedValue({ status: 'shared' })
   mockedFire.mockResolvedValue({ status: 'shared' })
   mockedRecord.mockResolvedValue({
     elapsedMs: 100,
-    channel: 'app',
+    channel: 'os_share_sheet',
     recipientCount: 1,
   })
   mockedWrite.mockImplementation(async (input) => ({
@@ -138,130 +139,102 @@ describe('selectExplicitRecipients', () => {
   })
 })
 
+const NOTE = 'The location is unavailable.'
+
+function input(overrides: Partial<Parameters<typeof shareLocation>[0]> = {}) {
+  return {
+    recipients: [contact({ id: 'c1' })],
+    position,
+    withoutLocationNote: NOTE,
+    startedAt: Date.now(),
+    ...overrides,
+  }
+}
+
 describe('shareLocation', () => {
-  it('writes one row per app-user recipient', async () => {
-    mockedResolve.mockResolvedValue(['c1', 'c2'])
+  it('opens one message to every recipient, with their phone numbers', async () => {
+    const result = await shareLocation(
+      input({
+        recipients: [
+          contact({ id: 'c1', phone: '+8801711000411' }),
+          contact({ id: 'c2', phone: '+8801711000422' }),
+          contact({ id: 'c3', phone: '+8801711000433' }),
+        ],
+      }),
+    )
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedWrite).toHaveBeenCalledTimes(2)
-    expect(mockedFire).not.toHaveBeenCalled()
-    expect(result.shared.app).toBe(2)
-    expect(result.outcomes).toEqual([
-      { contactId: 'c1', channel: 'app', status: 'shared' },
-      { contactId: 'c2', channel: 'app', status: 'shared' },
+    expect(mockedSms).toHaveBeenCalledTimes(1)
+    expect(mockedSms.mock.calls[0]?.[0]).toEqual([
+      '+8801711000411',
+      '+8801711000422',
+      '+8801711000433',
     ])
+    expect(mockedFire).not.toHaveBeenCalled()
+    expect(result.shared.os_share_sheet).toBe(3)
+    expect(result.outcomes).toHaveLength(3)
   })
 
-  it('fires the OS sheet once for a non-app recipient', async () => {
-    mockedResolve.mockResolvedValue([])
+  it('falls back to the share sheet, once, when the device has no message app', async () => {
+    mockedSms.mockResolvedValue({ status: 'unavailable' })
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    const result = await shareLocation(
+      input({ recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })] }),
+    )
 
     expect(mockedFire).toHaveBeenCalledTimes(1)
-    expect(result.shared.os_share_sheet).toBe(1)
-    expect(result.outcomes[0]).toEqual({
-      contactId: 'c1',
-      channel: 'os_share_sheet',
-      status: 'shared',
-    })
+    expect(result.shared.os_share_sheet).toBe(2)
   })
 
-  it('gives an app-user recipient exactly one row and no OS share', async () => {
-    mockedResolve.mockResolvedValue(['c1'])
+  it('opens only the share sheet, once, when the user picks other apps', async () => {
+    const result = await shareLocation(
+      input({ via: 'apps', recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })] }),
+    )
 
-    await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedWrite).toHaveBeenCalledTimes(1)
-    expect(mockedFire).not.toHaveBeenCalled()
+    expect(mockedSms).not.toHaveBeenCalled()
+    expect(mockedFire).toHaveBeenCalledTimes(1)
+    expect(result.shared.os_share_sheet).toBe(2)
   })
 
-  it('writes the OS audit row with no recipient contact id', async () => {
-    mockedResolve.mockResolvedValue([])
+  it('opens the share sheet with no contact selected, and writes no record', async () => {
+    const result = await shareLocation(input({ via: 'apps', recipients: [] }))
 
-    await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedWrite).toHaveBeenCalledWith({
-      recipientContactId: null,
-      position,
-      channel: 'os_share_sheet',
-    })
-  })
-
-  it('sends the same snapshot to every recipient — one fix for the whole fan-out', async () => {
-    mockedResolve.mockResolvedValue([])
-
-    await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c2' }), contact({ id: 'c3' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedFire).toHaveBeenCalledTimes(3)
-
-    const messages = mockedFire.mock.calls.map((call) => call[0])
-    expect(new Set(messages).size).toBe(1)
-  })
-
-  it('de-duplicates a recipient that is reached twice', async () => {
-    mockedResolve.mockResolvedValue(['c1'])
-
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedWrite).toHaveBeenCalledTimes(1)
-    expect(result.outcomes).toHaveLength(1)
-  })
-
-  it('writes nothing and fires no sheet when there are no recipients', async () => {
-    const result = await shareLocation({
-      recipients: [],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
+    expect(mockedSms).not.toHaveBeenCalled()
+    expect(mockedFire).toHaveBeenCalledTimes(1)
     expect(mockedWrite).not.toHaveBeenCalled()
-    expect(mockedFire).not.toHaveBeenCalled()
     expect(result.outcomes).toEqual([])
-    expect(result.shared).toEqual({ app: 0, os_share_sheet: 0 })
+    expect(result.status).toBe('shared')
   })
 
-  it('reports a dismissed sheet as "not sent" and never as shared', async () => {
-    mockedResolve.mockResolvedValue([])
+  it('tells a closed sheet from a sent one when no contact was selected', async () => {
     mockedFire.mockResolvedValue({ status: 'dismissed' })
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    const result = await shareLocation(input({ via: 'apps', recipients: [] }))
+
+    expect(result.status).toBe('dismissed')
+  })
+
+  it('reports a closed share sheet as "not sent" when the user picked other apps', async () => {
+    mockedFire.mockResolvedValue({ status: 'dismissed' })
+
+    const result = await shareLocation(input({ via: 'apps' }))
+
+    expect(result.outcomes[0]?.status).toBe('dismissed')
+    expect(result.shared.os_share_sheet).toBe(0)
+    expect(mockedWrite).not.toHaveBeenCalled()
+  })
+
+  it('sends the same text through the composer and the sheet', async () => {
+    mockedSms.mockResolvedValue({ status: 'unavailable' })
+
+    await shareLocation(input())
+
+    expect(mockedFire.mock.calls[0]?.[0]).toBe(mockedSms.mock.calls[0]?.[1])
+  })
+
+  it('reports a closed composer as "not sent" and writes no record', async () => {
+    mockedSms.mockResolvedValue({ status: 'dismissed' })
+
+    const result = await shareLocation(input())
 
     expect(result.outcomes[0]).toEqual({
       contactId: 'c1',
@@ -269,157 +242,112 @@ describe('shareLocation', () => {
       status: 'dismissed',
     })
     expect(result.shared.os_share_sheet).toBe(0)
+    expect(result.failed.os_share_sheet).toBe(0)
+    expect(mockedFire).not.toHaveBeenCalled()
+    expect(mockedWrite).not.toHaveBeenCalled()
   })
 
-  it('keeps processing the remaining recipients after a dismissal', async () => {
-    mockedResolve.mockResolvedValue([])
-    mockedFire
-      .mockResolvedValueOnce({ status: 'dismissed' })
-      .mockResolvedValueOnce({ status: 'shared' })
-
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedFire).toHaveBeenCalledTimes(2)
-    expect(result.outcomes[1]?.status).toBe('shared')
-  })
-
-  it('reports an OS failure as failed, not as shared', async () => {
-    mockedResolve.mockResolvedValue([])
+  it('reports it as failed when neither the composer nor the sheet can open', async () => {
+    mockedSms.mockResolvedValue({ status: 'unavailable' })
     mockedFire.mockResolvedValue({ status: 'unavailable' })
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    const result = await shareLocation(input())
 
     expect(result.outcomes[0]?.status).toBe('failed')
+    expect(result.shared.os_share_sheet).toBe(0)
     expect(result.failed.os_share_sheet).toBe(1)
+    expect(mockedWrite).not.toHaveBeenCalled()
   })
 
-  it('reports a failed in-app write as failed and fabricates no receipt', async () => {
-    mockedResolve.mockResolvedValue(['c1'])
+  it('writes one record per recipient, tied to the contact, with the OS channel', async () => {
+    await shareLocation(input({ recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })] }))
+
+    expect(mockedWrite).toHaveBeenCalledTimes(2)
+    expect(mockedWrite).toHaveBeenCalledWith({
+      recipientContactId: 'c1',
+      position,
+      channel: 'os_share_sheet',
+    })
+    expect(mockedWrite).toHaveBeenCalledWith({
+      recipientContactId: 'c2',
+      position,
+      channel: 'os_share_sheet',
+    })
+  })
+
+  it('never writes an in-app share: nothing delivers it to a recipient', async () => {
+    await shareLocation(input({ recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })] }))
+
+    for (const call of mockedWrite.mock.calls) {
+      expect(call[0].channel).toBe('os_share_sheet')
+    }
+  })
+
+  it('still reports the share as handed over when a record cannot be saved', async () => {
     mockedWrite.mockRejectedValue(new Error('network down'))
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    const result = await shareLocation(input())
 
-    expect(result.outcomes[0]).toEqual({ contactId: 'c1', channel: 'app', status: 'failed' })
-    expect(result.shared.app).toBe(0)
-    expect(result.failed.app).toBe(1)
+    expect(result.outcomes[0]?.status).toBe('shared')
+    expect(result.shared.os_share_sheet).toBe(1)
   })
 
-  it('keeps the other recipients going when one write fails', async () => {
-    mockedResolve.mockResolvedValue(['c1', 'c2'])
-    mockedWrite.mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce({
-      id: 'row-c2',
-      recipientContactId: 'c2',
-      lat: 23.7806,
-      lng: 90.4066,
-      accuracyM: 12,
-      mode: 'snapshot' as const,
-      shareChannel: 'app' as const,
-      sharedAt: '2026-11-04T10:30:00Z',
-    })
+  it('de-duplicates a recipient that is reached twice', async () => {
+    const result = await shareLocation(
+      input({ recipients: [contact({ id: 'c1' }), contact({ id: 'c1' })] }),
+    )
 
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    expect(mockedSms.mock.calls[0]?.[0]).toHaveLength(1)
+    expect(mockedWrite).toHaveBeenCalledTimes(1)
+    expect(result.outcomes).toHaveLength(1)
+  })
 
-    expect(result.outcomes[0]?.status).toBe('failed')
-    expect(result.outcomes[1]?.status).toBe('shared')
+  it('opens nothing and writes nothing when there are no recipients', async () => {
+    const result = await shareLocation(input({ recipients: [] }))
+
+    expect(mockedSms).not.toHaveBeenCalled()
+    expect(mockedFire).not.toHaveBeenCalled()
+    expect(mockedWrite).not.toHaveBeenCalled()
+    expect(result.outcomes).toEqual([])
+    expect(result.shared).toEqual({ os_share_sheet: 0 })
+    expect(result.status).toBe('nothing')
   })
 
   it('writes a null position for a share without a location', async () => {
-    mockedResolve.mockResolvedValue(['c1'])
-
-    await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position: null,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
+    await shareLocation(input({ position: null }))
 
     expect(mockedWrite).toHaveBeenCalledWith({
       recipientContactId: 'c1',
       position: { lat: null, lng: null, accuracyM: null },
-      channel: 'app',
+      channel: 'os_share_sheet',
     })
   })
 
-  it('sends a payload with no coordinate for a share without a location', async () => {
-    mockedResolve.mockResolvedValue([])
+  it('sends a message with no coordinate for a share without a location', async () => {
+    await shareLocation(input({ position: null }))
 
-    await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position: null,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    const message = mockedFire.mock.calls[0]?.[0] ?? ''
-    expect(message).toContain('The location is unavailable.')
+    const message = mockedSms.mock.calls[0]?.[1] ?? ''
+    expect(message).toContain(NOTE)
     expect(message).not.toContain('geo:')
     expect(message).not.toContain('maps.google.com')
   })
 
-  it('falls back to the OS path when the app-user lookup fails', async () => {
-    // A failed lookup answers "no confirmed app users" — the safe
-    // direction, because the OS path works with no network and claims
-    // nothing.
-    mockedResolve.mockResolvedValue([])
-
-    const result = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now(),
-    })
-
-    expect(mockedFire).toHaveBeenCalledTimes(1)
-    expect(result.shared.os_share_sheet).toBe(1)
-  })
-
   it('records the intent once, for the whole fan-out', async () => {
-    mockedResolve.mockResolvedValue(['c1', 'c2'])
-
     const startedAt = Date.now()
-    await shareLocation({
-      recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt,
-    })
+    await shareLocation(
+      input({ recipients: [contact({ id: 'c1' }), contact({ id: 'c2' })], startedAt }),
+    )
 
     expect(mockedRecord).toHaveBeenCalledTimes(1)
     expect(mockedRecord.mock.calls[0]?.[0]).toMatchObject({
       startedAt,
+      channel: 'os_share_sheet',
       recipientCount: 2,
     })
   })
 
   it('reports the elapsed time from the confirm tap', async () => {
-    mockedResolve.mockResolvedValue(['c1'])
-
-    const result: ShareResult = await shareLocation({
-      recipients: [contact({ id: 'c1' })],
-      position,
-      withoutLocationNote: 'The location is unavailable.',
-      startedAt: Date.now() - 250,
-    })
+    const result: ShareResult = await shareLocation(input({ startedAt: Date.now() - 250 }))
 
     expect(result.elapsedMs).toBeGreaterThanOrEqual(250)
   })

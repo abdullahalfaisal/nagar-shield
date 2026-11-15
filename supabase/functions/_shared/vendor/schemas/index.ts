@@ -15,8 +15,17 @@ import { REPORT_CATEGORIES, FLAG_REASONS } from '../enums/index.ts'
  */
 export const E164_PHONE_REGEX = /^\+880\d{10}$/
 
+/**
+ * Bangla digits (০-৯) to ASCII. The Bangla UI shows its numbers in Bangla
+ * digits, so people type them — and `\d` in the E.164 check does not match
+ * them, which silently dropped or rejected a valid number.
+ */
+export function bnDigitsToAscii(input: string): string {
+  return input.replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6))
+}
+
 export function normalisePhone(input: string): string {
-  const trimmed = input.trim()
+  const trimmed = bnDigitsToAscii(input).trim()
   const digits = trimmed.replace(/[\s\-()]/g, '')
   if (digits.startsWith('+880')) return `+880${digits.slice(4)}`
   if (digits.startsWith('880') && digits.length === 13) return `+${digits}`
@@ -221,6 +230,14 @@ export const areaHierarchySchema = z.object({
     .optional()
     .nullable()
     .transform((value) => (value && value.length > 0 ? value : undefined)),
+  /** A road, shop or landmark the citizen typed when they chose the area. */
+  place: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .nullable()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 })
 
 export type AreaHierarchyInput = z.infer<typeof areaHierarchySchema>
@@ -243,7 +260,11 @@ export function parseAreaHierarchy(value: unknown): AreaHierarchyInput {
   return areaHierarchySchema.parse(value)
 }
 
-/** FR-HIST-1 — History defaults: 1 km radius, 24-hour window. */
+/**
+ * The `history_nearby` fallbacks and caps. The 1 km radius is the **server's**
+ * fallback for a caller that omits the parameter; the History screen itself
+ * opens at the widest offered radius (15 km — see FR-HIST-1).
+ */
 export const HISTORY_DEFAULT_RADIUS_KM = 1
 export const HISTORY_DEFAULT_WINDOW_HOURS = 24
 export const HISTORY_MAX_RADIUS_KM = 50

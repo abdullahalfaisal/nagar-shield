@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nagar Shield — Report Crime redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+/* Tokens: the same palette, radii and gutter as the approved Home design. */
+.phone[data-theme="light"] {
+  --bg:#F6F4FC; --card:#FFFFFF; --card-border:rgba(30,11,71,.07);
+  --ink:#0B0B1A; --ink-2:#3A3A52; --muted:#5B5B73; --hairline:rgba(30,11,71,.09);
+  --field:#F6F4FC; --field-border:rgba(30,11,71,.16);
+  --violet:#6D28D9; --violet-ink:#FFFFFF; --violet-tint:rgba(109,40,217,.10); --link:#6D28D9;
+  --shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07);
+  --danger:#B91C1C; --danger-tint:rgba(220,38,38,.09);
+  --ok:#047857; --ok-tint:rgba(4,120,87,.10);
+  --warn:#B45309; --warn-tint:rgba(217,119,6,.12);
+  --scrim:rgba(14,10,31,.45); --sheet:#FFFFFF; --status:#1E0B47;
+  --thumb-a:#C4B5FD; --thumb-b:#8B5CF6;
+}
+.phone[data-theme="dark"] {
+  --bg:#0E0A1F; --card:#181331; --card-border:rgba(196,181,253,.10);
+  --ink:#F4F2FF; --ink-2:#D5D0EC; --muted:#A9A3C8; --hairline:rgba(196,181,253,.14);
+  --field:#110C27; --field-border:rgba(196,181,253,.28);
+  --violet:#A78BFA; --violet-ink:#1E0B47; --violet-tint:rgba(167,139,250,.16); --link:#C4B5FD;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 28px rgba(0,0,0,.45);
+  --danger:#FCA5A5; --danger-tint:rgba(248,113,113,.14);
+  --ok:#6EE7B7; --ok-tint:rgba(16,185,129,.14);
+  --warn:#FCD34D; --warn-tint:rgba(245,158,11,.14);
+  --scrim:rgba(0,0,0,.6); --sheet:#181331; --status:#F4F2FF;
+  --thumb-a:#4C2BB5; --thumb-b:#2A1766;
+}
+* { box-sizing:border-box; margin:0; }
+html { color-scheme: light dark; }
+body { font-family:'Inter',system-ui,sans-serif; background:#E9E5F5; color:#1A1A2E; min-height:100vh; padding:28px 16px 64px; }
+body[data-lang="bn"] { font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif; }
+
+/* Review page chrome (not part of the app design) */
+.page { max-width:1180px; margin:0 auto; }
+.head { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; margin-bottom:20px; }
+.head h1 { font-size:22px; font-weight:800; letter-spacing:-.3px; color:#1E0B47; }
+.head p { margin-top:4px; font-size:14px; color:#4A4A63; max-width:560px; line-height:1.5; }
+.controls { display:flex; gap:10px; flex-wrap:wrap; }
+.seg { display:inline-flex; flex-wrap:wrap; background:#fff; border:1px solid rgba(30,11,71,.12); border-radius:12px; padding:3px; }
+.seg button { font:inherit; font-size:13px; font-weight:600; padding:8px 12px; border:0; background:transparent; color:#4A4A63; border-radius:9px; cursor:pointer; min-height:36px; }
+.seg button[aria-pressed="true"] { background:#4C2BB5; color:#fff; }
+.stage { display:flex; flex-wrap:wrap; gap:32px; justify-content:center; align-items:flex-start; }
+.stage figure { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.stage figcaption { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#5B5B73; }
+.notes { margin-top:40px; background:#fff; border-radius:20px; padding:24px 28px; box-shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07); }
+.notes h2 { font-size:16px; font-weight:800; color:#1E0B47; margin-bottom:12px; }
+.notes ul { padding-left:18px; display:grid; gap:8px; font-size:14px; line-height:1.55; color:#34344A; }
+.notes li b { color:#1E0B47; }
+.notes .grid { display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+
+/* Phone frame */
+.phone { width:390px; height:844px; border-radius:46px; background:var(--bg); border:10px solid #14102A; box-shadow:0 30px 70px rgba(30,11,71,.30); position:relative; overflow:hidden; display:flex; flex-direction:column; color:var(--ink); font-family:inherit; --gutter:20px; --r-card:18px; --r-tile:14px; }
+.statusbar { height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 28px; font-size:14px; font-weight:700; color:var(--status); }
+.statusbar .notch { position:absolute; left:50%; top:10px; transform:translateX(-50%); width:92px; height:26px; border-radius:20px; background:#14102A; }
+.statusbar .right { display:flex; gap:6px; align-items:center; }
+.ico { display:inline-block; line-height:1; flex:0 0 auto; width:1em; height:1em; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; text-align:inherit; }
+button:focus-visible, textarea:focus-visible, input:focus-visible { outline:3px solid #8B5CF6; outline-offset:2px; }
+
+/* App bar */
+.appbar { display:flex; align-items:center; gap:12px; padding:4px var(--gutter) 8px; flex:0 0 auto; }
+.back { width:48px; height:48px; border-radius:var(--r-tile); background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); display:grid; place-items:center; font-size:22px; color:var(--ink-2); flex:0 0 auto; }
+.appbar .t b { display:block; font-size:19px; line-height:26px; font-weight:800; letter-spacing:-.2px; }
+body[data-lang="bn"] .appbar .t b { font-weight:700; line-height:28px; }
+.appbar .t span { display:block; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; }
+
+/* Scroll area + sticky footer */
+.scroll { flex:1; overflow-y:auto; padding:8px 0 20px; scrollbar-width:none; }
+.scroll::-webkit-scrollbar { display:none; }
+.footer { flex:0 0 auto; padding:12px var(--gutter) 18px; background:var(--bg); border-top:1px solid var(--hairline); }
+.cta { width:100%; min-height:52px; border-radius:var(--r-card); background:var(--violet); color:var(--violet-ink); font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; text-align:center; }
+.cta[disabled] { background:var(--hairline); color:var(--muted); cursor:not-allowed; }
+.cta .ico { font-size:20px; }
+.hint { margin-top:8px; text-align:center; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; min-height:18px; }
+
+/* Cards */
+.card { margin:0 var(--gutter) 12px; background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-card); box-shadow:var(--shadow); padding:16px; position:relative; }
+.card-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; min-height:28px; }
+.card-head h3 { font-size:16px; line-height:22px; font-weight:800; letter-spacing:-.1px; }
+body[data-lang="bn"] .card-head h3 { font-weight:700; line-height:26px; }
+.tag { display:inline-flex; align-items:center; min-height:24px; }
+.tag.req { color:var(--violet); border-color:color-mix(in srgb, var(--violet) 40%, transparent); }
+.tag { font-size:12px; line-height:16px; font-weight:600; color:var(--muted); padding:3px 9px; border-radius:999px; border:1px solid var(--hairline); }
+.spacer { flex:1; }
+/* The "i" button: small to look at, 48 px to hit. */
+.info { position:relative; width:48px; height:48px; margin:-10px -12px -10px -6px; display:grid; place-items:center; color:var(--muted); font-size:20px; border-radius:50%; }
+.info[aria-expanded="true"] { color:var(--violet); }
+.pop { position:absolute; left:12px; right:12px; top:50px; z-index:5; background:var(--sheet); color:var(--ink); border:1px solid var(--card-border); border-radius:var(--r-card); box-shadow:0 14px 34px rgba(14,10,31,.28); padding:14px 14px 12px; }
+.pop::before { content:""; position:absolute; top:-7px; left:var(--arrow,48px); width:12px; height:12px; background:var(--sheet); border-left:1px solid var(--card-border); border-top:1px solid var(--card-border); transform:rotate(45deg); }
+.pop h4 { font-size:14px; line-height:20px; font-weight:800; margin-bottom:8px; }
+.pop dl { display:grid; gap:8px; }
+.pop dt { font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px; }
+.pop dd { font-size:13px; line-height:18px; color:var(--ink-2); margin-left:22px; }
+.pop p { font-size:13px; line-height:19px; color:var(--ink-2); }
+.pop .ico { font-size:16px; color:var(--violet); }
+
+/* Evidence */
+.pick { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pick button { min-height:112px; border-radius:var(--r-card); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:12px 8px; background:var(--violet-tint); border:1.5px dashed color-mix(in srgb, var(--violet) 45%, transparent); }
+.pick .ico { font-size:30px; color:var(--violet); }
+.pick b { font-size:14px; line-height:20px; font-weight:700; color:var(--ink); }
+.pick small { font-size:12px; line-height:16px; color:var(--muted); font-weight:500; }
+.gallery { margin-top:12px; width:100%; min-height:48px; border-radius:var(--r-tile); border:1.5px solid var(--field-border); display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; font-weight:700; color:var(--ink); }
+.gallery .ico { font-size:20px; color:var(--violet); }
+.preview { position:relative; height:176px; border-radius:var(--r-tile); overflow:hidden; background:linear-gradient(135deg,var(--thumb-b),var(--thumb-a)); display:grid; place-items:center; color:#fff; }
+.preview::before { content:""; position:absolute; inset:0; background:radial-gradient(160px 80px at 25% 110%,rgba(255,255,255,.28),transparent 70%),radial-gradient(120px 120px at 85% -10%,rgba(255,255,255,.22),transparent 70%); }
+.preview .big { position:relative; font-size:44px; opacity:.9; }
+.preview .play { position:relative; width:56px; height:56px; border-radius:50%; background:rgba(255,255,255,.92); color:#4C2BB5; display:grid; place-items:center; font-size:24px; }
+.preview .meta { position:absolute; left:10px; bottom:10px; display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:rgba(14,10,31,.66); font-size:12px; font-weight:600; color:#fff; }
+.preview .meta .ico { font-size:14px; }
+.remove { position:absolute; right:-4px; top:-4px; width:48px; height:48px; display:grid; place-items:center; }
+.remove span { width:32px; height:32px; border-radius:50%; background:rgba(14,10,31,.66); color:#fff; display:grid; place-items:center; font-size:18px; }
+.attach-row { display:flex; align-items:center; justify-content:space-between; margin-top:12px; gap:8px; }
+.ready { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; color:var(--ok); }
+.ready .ico { font-size:18px; }
+.replace { min-height:48px; padding:0 4px 0 12px; display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:700; color:var(--link); }
+.replace .ico { font-size:18px; }
+.progress { margin-top:12px; }
+.progress .bar { height:8px; border-radius:999px; background:var(--hairline); overflow:hidden; }
+.progress .bar i { display:block; height:100%; border-radius:999px; background:var(--violet); width:62%; }
+.progress p { margin-top:8px; font-size:13px; color:var(--ink-2); font-weight:600; display:flex; justify-content:space-between; }
+.alertbox { margin-top:12px; display:flex; gap:10px; align-items:flex-start; padding:12px; border-radius:var(--r-tile); background:var(--danger-tint); color:var(--danger); font-size:13px; line-height:19px; font-weight:600; }
+.alertbox .ico { font-size:20px; margin-top:1px; }
+
+/* Fields */
+.field { width:100%; min-height:56px; border-radius:var(--r-tile); background:var(--field); border:1.5px solid var(--field-border); display:flex; align-items:center; gap:12px; padding:0 14px; font-size:15px; color:var(--ink); }
+.field .lead { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font-size:22px; flex:0 0 auto; background:color-mix(in srgb, var(--a, #6B6B85) 14%, var(--card)); color:var(--a, var(--muted)); }
+.phone[data-theme="dark"] .field .lead { background:color-mix(in srgb, var(--a, #6B6B85) 26%, var(--card)); color:color-mix(in srgb, var(--a, #6B6B85) 40%, #fff); }
+.field .val { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+.field .val.ph { color:var(--muted); font-weight:500; }
+.field .chev { color:var(--muted); font-size:20px; }
+textarea, input.text { width:100%; border-radius:var(--r-tile); background:var(--field); border:1.5px solid var(--field-border); color:var(--ink); font:inherit; font-size:15px; line-height:22px; padding:13px 14px; resize:none; }
+textarea::placeholder, input.text::placeholder { color:var(--muted); }
+.ta { position:relative; }
+.ta textarea { padding-bottom:32px; }
+.counter { position:absolute; right:14px; bottom:10px; font-size:12px; line-height:16px; font-weight:600; color:var(--muted); }
+.label { display:block; font-size:13px; font-weight:700; color:var(--ink-2); margin:14px 0 8px; }
+
+/* Segmented */
+.segc { display:grid; grid-template-columns:1fr 1fr; background:var(--field); border:1px solid var(--hairline); border-radius:var(--r-tile); padding:4px; gap:4px; }
+.segc button { min-height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; gap:7px; font-size:14px; font-weight:700; color:var(--muted); }
+.segc button .ico { font-size:18px; }
+.segc button[aria-pressed="true"] { background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(14,10,31,.16); }
+.segc button[aria-pressed="true"] .ico { color:var(--violet); }
+.where { margin-top:12px; display:flex; align-items:center; gap:12px; padding:12px; border-radius:var(--r-tile); background:var(--ok-tint); }
+.where .lead { width:40px; height:40px; border-radius:12px; background:var(--ok); color:#fff; display:grid; place-items:center; font-size:22px; flex:0 0 auto; }
+.phone[data-theme="dark"] .where .lead { color:#04210F; }
+.where .txt { flex:1; min-width:0; }
+.where b { display:block; font-size:15px; line-height:21px; font-weight:700; color:var(--ink); }
+.where span { display:block; font-size:13px; line-height:18px; color:var(--ink-2); font-weight:500; }
+.redetect { width:48px; height:48px; margin:-6px -6px -6px 0; display:grid; place-items:center; color:var(--ok); font-size:22px; border-radius:50%; flex:0 0 auto; }
+
+/* Toggle row */
+.row { display:flex; align-items:center; gap:12px; }
+.row .lead { width:40px; height:40px; border-radius:12px; background:var(--violet-tint); color:var(--violet); display:grid; place-items:center; font-size:22px; flex:0 0 auto; }
+.row .txt { flex:1; min-width:0; }
+.row b { display:block; font-size:15px; line-height:21px; font-weight:700; }
+.row small { display:block; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; }
+.switch { position:relative; width:52px; height:32px; border-radius:999px; background:var(--field-border); flex:0 0 auto; transition:background .15s; margin:8px -4px 8px 0; }
+.switch::after { content:""; position:absolute; left:3px; top:3px; width:26px; height:26px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .15s; }
+.switch[aria-checked="true"] { background:var(--violet); }
+.switch[aria-checked="true"]::after { transform:translateX(20px); }
+.phone[data-theme="dark"] .switch[aria-checked="true"]::after { background:#1E0B47; }
+
+/* Bottom sheet */
+.sheet-wrap { position:absolute; inset:0; z-index:20; display:flex; flex-direction:column; justify-content:flex-end; }
+.sheet-wrap .scrim { position:absolute; inset:0; background:var(--scrim); }
+.sheet { position:relative; background:var(--sheet); border-radius:26px 26px 0 0; padding:10px var(--gutter) 22px; max-height:78%; display:flex; flex-direction:column; }
+.sheet .grab { width:40px; height:4px; border-radius:2px; background:var(--field-border); margin:0 auto 12px; }
+.sheet h4 { font-size:18px; line-height:24px; font-weight:800; margin-bottom:8px; }
+.opts { overflow-y:auto; scrollbar-width:none; }
+.opts::-webkit-scrollbar { display:none; }
+.opt { width:100%; min-height:56px; display:flex; align-items:center; gap:12px; padding:0 4px; border-bottom:1px solid var(--hairline); font-size:15px; font-weight:600; }
+.opt .lead { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font-size:22px; background:color-mix(in srgb, var(--a, #6B6B85) 14%, var(--card)); color:var(--a, var(--muted)); }
+.phone[data-theme="dark"] .opt .lead { background:color-mix(in srgb, var(--a, #6B6B85) 26%, var(--card)); color:color-mix(in srgb, var(--a, #6B6B85) 40%, #fff); }
+.opt .grow { flex:1; }
+.opt .tick { color:var(--violet); font-size:22px; }
+.opt.skip { color:var(--muted); }
+
+/* Review states */
+.sendstate { display:flex; align-items:center; justify-content:center; gap:10px; }
+.spin { width:20px; height:20px; border-radius:50%; border:3px solid rgba(255,255,255,.35); border-top-color:#fff; animation:spin .8s linear infinite; }
+.phone[data-theme="dark"] .spin { border-color:rgba(30,11,71,.3); border-top-color:#1E0B47; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation:none; } }
+.banner { margin:0 var(--gutter) 12px; padding:12px 14px; border-radius:var(--r-card); display:flex; gap:10px; align-items:center; background:var(--warn-tint); color:var(--warn); font-size:13px; line-height:18px; font-weight:700; }
+.banner .ico { font-size:20px; }
+@media (max-width:480px) { .phone { width:100%; max-width:390px; } }
+</style>
+</head>
+<body data-lang="en">
+<div class="page">
+  <div class="head">
+    <div>
+      <h1>Nagar Shield — Report Crime redesign</h1>
+      <p>Review preview only. The app is unchanged. Tap the small <b>i</b> buttons, the Incident type field and the Location tabs to try them. Use the state buttons to see every step.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="seg-state" role="group" aria-label="State">
+        <button type="button" data-state="empty" aria-pressed="true">Empty</button>
+        <button type="button" data-state="photo" aria-pressed="false">Photo added</button>
+        <button type="button" data-state="video" aria-pressed="false">Video added</button>
+        <button type="button" data-state="preparing" aria-pressed="false">Preparing</button>
+        <button type="button" data-state="error" aria-pressed="false">File error</button>
+        <button type="button" data-state="sending" aria-pressed="false">Sending</button>
+        <button type="button" data-state="offline" aria-pressed="false">Offline</button>
+      </div>
+      <div class="seg" id="seg-lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="bn" aria-pressed="false">বাংলা</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <figure><div id="phone-light"></div><figcaption>Light</figcaption></figure>
+    <figure><div id="phone-dark"></div><figcaption>Dark</figcaption></figure>
+  </div>
+
+  <div class="notes">
+    <h2>What changed and why</h2>
+    <div class="grid">
+      <ul>
+        <li><b>One pattern for every card.</b> Evidence, Incident type, What happened, Location, then Privacy. Every card has the same header: the title, a small i, and one tag on the right (Required, Optional, or the current privacy choice). No numbers.</li>
+        <li><b>File rules live behind an “i”.</b> The long sentence about file types and sizes is gone from the page. Tap the small <b>i</b> next to Evidence to see the accepted files. Privacy and Location have one too.</li>
+        <li><b>The description is required.</b> The tag says so, the box has no “optional” wording, and the Send button stays off until something is written. The hint under it says what is missing.</li>
+        <li><b>Evidence is two clear choices.</b> Take a photo, or record a video. Choosing from the gallery is one button under them. After a file is added the card shows a large preview, its size, a Replace button and a clear Remove button.</li>
+        <li><b>The Send button is always in view.</b> It stays at the bottom. While something is missing it says what, in one short line.</li>
+      </ul>
+      <ul>
+        <li><b>Incident type is a field that opens a list.</b> Every type has its own icon and colour, the same as on the Home feed. “Not sure / skip” is the first choice.</li>
+        <li><b>Location is detected for the user.</b> A green card names the area and the accuracy, with a Redetect button. “Choose area” is one tap away for anyone who needs it.</li>
+        <li><b>Every state is designed.</b> Empty, file added, preparing a video, a file error, sending, and saved offline. Errors are short and say what to do.</li>
+        <li><b>Same system as Home.</b> Same tokens, 20 px gutters, 18 px cards, 14 px tiles, Fluent filled icons, light and dark. Every control is 44 to 56 px tall.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const STR = {
+  en: {
+    title:'Report Crime', sub:'Photo or video, takes a minute',
+    evidence:'Evidence', evInfoTitle:'Accepted files', photo:'Photo', video:'Video',
+    photoRule:'JPG, PNG, HEIC or WebP · up to 25 MB', videoRule:'MP4, MOV or 3GP · up to 30 seconds · up to 300 MB',
+    takePhoto:'Take photo', recVideo:'Record video', max30:'Up to 30 s', fromCam:'Use the camera', gallery:'Choose from gallery',
+    photoAdded:'Photo', videoAdded:'Video', replace:'Replace', ready:'Added', remove:'Remove the attachment',
+    preparing:'Preparing the video…', fileError:'This video is longer than 30 seconds. Trim it or record a shorter clip.',
+    tagAnon:'Anonymous', tagNamed:'Name shown', required:'Required', typeInfoTitle:'Incident type', typeInfo:'Pick what fits best. Not sure? Skip it. You can change it later.',
+    whatInfoTitle:'What to write', whatInfo:'Say what you saw, where and when. Do not add phone numbers or other private details.',
+    type:'Incident type', optional:'Optional', typePh:'Choose the incident type', typeSheet:'Choose the incident type', skip:'Not sure / skip',
+    what:'What happened?', whatPh:'Describe what happened', needText:'Describe what happened to continue',
+    loc:'Location', locInfoTitle:'How the area is set', locInfo:'The area is detected from your phone. If it is wrong, tap Redetect or choose the area yourself. The app always checks the area itself.',
+    auto:'Auto-detect', manual:'Choose area', place:'Dhanmondi, Dhaka', acc:'Auto-detected · ±12 m', redetect:'Redetect location',
+    area:'Area', areaPh:'Select an area', landmark:'Road, shop or landmark', landmarkPh:'e.g. Road 10, near the bus stand',
+    privacy:'Privacy', privInfoTitle:'Anonymous reports', privInfo:'Your name is never shown on the report or to other users. Moderators see only what is needed to check it.',
+    anon:'Stay anonymous', anonSub:'Your identity stays hidden', named:'Show my name', namedSub:'Your name is shown on this report',
+    send:'Send report', sending:'Sending…', needMedia:'Add a photo or a video to continue', needArea:'Choose an area to send the report', allSet:'Ready when you are',
+    offline:'You are offline. The report will send when the network returns.', offlineSend:'Save report', offlineHint:'It is kept on your phone until then',
+    back:'Back', info:'More information', close:'Close',
+    types:{ theft:'Theft', assault:'Assault', harassment:'Harassment', robbery:'Robbery', accident:'Accident', fire:'Fire', medical:'Medical', fraud:'Fraud', vandalism:'Vandalism', suspicious:'Suspicious', other:'Other' },
+    size:{ photo:'2.4 MB', video:'0:24 · 8.1 MB' }
+  },
+  bn: {
+    title:'অপরাধ রিপোর্ট', sub:'ছবি বা ভিডিও, এক মিনিটেই',
+    evidence:'প্রমাণ', evInfoTitle:'গ্রহণযোগ্য ফাইল', photo:'ছবি', video:'ভিডিও',
+    photoRule:'JPG, PNG, HEIC বা WebP · ২৫ এমবি পর্যন্ত', videoRule:'MP4, MOV বা 3GP · ৩০ সেকেন্ড পর্যন্ত · ৩০০ এমবি পর্যন্ত',
+    takePhoto:'ছবি তুলুন', recVideo:'ভিডিও করুন', max30:'৩০ সেকেন্ড পর্যন্ত', fromCam:'ক্যামেরা ব্যবহার করুন', gallery:'গ্যালারি থেকে বাছুন',
+    photoAdded:'ছবি', videoAdded:'ভিডিও', replace:'বদলান', ready:'যোগ করা হয়েছে', remove:'সংযুক্তি সরান',
+    preparing:'ভিডিও তৈরি হচ্ছে…', fileError:'ভিডিওটি ৩০ সেকেন্ডের বেশি লম্বা। ছোট করুন বা ছোট ক্লিপ করুন।',
+    tagAnon:'বেনামী', tagNamed:'নাম দেখা যাবে', required:'আবশ্যক', typeInfoTitle:'ঘটনার ধরন', typeInfo:'যেটি সবচেয়ে মেলে সেটি বাছুন। নিশ্চিত না হলে এড়িয়ে যান। পরে বদলাতে পারবেন।',
+    whatInfoTitle:'কী লিখবেন', whatInfo:'কী দেখেছেন, কোথায় ও কখন তা লিখুন। ফোন নম্বর বা অন্য ব্যক্তিগত তথ্য দেবেন না।',
+    type:'ঘটনার ধরন', optional:'ঐচ্ছিক', typePh:'ঘটনার ধরন বাছুন', typeSheet:'ঘটনার ধরন বাছুন', skip:'নিশ্চিত নই / এড়িয়ে যান',
+    what:'কী ঘটেছে?', whatPh:'কী ঘটেছে তা লিখুন', needText:'এগিয়ে যেতে কী ঘটেছে লিখুন',
+    loc:'অবস্থান', locInfoTitle:'এলাকা কীভাবে ঠিক হয়', locInfo:'আপনার ফোন থেকে এলাকা শনাক্ত করা হয়। ভুল হলে “আবার শনাক্ত” চাপুন বা নিজে এলাকা বাছুন। অ্যাপ নিজেও এলাকা যাচাই করে।',
+    auto:'নিজে শনাক্ত', manual:'এলাকা বাছুন', place:'ধানমন্ডি, ঢাকা', acc:'নিজে শনাক্ত · ±১২ মি.', redetect:'অবস্থান আবার শনাক্ত করুন',
+    area:'এলাকা', areaPh:'এলাকা বাছুন', landmark:'রাস্তা, দোকান বা চেনা জায়গা', landmarkPh:'যেমন: ১০ নম্বর রোড, বাস স্ট্যান্ডের কাছে',
+    privacy:'গোপনীয়তা', privInfoTitle:'নাম গোপন রাখা', privInfo:'রিপোর্টে বা অন্য ব্যবহারকারীর কাছে আপনার নাম কখনো দেখানো হয় না। মডারেটর শুধু যাচাইয়ের জন্য যা দরকার তা দেখেন।',
+    anon:'নাম গোপন রাখুন', anonSub:'আপনার পরিচয় গোপন থাকবে', named:'আমার নাম দেখান', namedSub:'এই রিপোর্টে আপনার নাম দেখা যাবে',
+    send:'রিপোর্ট পাঠান', sending:'পাঠানো হচ্ছে…', needMedia:'এগিয়ে যেতে ছবি বা ভিডিও যোগ করুন', needArea:'রিপোর্ট পাঠাতে এলাকা বাছুন', allSet:'আপনি তৈরি হলেই পাঠান',
+    offline:'আপনি অফলাইনে আছেন। নেটওয়ার্ক ফিরলে রিপোর্ট পাঠানো হবে।', offlineSend:'রিপোর্ট সংরক্ষণ করুন', offlineHint:'তত ক্ষণ এটি আপনার ফোনে থাকবে',
+    back:'পেছনে', info:'আরও তথ্য', close:'বন্ধ করুন',
+    types:{ theft:'চুরি', assault:'আক্রমণ', harassment:'উত্যন্ত', robbery:'ডাকাতি', accident:'দুর্ঘটনা', fire:'আগুন', medical:'চিকিৎসা', fraud:'প্রতারণা', vandalism:'ভাঙচোরা', suspicious:'সন্দেহজনক', other:'অন্যান্য' },
+    size:{ photo:'২.৪ এমবি', video:'০:২৪ · ৮.১ এমবি' }
+  }
+};
+const ICONS = {
+  back:'fluent:chevron-left-24-regular', camera:'fluent:camera-24-filled', video:'fluent:video-24-filled', gallery:'fluent:image-multiple-24-filled',
+  info:'fluent:info-24-filled', dismiss:'fluent:dismiss-24-filled', check:'fluent:checkmark-circle-24-filled', tick:'fluent:checkmark-24-filled',
+  pin:'fluent:location-24-filled', sync:'fluent:arrow-sync-24-filled', chev:'fluent:chevron-down-24-regular', send:'fluent:send-24-filled',
+  eyeoff:'fluent:eye-off-24-filled', person:'fluent:person-24-filled', edit:'fluent:edit-24-filled', play:'fluent:play-24-filled', image:'fluent:image-24-filled',
+  warn:'fluent:warning-24-filled', wifioff:'fluent:wifi-off-24-filled', search:'fluent:search-24-filled', wifi:'fluent:wifi-1-24-filled',
+  help:'fluent:question-circle-24-filled',
+  theft:'mdi:robber', assault:'mdi:kickboxing', harassment:'fluent:chat-warning-24-filled', robbery:'mdi:knife', accident:'fluent:vehicle-car-collision-24-filled',
+  fire:'fluent:fire-24-filled', medical:'fluent:heart-pulse-24-filled', fraud:'mdi:account-alert', vandalism:'mdi:hammer', suspicious:'fluent:eye-24-filled', other:'fluent:more-circle-24-filled'
+};
+const ACCENT = { theft:'#7B1FA2', assault:'#DC2626', harassment:'#9C27B0', robbery:'#B71C1C', accident:'#5D4037', fire:'#D97706', medical:'#C2185B', fraud:'#00838F', vandalism:'#4E342E', suspicious:'#546E7A', other:'#6B6B85' };
+const ic = (n, cls='') => `<iconify-icon icon="${ICONS[n]}" class="ico ${cls}" aria-hidden="true"></iconify-icon>`;
+
+// State shared by both phones; each phone keeps its own sheet, popover and tabs.
+let lang = 'en', flow = 'empty';
+const local = { light:{ pop:null, sheet:null, type:null, loc:'auto', anon:true, text:'' }, dark:{ pop:null, sheet:null, type:'theft', loc:'auto', anon:true, text:'' } };
+
+function infoBtn(theme, key, title) {
+  const s = STR[lang];
+  return `<button class="info" type="button" data-act="pop" data-key="${key}" aria-expanded="${local[theme].pop===key}" aria-label="${s.info}: ${title}">${ic('info')}</button>`;
+}
+function pop(theme, key, arrow, body) {
+  return local[theme].pop === key ? `<div class="pop" style="--arrow:${arrow}px" role="dialog">${body}</div>` : '';
+}
+
+function evidence(theme, s) {
+  const st = flow;
+  let body;
+  if (st === 'empty' || st === 'offline') {
+    body = `<div class="pick"><button type="button">${ic('camera')}<b>${s.takePhoto}</b><small>${s.fromCam}</small></button><button type="button">${ic('video')}<b>${s.recVideo}</b><small>${s.max30}</small></button></div>
+            <button class="gallery" type="button">${ic('gallery')}${s.gallery}</button>`;
+  } else if (st === 'error') {
+    body = `<div class="pick"><button type="button">${ic('camera')}<b>${s.takePhoto}</b><small>${s.fromCam}</small></button><button type="button">${ic('video')}<b>${s.recVideo}</b><small>${s.max30}</small></button></div>
+            <button class="gallery" type="button">${ic('gallery')}${s.gallery}</button>
+            <div class="alertbox" role="alert">${ic('warn')}<span>${s.fileError}</span></div>`;
+  } else if (st === 'preparing') {
+    body = `<div class="preview"><span class="play">${ic('play')}</span><span class="meta">${ic('video')}${s.videoAdded}</span></div>
+            <div class="progress"><div class="bar"><i></i></div><p><span>${s.preparing}</span><span>${lang==='bn'?'৬২%':'62%'}</span></p></div>`;
+  } else {
+    const isVideo = st === 'video';
+    body = `<div style="position:relative"><div class="preview">${isVideo ? `<span class="play">${ic('play')}</span>` : `<span class="big">${ic('image')}</span>`}<span class="meta">${ic(isVideo?'video':'image')}${isVideo?s.videoAdded:s.photoAdded} · ${isVideo?s.size.video:s.size.photo}</span></div>
+            <button class="remove" type="button" aria-label="${s.remove}"><span>${ic('dismiss')}</span></button></div>
+            <div class="attach-row"><span class="ready">${ic('check')}${s.ready}</span><button class="replace" type="button">${ic('sync')}${s.replace}</button></div>`;
+  }
+  const done = ['photo','video','sending','offline'].includes(st) && st !== 'empty';
+  const hasFile = ['photo','video','sending'].includes(st);
+  return `<section class="card">
+    <div class="card-head"><h3>${s.evidence}</h3>${infoBtn(theme,'ev',s.evInfoTitle)}<span class="spacer"></span><span class="tag req">${s.required}</span></div>
+    ${pop(theme,'ev',74,`<h4>${s.evInfoTitle}</h4><dl><div><dt>${ic('camera')}${s.photo}</dt><dd>${s.photoRule}</dd></div><div><dt>${ic('video')}${s.video}</dt><dd>${s.videoRule}</dd></div></dl>`)}
+    ${body}
+  </section>`;
+}
+
+function typeCard(theme, s) {
+  const L = local[theme];
+  const t = L.type;
+  const lead = t ? `<span class="lead" style="--a:${ACCENT[t]}">${ic(t)}</span>` : `<span class="lead">${ic('help')}</span>`;
+  return `<section class="card">
+    <div class="card-head"><h3>${s.type}</h3>${infoBtn(theme,'type',s.typeInfoTitle)}<span class="spacer"></span><span class="tag">${s.optional}</span></div>
+    ${pop(theme,'type',0,`<h4>${s.typeInfoTitle}</h4><p>${s.typeInfo}</p>`)}
+    <button class="field" type="button" data-act="sheet" data-key="type" aria-haspopup="listbox">${lead}<span class="val ${t?'':'ph'}">${t?s.types[t]:s.typePh}</span>${ic('chev','chev')}</button>
+  </section>`;
+}
+
+function whatCard(theme, s) {
+  return `<section class="card">
+    <div class="card-head"><h3>${s.what}</h3>${infoBtn(theme,'what',s.whatInfoTitle)}<span class="spacer"></span><span class="tag req">${s.required}</span></div>
+    ${pop(theme,'what',0,`<h4>${s.whatInfoTitle}</h4><p>${s.whatInfo}</p>`)}
+    <div class="ta"><textarea rows="3" maxlength="140" placeholder="${s.whatPh}" data-act="text" data-theme="${theme}" aria-label="${s.what}"></textarea><span class="counter" id="counter-${theme}">${lang==='bn'?'০':'0'} / ${lang==='bn'?'১৪০':'140'}</span></div>
+  </section>`;
+}
+
+function locCard(theme, s) {
+  const L = local[theme];
+  const auto = L.loc === 'auto';
+  const body = auto
+    ? `<div class="where"><span class="lead">${ic('pin')}</span><div class="txt"><b>${s.place}</b><span>${s.acc}</span></div><button class="redetect" type="button" aria-label="${s.redetect}">${ic('sync')}</button></div>`
+    : `<label class="label" style="margin-top:12px">${s.area}</label>
+       <button class="field" type="button" data-act="sheet" data-key="area"><span class="lead">${ic('pin')}</span><span class="val ph">${s.areaPh}</span>${ic('chev','chev')}</button>
+       <label class="label">${s.landmark} <span style="font-weight:500;color:var(--muted)">· ${s.optional}</span></label>
+       <input class="text" type="text" placeholder="${s.landmarkPh}" aria-label="${s.landmark}" />`;
+  return `<section class="card">
+    <div class="card-head"><h3>${s.loc}</h3>${infoBtn(theme,'loc',s.locInfoTitle)}<span class="spacer"></span><span class="tag req">${s.required}</span></div>
+    ${pop(theme,'loc',66,`<h4>${s.locInfoTitle}</h4><p>${s.locInfo}</p>`)}
+    <div class="segc" role="tablist"><button type="button" data-act="loc" data-v="auto" aria-pressed="${auto}">${ic('pin')}${s.auto}</button><button type="button" data-act="loc" data-v="manual" aria-pressed="${!auto}">${ic('search')}${s.manual}</button></div>
+    ${body}
+  </section>`;
+}
+
+function privCard(theme, s) {
+  const L = local[theme];
+  return `<section class="card">
+    <div class="card-head"><h3>${s.privacy}</h3>${infoBtn(theme,'priv',s.privInfoTitle)}<span class="spacer"></span><span class="tag">${L.anon?s.tagAnon:s.tagNamed}</span></div>
+    ${pop(theme,'priv',58,`<h4>${s.privInfoTitle}</h4><p>${s.privInfo}</p>`)}
+    <div class="row"><span class="lead">${ic(L.anon?'eyeoff':'person')}</span><div class="txt"><b>${L.anon?s.anon:s.named}</b><small>${L.anon?s.anonSub:s.namedSub}</small></div>
+      <button class="switch" type="button" role="switch" aria-checked="${L.anon}" aria-label="${s.anon}" data-act="anon"></button></div>
+  </section>`;
+}
+
+function sheet(theme, s) {
+  const L = local[theme];
+  if (!L.sheet) return '';
+  if (L.sheet === 'type') {
+    const rows = Object.keys(s.types).map(k => `<button class="opt" type="button" data-act="pick-type" data-v="${k}" role="option" aria-selected="${L.type===k}"><span class="lead" style="--a:${ACCENT[k]}">${ic(k)}</span><span class="grow">${s.types[k]}</span>${L.type===k?ic('tick','tick'):''}</button>`).join('');
+    return `<div class="sheet-wrap"><div class="scrim" data-act="close"></div><div class="sheet" role="dialog"><div class="grab"></div><h4>${s.typeSheet}</h4><div class="opts"><button class="opt skip" type="button" data-act="pick-type" data-v=""><span class="lead">${ic('help')}</span><span class="grow">${s.skip}</span></button>${rows}</div></div></div>`;
+  }
+  const areas = lang==='bn' ? ['ধানমন্ডি','মোহাম্মদপুর','মিরপুর','উত্তরা','গুলশান'] : ['Dhanmondi','Mohammadpur','Mirpur','Uttara','Gulshan'];
+  return `<div class="sheet-wrap"><div class="scrim" data-act="close"></div><div class="sheet" role="dialog"><div class="grab"></div><h4>${s.area}</h4><div class="opts">${areas.map(a=>`<button class="opt" type="button" data-act="close"><span class="lead">${ic('pin')}</span><span class="grow">${a}</span></button>`).join('')}</div></div></div>`;
+}
+
+function footer(theme, s) {
+  const L = local[theme];
+  let cta, hint;
+  if (flow === 'sending') { cta = `<button class="cta" type="button" disabled><span class="sendstate"><span class="spin"></span>${s.sending}</span></button>`; hint = ''; }
+  else if (flow === 'empty' || flow === 'error' || flow === 'preparing') {
+    cta = `<button class="cta" type="button" disabled>${ic('send')}${s.send}</button>`;
+    hint = flow === 'preparing' ? s.preparing : s.needMedia;
+  }
+  else if (flow === 'offline') { cta = `<button class="cta" type="button">${ic('send')}${s.offlineSend}</button>`; hint = s.offlineHint; }
+  else if (L.text.trim().length === 0) { cta = `<button class="cta" type="button" disabled>${ic('send')}${s.send}</button>`; hint = s.needText; }
+  else if (L.loc === 'manual') { cta = `<button class="cta" type="button" disabled>${ic('send')}${s.send}</button>`; hint = s.needArea; }
+  else { cta = `<button class="cta" type="button">${ic('send')}${s.send}</button>`; hint = s.allSet; }
+  return `<div class="footer">${cta}<p class="hint" role="status">${hint}</p></div>`;
+}
+
+function phone(theme) {
+  const s = STR[lang];
+  return `<div class="phone" data-theme="${theme}" data-which="${theme}">
+    <div class="statusbar"><span>9:41</span><span class="notch"></span><span class="right">${ic('wifi')}<span>82%</span></span></div>
+    <header class="appbar"><button class="back" type="button" aria-label="${s.back}">${ic('back')}</button><div class="t"><b>${s.title}</b><span>${s.sub}</span></div></header>
+    <div class="scroll">
+      ${flow==='offline' ? `<div class="banner" role="status">${ic('wifioff')}<span>${s.offline}</span></div>` : ''}
+      ${evidence(theme, s)}
+      ${typeCard(theme, s)}
+      ${whatCard(theme, s)}
+      ${locCard(theme, s)}
+      ${privCard(theme, s)}
+    </div>
+    ${footer(theme, s)}
+    ${sheet(theme, s)}
+  </div>`;
+}
+
+function render() {
+  document.body.dataset.lang = lang;
+  document.documentElement.lang = lang;
+  const keep = {};
+  for (const th of ['light','dark']) {
+    const sc = document.querySelector(`#phone-${th} .scroll`);
+    keep[th] = sc ? sc.scrollTop : 0;
+  }
+  document.getElementById('phone-light').innerHTML = phone('light');
+  document.getElementById('phone-dark').innerHTML = phone('dark');
+  document.querySelectorAll('.pop').forEach((pop) => {
+    const btn = pop.parentElement.querySelector('.info[aria-expanded="true"]');
+    if (btn) pop.style.setProperty('--arrow', (btn.offsetLeft + btn.offsetWidth / 2 - 12 - 6) + 'px');
+  });
+  for (const th of ['light','dark']) {
+    const sc = document.querySelector(`#phone-${th} .scroll`);
+    if (sc) sc.scrollTop = keep[th];
+    const ta = document.querySelector(`#phone-${th} textarea`);
+    if (ta) ta.value = local[th].text;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const sw = e.target.closest('#seg-state button');
+  if (sw) { flow = sw.dataset.state; document.querySelectorAll('#seg-state button').forEach(b => b.setAttribute('aria-pressed', b === sw)); render(); return; }
+  const lg = e.target.closest('#seg-lang button');
+  if (lg) { lang = lg.dataset.lang; document.querySelectorAll('#seg-lang button').forEach(b => b.setAttribute('aria-pressed', b === lg)); render(); return; }
+  const el = e.target.closest('[data-act]');
+  const ph = e.target.closest('.phone');
+  if (!el || !ph) { return; }
+  const L = local[ph.dataset.which];
+  const act = el.dataset.act;
+  if (act === 'pop') { L.pop = L.pop === el.dataset.key ? null : el.dataset.key; }
+  else if (act === 'sheet') { L.sheet = el.dataset.key; L.pop = null; }
+  else if (act === 'close') { L.sheet = null; }
+  else if (act === 'pick-type') { L.type = el.dataset.v || null; L.sheet = null; }
+  else if (act === 'loc') { L.loc = el.dataset.v; L.pop = null; }
+  else if (act === 'anon') { L.anon = !L.anon; }
+  else if (act === 'text') { return; }
+  render();
+});
+document.addEventListener('input', (e) => {
+  const ta = e.target.closest('textarea[data-act="text"]');
+  if (!ta) return;
+  const th = ta.dataset.theme;
+  local[th].text = ta.value;
+  const phoneEl = ta.closest('.phone');
+  const footerEl = phoneEl.querySelector('.footer');
+  if (footerEl) footerEl.outerHTML = footer(th, STR[lang]);
+  const n = ta.value.length;
+  const c = document.getElementById('counter-' + th);
+  if (c) c.textContent = (lang === 'bn' ? String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]) : n) + ' / ' + (lang === 'bn' ? '১৪০' : '140');
+});
+// Deep links for review: #state=photo&pop=ev&sheet=type&scroll=600&lang=bn
+(function () {
+  const q = new URLSearchParams(location.hash.slice(1));
+  if (q.get('state')) { flow = q.get('state'); document.querySelectorAll('#seg-state button').forEach(b => b.setAttribute('aria-pressed', b.dataset.state === flow)); }
+  if (q.get('lang')) { lang = q.get('lang'); document.querySelectorAll('#seg-lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang)); }
+  for (const th of ['light','dark']) { if (q.get('pop')) local[th].pop = q.get('pop'); if (q.get('sheet')) local[th].sheet = q.get('sheet'); }
+  render();
+  if (q.get('scroll')) document.querySelectorAll('.scroll').forEach(x => x.scrollTop = Number(q.get('scroll')));
+})();
+</script>
+</body>
+</html>

@@ -30,16 +30,24 @@ jest.mock('./uploadQueue', () => {
     ...actual,
     readQueue: jest.fn().mockResolvedValue([]),
     removeFromQueue: jest.fn(),
+    claimUnowned: jest.fn().mockResolvedValue(0),
     deleteDraftMedia: jest.fn(),
   }
 })
 
+jest.mock('./sessionUser', () => ({ currentUserId: jest.fn() }))
+jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn() }))
+
 jest.mock('expo-file-system', () => ({
+  // A file exists unless its path says it is missing. A `File` built from a
+  // directory (the queue's own files) reads as absent, so the real queue code
+  // sees an empty queue.
   File: class {
     uri: string
-    exists = false
-    constructor(uri: string) {
-      this.uri = uri
+    exists: boolean
+    constructor(...parts: unknown[]) {
+      this.uri = parts.map(String).join('/')
+      this.exists = typeof parts[0] === 'string' && !parts[0].includes('missing')
     }
     delete() {}
   },
@@ -54,18 +62,26 @@ jest.mock('expo-file-system', () => ({
   Paths: { cache: '/cache' },
 }))
 
+import * as Network from 'expo-network'
 import { submitCapture } from './submitCapture'
-import { deleteDraftMedia, readQueue, removeFromQueue } from './uploadQueue'
+import { currentUserId } from './sessionUser'
+import { claimUnowned, deleteDraftMedia, readQueue, removeFromQueue } from './uploadQueue'
 
 const mockedSubmit = submitCapture as jest.MockedFunction<typeof submitCapture>
 const mockedRemove = removeFromQueue as jest.MockedFunction<typeof removeFromQueue>
 const mockedDelete = deleteDraftMedia as jest.MockedFunction<typeof deleteDraftMedia>
 const mockedRead = readQueue as jest.MockedFunction<typeof readQueue>
+const mockedUser = currentUserId as jest.MockedFunction<typeof currentUserId>
+const mockedNetwork = Network.getNetworkStateAsync as jest.MockedFunction<
+  typeof Network.getNetworkStateAsync
+>
+const mockedClaim = claimUnowned as jest.MockedFunction<typeof claimUnowned>
 
 /** A queue item, for the drain tests. */
 function item(overrides: Partial<QueuedUpload> = {}): QueuedUpload {
   return {
     clientRequestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    authorId: 'user-1',
     mediaUri: '/cache/draft.jpg',
     mediaType: 'photo',
     byteSize: 1024,
@@ -98,6 +114,12 @@ beforeEach(() => {
   })
   mockedRemove.mockResolvedValue(undefined)
   mockedDelete.mockResolvedValue(undefined)
+  mockedClaim.mockResolvedValue(0)
+  mockedUser.mockResolvedValue('user-1')
+  mockedNetwork.mockResolvedValue({
+    isConnected: true,
+    isInternetReachable: true,
+  } as Awaited<ReturnType<typeof Network.getNetworkStateAsync>>)
 })
 
 // --- The retry classification -------------------------------------------------
@@ -206,6 +228,16 @@ describe('drainItem', () => {
 
     expect(outcome).toMatchObject({ status: 'retry', attempts: 3, savedOnDevice: true })
   })
+
+  it('writes off an item whose file has gone, without trying to send it', async () => {
+    // The OS cleared the file. Trying would burn the attempts and leave an
+    // item that holds a queue place for good.
+    const outcome = await drainItem(item({ mediaUri: '/missing/draft.jpg' }))
+
+    expect(outcome).toEqual({ status: 'rejected', code: 'MEDIA_MISSING' })
+    expect(mockedSubmit).not.toHaveBeenCalled()
+    expect(mockedRemove).toHaveBeenCalledWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+  })
 })
 
 // --- The whole drain ----------------------------------------------------------
@@ -253,6 +285,86 @@ describe('drainQueue', () => {
 
     expect(result.retried).toBe(1)
     expect(result.savedOnDevice).toBe(1)
+  })
+
+  it("sends only the signed-in user's items — never another account's report", async () => {
+    // User A queued this and signed out without sending it. User B signs in.
+    mockedUser.mockResolvedValue('user-2')
+    mockedRead.mockResolvedValue([item({ authorId: 'user-1' })])
+
+    const result = await drainQueue()
+
+    expect(mockedSubmit).not.toHaveBeenCalled()
+    expect(result).toEqual({ sent: 0, retried: 0, rejected: 0, savedOnDevice: 0 })
+  })
+
+  it("still sends the signed-in user's own item when another user's is ahead of it", async () => {
+    mockedUser.mockResolvedValue('user-2')
+    mockedRead.mockResolvedValue([
+      item({ authorId: 'user-1' }),
+      item({ clientRequestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', authorId: 'user-2' }),
+    ])
+
+    const result = await drainQueue()
+
+    expect(mockedSubmit).toHaveBeenCalledTimes(1)
+    expect(mockedSubmit.mock.calls[0]?.[0].clientRequestId).toBe(
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    )
+    expect(result.sent).toBe(1)
+  })
+
+  it('hands items saved before authors were recorded to the user who drains them', async () => {
+    mockedRead.mockResolvedValue([item({ authorId: undefined })])
+
+    const result = await drainQueue()
+
+    expect(mockedClaim).toHaveBeenCalledWith('user-1')
+    expect(result.sent).toBe(1)
+  })
+
+  it('does nothing without a session', async () => {
+    mockedUser.mockResolvedValue(null)
+    mockedRead.mockResolvedValue([item()])
+
+    await drainQueue()
+
+    expect(mockedSubmit).not.toHaveBeenCalled()
+    expect(mockedRead).not.toHaveBeenCalled()
+  })
+
+  it('does not spend an attempt while the phone is offline', async () => {
+    mockedNetwork.mockResolvedValue({
+      isConnected: false,
+      isInternetReachable: false,
+    } as Awaited<ReturnType<typeof Network.getNetworkStateAsync>>)
+    mockedRead.mockResolvedValue([item()])
+
+    const result = await drainQueue()
+
+    // No submit, and no attempt recorded: three airplane-mode launches used to
+    // use the whole budget before the signal ever came back.
+    expect(mockedSubmit).not.toHaveBeenCalled()
+    expect(result).toEqual({ sent: 0, retried: 0, rejected: 0, savedOnDevice: 0 })
+  })
+
+  it('tries anyway when the network state cannot be read', async () => {
+    mockedNetwork.mockRejectedValue(new Error('unavailable'))
+    mockedRead.mockResolvedValue([item()])
+
+    const result = await drainQueue()
+
+    expect(result.sent).toBe(1)
+  })
+
+  it('shares one drain between two callers', async () => {
+    // The signed-in layout and the Capture screen both start a drain.
+    mockedRead.mockResolvedValue([item()])
+
+    const [first, second] = await Promise.all([drainQueue(), drainQueue()])
+
+    expect(mockedSubmit).toHaveBeenCalledTimes(1)
+    expect(second).toBe(first)
   })
 
   it('drains the items one at a time — a burst of uploads is what the backoff exists to prevent', async () => {

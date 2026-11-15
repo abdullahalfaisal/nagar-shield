@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { FLAG_REASONS, type FlagReason } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { BottomSheet, Button, RadioGroup } from '@/shared/ui'
+import { BottomSheet, Button, RadioGroup, useToast } from '@/shared/ui'
 import { useFlagReport } from '@/shared/api/flags'
 
 /**
@@ -37,18 +37,38 @@ export function FlagSheet({ visible, reportId, onClose, onFlagged }: FlagSheetPr
   const [message, setMessage] = useState<string | null>(null)
 
   const mutation = useFlagReport()
+  const toast = useToast()
+  const { reset: resetMutation } = mutation
 
+  // A parent can close the sheet without going through `close` (a hardware
+  // back press, or the alert-detail screen's own handler). Reset on every
+  // close, so reopening never shows the previous "sent" text or reason.
+  useEffect(() => {
+    if (visible) return
+    setReason(null)
+    setMessage(null)
+    resetMutation()
+  }, [visible, resetMutation])
+
+  // `off_topic` → `flagReasonOffTopic`: the id's snake case becomes the key's
+  // camel case. Capitalising only the first letter printed the raw key
+  // `alerts.flagReasonOff_topic` on screen.
   const options = FLAG_REASON_IDS.map((id) => ({
     id,
-    label: t(`alerts.flagReason${id.charAt(0).toUpperCase()}${id.slice(1)}`),
+    label: t(
+      `alerts.flagReason${id
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('')}`,
+    ),
   }))
 
   const close = useCallback(() => {
     setReason(null)
     setMessage(null)
-    mutation.reset()
+    resetMutation()
     onClose()
-  }, [mutation, onClose])
+  }, [resetMutation, onClose])
 
   const submit = useCallback(async () => {
     if (!reason) return
@@ -58,8 +78,11 @@ export function FlagSheet({ visible, reportId, onClose, onFlagged }: FlagSheetPr
 
       switch (outcome.status) {
         case 'ok':
-          setMessage(t('alerts.flagSuccess'))
+          // Confirm with a toast and close from here: the sheet is not the
+          // place to leave a "sent" line with Submit still live.
+          toast.show({ message: t('alerts.flagSuccess'), tone: 'success' })
           onFlagged?.({ reportHidden: outcome.reportHidden })
+          close()
           break
         case 'duplicate':
           setMessage(t('alerts.flagAlreadyReported'))
@@ -78,7 +101,7 @@ export function FlagSheet({ visible, reportId, onClose, onFlagged }: FlagSheetPr
     } catch {
       setMessage(t('errors.internal'))
     }
-  }, [mutation, onFlagged, reason, reportId, t])
+  }, [close, mutation, onFlagged, reason, reportId, t, toast])
 
   return (
     <BottomSheet
@@ -91,7 +114,10 @@ export function FlagSheet({ visible, reportId, onClose, onFlagged }: FlagSheetPr
         <RadioGroup
           options={options}
           selectedId={reason}
-          onSelect={(id) => setReason(id as FlagReason)}
+          onSelect={(id) => {
+            setReason(id as FlagReason)
+            setMessage(null)
+          }}
         />
 
         {message ? (

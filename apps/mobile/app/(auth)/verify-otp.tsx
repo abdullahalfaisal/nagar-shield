@@ -1,17 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { AppError, otpCodeSchema } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { AppBar, Button, InputField } from '@/shared/ui'
+import { AppBar, Button, InputField, KeyboardScroll, useToast } from '@/shared/ui'
 import {
   clearPendingReset,
+  isRateLimited,
+  isResetNetworkError,
+  isValidityMilestone,
+  parseResetNotice,
   peekPendingReset,
+  readRetryAfterSeconds,
+  remainingValiditySeconds,
   sendPasswordResetOtp,
   stagePasswordReset,
 } from '@/shared/auth/passwordResetService'
 import { errorCopy } from '@/shared/i18n/errorCopy'
+
+/**
+ * How long Resend stays greyed after a code was sent. It only spares the user
+ * an accidental double tap; the server's own limits are what actually apply.
+ */
+const RESEND_COOLDOWN_SECONDS = 30
 
 /**
  * Screen 13b — the reset-code entry step.
@@ -50,13 +64,17 @@ import { errorCopy } from '@/shared/i18n/errorCopy'
 export default function VerifyOtpScreen() {
   const theme = useTheme()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const params = useLocalSearchParams<{
     /** The server's remaining cooldown, in seconds. */
     retryAfter?: string
     /** The server's remaining attempts. */
     attemptsRemaining?: string
+    /** Why the user was sent back here: a key, rendered in the banner. */
+    notice?: string
   }>()
+  const toast = useToast()
 
   // The identifier is read from the in-memory hand-off, not from the route
   // params: it is PII, and a route param is part of a URL.
@@ -64,11 +82,27 @@ export default function VerifyOtpScreen() {
   // The hand-off is **peeked**, not taken — the identifier has to survive the
   // round trip to the password step and back again, so it is read without
   // being consumed. The code is not read here at all.
-  const identifier = useMemo(() => peekPendingReset()?.identifier ?? '', [])
+  const staged = useMemo(() => peekPendingReset(), [])
+  const identifier = staged?.identifier ?? ''
 
   const [code, setCode] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [formError, setFormError] = useState<string | undefined>()
+  const [formError, setFormError] = useState<string | undefined>(() => {
+    // The notice is the reason the password step sent the user back. It is
+    // shown here because that screen unmounts and takes its own message along.
+    const notice = parseResetNotice(params.notice)
+    const attempts = Number(params.attemptsRemaining)
+    if (notice === 'wrong') {
+      return params.attemptsRemaining !== undefined && Number.isFinite(attempts)
+        ? t('auth.otpWrongAttempts', { count: attempts })
+        : t('auth.otpWrong')
+    }
+    // With a wait the server sent, the cooldown banner already says it.
+    if (notice === 'rateLimited' && !(Number(params.retryAfter) > 0)) {
+      return t('errors.otpRateLimit')
+    }
+    return undefined
+  })
   const [submitting, setSubmitting] = useState(false)
   const [sending, setSending] = useState(false)
 
@@ -87,12 +121,19 @@ export default function VerifyOtpScreen() {
     return Number.isFinite(value) ? value : undefined
   })
 
-  // The 10-minute validity window, mirrored from the server's answer.
+  // The 10-minute validity window, mirrored from when the code was issued.
   //
-  // It is seeded on mount: the code the user is about to type was issued
-  // moments ago, so the window starts now. The countdown is a **mirror** —
-  // it is the server that decides whether a code has expired.
-  const [validitySeconds, setValiditySeconds] = useState<number | null>(10 * 60)
+  // The issue time rides the hand-off, so coming back from the password step
+  // does not restart the window at 10:00. Without one (the hand-off was lost)
+  // the window starts now. The countdown is a **mirror** — it is the server
+  // that decides whether a code has expired.
+  const [issuedAt, setIssuedAt] = useState<number>(() => staged?.issuedAt ?? Date.now())
+  const [now, setNow] = useState(() => Date.now())
+  const validitySeconds = remainingValiditySeconds(issuedAt, now)
+  const expired = validitySeconds <= 0
+
+  // The wait before Resend may be pressed again; `null` means none.
+  const [resendWait, setResendWait] = useState<number | null>(null)
 
   /**
    * Ticks the mirrored countdown.
@@ -115,23 +156,52 @@ export default function VerifyOtpScreen() {
     return () => clearInterval(timer)
   }, [cooldownSeconds])
 
+  // The clock reads the wall time each tick instead of counting ticks, so a
+  // backgrounded app catches up when it returns.
   useEffect(() => {
-    if (validitySeconds === null || validitySeconds <= 0) return
+    if (expired) return
 
-    const timer = setInterval(() => {
-      setValiditySeconds((current) => {
-        if (current === null) return null
-        const next = current - 1
-        return next <= 0 ? null : next
-      })
-    }, 1000)
-
+    const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [validitySeconds])
+  }, [expired])
+
+  useEffect(() => {
+    if (resendWait === null) return
+
+    const timer = setTimeout(
+      () => setResendWait((current) => (current && current > 1 ? current - 1 : null)),
+      1000,
+    )
+    return () => clearTimeout(timer)
+  }, [resendWait])
+
+  // A screen reader hears the countdown at a few milestones, not every second.
+  useEffect(() => {
+    if (!isValidityMilestone(validitySeconds)) return
+
+    void AccessibilityInfo.announceForAccessibility(
+      validitySeconds === 0
+        ? t('auth.otpExpired')
+        : t('auth.otpExpiresIn', {
+            minutes: Math.floor(validitySeconds / 60),
+            seconds: String(validitySeconds % 60).padStart(2, '0'),
+          }),
+    )
+  }, [t, validitySeconds])
 
   const inCooldown = cooldownSeconds !== null && cooldownSeconds > 0
+  const canSubmit = !inCooldown && code.length === 6 && !submitting
+
+  const resendBlocked = sending || inCooldown || resendWait !== null
 
   const onVerify = useCallback(async () => {
+    // Nothing staged means the app was restored mid-flow. The password step
+    // would bounce straight back, so say so here and start over instead.
+    if (identifier.length === 0) {
+      router.replace({ pathname: '/(auth)/forgot-password', params: { notice: 'sessionLost' } })
+      return
+    }
+
     const parsed = otpCodeSchema.safeParse(code)
 
     if (!parsed.success) {
@@ -155,14 +225,19 @@ export default function VerifyOtpScreen() {
       //
       // It is still never the client's decision: the server compares it
       // against the challenge's bcrypt hash whatever the client says.
-      stagePasswordReset(identifier, parsed.data)
+      stagePasswordReset(identifier, parsed.data, issuedAt)
       router.push('/(auth)/reset-password')
     } finally {
       setSubmitting(false)
     }
-  }, [code, identifier, router, t])
+  }, [code, identifier, issuedAt, router, t])
 
   const onResend = useCallback(async () => {
+    if (identifier.length === 0) {
+      router.replace({ pathname: '/(auth)/forgot-password', params: { notice: 'sessionLost' } })
+      return
+    }
+
     setSending(true)
     setFormError(undefined)
 
@@ -173,34 +248,51 @@ export default function VerifyOtpScreen() {
       // with it, so the mirror restarts too — and any code that was staged
       // for the password step is now a code the server has already
       // superseded, so it is discarded.
+      const issued = Date.now()
       clearPendingReset()
-      setValiditySeconds(10 * 60)
+      stagePasswordReset(identifier, '', issued)
+      setIssuedAt(issued)
+      setNow(issued)
       setCooldownSeconds(null)
       setAttemptsRemaining(undefined)
       setCode('')
+      setResendWait(RESEND_COOLDOWN_SECONDS)
+      toast.show({ message: t('auth.otpResent'), tone: 'success' })
     } catch (error) {
       const appError = error instanceof AppError ? error : null
-      setFormError(appError ? errorCopy(t, appError.code) : t('errors.internal'))
+
+      if (isRateLimited(error)) {
+        const retryAfter = readRetryAfterSeconds(error)
+        if (retryAfter !== undefined && retryAfter > 0) setCooldownSeconds(Math.ceil(retryAfter))
+      }
+
+      setFormError(
+        isResetNetworkError(error)
+          ? t('errors.network')
+          : appError
+            ? errorCopy(t, appError.code)
+            : t('errors.internal'),
+      )
     } finally {
       setSending(false)
     }
-  }, [identifier, t])
+  }, [identifier, router, t, toast])
 
   const validityLabel = useMemo(() => {
-    if (validitySeconds === null) return null
+    if (expired) return t('auth.otpExpired')
     const minutes = Math.floor(validitySeconds / 60)
     const seconds = validitySeconds % 60
     return t('auth.otpExpiresIn', {
       minutes,
       seconds: String(seconds).padStart(2, '0'),
     })
-  }, [t, validitySeconds])
+  }, [expired, t, validitySeconds])
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
       <AppBar title={t('auth.accountRecovery')} onBack={() => router.back()} />
 
-      <View style={styles.content}>
+      <KeyboardScroll contentStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}>
         <Text style={[styles.title, { color: theme.colors.ink[950] }]}>{t('auth.otpTitle')}</Text>
         <Text style={[styles.subtitle, { color: theme.colors.ink[600] }]}>
           {t('auth.otpEmailSubtitle')}
@@ -208,13 +300,23 @@ export default function VerifyOtpScreen() {
 
         {formError ? (
           <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
-            <Text style={{ color: theme.palette.red[600], fontSize: 13 }}>{formError}</Text>
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={{ color: theme.palette.red[600], fontSize: 13 }}
+            >
+              {formError}
+            </Text>
           </View>
         ) : null}
 
         {inCooldown ? (
           <View style={[styles.cooldownBanner, { backgroundColor: theme.palette.amber[50] }]}>
-            <Text style={{ color: theme.palette.amber[600], fontSize: 13 }}>
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={{ color: theme.palette.amber[600], fontSize: 13 }}
+            >
               {t('auth.otpCooldown', {
                 minutes: Math.ceil((cooldownSeconds ?? 0) / 60),
               })}
@@ -225,18 +327,23 @@ export default function VerifyOtpScreen() {
         <InputField
           label={t('auth.otpLabel')}
           value={code}
-          onChangeText={setCode}
+          onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, 6))}
           placeholder={t('auth.otpPlaceholder')}
           keyboardType="number-pad"
           autoComplete="sms-otp"
           textContentType="oneTimeCode"
+          maxLength={6}
+          returnKeyType="done"
+          onSubmitEditing={() => {
+            if (canSubmit) void onVerify()
+          }}
           icon="lock"
           helper={validityLabel ?? undefined}
           error={errors.code}
           testID="reset-otp-code"
         />
 
-        {attemptsRemaining !== undefined ? (
+        {attemptsRemaining !== undefined && !formError ? (
           <Text style={[styles.attempts, { color: theme.colors.ink[500] }]}>
             {t('auth.otpAttemptsRemaining', { count: attemptsRemaining })}
           </Text>
@@ -244,21 +351,43 @@ export default function VerifyOtpScreen() {
 
         <Button
           label={submitting ? t('capture.submitting') : t('auth.verifyCta')}
-          variant="primary"
+          variant={expired ? 'secondary' : 'primary'}
           size="lg"
-          disabled={inCooldown || code.length !== 6 || submitting}
+          disabled={!canSubmit}
           onPress={onVerify}
           style={styles.cta}
         />
 
-        <Text
-          accessibilityRole="button"
-          onPress={onResend}
-          style={[styles.resend, { color: theme.palette.violet[700] }]}
-        >
-          {sending ? t('capture.submitting') : t('auth.resendOtp')}
-        </Text>
-      </View>
+        {expired ? (
+          // An expired code can only be replaced, so Resend becomes the main
+          // action instead of a small link.
+          <Button
+            label={sending ? t('capture.submitting') : t('auth.resendOtp')}
+            variant="primary"
+            size="lg"
+            disabled={resendBlocked}
+            onPress={onResend}
+            style={styles.cta}
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: resendBlocked }}
+            disabled={resendBlocked}
+            onPress={onResend}
+            hitSlop={8}
+            style={[styles.resendHit, resendBlocked && styles.resendDisabled]}
+          >
+            <Text style={[styles.resend, { color: theme.palette.violet[700] }]}>
+              {sending
+                ? t('capture.submitting')
+                : resendWait !== null
+                  ? t('auth.resendIn', { seconds: resendWait })
+                  : t('auth.resendOtp')}
+            </Text>
+          </Pressable>
+        )}
+      </KeyboardScroll>
     </View>
   )
 }
@@ -268,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 28,
   },
@@ -300,10 +429,16 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: 20,
   },
-  resend: {
+  resendHit: {
     alignSelf: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  resendDisabled: {
+    opacity: 0.5,
+  },
+  resend: {
     fontSize: 13,
     fontWeight: '600',
-    paddingVertical: 12,
   },
 })

@@ -1,5 +1,12 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import {
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+  type UseInfiniteQueryResult,
+  type UseQueryResult,
+} from '@tanstack/react-query'
+import {
+  ALERTS_REFRESH_INTERVAL_MS,
   HISTORY_DEFAULT_RADIUS_KM,
   HISTORY_DEFAULT_WINDOW_HOURS,
   type AreaHierarchy,
@@ -7,7 +14,9 @@ import {
   type ReportCategory,
 } from '@nagar-shield/shared'
 import { supabase } from '@/shared/api/supabase'
+import { useRefreshGuard } from '@/shared/services/refreshGuard'
 import { fromSupabaseError } from '@/shared/api/errors'
+import { toBengaliDigits } from '@/shared/utils/relativeTime'
 
 /**
  * The local History read model.
@@ -66,6 +75,7 @@ function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | nu
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
+    place: raw.place ?? undefined,
   }
 }
 
@@ -141,6 +151,74 @@ export function useHistory(
     // feed's cadence without hammering the RPC.
     staleTime: 60_000,
   })
+}
+
+/** The History list's accumulated pages. */
+export type HistoryFeedData = InfiniteData<HistoryPage, string | null>
+
+/** How many rows one History page asks for. */
+export const HISTORY_PAGE_SIZE = 50
+
+/**
+ * The History list, cursor-paginated.
+ *
+ * The first page used to be the whole list, so in a busy area the newest 50
+ * rows crowded out the user's own reports and the totals disagreed with the
+ * rows. The list now reads page after page; the screen says how many of the
+ * matched rows it has loaded.
+ *
+ * The key starts with `history`, so one `invalidateQueries(['history'])` after
+ * an edit refreshes this list and the single-page map read together.
+ */
+export function useHistoryFeed(
+  query: Omit<HistoryQuery, 'cursor' | 'limit'>,
+  options?: { enabled?: boolean },
+): UseInfiniteQueryResult<HistoryFeedData, Error> {
+  // The same pause rules as the feed: no polling in the background, on a low
+  // battery or offline.
+  const guard = useRefreshGuard()
+
+  return useInfiniteQuery<HistoryPage, Error, HistoryFeedData, unknown[], string | null>({
+    queryKey: ['history', 'feed', query],
+    queryFn: ({ pageParam }) =>
+      fetchHistory({ ...query, cursor: pageParam, limit: HISTORY_PAGE_SIZE }),
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
+    // History used to load once and then sit still: a report someone else filed
+    // nearby showed only after a pull. It now refreshes on the feed's cadence.
+    refetchInterval: () => (guard.isPaused ? false : ALERTS_REFRESH_INTERVAL_MS),
+    refetchIntervalInBackground: false,
+  })
+}
+
+/** Every loaded row, in order. */
+export function historyItems(data: HistoryFeedData | undefined): HistoryReport[] {
+  return data ? data.pages.flatMap((page) => page.items) : []
+}
+
+/** The number of rows the query matched, as the newest page reports it. */
+export function historyTotal(data: HistoryFeedData | undefined): number | null {
+  const last = data?.pages[data.pages.length - 1]
+  return last ? last.totalCount : null
+}
+
+/**
+ * How a row's distance is written: metres below a kilometre, kilometres from
+ * a kilometre up (`4200 m` is hard to read). The digits follow the language.
+ */
+export function distanceLabelParts(
+  metres: number,
+  language: string,
+): { key: 'history.distanceAway' | 'history.kmAway'; distance: string } {
+  const bn = language === 'bn'
+  if (metres < 1000) {
+    const text = String(Math.round(metres))
+    return { key: 'history.distanceAway', distance: bn ? toBengaliDigits(text) : text }
+  }
+  const km = (Math.round(metres / 100) / 10).toFixed(1).replace(/\.0$/, '')
+  return { key: 'history.kmAway', distance: bn ? toBengaliDigits(km) : km }
 }
 
 /**

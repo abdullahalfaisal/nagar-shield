@@ -1,4 +1,4 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import type {
   AreaHierarchy,
   MediaType,
@@ -93,6 +93,7 @@ function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | nu
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
+    place: raw.place ?? undefined,
   }
 }
 
@@ -173,4 +174,81 @@ export async function signAlertMediaUrls(
   )
 
   return Object.fromEntries(pairs.filter(([, url]) => Boolean(url)) as Array<[string, string]>)
+}
+
+/**
+ * How long a signed link is trusted. The link lasts ten minutes
+ * (`signMediaUrl`), so it is renewed a little before that: a photo opened at
+ * minute nine must not turn blank at minute ten.
+ */
+export const SIGNED_URL_RENEW_MS = 8 * 60_000
+
+/** Whether links signed at `signedAt` (epoch ms, 0 for never) are due for renewal. */
+export function signedUrlsAreStale(signedAt: number, now: number = Date.now()): boolean {
+  return now - signedAt >= SIGNED_URL_RENEW_MS
+}
+
+/** One of a feed report's attachments, with its signed URL when it has one. */
+export interface AlertThumbnailItem {
+  id: string
+  kind: MediaType
+  url: string | null
+}
+
+/**
+ * What a feed card shows for a report's first media item, plus every item so
+ * the card can open them full screen.
+ */
+export type AlertThumbnail =
+  | { kind: 'photo'; url: string; count: number; items: AlertThumbnailItem[] }
+  | { kind: 'video'; count: number; items: AlertThumbnailItem[] }
+  | { kind: 'file'; count: number; items: AlertThumbnailItem[] }
+
+/**
+ * The first media item of a feed report, ready for the card.
+ *
+ * The feed projection carries only `has_media` / `media_count`, so the card
+ * reads the report's public detail (the same query the detail screen uses, so
+ * opening the report afterwards is instant) and mints a signed URL for each
+ * item. The bucket stays private; the URL lasts ten minutes, so the query is
+ * kept a little less than that.
+ *
+ * A video shows a play tile rather than a frame — extracting a frame would
+ * mean downloading the clip on the feed.
+ */
+export function useAlertThumbnail(
+  reportId: string,
+  hasMedia: boolean,
+): UseQueryResult<AlertThumbnail | null, Error> {
+  const queryClient = useQueryClient()
+
+  return useQuery({
+    queryKey: ['alert-thumbnail', reportId],
+    enabled: hasMedia,
+    staleTime: SIGNED_URL_RENEW_MS,
+    gcTime: 9 * 60_000,
+    retry: 0,
+    queryFn: async () => {
+      const detail = await queryClient.fetchQuery({
+        queryKey: ['alert-detail', reportId],
+        queryFn: () => fetchPublicAlertDetail(reportId),
+      })
+      const first = detail?.media[0]
+      if (!detail || !first) return null
+
+      const count = detail.media.length
+      const urls = await signAlertMediaUrls(detail.media)
+      const items = detail.media.map((media) => ({
+        id: media.id,
+        kind: media.mediaType,
+        url: urls[media.storagePath] ?? null,
+      }))
+
+      if (first.mediaType === 'video') return { kind: 'video', count, items }
+      if (first.mediaType !== 'photo') return { kind: 'file', count, items }
+
+      const url = urls[first.storagePath]
+      return url ? { kind: 'photo', url, count, items } : null
+    },
+  })
 }

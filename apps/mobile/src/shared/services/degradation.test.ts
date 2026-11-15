@@ -29,24 +29,49 @@ jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn(),
 }))
 
+jest.mock('expo-battery', () => ({
+  isLowPowerModeEnabledAsync: jest.fn(),
+}))
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Network = require('expo-network')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Battery = require('expo-battery')
 
 function state(overrides: Partial<DegradedState> = {}): DegradedState {
   return { ...UNKNOWN_DEGRADED_STATE, ...overrides }
 }
 
 describe('the power-save capability', () => {
-  it('is recorded as a known limitation, not a silent no-op', () => {
-    // FR-PERMS-3: there is no first-class Expo API for Android power-save
-    // mode. This build ships no native module, so the capability is
-    // unavailable — and that fact is a named constant, visible in one grep.
-    expect(BATTERY_SAVER_DETECTION).toBe('unavailable')
+  it('is available: expo-battery reads Android power-saver mode', () => {
+    // FR-PERMS-3. The earlier build assumed no Expo API could read Android
+    // power-save mode — and warned about battery saver after **every** dial,
+    // because an always-unknown state is treated as "worth warning about".
+    // `Battery.isLowPowerModeEnabledAsync()` is that first-class API, so the
+    // capability is real now and the false prompt is gone.
+    expect(BATTERY_SAVER_DETECTION).toBe('available')
+  })
+})
+
+describe('readPowerSaveState', () => {
+  beforeEach(() => {
+    Battery.isLowPowerModeEnabledAsync.mockReset()
   })
 
-  it('reads as unknown rather than off when the capability is missing', async () => {
+  it('reads an enabled power-saver mode as on', async () => {
+    Battery.isLowPowerModeEnabledAsync.mockResolvedValue(true)
+    await expect(readPowerSaveState()).resolves.toBe('on')
+  })
+
+  it('reads a disabled power-saver mode as off', async () => {
+    Battery.isLowPowerModeEnabledAsync.mockResolvedValue(false)
+    await expect(readPowerSaveState()).resolves.toBe('off')
+  })
+
+  it('reads as unknown rather than off when the read fails', async () => {
     // "We could not read the state" is not "power saving is off". Reading it
     // as off would suppress a warning the user needs.
+    Battery.isLowPowerModeEnabledAsync.mockRejectedValue(new Error('module unavailable'))
     await expect(readPowerSaveState()).resolves.toBe('unknown')
   })
 })
@@ -120,6 +145,7 @@ describe('readIsOffline', () => {
 describe('readDegradedState', () => {
   beforeEach(() => {
     Network.getNetworkStateAsync.mockReset()
+    Battery.isLowPowerModeEnabledAsync.mockReset()
   })
 
   it('never reports a location denial it did not observe', async () => {
@@ -129,18 +155,31 @@ describe('readDegradedState', () => {
       isConnected: true,
       isInternetReachable: true,
     })
+    Battery.isLowPowerModeEnabledAsync.mockResolvedValue(false)
     const degraded = await readDegradedState()
     expect(degraded.isLocationDenied).toBe(false)
   })
 
-  it('reports the power-save state as unknown on this build', async () => {
+  it('carries the real power-save reading and its capability', async () => {
     Network.getNetworkStateAsync.mockResolvedValue({
       isConnected: true,
       isInternetReachable: true,
     })
+    Battery.isLowPowerModeEnabledAsync.mockResolvedValue(false)
+    const degraded = await readDegradedState()
+    expect(degraded.powerSave).toBe('off')
+    expect(degraded.powerSaveCapability).toBe('available')
+  })
+
+  it('degrades the power-save reading to unknown when the read fails', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({
+      isConnected: true,
+      isInternetReachable: true,
+    })
+    Battery.isLowPowerModeEnabledAsync.mockRejectedValue(new Error('module unavailable'))
     const degraded = await readDegradedState()
     expect(degraded.powerSave).toBe('unknown')
-    expect(degraded.powerSaveCapability).toBe('unavailable')
+    expect(degraded.powerSaveCapability).toBe('available')
   })
 })
 

@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store'
+import Constants from 'expo-constants'
 
 /**
  * The session store — the only module that touches session persistence.
@@ -29,12 +30,21 @@ import * as SecureStore from 'expo-secure-store'
  *
  * 2. **The session fits anyway.** A Supabase session is the whole session
  *    object as one JSON string: the access token (a JWT), the refresh token,
- *    and the user object. Measured against the app's own user shape —
- *    `full_name`, `phone`, `preferred_language`, `biometric_opt_in` — the
- *    session is ~1550 bytes, and even an oversized profile with an avatar
- *    URL, an address and two emergency contacts stays under 2048 bytes. The
- *    refresh token on its own is 43–86 bytes; it was never the thing that
- *    could exceed the limit. The *whole session* could, and it does not.
+ *    and the user object. Measured against the **real** session the local
+ *    server issues, it is **2176 bytes** — a 939-byte access token and a
+ *    1115-byte user object — and an oversized profile with an avatar URL, an
+ *    address and two emergency contacts stays comfortably inside the 8192-byte
+ *    threshold. The refresh token on its own is 43–86 bytes; it was never the
+ *    thing that could exceed the limit. The *whole session* could, and it
+ *    does.
+ *
+ *    **This paragraph used to say "~1550 bytes".** That was wrong, and it was
+ *    the wrongness that caused a defect: a 2048-byte limit, justified by a
+ *    1550-byte measurement, refused the **real** 2176-byte session. The
+ *    session was never written, the next read found nothing, and
+ *    `supabase-js` removed the session as invalid — which signed the user out
+ *    immediately after a successful sign-in. The number is now measured
+ *    rather than assumed, and a test measures it on every run.
  *
  * So the fallback is **removed**, and the behaviour it was covering is
  * handled the way the story's own edge case describes:
@@ -67,15 +77,36 @@ import * as SecureStore from 'expo-secure-store'
 /**
  * The size at which a value is refused before it is even attempted.
  *
- * This is the **iOS** Keychain limit, and the app is Android-only — but the
- * check costs nothing, and it means that if this app is ever ported to iOS
- * the oversized write fails *loudly and safely* (a rejected write, never a
- * truncated one) rather than failing at the Keychain with an opaque error.
+ * ## Why this is 8192 and not 2048
  *
- * The session fits with hundreds of bytes to spare (see the module note), so
- * this threshold is a backstop, not a working part of the design.
+ * 2048 is **Apple's** Keychain limit. The app is **Android-only**, and
+ * Android's `expo-secure-store` writes an encrypted blob into
+ * `SharedPreferences` with **no size limit at all** — so 2048 was never a
+ * constraint this app was subject to.
+ *
+ * It was worse than useless: it was **wrong in a way that broke sign-in**.
+ * The real session measures **2176 bytes** — a 939-byte ES256 access token
+ * plus a 1115-byte user object — so the store refused it, the session was
+ * never written, and the next read found nothing. `supabase-js` then removed
+ * the session as invalid, which signed the user out on the spot: the app
+ * bounced straight back to the welcome screen after a successful sign-in.
+ *
+ * The number that guarded against that was a **measurement** — and the
+ * measurement was wrong. The comment this replaced claimed "a real session
+ * measures ~1550 bytes", which is where the wrong limit came from. The
+ * session is bigger than that because the local GoTrue signs with **ES256**
+ * (a longer JWT than HS256) and returns the **whole** user object.
+ *
+ * So the limit is now set well above the real measurement, with room for a
+ * larger profile — an avatar URL, an address, two emergency contacts.
+ * `session-storage.test.ts` measures the **real** session against this
+ * threshold, so the number cannot rot again.
+ *
+ * The check is still worth having: a value that is refused outright fails
+ * *loudly and safely* — a rejected write, never a truncated one — instead of
+ * failing inside the Keychain with an opaque error.
  */
-export const MAX_SECURE_STORE_VALUE_BYTES = 2048
+export const MAX_SECURE_STORE_VALUE_BYTES = 8192
 
 /**
  * The key prefix every value this module owns is written under.
@@ -122,13 +153,71 @@ const PERSISTED_AT_KEY = `${SESSION_KEY_PREFIX}session-persisted-at`
 /**
  * The key `supabase-js` writes the session under.
  *
- * This is the default `storageKey` of the client in `shared/api/supabase.ts`,
- * and it is the only key in the store that carries a **window**. The other
- * values this module owns — the biometric flags in `useBiometricGate.ts` — are
- * not sessions and must never be expired by the session's policy, so the
- * expiry check is scoped to this key and not to "the last value written".
+ * `supabase-js` derives it from the URL's hostname:
+ *
+ * > `defaultStorageKey = \`sb-${baseUrl.hostname.split(".")[0]}-auth-token\``
+ *
+ * so it is `sb-127-auth-token` for `127.0.0.1`, `sb-192-auth-token` for
+ * `192.168.1.37`, and `sb-localhost-auth-token` only for the hostname
+ * `localhost`. Hardcoding one of them makes the window check below **never
+ * run** for every other URL — the session would never expire, and FR-AUTH-2's
+ * "the session survives only the configured grace window" would be dead code.
+ *
+ * So the key is **derived** from the same URL the client was built with,
+ * rather than guessed. The client's own `storageKey` is exported by
+ * `supabase-js` in newer versions; where it is not available, the same
+ * derivation is applied to the configured URL.
  */
-const SESSION_STORAGE_KEY = 'sb-localhost-auth-token'
+function deriveSessionStorageKey(url: string): string {
+  try {
+    const hostname = new URL(url).hostname
+    return `sb-${hostname.split('.')[0]}-auth-token`
+  } catch {
+    // A URL that cannot be parsed cannot be derived from. The localhost key
+    // is the one the app was written against, so it is the safest fallback.
+    return 'sb-localhost-auth-token'
+  }
+}
+
+/**
+ * The configured Supabase URL, read the same way the client reads it.
+ *
+ * The client prefers `Constants.expoConfig.extra.supabaseUrl` and falls back
+ * to `process.env.EXPO_PUBLIC_SUPABASE_URL`. This module reads the same two
+ * places, in the same order, so the derived key always matches the key the
+ * client actually writes.
+ */
+function configuredSupabaseUrl(): string | undefined {
+  const extra = (Constants as { expoConfig?: { extra?: Record<string, unknown> } }).expoConfig
+    ?.extra
+
+  const fromExtra = extra?.supabaseUrl ?? extra?.EXPO_PUBLIC_SUPABASE_URL
+  if (typeof fromExtra === 'string' && fromExtra.length > 0) return fromExtra
+
+  const fromEnv = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (typeof fromEnv === 'string' && fromEnv.length > 0) return fromEnv
+
+  return undefined
+}
+
+/**
+ * The key the session is actually stored under.
+ *
+ * Computed once, when the module loads, because the URL cannot change at
+ * runtime — the client was built with it.
+ */
+const SESSION_STORAGE_KEY = deriveSessionStorageKey(configuredSupabaseUrl() ?? 'http://localhost')
+
+/**
+ * The key the session is stored under.
+ *
+ * Exported so a test can pin the derivation against the URL the app was
+ * configured with — the bug this replaced was a hardcoded key that matched
+ * no URL at all.
+ */
+export function sessionStorageKey(): string {
+  return SESSION_STORAGE_KEY
+}
 
 /**
  * The persistence policy in force for the current session.
@@ -186,6 +275,36 @@ export function sessionPersistencePolicy(): SessionPersistencePolicy | undefined
  */
 export function clearSessionPersistencePolicy(): void {
   currentPolicy = undefined
+}
+
+type ExpiryListener = () => void
+
+const expiryListeners = new Set<ExpiryListener>()
+
+/**
+ * Calls `listener` when a stored session is found to be past its window.
+ *
+ * The expiry is detected in `getItem`, which only answers "no session". That
+ * is enough at boot, but when the window ends while the app is running
+ * `supabase-js` treats the miss as "not signed in" without announcing a
+ * sign-out, so nothing leaves the signed-in screens. The listener is how the
+ * app finds out. Returns a function that removes it.
+ */
+export function onSessionWindowExpired(listener: ExpiryListener): () => void {
+  expiryListeners.add(listener)
+  return () => {
+    expiryListeners.delete(listener)
+  }
+}
+
+function notifyExpired(): void {
+  for (const listener of expiryListeners) {
+    try {
+      listener()
+    } catch {
+      // A listener's failure must not turn a miss into a throw.
+    }
+  }
 }
 
 /**
@@ -405,6 +524,7 @@ export const secureStore = {
       // Past the window: the session is gone as far as the app is concerned.
       await SecureStore.deleteItemAsync(key)
       await removePersistedPolicy()
+      notifyExpired()
       return null
     } catch {
       // A device that cannot read the Keystore has no stored session. That
@@ -452,7 +572,11 @@ export const secureStore = {
     if (key === SESSION_STORAGE_KEY) {
       const policy = currentPolicy
       if (policy) {
-        await writePersistedPolicy({ ...policy, persistedAt: Date.now() })
+        // The time the user **signed in**, as the login flow recorded it. This
+        // used to be `Date.now()`, and `supabase-js` writes the session on
+        // every token refresh, so the 24-hour window moved forward each hour
+        // for as long as the process stayed alive and never ended.
+        await writePersistedPolicy(policy)
       }
     }
   },

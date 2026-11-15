@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
-import { AppError } from '@nagar-shield/shared'
+import { AppError, bnDigitsToAscii } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { Brand, Button, InputField, Toggle } from '@/shared/ui'
-import { logIn } from '@/shared/auth/authService'
-import { markPasswordSignIn } from '@/shared/auth/useBiometricGate'
-import { clearLocalBiometricState, resetBiometricFailures } from '@/shared/auth/biometricService'
+import { Brand, Button, EscapeLink, InputField, KeyboardScroll, Toggle } from '@/shared/ui'
+import { isInvalidCredentials, logIn } from '@/shared/auth/authService'
+import { completePasswordSignIn } from '@/shared/auth/completePasswordSignIn'
 import { fromSupabaseError } from '@/shared/api/errors'
 import { errorCopy } from '@/shared/i18n/errorCopy'
 
@@ -24,50 +24,51 @@ import { errorCopy } from '@/shared/i18n/errorCopy'
  */
 export default function LoginScreen() {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
   const router = useRouter()
   const { t } = useTranslation()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | undefined>()
   const [submitting, setSubmitting] = useState(false)
 
   const canSubmit = identifier.trim().length > 0 && password.length > 0 && !submitting
 
   const onSubmit = async () => {
+    if (!canSubmit) return
     setSubmitting(true)
     setFormError(undefined)
-    setErrors({})
     try {
-      await logIn({ identifier, password, rememberMe })
-
-      // The user just proved who they are with a password. Two things
-      // follow from that:
-      //
-      //   * the biometric gate is not shown for this session — asking for a
-      //     fingerprint right after a password would be theatre;
-      //   * the biometric failure count is cleared — the failures that led
-      //     here must not follow the user to the next session.
-      await markPasswordSignIn()
-      await resetBiometricFailures()
-      await clearLocalBiometricState()
+      // The user just proved who they are with a password. The shared
+      // finish-sign-in step records the Remember-me window before the session
+      // is written, keeps the biometric gate from asking for a fingerprint
+      // straight after the password, and clears the failure count that led
+      // here. Sign-up and the password reset go through the same step.
+      await completePasswordSignIn({ rememberMe }, () =>
+        logIn({ identifier, password, rememberMe }),
+      )
 
       router.replace('/(app)/home')
     } catch (error) {
       const appError = error instanceof AppError ? error : fromSupabaseError(error)
-      setErrors({
-        password: errorCopy(t, appError.code),
-      })
-      setFormError(errorCopy(t, appError.code))
+      // The message is shown once, in the banner — repeating it under the
+      // password field would read the same text twice.
+      // A wrong password is not an ended session: "Please sign in again" tells
+      // someone who just typed a password nothing useful.
+      setFormError(
+        isInvalidCredentials(appError)
+          ? t('errors.invalidCredentials')
+          : errorCopy(t, appError.code),
+      )
       setSubmitting(false)
     }
   }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-      <View style={styles.content}>
+      <KeyboardScroll contentStyle={[styles.content, { paddingTop: 40 + insets.top }]}>
         <View style={styles.brand}>
           <Brand name={t('common.appName')} tagline={t('common.brandTagline')} />
         </View>
@@ -81,19 +82,18 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {formError ? (
-          <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
-            <Text style={{ color: theme.palette.red[600], fontSize: 13 }}>{formError}</Text>
-          </View>
-        ) : null}
-
         <InputField
           label={t('auth.identifierLabel')}
           value={identifier}
-          onChangeText={setIdentifier}
-          placeholder={t('auth.phonePlaceholder')}
+          // Bangla digits in a phone number are converted as they are typed; an
+          // email has none, so it passes through unchanged.
+          onChangeText={(next) => setIdentifier(bnDigitsToAscii(next))}
+          placeholder={t('auth.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoComplete="username"
+          textContentType="username"
+          returnKeyType="next"
           icon="mail"
           helper={t('auth.loginSubtitle')}
           testID="login-identifier"
@@ -105,8 +105,9 @@ export default function LoginScreen() {
           onChangeText={setPassword}
           secureTextEntry
           autoCapitalize="none"
+          autoComplete="password"
+          textContentType="password"
           icon="lock"
-          error={errors.password}
           onSubmitEditing={onSubmit}
           returnKeyType="go"
           testID="login-password"
@@ -123,13 +124,33 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        <Text
+        <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/(auth)/forgot-password')}
-          style={[styles.forgotLink, { color: theme.palette.violet[700] }]}
+          hitSlop={8}
+          style={styles.forgotHit}
         >
-          {t('auth.forgotPassword')}
-        </Text>
+          <Text style={[styles.forgotLink, { color: theme.palette.violet[700] }]}>
+            {t('auth.forgotPassword')}
+          </Text>
+        </Pressable>
+
+        {/*
+          The banner sits just above the button, not at the top of the form:
+          the button is where the finger is, and the form scrolls on a small
+          screen, so a message at the top could be off screen after the tap.
+        */}
+        {formError ? (
+          <View style={[styles.errorBanner, { backgroundColor: theme.palette.red[50] }]}>
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={{ color: theme.palette.red[600], fontSize: 13 }}
+            >
+              {formError}
+            </Text>
+          </View>
+        ) : null}
 
         <Button
           label={submitting ? t('capture.submitting') : t('auth.signIn')}
@@ -144,15 +165,20 @@ export default function LoginScreen() {
           <Text style={[styles.footerText, { color: theme.colors.ink[600] }]}>
             {t('auth.noAccount')}
           </Text>
-          <Text
+          <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/(auth)/register')}
-            style={[styles.link, { color: theme.palette.violet[500] }]}
+            hitSlop={8}
+            style={styles.linkHit}
           >
-            {t('auth.createAccount')}
-          </Text>
+            <Text style={[styles.link, { color: theme.palette.violet[500] }]}>
+              {t('auth.createAccount')}
+            </Text>
+          </Pressable>
         </View>
-      </View>
+
+        <EscapeLink label={t('common.back')} onPress={() => router.back()} />
+      </KeyboardScroll>
     </View>
   )
 }
@@ -162,7 +188,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
   },
@@ -201,11 +227,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 8,
   },
-  forgotLink: {
+  forgotHit: {
     alignSelf: 'flex-end',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  forgotLink: {
     fontSize: 13,
     fontWeight: '600',
-    paddingVertical: 8,
+  },
+  linkHit: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
   },
   cta: {
     marginTop: 16,

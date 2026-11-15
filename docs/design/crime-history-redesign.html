@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nagar Shield — Crime History redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+<style>
+/* Tokens: the same palette, radii and gutter as the approved Home, Report Crime and Location Sharing designs. */
+.phone[data-theme="light"] {
+  --bg:#F6F4FC; --card:#FFFFFF; --card-border:rgba(30,11,71,.07);
+  --ink:#0B0B1A; --ink-2:#3A3A52; --muted:#5B5B73; --hairline:rgba(30,11,71,.09);
+  --field:#F6F4FC; --field-border:rgba(30,11,71,.16);
+  --violet:#6D28D9; --violet-ink:#FFFFFF; --violet-tint:rgba(109,40,217,.10); --link:#6D28D9;
+  --shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07);
+  --danger:#B91C1C; --danger-tint:rgba(220,38,38,.09);
+  --ok:#047857; --warn:#B45309; --warn-tint:rgba(217,119,6,.12);
+  --scrim:rgba(14,10,31,.45); --sheet:#FFFFFF; --status:#1E0B47;
+}
+.phone[data-theme="dark"] {
+  --bg:#0E0A1F; --card:#181331; --card-border:rgba(196,181,253,.10);
+  --ink:#F4F2FF; --ink-2:#D5D0EC; --muted:#A9A3C8; --hairline:rgba(196,181,253,.14);
+  --field:#110C27; --field-border:rgba(196,181,253,.28);
+  --violet:#A78BFA; --violet-ink:#1E0B47; --violet-tint:rgba(167,139,250,.16); --link:#C4B5FD;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 28px rgba(0,0,0,.45);
+  --danger:#FCA5A5; --danger-tint:rgba(248,113,113,.14);
+  --ok:#6EE7B7; --warn:#FCD34D; --warn-tint:rgba(245,158,11,.14);
+  --scrim:rgba(0,0,0,.6); --sheet:#181331; --status:#F4F2FF;
+}
+* { box-sizing:border-box; margin:0; }
+html { color-scheme: light dark; }
+body { font-family:'Inter',system-ui,sans-serif; background:#E9E5F5; color:#1A1A2E; min-height:100vh; padding:28px 16px 64px; }
+body[data-lang="bn"] { font-family:'Noto Sans Bengali','Inter',system-ui,sans-serif; }
+
+/* Review page chrome (not part of the app design) */
+.page { max-width:1180px; margin:0 auto; }
+.head { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; margin-bottom:20px; }
+.head h1 { font-size:22px; font-weight:800; letter-spacing:-.3px; color:#1E0B47; }
+.head p { margin-top:4px; font-size:14px; color:#4A4A63; max-width:560px; line-height:1.5; }
+.controls { display:flex; gap:10px; flex-wrap:wrap; }
+.seg { display:inline-flex; flex-wrap:wrap; background:#fff; border:1px solid rgba(30,11,71,.12); border-radius:12px; padding:3px; }
+.seg button { font:inherit; font-size:13px; font-weight:600; padding:8px 12px; border:0; background:transparent; color:#4A4A63; border-radius:9px; cursor:pointer; min-height:36px; }
+.seg button[aria-pressed="true"] { background:#4C2BB5; color:#fff; }
+.stage { display:flex; flex-wrap:wrap; gap:32px; justify-content:center; align-items:flex-start; }
+.stage figure { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.stage figcaption { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#5B5B73; }
+.notes { margin-top:40px; background:#fff; border-radius:20px; padding:24px 28px; box-shadow:0 1px 2px rgba(30,11,71,.06),0 8px 24px rgba(30,11,71,.07); }
+.notes h2 { font-size:16px; font-weight:800; color:#1E0B47; margin-bottom:12px; }
+.notes ul { padding-left:18px; display:grid; gap:8px; font-size:14px; line-height:1.55; color:#34344A; }
+.notes li b { color:#1E0B47; }
+.notes .grid { display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+
+/* Phone frame */
+.phone { width:390px; height:844px; border-radius:46px; background:var(--bg); border:10px solid #14102A; box-shadow:0 30px 70px rgba(30,11,71,.30); position:relative; overflow:hidden; display:flex; flex-direction:column; color:var(--ink); font-family:inherit; --gutter:20px; --r-card:18px; --r-tile:14px; }
+.statusbar { height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 28px; font-size:14px; font-weight:700; color:var(--status); position:relative; }
+.statusbar .notch { position:absolute; left:50%; top:10px; transform:translateX(-50%); width:92px; height:26px; border-radius:20px; background:#14102A; }
+.statusbar .right { display:flex; gap:6px; align-items:center; }
+.ico { display:inline-block; line-height:1; flex:0 0 auto; width:1em; height:1em; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; text-align:inherit; }
+button:focus-visible { outline:3px solid #8B5CF6; outline-offset:2px; }
+
+/* App bar */
+.appbar { display:flex; align-items:center; gap:12px; padding:4px var(--gutter) 8px; flex:0 0 auto; }
+.iconbtn { width:48px; height:48px; border-radius:var(--r-tile); background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); display:grid; place-items:center; font-size:22px; color:var(--ink-2); flex:0 0 auto; }
+.appbar .t { flex:1; min-width:0; }
+.appbar .t b { display:block; font-size:19px; line-height:26px; font-weight:800; letter-spacing:-.2px; }
+body[data-lang="bn"] .appbar .t b { font-weight:700; line-height:28px; }
+.appbar .t span { display:block; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; }
+.iconbtn.map { color:var(--violet); }
+
+.scroll { flex:1; overflow-y:auto; padding:8px 0 24px; scrollbar-width:none; }
+.scroll::-webkit-scrollbar { display:none; }
+
+/* Filter row: one tappable card that says what the list shows */
+.filter { margin:0 var(--gutter) 12px; width:calc(100% - 40px); min-height:64px; display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:var(--r-card); background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow); }
+.filter .lead { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font-size:22px; flex:0 0 auto; background:var(--violet-tint); color:var(--violet); }
+.filter.warn .lead { background:var(--warn); color:#fff; }
+.phone[data-theme="dark"] .filter.warn .lead { color:#1E0B47; }
+.filter .txt { flex:1; min-width:0; }
+.filter b { display:block; font-size:15px; line-height:21px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.filter span { display:block; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.filter.warn span { color:var(--warn); font-weight:600; }
+.filter .chev { color:var(--muted); font-size:20px; }
+
+/* Tabs */
+.tabs { margin:0 var(--gutter) 12px; display:grid; grid-template-columns:repeat(3,1fr); background:var(--card); border:1px solid var(--hairline); border-radius:var(--r-tile); padding:4px; gap:4px; }
+.tabs button { min-height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:14px; font-weight:700; color:var(--muted); text-align:center; padding:0 6px; }
+.tabs button[aria-selected="true"] { background:var(--violet); color:var(--violet-ink); }
+.tabs .n { font-size:12px; font-weight:700; opacity:.85; }
+
+/* Day groups: a label, then one card of rows */
+.day { margin:16px var(--gutter) 8px; font-size:13px; line-height:18px; font-weight:700; color:var(--muted); }
+.day:first-child { margin-top:4px; }
+.group { margin:0 var(--gutter); background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-card); box-shadow:var(--shadow); overflow:hidden; }
+.row { width:100%; min-height:72px; display:flex; align-items:center; gap:12px; padding:12px 12px 12px 14px; border-bottom:1px solid var(--hairline); }
+.row:last-child { border-bottom:0; }
+.tile { width:44px; height:44px; border-radius:13px; display:grid; place-items:center; font-size:24px; flex:0 0 auto; background:color-mix(in srgb, var(--a, #6B6B85) 13%, var(--card)); color:var(--a, var(--muted)); }
+.phone[data-theme="dark"] .tile { background:color-mix(in srgb, var(--a, #6B6B85) 26%, var(--card)); color:color-mix(in srgb, var(--a, #6B6B85) 40%, #fff); }
+.row .txt { flex:1; min-width:0; }
+.row .ti { display:block; font-size:15px; line-height:21px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row .su { display:block; font-size:13px; line-height:18px; color:var(--muted); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row .end { display:flex; align-items:center; gap:2px; flex:0 0 auto; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
+.row .end.own { color:var(--violet); }
+.row .end .ico { font-size:18px; }
+.more { margin:12px var(--gutter) 0; text-align:center; }
+.more p { font-size:12px; line-height:17px; color:var(--muted); margin-bottom:2px; }
+.more button { width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:var(--link); text-align:center; }
+
+/* Summary */
+.counts { margin:0 var(--gutter) 12px; display:grid; grid-template-columns:repeat(3,1fr); background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-card); box-shadow:var(--shadow); }
+.counts div { padding:16px 8px; text-align:center; border-left:1px solid var(--hairline); }
+.counts div:first-child { border-left:0; }
+.counts b { display:block; font-size:26px; line-height:32px; font-weight:800; letter-spacing:-.3px; }
+.counts span { display:block; margin-top:2px; font-size:12px; line-height:16px; font-weight:600; color:var(--muted); }
+.bytype { margin:0 var(--gutch,0); }
+.cardhead { margin:16px var(--gutter) 8px; font-size:13px; line-height:18px; font-weight:700; color:var(--muted); }
+.row.count { min-height:60px; }
+.row.count .tile { width:40px; height:40px; border-radius:12px; font-size:22px; }
+.row.count .num { font-size:16px; font-weight:800; color:var(--ink); }
+.foot { margin:12px var(--gutter) 0; font-size:12px; line-height:17px; color:var(--muted); text-align:center; }
+
+/* States */
+.skel { height:72px; border-bottom:1px solid var(--hairline); display:flex; align-items:center; gap:12px; padding:0 14px; }
+.skel:last-child { border-bottom:0; }
+.skel i { display:block; border-radius:8px; background:var(--hairline); }
+.skel .a { width:44px; height:44px; border-radius:13px; }
+.skel .b { flex:1; display:grid; gap:8px; } .skel .b i:first-child { height:12px; width:46%; } .skel .b i:last-child { height:10px; width:72%; }
+.empty { margin:24px var(--gutter) 0; text-align:center; padding:24px 16px; background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-card); box-shadow:var(--shadow); }
+.empty .lead { width:56px; height:56px; border-radius:18px; margin:0 auto 12px; display:grid; place-items:center; font-size:30px; background:var(--violet-tint); color:var(--violet); }
+.empty.bad .lead { background:var(--danger-tint); color:var(--danger); }
+.empty b { display:block; font-size:16px; line-height:22px; font-weight:800; }
+.empty p { margin:4px 0 14px; font-size:13px; line-height:19px; color:var(--muted); }
+.btn2 { width:100%; min-height:48px; border-radius:var(--r-tile); border:1.5px solid var(--field-border); display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; font-weight:700; color:var(--ink); }
+.btn2 .ico { font-size:20px; color:var(--violet); }
+
+/* Filter sheet */
+.sheet-wrap { position:absolute; inset:0; z-index:40; display:flex; flex-direction:column; justify-content:flex-end; }
+.sheet-wrap .scrim { position:absolute; inset:0; background:var(--scrim); }
+.sheet { position:relative; background:var(--sheet); border-radius:26px 26px 0 0; padding:10px var(--gutter) 18px; display:flex; flex-direction:column; max-height:88%; }
+.sheet .grab { width:40px; height:4px; border-radius:2px; background:var(--field-border); margin:0 auto 12px; flex:0 0 auto; }
+.sheet h4 { font-size:18px; line-height:24px; font-weight:800; }
+.sheet .body { overflow-y:auto; scrollbar-width:none; padding-bottom:4px; }
+.sheet .body::-webkit-scrollbar { display:none; }
+.lab { display:block; font-size:13px; font-weight:700; color:var(--ink-2); margin:16px 0 8px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { min-height:44px; padding:0 14px; border-radius:12px; background:var(--field); border:1.5px solid var(--hairline); display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:14px; font-weight:600; color:var(--ink-2); }
+.chip[aria-pressed="true"] { background:var(--violet-tint); border-color:var(--violet); color:var(--violet); font-weight:700; }
+.chip .ico { font-size:18px; color:var(--a, var(--muted)); }
+.phone[data-theme="dark"] .chip .ico { color:color-mix(in srgb, var(--a, #A9A3C8) 45%, #fff); }
+.grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; } .grid3 .chip { padding:0 6px; }
+.tgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.tgrid .chip { min-height:68px; flex-direction:column; gap:6px; padding:8px 4px; border-radius:14px; text-align:center; font-size:13px; line-height:16px; }
+.tgrid .chip span { max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tgrid .chip .ico { font-size:24px; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; } .grid4 .chip { padding:0 4px; }
+.sheetfoot { display:flex; gap:12px; padding-top:14px; flex:0 0 auto; border-top:1px solid var(--hairline); margin-top:12px; }
+.cta { flex:1; min-height:52px; border-radius:var(--r-card); background:var(--violet); color:var(--violet-ink); font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; text-align:center; }
+.ghost { min-width:96px; min-height:52px; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:var(--link); text-align:center; }
+@media (max-width:480px) { .phone { width:100%; max-width:390px; } }
+</style>
+</head>
+<body data-lang="en">
+<div class="page">
+  <div class="head">
+    <div>
+      <h1>Nagar Shield — Crime History redesign</h1>
+      <p>Review preview only. The app is unchanged. Tap the filter card, the tabs and the rows. Use the state buttons to see every case.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="seg-state" role="group" aria-label="State">
+        <button type="button" data-state="reports" aria-pressed="true">Reports</button>
+        <button type="button" data-state="mine" aria-pressed="false">My reports</button>
+        <button type="button" data-state="summary" aria-pressed="false">Summary</button>
+        <button type="button" data-state="filters" aria-pressed="false">Filters</button>
+        <button type="button" data-state="loading" aria-pressed="false">Loading</button>
+        <button type="button" data-state="empty" aria-pressed="false">No results</button>
+        <button type="button" data-state="mineempty" aria-pressed="false">No own reports</button>
+        <button type="button" data-state="failed" aria-pressed="false">Load failed</button>
+        <button type="button" data-state="nolocation" aria-pressed="false">No location</button>
+      </div>
+      <div class="seg" id="seg-lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="bn" aria-pressed="false">বাংলা</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <figure><div id="phone-light"></div><figcaption>Light</figcaption></figure>
+    <figure><div id="phone-dark"></div><figcaption>Dark</figcaption></figure>
+  </div>
+
+  <div class="notes">
+    <h2>What changed and why</h2>
+    <div class="grid">
+      <ul>
+        <li><b>One card says what you are looking at.</b> The area, then the radius, the time window and the incident type in one quiet line. Tap it to change them. It replaces the long scope sentence at the bottom of the page.</li>
+        <li><b>Three tabs, not four.</b> Reports, My reports, Summary. “Totals” and “Distribution” were two tabs that both showed counts; they are now one Summary tab.</li>
+        <li><b>Rows read like the Home feed.</b> The same incident icon and colour, the type as the title, then time and area. The distance sits on the right as plain text. Your own reports say “Your report” in violet.</li>
+        <li><b>Grouped by day.</b> Today, Yesterday, Earlier. One card per day, thin dividers between rows. Easier to scan than a stack of separate boxes.</li>
+        <li><b>The map is one tap away.</b> A map button sits in the top bar. The full-width “Map view” link under the list is gone.</li>
+      </ul>
+      <ul>
+        <li><b>Summary stays counts only.</b> Total, Yours and Nearby as three big numbers, then a count per incident type in that same fixed order. No charts, no bars, no heatmaps, as the product rule says.</li>
+        <li><b>The filter sheet is easier to use.</b> Radius is a 3×2 grid, the time window is one row, and incident types are a tidy 3×4 grid of equal tiles, each with its own icon, in a fixed order (everyday crimes, then emergencies, then the rest) instead of a long checklist. Reset and Apply sit side by side; the separate Cancel button is gone, the scrim and Back close it.</li>
+        <li><b>Every state is designed.</b> Loading skeleton, no results, no own reports, load failed with Try again, location unavailable (an amber card says it is showing Dhaka), and load more with “Showing 50 of 120”.</li>
+        <li><b>Same system as Home.</b> Same tokens, 20 px gutters, 18 px cards, 14 px tiles, Fluent filled icons, light and dark. Every control is 44 to 56 px tall.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const STR = {
+  en: {
+    title:'Crime History', sub:'Reports near you and your own', map:'Map view', back:'Back',
+    area:'Dhanmondi, Dhaka', fbArea:'Location unavailable', fbSub:'Showing Dhaka · ',
+    r:(k)=> k<1 ? (k*1000)+' m' : k+' km', w:{1:'Last hour',24:'Last 24 hours',168:'Last 7 days',720:'Last 30 days'}, wShort:{1:'1 h',24:'24 h',168:'7 d',720:'30 d'}, allTypes:'All types',
+    tabs:['Reports','My reports','Summary'], today:'Today', yest:'Yesterday', earlier:'Earlier', own:'Your report',
+    showing:'Showing 50 of 120 reports', loadMore:'Load more reports',
+    total:'Total', yours:'Yours', nearby:'Nearby', byType:'By type', countsOnly:'Counts only — no charts and no heatmaps.',
+    noRes:'No reports found', noResSub:'Try widening the radius or the time window.', change:'Change filters',
+    noOwn:'You have not filed a report yet', noOwnSub:'Reports you file show up here straight away.',
+    failT:'Could not load reports', failSub:'Check your connection and try again.', retry:'Try again',
+    fTitle:'Filters', radius:'Radius', window:'Time window', type:'Incident type', apply:'Apply', reset:'Reset',
+    types:{ theft:'Theft', assault:'Assault', harassment:'Harassment', robbery:'Robbery', accident:'Accident', fire:'Fire', medical:'Medical', fraud:'Fraud', vandalism:'Vandalism', suspicious:'Suspicious', other:'Other' },
+    ago:(m)=> m<60 ? m+' min ago' : Math.floor(m/60)+' h ago', yAt:'Yesterday', dAgo:(d)=>d+' days ago',
+    num:(n)=>String(n)
+  },
+  bn: {
+    title:'ক্রাইম হিস্ট্রি', sub:'আপনার আশপাশের ও আপনার রিপোর্ট', map:'ম্যাপ ভিউ', back:'পেছনে',
+    area:'ধানমন্ডি, ঢাকা', fbArea:'লোকেশন পাওয়া যায়নি', fbSub:'ঢাকা ধরে দেখানো হচ্ছে · ',
+    r:(k)=> k<1 ? '৫০০ মিটার' : String(k).replace(/\d/g,d=>'০১২৩৪৫৬৭৮৯'[d])+' কিমি', w:{1:'গত ১ ঘণ্টা',24:'গত ২৪ ঘণ্টা',168:'গত ৭ দিন',720:'গত ৩০ দিন'}, wShort:{1:'১ ঘণ্টা',24:'২৪ ঘণ্টা',168:'৭ দিন',720:'৩০ দিন'}, allTypes:'সব ধরন',
+    tabs:['রিপোর্ট','আমার রিপোর্ট','সারাংশ'], today:'আজ', yest:'গতকাল', earlier:'আগে', own:'আপনার রিপোর্ট',
+    showing:'মোট ১২০টির মধ্যে ৫০টি রিপোর্ট দেখানো হচ্ছে', loadMore:'আরও রিপোর্ট দেখুন',
+    total:'মোট', yours:'আপনার', nearby:'কাছাকাছি', byType:'ধরন অনুযায়ী', countsOnly:'শুধু সংখ্যা — কোনো চার্ট বা হিটম্যাপ নেই।',
+    noRes:'কোনো রিপোর্ট পাওয়া যায়নি', noResSub:'রেডিয়াস বা সময়সীমা বাড়িয়ে আবার দেখুন।', change:'ফিল্টার বদলান',
+    noOwn:'আপনি এখনো কোনো রিপোর্ট করেননি', noOwnSub:'আপনার রিপোর্ট এখানে সাথে সাথে দেখা যাবে।',
+    failT:'রিপোর্ট লোড করা যায়নি', failSub:'ইন্টারনেট দেখে আবার চেষ্টা করুন।', retry:'আবার চেষ্টা করুন',
+    fTitle:'ফিল্টার', radius:'রেডিয়াস', window:'সময়সীমা', type:'ঘটনার ধরন', apply:'প্রয়োগ করুন', reset:'রিসেট',
+    types:{ theft:'চুরি', assault:'আক্রমণ', harassment:'উত্যক্ত', robbery:'ডাকাতি', accident:'দুর্ঘটনা', fire:'আগুন', medical:'চিকিৎসা', fraud:'প্রতারণা', vandalism:'ভাঙচুর', suspicious:'সন্দেহজনক', other:'অন্যান্য' },
+    ago:(m)=> m<60 ? m.toLocaleString('bn-BD')+' মিনিট আগে' : Math.floor(m/60).toLocaleString('bn-BD')+' ঘণ্টা আগে', yAt:'গতকাল', dAgo:(d)=>d.toLocaleString('bn-BD')+' দিন আগে',
+    num:(n)=>n.toLocaleString('bn-BD')
+  }
+};
+const ICONS = {
+  back:'fluent:chevron-left-24-regular', map:'fluent:map-24-filled', filter:'fluent:options-24-filled', chevd:'fluent:chevron-down-24-regular', chevr:'fluent:chevron-right-24-regular',
+  warn:'fluent:location-off-24-filled', cloud:'fluent:cloud-off-24-filled', empty:'fluent:document-search-24-filled', add:'fluent:document-add-24-filled', sync:'fluent:arrow-sync-24-filled',
+  theft:'mdi:robber', assault:'mdi:kickboxing', harassment:'fluent:chat-warning-24-filled', robbery:'mdi:knife', accident:'fluent:vehicle-car-collision-24-filled',
+  fire:'fluent:fire-24-filled', medical:'fluent:heart-pulse-24-filled', fraud:'mdi:account-alert', vandalism:'mdi:hammer', suspicious:'fluent:eye-24-filled', other:'fluent:more-circle-24-filled', all:'fluent:grid-24-filled'
+};
+const ACCENT = { theft:'#7B1FA2', assault:'#DC2626', harassment:'#9C27B0', robbery:'#B71C1C', accident:'#5D4037', fire:'#D97706', medical:'#C2185B', fraud:'#00838F', vandalism:'#4E342E', suspicious:'#546E7A', other:'#6B6B85' };
+const ic = (n, cls='') => `<iconify-icon icon="${ICONS[n]}" class="ico ${cls}" aria-hidden="true"></iconify-icon>`;
+
+// Sample reports: minutes ago, area, km away (null = no distance), own?
+const ROWS = [
+  { c:'theft', m:12, a:'Dhanmondi', a_bn:'ধানমন্ডি', km:0.8, g:'today' },
+  { c:'fraud', m:95, a:'Dhanmondi', a_bn:'ধানমন্ডি', km:null, own:true, g:'today' },
+  { c:'assault', m:180, a:'Mohammadpur', a_bn:'মোহাম্মদপুর', km:2.4, g:'today' },
+  { c:'fire', m:1560, a:'Jigatola', a_bn:'জিগাতলা', km:3.1, g:'yest' },
+  { c:'vandalism', m:1700, a:'Lalmatia', a_bn:'লালমাটিয়া', km:1.6, g:'yest' },
+  { c:'harassment', m:4300, a:'Kalabagan', a_bn:'কলাবাগান', km:1.9, g:'earlier' },
+  { c:'robbery', m:5200, a:'Rayer Bazar', a_bn:'রায়েরবাজার', km:4.2, g:'earlier' }
+];
+const ORDER = ['theft','robbery','assault','harassment','fraud','vandalism','fire','medical','accident','suspicious','other'];
+const COUNTS = { theft:14, assault:9, harassment:7, robbery:5, accident:11, fire:3, medical:6, fraud:8, vandalism:4, suspicious:10, other:2 };
+
+let lang = 'en', flow = 'reports';
+const F = { light:{ radius:15, win:24, type:null }, dark:{ radius:15, win:24, type:null } };
+
+const dec = (k, bn) => bn ? String(k).replace(/\d/g,d=>'০১২৩৪৫৬৭৮৯'[d]) : String(k);
+function filterLine(theme, s) {
+  const f = F[theme];
+  return `${s.r(f.radius)} · ${s.w[f.win]} · ${f.type ? s.types[f.type] : s.allTypes}`;
+}
+function filterCard(theme, s) {
+  const fb = flow === 'nolocation';
+  const dist = fb ? s.fbSub + s.r(F[theme].radius) + ' · ' + s.w[F[theme].win] : filterLine(theme, s);
+  return `<button class="filter ${fb?'warn':''}" type="button" data-act="filters" aria-label="${s.fTitle}">
+    <span class="lead">${ic(fb?'warn':'filter')}</span>
+    <span class="txt"><b>${fb ? s.fbArea : s.area}</b><span>${dist}</span></span>${ic('chevd','chev')}</button>`;
+}
+function tabsBar(s, active) {
+  return `<div class="tabs" role="tablist">${s.tabs.map((t,i)=>`<button type="button" role="tab" data-act="tab" data-i="${i}" aria-selected="${i===active}">${t}</button>`).join('')}</div>`;
+}
+function rowHtml(r, s, withDist) {
+  const bn = lang==='bn';
+  const area = bn ? r.a_bn : r.a;
+  const time = s.ago(r.m);
+  let when = r.m < 1440 ? time : r.m < 2880 ? s.yAt : s.dAgo(Math.floor(r.m/1440));
+  const end = r.own ? `<span class="end own">${s.own}${ic('chevr')}</span>` : `<span class="end">${withDist && r.km!=null ? dec(r.km,bn)+(bn?' কিমি':' km') : ''}${ic('chevr')}</span>`;
+  return `<button class="row" type="button"><span class="tile" style="--a:${ACCENT[r.c]}">${ic(r.c)}</span><span class="txt"><span class="ti">${s.types[r.c]}</span><span class="su">${when} · ${area}</span></span>${end}</button>`;
+}
+function list(rows, s, withDist) {
+  const groups = [['today',s.today],['yest',s.yest],['earlier',s.earlier]];
+  return groups.map(([g,label])=>{
+    const rs = rows.filter(r=>r.g===g); if (!rs.length) return '';
+    return `<p class="day">${label}</p><div class="group">${rs.map(r=>rowHtml(r,s,withDist)).join('')}</div>`;
+  }).join('') + `<div class="more"><p>${s.showing}</p><button type="button">${s.loadMore}</button></div>`;
+}
+function summary(s) {
+  const bn = lang==='bn';
+  const types = ORDER;
+  return `<div class="counts"><div><b>${s.num(120)}</b><span>${s.total}</span></div><div><b>${s.num(3)}</b><span>${s.yours}</span></div><div><b>${s.num(117)}</b><span>${s.nearby}</span></div></div>
+    <p class="cardhead">${s.byType}</p>
+    <div class="group">${types.map(k=>`<div class="row count"><span class="tile" style="--a:${ACCENT[k]}">${ic(k)}</span><span class="txt"><span class="ti">${s.types[k]}</span></span><span class="num">${s.num(COUNTS[k])}</span></div>`).join('')}</div>
+    <p class="foot">${s.countsOnly}</p>`;
+}
+function skeleton() { return `<div class="group">${[0,1,2,3].map(()=>`<div class="skel"><i class="a"></i><div class="b"><i></i><i></i></div></div>`).join('')}</div>`; }
+function emptyCard(s, kind) {
+  if (kind==='failed') return `<div class="empty bad" role="alert"><div class="lead">${ic('cloud')}</div><b>${s.failT}</b><p>${s.failSub}</p><button class="btn2" type="button">${ic('sync')}${s.retry}</button></div>`;
+  if (kind==='mine') return `<div class="empty"><div class="lead">${ic('add')}</div><b>${s.noOwn}</b><p>${s.noOwnSub}</p></div>`;
+  return `<div class="empty"><div class="lead">${ic('empty')}</div><b>${s.noRes}</b><p>${s.noResSub}</p><button class="btn2" type="button" data-act="filters">${ic('filter')}${s.change}</button></div>`;
+}
+function sheet(theme, s) {
+  const f = F[theme], bn = lang==='bn';
+  const R=[0.5,1,2,5,10,15], W=[1,24,168,720];
+  return `<div class="sheet-wrap"><div class="scrim" data-act="close"></div><div class="sheet" role="dialog"><div class="grab"></div><h4>${s.fTitle}</h4>
+   <div class="body">
+    <span class="lab">${s.radius}</span><div class="grid3">${R.map(k=>`<button class="chip" type="button" data-act="radius" data-v="${k}" aria-pressed="${f.radius===k}">${s.r(k)}</button>`).join('')}</div>
+    <span class="lab">${s.window}</span><div class="grid4">${W.map(h=>`<button class="chip" type="button" data-act="win" data-v="${h}" aria-pressed="${f.win===h}">${s.wShort[h]}</button>`).join('')}</div>
+    <span class="lab">${s.type}</span><div class="tgrid"><button class="chip" type="button" data-act="type" data-v="" aria-pressed="${f.type===null}">${ic('all')}<span>${s.allTypes}</span></button>${ORDER.map(k=>`<button class="chip" type="button" data-act="type" data-v="${k}" aria-pressed="${f.type===k}" style="--a:${ACCENT[k]}">${ic(k)}<span>${s.types[k]}</span></button>`).join('')}</div>
+   </div>
+   <div class="sheetfoot"><button class="ghost" type="button" data-act="reset">${s.reset}</button><button class="cta" type="button" data-act="close">${s.apply}</button></div></div></div>`;
+}
+function body(theme, s) {
+  const tab = flow==='mine'||flow==='mineempty' ? 1 : flow==='summary' ? 2 : 0;
+  let main;
+  if (flow==='loading') main = skeleton();
+  else if (flow==='empty') main = emptyCard(s,'empty');
+  else if (flow==='failed') main = emptyCard(s,'failed');
+  else if (flow==='mineempty') main = emptyCard(s,'mine');
+  else if (tab===1) main = list(ROWS.filter(r=>r.own).concat([]), s, false).replace(/<div class="more">.*<\/div>/s,'');
+  else if (tab===2) main = summary(s);
+  else main = list(ROWS, s, flow!=='nolocation');
+  return filterCard(theme,s) + tabsBar(s,tab) + main;
+}
+function phone(theme) {
+  const s = STR[lang];
+  return `<div class="phone" data-theme="${theme}">
+    <div class="statusbar"><span>9:41</span><div class="notch"></div><div class="right"><iconify-icon icon="fluent:wifi-1-24-filled" class="ico"></iconify-icon><iconify-icon icon="fluent:battery-10-24-filled" class="ico"></iconify-icon></div></div>
+    <div class="appbar"><button class="iconbtn" type="button" aria-label="${s.back}">${ic('back')}</button><div class="t"><b>${s.title}</b><span>${s.sub}</span></div><button class="iconbtn map" type="button" aria-label="${s.map}">${ic('map')}</button></div>
+    <div class="scroll">${body(theme,s)}</div>
+    ${flow==='filters' ? sheet(theme,s) : ''}
+  </div>`;
+}
+function render() {
+  document.body.dataset.lang = lang; document.documentElement.lang = lang;
+  for (const t of ['light','dark']) document.getElementById('phone-'+t).innerHTML = phone(t);
+}
+render();
+function setFlow(v) { flow = v; document.querySelectorAll('#seg-state button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.state===v)); }
+document.addEventListener('click', (e) => {
+  const seg = e.target.closest('#seg-state button, #seg-lang button');
+  if (seg) {
+    if (seg.dataset.state) setFlow(seg.dataset.state);
+    if (seg.dataset.lang) { lang = seg.dataset.lang; document.querySelectorAll('#seg-lang button').forEach(b=>b.setAttribute('aria-pressed', b===seg)); }
+    render(); return;
+  }
+  const act = e.target.closest('[data-act]'), ph = e.target.closest('.phone');
+  if (!act || !ph) return;
+  const f = F[ph.dataset.theme], a = act.dataset.act;
+  if (a==='filters') setFlow('filters');
+  if (a==='close') setFlow('reports');
+  if (a==='tab') setFlow(['reports','mine','summary'][+act.dataset.i]);
+  if (a==='radius') f.radius = +act.dataset.v;
+  if (a==='win') f.win = +act.dataset.v;
+  if (a==='type') f.type = act.dataset.v || null;
+  if (a==='reset') { f.radius = 15; f.win = 24; f.type = null; }
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { AppError } from '@nagar-shield/shared'
-import { submitCapture, type CaptureSubmission } from './submitCapture'
+import { authorTokenOnDevice, submitCapture, type CaptureSubmission } from './submitCapture'
 
 /**
  * The capture submit path's **response contract**.
@@ -43,6 +43,10 @@ jest.mock('./mediaPipeline', () => ({
   newClientRequestId: jest.fn(() => 'client-request'),
 }))
 
+// The device digest is now a pure-TypeScript SHA-256 (`./sha256`); the tests
+// below compare it against Node's own SHA-256 — a real cross-implementation
+// verification, no native mock needed.
+
 jest.mock('expo-file-system', () => ({
   File: class {
     async arrayBuffer() {
@@ -62,12 +66,10 @@ function stubSession() {
   mockedSupabase.auth.getSession.mockResolvedValue({ data: { session: mockSession } })
 }
 
-function stubUpload(ok = true) {
-  mockedSupabase.storage.from.mockReturnValue({
-    upload: jest
-      .fn()
-      .mockResolvedValue(ok ? { error: null } : { error: { message: 'upload failed' } }),
-  })
+function stubUpload(ok = true, error: Record<string, unknown> = { message: 'upload failed' }) {
+  const upload = jest.fn().mockResolvedValue(ok ? { error: null } : { error })
+  mockedSupabase.storage.from.mockReturnValue({ upload })
+  return upload
 }
 
 /** Stubs `fetch` with one answer. */
@@ -120,6 +122,28 @@ describe('submitCapture — the response contract', () => {
     const result = await submitCapture(submission)
 
     expect(result.reportId).toBe('a-real-report-id')
+  })
+
+  it('sends a chosen area and the place detail as `area_id` / `place_detail`', async () => {
+    stubFetch(200, {
+      data: { report_id: 'a-real-report-id', area_hierarchy: null, moderation_status: 'visible' },
+    })
+
+    await submitCapture({ ...submission, areaId: 'area-uuid', placeDetail: 'Road 10' })
+
+    const init = (global.fetch as jest.Mock).mock.calls[0]?.[1] as { body: string }
+    expect(JSON.parse(init.body)).toMatchObject({ area_id: 'area-uuid', place_detail: 'Road 10' })
+  })
+
+  it('sends null for both when the position was detected', async () => {
+    stubFetch(200, {
+      data: { report_id: 'a-real-report-id', area_hierarchy: null, moderation_status: 'visible' },
+    })
+
+    await submitCapture(submission)
+
+    const init = (global.fetch as jest.Mock).mock.calls[0]?.[1] as { body: string }
+    expect(JSON.parse(init.body)).toMatchObject({ area_id: null, place_detail: null })
   })
 
   it('does not read a camelCase `reportId` — the function never sends one', async () => {
@@ -181,11 +205,59 @@ describe('submitCapture — the response contract', () => {
     expect(mockedSupabase.storage.from).not.toHaveBeenCalled()
   })
 
+  it('never asks the bucket to replace an object', async () => {
+    // Replacing is an UPDATE and the bucket has no UPDATE policy: a retry that
+    // asked for it was refused for good. See tools/probe-capture-submit.cjs.
+    const upload = stubUpload()
+    stubFetch(200, { data: { report_id: 'r1' } })
+
+    await submitCapture(submission)
+
+    expect(upload).toHaveBeenCalledWith(
+      expect.stringContaining('client-request'),
+      expect.anything(),
+      expect.objectContaining({ upsert: false }),
+    )
+  })
+
+  it('finalizes when the object is already there — a retry after a lost confirmation', async () => {
+    // The first attempt's bytes landed and its answer was lost. The queue
+    // retries with the same path; storage says "Duplicate", and that is success.
+    stubUpload(false, {
+      message: 'The resource already exists',
+      statusCode: '409',
+      error: 'Duplicate',
+    })
+    stubFetch(200, { data: { report_id: 'r1' } })
+
+    await expect(submitCapture(submission)).resolves.toMatchObject({ reportId: 'r1' })
+  })
+
+  it('still fails on an upload error that is not a duplicate', async () => {
+    stubUpload(false, { message: 'new row violates row-level security policy', statusCode: '403' })
+    stubFetch(200, { data: { report_id: 'r1' } })
+
+    await expect(submitCapture(submission)).rejects.toMatchObject({ code: 'INTERNAL' })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
   it('does not call the Edge Function when the upload fails', async () => {
     stubUpload(false)
 
     await expect(submitCapture(submission)).rejects.toThrow(AppError)
 
     expect(global.fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('authorTokenOnDevice', () => {
+  it('is the same hash as the shared authorToken, without crypto.subtle', async () => {
+    // The real shared helper; Node has `crypto.subtle`, the phone does not.
+    const { authorToken } = jest.requireActual('@nagar-shield/shared') as {
+      authorToken: (userId: string) => Promise<string>
+    }
+    const userId = '4f7b010f-e9bc-4856-bbb6-03fdb6202a37'
+
+    expect(await authorTokenOnDevice(userId)).toBe(await authorToken(userId))
   })
 })

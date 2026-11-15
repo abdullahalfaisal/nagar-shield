@@ -5,6 +5,13 @@ import { useTheme } from '../theme'
 interface PulseDotProps {
   /** Pauses the animation — the battery / offline quiet indicator. */
   paused?: boolean
+  /**
+   * The operating system's reduce-motion setting.
+   *
+   * A reduced-motion dot is **still rendered** — it is frozen, not removed,
+   * and the halo is still drawn. Only the *movement* stops.
+   */
+  reduceMotion?: boolean
   color?: string
 }
 
@@ -25,6 +32,13 @@ interface PulseDotProps {
  * That is the quiet indicator the spec asks for when the auto-refresh is
  * paused: a dot that is still pulsing says the feed is still refreshing, and
  * it would be saying it falsely.
+ *
+ * When `reduceMotion` is set the dot is **frozen** rather than removed: the
+ * halo is still drawn, at `progress = 0`, and only the movement stops. The
+ * two states are different on purpose — `paused` says *"the feed is not
+ * refreshing"*, and the halo's absence is part of that message, while
+ * reduced motion says *"do not move things"*, which does not ask for the
+ * indicator to disappear.
  */
 
 /** The prototype's pulse period, in milliseconds. */
@@ -33,14 +47,20 @@ const PULSE_PERIOD_MS = 1_500
 /** How far the ring grows, in dp. The prototype's `0 0 0 6px`. */
 const HALO_GROWTH_DP = 6
 
-export function PulseDot({ paused = false, color }: PulseDotProps) {
+export function PulseDot({ paused = false, reduceMotion = false, color }: PulseDotProps) {
   const theme = useTheme()
   const dotColor = color ?? theme.palette.red[500]
 
   const progress = useRef(new Animated.Value(0)).current
 
+  // The animation stops for either reason; the **halo** only disappears for
+  // one of them. `paused` is the app's own quiet indicator, `reduceMotion` is
+  // the user's accessibility setting, and the setting does not get to change
+  // what the app is claiming.
+  const isStatic = paused || reduceMotion
+
   useEffect(() => {
-    if (paused) {
+    if (isStatic) {
       // The animation is stopped outright, not merely left at its start
       // frame — a stopped animation still holds a value.
       progress.stopAnimation()
@@ -62,7 +82,7 @@ export function PulseDot({ paused = false, color }: PulseDotProps) {
     return () => {
       animation.stop()
     }
-  }, [paused, progress])
+  }, [isStatic, progress])
 
   // The ring starts at the dot's own size and grows to 6 dp beyond it, while
   // fading from the prototype's 0.45 alpha to nothing.

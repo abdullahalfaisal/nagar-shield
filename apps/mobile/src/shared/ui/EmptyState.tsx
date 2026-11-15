@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
+import { usePressGuard } from './usePressGuard'
 
 interface EmptyStateProps {
   icon: string
@@ -17,6 +18,7 @@ interface EmptyStateProps {
  */
 export function EmptyState({ icon, title, description, action, style }: EmptyStateProps) {
   const theme = useTheme()
+  const pressAction = usePressGuard(action?.onPress)
   return (
     <View style={[styles.container, style]}>
       <View style={[styles.iconTile, { backgroundColor: theme.colors.ink[100] }]}>
@@ -54,7 +56,7 @@ export function EmptyState({ icon, title, description, action, style }: EmptySta
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={action.label}
-          onPress={action.onPress}
+          onPress={pressAction}
           style={styles.action}
         >
           <Text

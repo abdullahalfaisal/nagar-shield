@@ -387,10 +387,14 @@ this scale.
 ### FR-HIST: History (local view)
 
 #### FR-HIST-1 — Default radius and window
-- **Description**: History shows reports within **1 km** of the user's current
-  location from the last **24 hours** by default.
+- **Description**: History opens on the **widest radius the filter sheet offers**
+  — **15 km** — of the user's current location from the last **24 hours** by
+  default, so a cold launch shows the full local picture instead of an empty
+  quiet-hour street. (The `history_nearby` RPC keeps a server-side fallback of
+  1 km for callers that omit the parameter.)
 - **Acceptance Criteria**: Opening History with no filter applied queries
-  `radius_km = 1` and `window_hours = 24`.
+  `radius_km = 15` (the largest radius option) and `window_hours = 24`; the
+  reset action restores exactly these values.
 - **Priority**: Must
 - **Related Stories**: US-HIST-01
 

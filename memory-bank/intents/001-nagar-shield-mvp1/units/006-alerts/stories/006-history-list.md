@@ -14,27 +14,27 @@ implemented: true
 ## User Story
 
 **As a** Nagar Shield user who wants to review what has been reported around me and what I filed myself
-**I want** a local History view showing my own reports and the reports within 1 km of my current position over the last 24 hours
+**I want** a local History view showing my own reports and the reports inside a radius I control around my current position over a recent window
 **So that** I can check on my neighbourhood and my own submissions without the whole country feed
 
 ## Acceptance Criteria
 
 - [ ] **Given** the user opens History, **When** the screen renders, **Then** it is a 1:1 port of the prototype's `data-screen="21"` — the app bar (`arrow_back` → Home screen 14, the centred title **ক্রাইম হিস্ট্রি**, a 40 px right spacer), the location pill, the segmented tabs (**ধরন** / **মোট** / **বিতরণ**), the **ম্যাপ ভিউ** link, the body copy, and the report list — and the fake iOS status bar is **not** ported
 - [ ] **Given** the location pill renders, **When** its style is read, **Then** it matches the prototype exactly: `margin: 16px 20px`, `padding: 10px 16px`, `background: white`, `border: 1px solid var(--ink-100)`, `border-radius: 999px`, `font-size: 13px`, `color: var(--ink-700)`, `font-weight: 500`, with the 18 dp `location_on` icon in `--purple-700`, the address text, and a trailing `keyboard_arrow_down` in `--ink-400`
-- [ ] **Given** History is opened with no filter applied, **When** the query runs, **Then** it queries `radius_km = 1` and `window_hours = 24` (FR-HIST-1)
-- [ ] **Given** the default query runs, **When** the result set is built, **Then** it contains the author's **own reports** **plus** the reports within 1 km of the current fix in the last 24 h — the own-reports branch is independent of the radius and window filters
+- [ ] **Given** History is opened with no filter applied, **When** the query runs, **Then** it queries `radius_km = 15` (the widest offered radius, per FR-HIST-1) and `window_hours = 24`
+- [ ] **Given** the default query runs, **When** the result set is built, **Then** it contains the author's **own reports** **plus** the reports within the active radius of the current fix in the last 24 h — the own-reports branch is independent of the radius and window filters
 - [ ] **Given** the author has just submitted a report, **When** the author opens History, **Then** the report is present **immediately** — no pending-review gate, no moderation step, no delay beyond the submit response (FR-HIST-3)
 - [ ] **Given** the default History view is opened on a **warm session**, **When** the list settles, **Then** it is rendered within **2 seconds**, and a **skeleton** row is shown for the whole of the loading period (FR-HIST-4)
 - [ ] **Given** the **ম্যাপ ভিউ** link is tapped, **When** the navigation happens, **Then** it opens the **History map** — **not** the prototype's screen 23 (Charts) — and the link's label, `map` icon, and placement are unchanged
-- [ ] **Given** the body copy renders, **When** its text is read, **Then** it states the real defaults — *"Reports you file and recent reports within 1 km in the last 24 hours."* — and the prototype's second sentence *"Detailed map + filters coming soon."* is **removed**, because both the map and the filters ship in Phase 1 and "coming soon" would be a false claim in the shipped UI
+- [ ] **Given** the body copy renders, **When** its text is read, **Then** it states the **real, current** filter scope — *"Reports you file and recent reports within {{radiusKm}} km in the last {{hours}} hours."* with the active values interpolated — and the prototype's second sentence *"Detailed map + filters coming soon."* is **removed**, because both the map and the filters ship in Phase 1 and "coming soon" would be a false claim in the shipped UI
 - [ ] **Given** the segmented tabs render, **When** **ধরন** is active, **Then** the tab shows the list of reports as a list of rows; **মোট** shows the totals for the current filter set; **বিতরণ** shows the distribution as **counts in a list — never a chart, a bar, a percentage, or a trend**
 - [ ] **Given** the location permission is denied or the fix fails, **When** the screen renders, **Then** the pill shows a degraded origin state, the History list stays usable with the manual / Dhaka-default origin, the screen does not crash, and no permission prompt fires on mount (the prompt is just-in-time, when the user asks for a fix)
 
 ## Technical Notes
 
-- **`history_nearby` is the read model.** `POST /rest/v1/rpc/history_nearby` with `{ lat, lng, radius_km, window_hours, category?, cursor?, limit? }`, returning `{ "data": { "items": [...], "next_cursor": "…" | null, "total_count": n } }`. The default `radius_km` is **1** and the default `window_hours` is **24**; `limit` defaults to 20 and caps at 100.
+- **`history_nearby` is the read model.** `POST /rest/v1/rpc/history_nearby` with `{ lat, lng, radius_km, window_hours, category?, cursor?, limit? }`, returning `{ "data": { "items": [...], "next_cursor": "…" | null, "total_count": n } }`. The RPC's **server-side** default `radius_km` is **1** (for callers that omit the parameter) and the default `window_hours` is **24**; the **screen** opens at the widest offered radius — 15 km. `limit` defaults to 20 and caps at 100.
 - **The radius filter is server-side PostGIS.** `ST_DWithin(report.geog, origin.geog, radius_km * 1000)` against the `geography(Point,4326)` GiST index owned by unit 004 — the client never fetches and filters locally.
-- **The caller's own reports are included regardless of the filters.** The RPC's `WHERE` is `(ST_DWithin(...) AND captured_at >= now() - window) OR author_id = auth.uid()`. That `OR` branch is what makes FR-HIST-3 true even when the user's fix is more than 1 km away or the report is older than the window.
+- **The caller's own reports are included regardless of the filters.** The RPC's `WHERE` is `(ST_DWithin(...) AND captured_at >= now() - window) OR author_id = auth.uid()`. That `OR` branch is what makes FR-HIST-3 true even when the user's fix is outside the active radius or the report is older than the window.
 - **The History query uses `useQuery` (not `useInfiniteQuery`)** with a 60 s stale window, keyed by `{ lat, lng, radiusKm, windowHours, category }` — so a filter change produces a distinct cache entry and the wrong page is never served for the new filter.
 - **`useHistoryNearby` exposes `{ items, nextCursor, totalCount, isLoading, refetch }`.** The **মোট** tab reads `totalCount`; the **বিতরণ** tab reads the per-category counts for the current filter set.
 - **The segmented tabs are `shared/ui/SegmentedTabs`.** The prototype's control is `.segmented-tabs` (`margin: 0 20px 16px`, `background: var(--ink-100)`, `border-radius: var(--r-md)`, `padding: 4px`) with three equal-width tabs; the active tab is **ধরন**. Every tab is ≥ 48 × 48 dp and announces its selected state.
@@ -44,9 +44,9 @@ implemented: true
 - **The location permission is just-in-time, never on mount.** Opening History does **not** fire the permission prompt; the prompt fires when the user explicitly asks for a fresh origin. The panic path is never affected by this screen.
 - **The skeleton is a real skeleton row,** not a spinner — it mirrors the row's geometry so the layout does not jump when the data lands. It is replaced within 2 s on a warm session (FR-HIST-4); the query is index-backed and returns only a page, so the load is dominated by the round trip.
 - **The app bar's `arrow_back` returns to Home (screen 14)** — the prototype's target — and the real Android status bar replaces the fake iOS status bar. The 40 px right spacer is preserved so the title stays optically centred.
-- **The body copy is localised in `bn` and `en`** and states the real defaults (1 km / 24 h) rather than promising features that are not built.
+- **The body copy is localised in `bn` and `en`** and states the real, current filter scope (the active radius and window, interpolated) rather than promising features that are not built.
 - **The History screen owns no write path.** The report-detail entry point (including the author-only category edit) is unit 004's surface; this screen links to it and renders the read model.
-- **Testing.** Jest covers the relative-time formatter and the Bangla / English pair rendering on the History rows. A Supabase-local integration test covers the `history_nearby` radius / window / category filters, the own-reports branch, and the cursor pagination. A Maestro flow covers: open History → the default query is 1 km / 24 h → a filter change alters the result set → the map opens.
+- **Testing.** Jest covers the relative-time formatter and the Bangla / English pair rendering on the History rows. A Supabase-local integration test covers the `history_nearby` radius / window / category filters, the own-reports branch, and the cursor pagination. A Maestro flow covers: open History → the default query is the widest radius (15 km) / 24 h → a filter change alters the result set → the map opens.
 
 ## Implementation
 
@@ -130,7 +130,7 @@ implemented: true
 | The location permission is denied | The pill shows a degraded origin state, the query falls back to the manual / Dhaka-default origin, the list still renders, and no permission prompt fires on mount |
 | The GPS fix is slow or fails indoors | The screen renders with the skeleton, the query runs against the last known or default origin, and the list settles — the screen never shows an endless spinner |
 | The author has just submitted a report | The report appears in the author's History immediately with no moderation gate (FR-HIST-3) |
-| The author's report is more than 1 km from the current fix | The report is still in the author's own History — the own-reports branch is independent of the radius filter |
+| The author's report is outside the active radius from the current fix | The report is still in the author's own History — the own-reports branch is independent of the radius filter |
 | The author's report is older than 24 h | The report is still in the author's own History — the own-reports branch is independent of the window filter |
 | The result set is empty | The list renders its empty state and never a bare screen; the skeleton is replaced by the empty state, not by an endless skeleton |
 | The query exceeds 2 s on a cold session | The skeleton stays until the data lands; the 2 s budget is a **warm-session** target and the skeleton is never removed before the data is ready |

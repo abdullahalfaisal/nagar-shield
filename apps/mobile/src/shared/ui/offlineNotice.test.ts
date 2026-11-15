@@ -130,7 +130,8 @@ describe('the offline case never blanks the feed', () => {
     // failed refetch leaves them in place. The empty state is rendered only
     // when there are **no** rows, not when the request failed.
     expect(code).toContain('alertsItems(data)')
-    expect(code).toContain('items.length > 0')
+    // Home shows the newest few and has no "load more" footer to guard.
+    expect(code).toContain('data={items}')
   })
 
   it.each(FEED_SCREENS)('$name keeps the rows when the query errors', ({ path }) => {

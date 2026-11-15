@@ -1,15 +1,17 @@
 import { Children, useEffect, useState, type ReactNode } from 'react'
-import { StyleSheet, Text, View, Alert } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Alert, Share, StyleSheet, Text, View } from 'react-native'
+import Constants from 'expo-constants'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme, useThemeControls } from '@/shared/theme'
 import { Button, Icon, ListRow, PermissionRow, Screen, Toggle } from '@/shared/ui'
 import { BottomSheet } from '@/shared/ui/BottomSheet'
 import { setLocale } from '@/shared/i18n'
 import { logOut } from '@/shared/auth/authService'
+import { useSignOut } from '@/shared/auth/useSignOut'
 import { softDeleteAccount } from '@/shared/api/account'
 import { loadProfile, updateProfile } from '@/shared/api/profile'
-import { isBiometricAvailable } from '@/shared/auth/biometricService'
+import { isBiometricAvailable, mirrorBiometricOptIn } from '@/shared/auth/biometricService'
 import { useAuthSession } from '@/shared/auth/useAuthSession'
 import { usePermissions } from '@/shared/services/usePermissions'
 import {
@@ -36,6 +38,8 @@ export default function SettingsScreen() {
   const { t, i18n } = useTranslation()
   const { toggleTheme, setTheme } = useThemeControls()
   const { session } = useAuthSession()
+  const { signOut } = useSignOut()
+  const appVersion = Constants.expoConfig?.version ?? '1.0.0'
 
   // The live permission state. It is read — never prompted for — and it is
   // re-read on every foreground, so a permission revoked while the app was
@@ -49,6 +53,16 @@ export default function SettingsScreen() {
   const [deleteError, setDeleteError] = useState<string | undefined>()
 
   const isBangla = i18n.language === 'bn'
+
+  // The signed-in person's own details, with the labels as a fallback while
+  // the session loads or when the metadata carries no name.
+  const metaName = session?.user?.user_metadata?.full_name
+  const trimmedName = typeof metaName === 'string' ? metaName.trim() : ''
+  const displayName = trimmedName || t('auth.fullNameLabel')
+  const displayEmail = session?.user?.email ?? t('auth.emailLabel')
+  const avatarInitial = trimmedName
+    ? trimmedName.charAt(0).toUpperCase()
+    : t('common.appNameInitial')
 
   // The biometric preference is server-side: `profiles.biometric_opt_in` is
   // what the gate reads on the next launch, and it is what the failure
@@ -68,6 +82,8 @@ export default function SettingsScreen() {
       try {
         const profile = await loadProfile(userId)
         if (active) setBiometric(profile.biometric_opt_in)
+        // Keep the on-device copy the lock reads when it cannot reach the server.
+        void mirrorBiometricOptIn(userId, profile.biometric_opt_in)
       } catch {
         // Leave the toggle off. Opting in is the user's action, and
         // failing to read the current value must not silently turn it on.
@@ -93,6 +109,10 @@ export default function SettingsScreen() {
 
     try {
       await updateProfile(userId, { biometric_opt_in: next })
+      // The lock decides from this copy when the phone is offline. Without it,
+      // someone who opts in and relaunches offline before any online check
+      // would open the app with no lock.
+      await mirrorBiometricOptIn(userId, next)
     } catch {
       // The write failed, so the server still holds the old value. The
       // toggle is put back to match, rather than leaving the screen
@@ -114,7 +134,8 @@ export default function SettingsScreen() {
     setDeleteError(undefined)
     try {
       await softDeleteAccount()
-      await logOut()
+      // The account is gone, so its unsent reports have no one to be sent for.
+      await logOut({ discardUploads: true })
       router.replace('/(auth)/welcome')
     } catch {
       setDeleteError(t('errors.internal'))
@@ -135,26 +156,17 @@ export default function SettingsScreen() {
         ]}
       >
         <View style={[styles.avatar, { backgroundColor: theme.palette.violet[600] }]}>
-          <Text style={styles.avatarText}>{t('common.appNameInitial')}</Text>
+          <Text style={styles.avatarText}>{avatarInitial}</Text>
         </View>
         <View style={styles.profileInfo}>
-          <Text style={[styles.profileName, { color: theme.colors.ink[950] }]}>
-            {t('auth.fullNameLabel')}
+          <Text numberOfLines={1} style={[styles.profileName, { color: theme.colors.ink[950] }]}>
+            {displayName}
           </Text>
-          <Text style={[styles.profileEmail, { color: theme.colors.ink[500] }]}>
-            {t('auth.emailLabel')}
+          <Text numberOfLines={1} style={[styles.profileEmail, { color: theme.colors.ink[500] }]}>
+            {displayEmail}
           </Text>
         </View>
-        <Text style={[styles.profileEdit, { color: theme.palette.violet[700] }]}>
-          {t('common.save')}
-        </Text>
       </View>
-
-      {/* Account */}
-      <Section title={t('more.accountHeader')}>
-        <ListRow icon="account_circle" tone="purple" title={t('settings.profileEdit')} />
-        <ListRow icon="badge" tone="purple" title={t('settings.changeIdentity')} showArrow />
-      </Section>
 
       {/* Preferences */}
       <Section title={t('settings.preferences')}>
@@ -259,15 +271,21 @@ export default function SettingsScreen() {
           icon="info"
           tone="purple"
           title={t('more.about')}
-          subtitle={`${t('settings.version')} 1.0.0`}
+          subtitle={`${t('settings.version')} ${appVersion}`}
+          showArrow={false}
+          onPress={() => Alert.alert(t('common.appName'), `${t('settings.version')} ${appVersion}`)}
         />
-        <ListRow icon="star" tone="amber" title={t('settings.rateApp')} />
-        <ListRow icon="ios_share" tone="green" title={t('settings.shareApp')} />
+        <ListRow
+          icon="ios_share"
+          tone="green"
+          title={t('settings.shareApp')}
+          showArrow={false}
+          onPress={() => void Share.share({ message: t('common.appName') })}
+        />
       </Section>
 
       {/* Privacy + account deletion */}
       <Section title={t('settings.privacy')}>
-        <ListRow icon="privacy_tip" tone="gray" title={t('settings.privacyPolicy')} />
         <ListRow
           icon="delete"
           tone="red"
@@ -282,22 +300,7 @@ export default function SettingsScreen() {
 
       <Text
         accessibilityRole="button"
-        onPress={async () => {
-          const { discardedUploads } = await logOut()
-
-          // Unsent reports are discarded on sign-out — they are scoped to the
-          // session and must never be uploaded under another account. The user
-          // is told, because evidence that never landed is evidence they still
-          // need to know about.
-          if (discardedUploads > 0) {
-            Alert.alert(t('settings.discardQueueWarning', { count: discardedUploads }), undefined, [
-              { text: t('common.done'), onPress: () => router.replace('/(auth)/welcome') },
-            ])
-            return
-          }
-
-          router.replace('/(auth)/welcome')
-        }}
+        onPress={() => void signOut()}
         style={[
           styles.logoutRow,
           {
@@ -331,7 +334,13 @@ export default function SettingsScreen() {
         </Text>
 
         {deleteError ? (
-          <Text style={[styles.deleteError, { color: theme.palette.red[600] }]}>{deleteError}</Text>
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={[styles.deleteError, { color: theme.palette.red[600] }]}
+          >
+            {deleteError}
+          </Text>
         ) : null}
 
         <View style={styles.deleteActions}>
@@ -429,6 +438,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
+    minWidth: 0,
   },
   profileName: {
     fontSize: 15,
@@ -437,10 +447,6 @@ const styles = StyleSheet.create({
   profileEmail: {
     fontSize: 12,
     marginTop: 2,
-  },
-  profileEdit: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   section: {
     marginHorizontal: 20,

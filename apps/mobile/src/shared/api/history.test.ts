@@ -1,5 +1,12 @@
 import type { ReportCategory } from '@nagar-shield/shared'
-import { countByCategory, type HistoryReport } from './history'
+import {
+  countByCategory,
+  distanceLabelParts,
+  historyItems,
+  historyTotal,
+  type HistoryFeedData,
+  type HistoryReport,
+} from './history'
 
 /**
  * The Supabase client is mocked at the module boundary. The distribution is a
@@ -128,5 +135,44 @@ describe('the per-category counts', () => {
       expect(entry).not.toHaveProperty('height')
       expect(entry).not.toHaveProperty('percent')
     }
+  })
+})
+
+describe('the paginated History list', () => {
+  const pages: HistoryFeedData = {
+    pageParams: [null, 'c1'],
+    pages: [
+      { items: [report('theft', '1')], nextCursor: 'c1', totalCount: 3 },
+      { items: [report('fire', '2'), report('fire', '3')], nextCursor: null, totalCount: 3 },
+    ],
+  }
+
+  it('flattens every loaded page in order', () => {
+    expect(historyItems(pages).map((r) => r.id)).toEqual(['1', '2', '3'])
+    expect(historyItems(undefined)).toEqual([])
+  })
+
+  it('reports the matched total, or null before the first page', () => {
+    expect(historyTotal(pages)).toBe(3)
+    expect(historyTotal(undefined)).toBeNull()
+  })
+})
+
+describe('the distance label', () => {
+  it('uses metres under a kilometre', () => {
+    expect(distanceLabelParts(420.4, 'en')).toEqual({
+      key: 'history.distanceAway',
+      distance: '420',
+    })
+  })
+
+  it('uses kilometres from a kilometre up', () => {
+    expect(distanceLabelParts(4200, 'en')).toEqual({ key: 'history.kmAway', distance: '4.2' })
+    expect(distanceLabelParts(1000, 'en')).toEqual({ key: 'history.kmAway', distance: '1' })
+  })
+
+  it('writes Bangla digits in Bangla', () => {
+    expect(distanceLabelParts(4200, 'bn')).toEqual({ key: 'history.kmAway', distance: '৪.২' })
+    expect(distanceLabelParts(350, 'bn').distance).toBe('৩৫০')
   })
 })

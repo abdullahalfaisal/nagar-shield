@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { readModeratorRole } from '@/lib/supabase/server'
 import { AccessOnlyState } from '@/app/access-only-state'
 
@@ -33,11 +34,13 @@ import { AccessOnlyState } from '@/app/access-only-state'
  * ------------------
  *
  *   * **moderator** — the console renders.
- *   * **citizen** or **no session** — the access-only state renders, and the
- *     client bundle is never mounted, so no query is fired at all.
+ *   * **citizen** — the access-only state renders, with a sign-out button, and
+ *     the client bundle is never mounted, so no query is fired at all.
+ *   * **no session** — the visitor is sent to `/login`. The access-only card
+ *     used to render here, which told a moderator whose cookie had expired
+ *     that "this account has no permission" and gave them no way to sign in.
  *
- * A signed-out visitor gets the access-only state too, rather than a console
- * that fires requests nobody is authorized to make.
+ * Either way, no console query is fired for a caller who is not a moderator.
  */
 
 interface ModeratorGateProps {
@@ -46,6 +49,10 @@ interface ModeratorGateProps {
 
 export async function ModeratorGate({ children }: ModeratorGateProps) {
   const role = await readModeratorRole()
+
+  if (role === null) {
+    redirect('/login')
+  }
 
   if (role !== 'moderator') {
     return <AccessOnlyState />

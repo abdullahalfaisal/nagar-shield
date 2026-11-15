@@ -1,6 +1,7 @@
 import { StyleSheet, Text, Pressable, ScrollView } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../theme'
+import { Icon } from './Icon'
 
 /**
  * The area filter chip row. The active chip uses `--grad-primary` with white
@@ -68,18 +69,6 @@ export function AreaChipRow({ chips, activeId, onSelect }: AreaChipRowProps) {
         const active = chip.id === activeId
         const disabled = chip.disabled === true
 
-        const label = (
-          <Text
-            style={{
-              color: active ? theme.staticColors.white : theme.colors.ink[700],
-              fontSize: 12,
-              fontWeight: '600',
-            }}
-          >
-            {chip.label}
-          </Text>
-        )
-
         return (
           <Pressable
             key={chip.id}
@@ -88,34 +77,45 @@ export function AreaChipRow({ chips, activeId, onSelect }: AreaChipRowProps) {
             accessibilityLabel={chip.label}
             disabled={disabled}
             onPress={() => onSelect(chip)}
-            // The chip's visual box is 28 dp tall, but the tap target is
-            // padded to 48 dp without changing the visual (FR-UX-4).
+            // The chip's visual box is 36 dp tall; the tap target is padded
+            // to 56 dp without changing the visual (FR-UX-4).
             hitSlop={10}
-            style={[
+            style={({ pressed }) => [
               styles.chip,
               {
-                backgroundColor: active ? theme.palette.violet[600] : theme.colors.surface.white,
+                backgroundColor: theme.colors.surface.white,
                 borderColor: active ? theme.palette.violet[600] : theme.colors.ink[200],
                 opacity: disabled ? 0.45 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
               },
             ]}
           >
             {/* The selected chip wears `var(--grad-primary)` — the prototype's
                 gradient — and the gradient is a **token**, so the chip keeps
-                its AA contrast in light and dark mode. The unselected chip
-                stays a flat `--surface-white` with an `--ink-200` border. */}
+                its AA contrast in light and dark mode. It is painted as the
+                chip's *background* (absolute fill), so it covers the whole
+                pill and the label sits centred on top of it; as a flex child
+                it used to be inset by the chip's own padding. The unselected
+                chip stays a flat `--surface-white` with an `--ink-200`
+                border. */}
             {active ? (
               <LinearGradient
                 colors={[...theme.gradients.primary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.fill}
-              >
-                {label}
-              </LinearGradient>
-            ) : (
-              label
-            )}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : null}
+            {active ? <Icon name="check" size={14} color={theme.staticColors.white} /> : null}
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.label,
+                { color: active ? theme.staticColors.white : theme.colors.ink[700] },
+              ]}
+            >
+              {chip.label}
+            </Text>
           </Pressable>
         )
       })}
@@ -130,8 +130,10 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 12,
     // The content must not stretch to the viewport width — a `ScrollView`'s
     // content container does by default, and a stretched row would fill the
@@ -139,19 +141,25 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   chip: {
-    // The chip is a fixed-size pill: 12 dp type on 8 dp of vertical padding
-    // makes it 28 dp tall. The height is stated rather than inferred, so the
-    // tap-target gate can read it without having to follow the label out of
-    // the element and into a variable.
-    height: 28,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
+    // The chip is a fixed-size pill, 36 dp tall. The height is stated rather
+    // than inferred, so the tap-target gate can read it without having to
+    // follow the label out of the element and into a variable. The content is
+    // a centred row, so the label sits in the vertical middle (a bare child of
+    // a `Pressable` hugs the top edge).
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1.5,
     flexShrink: 0,
-  },
-  fill: {
-    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    overflow: 'hidden',
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
 })

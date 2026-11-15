@@ -67,16 +67,18 @@ every help entry point renders the **same** guidance component.
     cannot substantiate.
   - **The dial path is offline-capable.** Every signal comes from the OS; the
     server is never asked. A citizen with no signal still reaches help.
-- **The power-save capability — `BATTERY_SAVER_DETECTION`.** There is **no
-  first-class Expo API** for Android power-save mode (`expo-battery` reports
-  the *level*, not the *mode*, and the level says nothing about whether the
-  OEM will suppress the dialer). Detecting it needs a native module reading
-  `PowerManager.isPowerSaveMode`. **This build ships no such module**, so the
-  capability is `'unavailable'`, recorded as a named constant in
-  `degradation.ts` — one grep finds it. This is the story's FR-PERMS-3
-  "known limitation", shipped **visibly** rather than as a silent no-op: the
-  static copy ships either way, because a warning that the dialler *may* be
-  suppressed is true whether or not power saving is on.
+- **The power-save capability — `BATTERY_SAVER_DETECTION`.** The capability is
+  **`'available'`**: `expo-battery` ships `isLowPowerModeEnabledAsync()`, which
+  maps to `PowerManager.isPowerSaveMode` on Android. The build originally
+  shipped this as `'unavailable'` — the premise was that no first-class Expo
+  API exposed the mode — and that made the warning render after **every**
+  dial attempt (an always-`'unknown'` state is treated as "worth warning
+  about"), which users read as a false "battery saver is on" prompt when they
+  returned from the dialer. The read is live now: `readPowerSaveState()`
+  returns `'on'` / `'off'` from the OS, and `'unknown'` only when the read
+  itself fails (a platform without the module). The copy's second clause —
+  "or this phone does not let the app check" — is exactly the `'unknown'`
+  case, so the static wording still ships and stays truthful.
 - **The shared surface — `apps/mobile/src/shared/ui/ManualDialGuidance.tsx`.**
   One component renders the title, the number in **both** Bangla numerals and
   ASCII digits (`৯৯৯ · 999`), the body, and the two conditional lines — the
@@ -84,9 +86,11 @@ every help entry point renders the **same** guidance component.
   Alert cards, the More Help sheet, the hotline list, the thana line, and the
   station map.
 - **The flow — `apps/mobile/src/shared/services/useDegradedHelp.ts`.** The
-  hook reads the device state **once per mount** (the story requires the
-  warning to reflect the state at the moment the help action is opened, not a
-  value cached across sessions), dials through the single `openDialer` helper,
+  hook reads the device state **on mount and again on every return to the
+  foreground** (the reads are OS calls, never network, and the state can
+  change while the app is away — the dialer is exactly such an absence; a
+  stale or single-failed mount read must not pin `'unknown'`, which warns,
+  for the rest of the visit), dials through the single `openDialer` helper,
   and decides whether the guidance shows:
   ```ts
   export function needsManualDialGuidance(state: DegradedState, dialerOpened: boolean): boolean {
@@ -136,7 +140,7 @@ every help entry point renders the **same** guidance component.
 | AC #2 — manual-dial guidance names the number and how to dial, in `bn` and `en` | `degradation.test.ts` — `manualDialGuidance('999')` returns `৯৯৯` and `999`; `degradationCopy.test.ts` asserts every `degradation.` key exists in both bundles. |
 | AC #3 — the thana line shows the exact fallback banner and dials `999` | `thanaFallbackCopy.test.ts` — the English title and the Bangla sentence are pinned character for character; the dial target is `SEEK_FALLBACK_NUMBER`. |
 | AC #4 — the battery-saver warning appears, in `bn` and `en` | `degradation.test.ts` — `powerSaveWarningIsUseful` is true for `'on'` and for `'unknown'`; `degradationCopy.test.ts` asserts both bundles carry the warning and that it says *may*, not *was*. |
-| AC #5 — the unavailable detection shows static copy and is recorded as a known limitation | `degradation.test.ts` — `BATTERY_SAVER_DETECTION` is `'unavailable'`, `readPowerSaveState()` resolves `'unknown'`, and `readDegradedState()` reports the capability. |
+| AC #5 — the unavailable detection shows static copy and is recorded as a known limitation | `degradation.test.ts` — the capability is `'available'` via `expo-battery`'s `isLowPowerModeEnabledAsync`; a **failed** read still degrades: `readPowerSaveState()` resolves `'unknown'` (never `'off'`) and `readDegradedState()` reports the capability. |
 | AC #6 — no signal shows the guidance and never claims a call was placed | `degradation.test.ts` — `needsManualDialGuidance(state, true)` is true when offline; `degradationCopy.test.ts` walks the **actual bundles** and fails on any copy claiming a call was placed, connected, or delivered. |
 | AC #7 — Home shows no location prompt and the help cards render with their numbers | The Home screen (`app/(app)/home.tsx`) does not import `useCurrentFix`; the Help Alert screen renders Police `999`, Medical `999`, and Fire `102` with no location read on the path. |
 | AC #8 — no copy claims a dispatch | `degradationCopy.test.ts` — the bundle walk covers `help.*`, `degradation.*`, and every other namespace. |
@@ -149,7 +153,7 @@ Each guard was neutered and the suite watched to fail, then restored:
 
 | Neutered | Failing assertion |
 |---|---|
-| `BATTERY_SAVER_DETECTION` → `'available'` | "is recorded as a known limitation, not a silent no-op" and "reports the power-save state as unknown on this build" |
+| The power-save read removed (mock resolving `undefined`/rejecting) | "reads as unknown rather than off when the read fails" and "degrades the power-save reading to unknown when the read fails" |
 | `readIsOffline()`'s catch → `return true` | "does not claim a degraded mode it cannot substantiate" |
 | A `fetch` added to `openDialer` | "performs zero network requests" |
 

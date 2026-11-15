@@ -3,9 +3,9 @@
 > Read this first in a fresh session. It says what is **done**, what is
 > **broken**, and what to do **next**, in that order.
 >
-> Last updated: 2026-11-14 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
+> Last updated: 2026-11-15 · repo: `d:\Projects\E2E Delivery Delivery Engineer Training`
 > Flow: specsmd AI-DLC · intent `001-nagar-shield-mvp1` · 54 stories / 27 bolts
-> Gate: `pnpm verify` → **0** · 1056 unit tests · 476 SQL assertions · 37/37 console probes
+> Gate: `pnpm verify` → **0** · 1151 unit tests · 476 SQL assertions · 37/37 console probes
 
 ---
 
@@ -14,7 +14,7 @@
 The backend, the Edge Functions, the admin console and the mobile UI shell are
 built and verified.
 
-**The stories are now counted three ways, not two: 43 `complete`, 10
+**The stories are now counted three ways, not two: 44 `complete`, 9
 `partial`, 1 `planned`.** The middle state is new, and it is the honest one.
 An audit of the 23 stories that carried `implemented: false` found that
 **none** of them were fully unimplemented: the features had shipped and
@@ -104,7 +104,7 @@ Every command below was run green against the local Supabase stack.
 | Area | Evidence |
 |---|---|
 | Monorepo | pnpm workspace, 3 apps (`apps/mobile`, `apps/admin`, `packages/shared`), TS strict, ESLint flat config |
-| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **200 unit tests** |
+| Shared contracts | `packages/shared` — schemas, enums, errors, jobs, reference data; **203 unit tests** |
 | Database | **37 migrations**, `supabase/migrations/` — schema, RLS, business functions, read models, storage, jobs, password-reset OTP, contacts owner default + phone CHECK, author-only `update_category`, nullable all-or-nothing location position, the contact app-user lookup, the **distinct-report** author auto-hide, the **anonymous wrong-number reporter**, the **polymorphic entry-integrity trigger**, the wrong-number `details` / `pending` vocabulary, the **moderation decision conflict**, the **30-day restore window**, and the **purge worklist boundary + job privileges** |
 | RLS + write guards | `supabase/tests/write_guards.sql` — regression suite for 6 probed defects (A–F) plus the wrong-number integrity guards (I1–I21) |
 | SQL test suites | **476 assertions pass** — `schema_contract` (24), `business_rules` (35), `read_models` (57), `write_guards` (103), `account_deletion` (12), `password_reset` (47), `contacts` (47), `report_category` (32), `location_shares` (37), `alert_detail` (36), `moderation_conflicts` (46) |
@@ -134,11 +134,12 @@ Every command below was run green against the local Supabase stack.
 | Alerts feed | `useInfiniteQuery` with the **cursor as the page parameter** and the area filter alone in the query key; `alertsItems()` flattens the pages and is the only way the screens read the feed. The uncategorized card renders the **localized** placeholder on the neutral `--ink-300` ramp; the offline case is one shared rule (`alertsShowingCachedPage()`) driving one shared notice (`OfflineNotice.tsx`), and **neither** feed screen blanks on error. **17 unit tests** (`alerts.dom.test.ts`). |
 | Alert card rendering | `alertCard.test.ts` (25) — the box model, the accent map's single source, the uncategorized placeholder, the empty-description gap, the Bangla / English pair; `offlineNotice.test.ts` (15) — the notice exists, uses the bundle copy, is announced, and is rendered by **both** feed screens off the shared rule; `pulseDot.test.ts` (12) — the 1.5 s pulse, the 6 dp halo, and the paused state. See §4.6 A4. |
 | Area filter chips | `AreaChipRow.tsx` is a horizontal `ScrollView` with the prototype's `padding: 0 20px 12px` contract and a non-stretching content container; the chip list is built from **`area_lookup`** by the new `src/shared/api/areaChips.ts`, and `resolveAreaFilter` is the **single** mapping both feed screens use. The **My division** / **My city** chips resolve from the current fix and are **disabled** without one — a disabled chip sends **no** parameter, so the feed keeps its result set. **38 unit tests** (`areaChipRow.test.ts`). See §4.6 A5. |
+| Auto-refresh + pull-to-refresh | `useAlertsFeed` **owns** the guard — no caller can forget it — and both feed screens read the *same* guard **out of the hook**. The 60 s poll stops on low battery (20 %, strictly less), on backgrounding and offline; the app-state check is **live** (`isPausedNow()`), so a request cannot slip out between the native event and React's commit. The pull re-queries without advancing the cursor. `PulseDot` honours `AccessibilityInfo`'s reduce-motion setting — the dot goes static, the label and its styling **do not**. **66 unit tests** across five suites (`refreshGuard.test.ts`, `refreshGuard.dom.test.ts`, `alertsRefresh.dom.test.ts`, `reduceMotion.dom.test.ts`, `feedHeader.test.ts`). See §4.6 A6. |
 | Error copy | `errorCopy()` — one place that consults the shared `API_ERROR_I18N_KEYS` map, with an `errors.internal` fallback for an unknown code. **7 unit tests**, against the **real** bundles. |
 | Configuration error | `isSupabaseConfigured` + `ConfigErrorView` — a missing build setting shows a localized screen instead of a module-load crash. **10 unit tests**, including one that re-imports the module under `jest.isolateModules()`. |
 | Test environments | the mobile suite runs as **two Jest projects** (`node` and `jsdom`); a test opts into jsdom by its **name** (`*.dom.test.ts`), and `jest.dom.setup.js` gives jsdom back the `TextEncoder` / `crypto.subtle` it lacks. |
 | App shell | `boot.dom.test.tsx` — **29 tests**: the provider stack is **rendered** in jsdom and the root layout's structure is **read from source** (the provider order, the unconfigured branch, every `<Redirect>` target resolving to a real file). See §3 M2. |
-| Session storage | `session-storage.ts` — the session goes to `expo-secure-store` and **nowhere else**; the 2048-byte figure is Apple's Keychain limit, not Expo's, and Android has none (a measured session is ~1550 bytes). A device that cannot write degrades to **memory-only**, with a localized notice. **27 tests**, including one that reads the installed `auth-js` source to assert the `supabase-js` rethrow contract. The FR-AUTH-2 window (30 days remembered / 24 hours otherwise) is enforced here, at the only place a session is read back. |
+| Session storage | `session-storage.ts` — the session goes to `expo-secure-store` and **nowhere else**; the 2048-byte figure is Apple's Keychain limit, not Expo's, and Android has none. The threshold is **8192**, because the **real** session measures **2176 bytes** — and the old 2048 limit refused it, which signed the user out on every sign-in (the root cause of the phone sign-in loop, found on the real device). The storage **key is derived** from the Supabase URL (`sb-<host>-auth-token`), not hardcoded. A device that cannot write degrades to **memory-only**, with a localized notice. **32 tests**, including one that reads the installed `auth-js` source to assert the `supabase-js` rethrow contract. The FR-AUTH-2 window (30 days remembered / 24 hours otherwise) is enforced here, at the only place a session is read back. |
 | Login screen | `apps/mobile/src/__tests__/login.dom.test.tsx` (12), `apps/mobile/src/shared/api/session-window.test.ts` (14), `apps/mobile/src/shared/auth/authService.test.ts` (11), `apps/mobile/src/__tests__/noSocialLogin.test.ts` (11) — the identifier passes through **unchanged**, the Remember-me flag reaches the session write **before** the sign-in and **changes** the window, and no social sign-in method is wired. See §3 M5. |
 | Theme coverage | `themeCoverage.test.ts` — **5 tests**: every route screen reaches the theme, directly or **transitively** through a component it renders. |
 | CI | `.github/workflows/ci.yml` — lint → typecheck → shared-test → unit tests → maestro-flow → migration-dry-run → rls-integration → secret-scan |
@@ -152,7 +153,7 @@ Every command below was run green against the local Supabase stack.
 ```bash
 pnpm typecheck        # 3 workspaces
 pnpm lint
-pnpm test             # 1013 tests (669 mobile, 200 shared, 144 admin)
+pnpm test             # 1151 tests (804 mobile, 203 shared, 144 admin)
 pnpm db:test          # 476 SQL assertions
 pnpm db:smoke         # 11 REST checks
 pnpm story:index:check # the index, the bolts and the story files agree
@@ -1022,7 +1023,7 @@ carries the detailed account of both defects.
 
 ---
 
-## 4. What is NOT DONE — 10 `partial`, 1 `planned`
+## 4. What is NOT DONE — 9 `partial`, 1 `planned`
 
 Ordered by dependency. Bolt numbers in brackets.
 
@@ -1082,7 +1083,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > | `003-help-seek` | 5 | 2 | 1 |
 > | `004-capture` | 3 | 4 | 0 |
 > | `005-location` | 5 | 0 | 0 |
-> | `006-alerts` | 7 | 2 | 0 |
+> | `006-alerts` | 8 | 1 | 0 |
 > | `007-moderation` | 6 | 0 | 0 |
 > | `008-jobs-operations` | 7 | 0 | 0 |
 >
@@ -1091,7 +1092,7 @@ Ordered by dependency. Bolt numbers in brackets.
 > **void** criterion — a placeholder-route requirement that unit 007 superseded
 > with live screens. Its five missing guards are all built (§3 M3).
 
-### 4.0 The 11 stories that are not `complete`
+### 4.0 The 10 stories that are not `complete`
 
 Each row's story file carries an `## Implementation` section naming the exact
 gap. **Open the story file, not this table, when you pick one up.**
@@ -1108,7 +1109,7 @@ gap. **Open the story file, not this table, when you pick one up.**
 | `004-exif-strip-and-media-caps` | 004-capture | partial | the video path copies the original bytes — no trim, no metadata strip; the cap is 1080, not 1920 |
 | `007-storage-upload-and-finalize` | 004-capture | partial | no unit test ties the client's storage path to the server's |
 | `001-alerts-feed-list` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A4** — the uncategorized placeholder, the offline indication and the rendering tests all landed; two real defects (the blank area line, the static pulsing dot) were found on the way |
-| `002-auto-refresh-and-pull-to-refresh` | 006-alerts | partial | neither the interval nor pull-to-refresh is tested |
+| `002-auto-refresh-and-pull-to-refresh` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A6** — the 60 s poll, the low-battery pause, the pull-to-refresh and the reduced-motion dot all have guards; three real defects (the unguarded Home poll, the React-Native no-op flag, the `enabled: false` mount-fetch block) were found on the way |
 | `003-area-filter-chips` | 006-alerts | ~~partial~~ **complete** | ✅ **CLOSED in §4.6 A5** — the row is a horizontal `ScrollView`, the chip list is **data-driven** from `area_lookup`, and the location chips are disabled without a fix |
 | `004-flag-an-alert` | 006-alerts | partial | the server returns `duplicate`/`rate_limited`, not the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant |
 
@@ -1200,10 +1201,8 @@ shipped behaviour, or retire it as superseded.
 
 ### 4.6 Alerts — unit `006-alerts`
 
-> **Two of this unit's nine stories are still `partial`:** 
-> `002-auto-refresh-and-pull-to-refresh`
-> (neither the interval nor pull-to-refresh is tested)
-> and `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
+> **One of this unit's nine stories is still `partial`:**
+> `004-flag-an-alert` (the server returns `duplicate`/`rate_limited`, not
 > the mandated `CONFLICT`/`FLAG_RATE_LIMIT`; `retry_after_sec` is a constant).
 > See the §4.0 table.
 
@@ -1214,6 +1213,8 @@ shipped behaviour, or retire it as superseded.
 | A3 | ✅ **FIXED** — the filters, the map, and the author auto-hide are live. **The filters**: one filter object, one query key — the list, the totals, the distribution and the map all move together, and a sheet that changes nothing does not re-query. **The map**: one shared wrapper, no fork — the attribution is owned by the wrapper, only `tile.openstreetmap.org` is contacted, and the marker set is capped at 150 keeping the markers **nearest the centre**. **The author auto-hide**: the transition lives in `public.flag_report` — one transaction, so a partial hide is impossible. **A real defect was found and fixed by migration 030**: the function counted `count(*)` over the author's flags, so **five flags on a single report** fired the auto-hide and swept in the author's other reports — exactly what the story forbids ("five flags on one report are one flagged report"). It now counts `count(distinct f.report_id)`, and the response carries **both** counts side by side (`author_flags_24h` and `author_flagged_reports_24h`) so the distinction is visible rather than implied. The old SQL test had encoded the wrong behaviour and was rewritten, and a new Test 10 asserts the negative case directly. The hide is `hidden_pending_review`, not `removed` — it is a moderator's to reverse. **The author still sees their own hidden reports**; the public hide never touches own-report visibility. | [020–021] |
 | A4 | ✅ **FIXED** — the alerts feed is `complete`. Three gaps closed, and **two real defects found on the way**. **(1) The uncategorized card rendered `'—'`.** The bundle already carried `alerts.uncategorized` = `অকার্যনির্দিষ্ট — Uncategorized`; the card used a literal instead. It now renders the localized placeholder and falls back to the **neutral `--ink-300` ramp** for the accent border, the icon tint and the category text. The repo's hardcoded-string scan **did not** catch it — `'—'` is one character with no space — so the guard added is behavioural, not lexical. **(2) The offline behaviour did not exist.** `apps/mobile/src/shared/ui/OfflineNotice.tsx` is new, and `alertsShowingCachedPage()` in `apps/mobile/src/shared/api/alerts.ts` is the **one rule** both feed screens render it from — and it needs **both** halves (the query is in error **and** a cached page with rows exists), so a cold start with no network shows the empty state rather than an offline notice over nothing. The feed never blanks. **(3) The rendering tests.** `alertCard.test.ts` (25), `offlineNotice.test.ts` (15) and `pulseDot.test.ts` (12). **The two defects:** the **area line rendered blank** — the database holds `"thana": null` on degraded captures, the client boundary normalises a null level to `''`, and the old `??` chain stopped there (an empty string is not nullish); the rule now lives in **one** function, `formatAreaHierarchy()`, used by four surfaces. And the **pulsing dot did not pulse** — `PulseDot.tsx` rendered a static halo while its own comment claimed *"the pulse is a React Native `Animated` loop"*; it now runs a real `Animated.loop` over the prototype's 1.5 s period, and when paused it **stops the animation outright** and renders no halo (a still-pulsing dot says the feed is still refreshing, falsely). Six **causal checks** confirm each guard fires. The honest residue is recorded in the story file: the Bangla half of the area line is **server-side only** (`area_lookup` is not in the public projection), and the **screenshot comparison** the Testing note asks for needs a device harness this repo does not have. | [018] story 001 |
 | A5 | ✅ **FIXED** — the area chip row is `complete`. Three gaps closed, and **two real defects found on the way**. **(1) The row clipped.** `AreaChipRow.tsx` used a plain `View`, so on a narrow phone with a dozen areas the chips past the edge were not clipped but **unreachable** — no gesture brought them into view. The row is now a horizontal `ScrollView` with `showsHorizontalScrollIndicator={false}`, the prototype's `padding: 0 20px 12px` contract on the content container, and `flexGrow: 0` on both the scroll view and the container (a `ScrollView`'s content stretches to the viewport by default, which would make the row swallow the feed beneath it). The chips keep `flexShrink: 0`, so a chip never squeezes to fit. **(2) The chip list was a hardcoded array in two screens.** `alerts.tsx` and `home.tsx` each carried their own five-chip array — the same one, twice — with **Mirpur** and **Dhanmondi** written into the screen files. The list is now built from the **`area_lookup`** reference table, so a new area is a **data** change, not a code change in two files. **(3) The location chips lied.** They sent `{ division: 'Dhaka' }` — a **hardcoded** division — so the chip said "My division" while filtering a division the user might not be in. They now resolve from the **current fix** (just-in-time, never at app open, never on the panic path), and with no fix they are **disabled** — rendered, marked unavailable, not pressed — and `resolveAreaFilter` sends **no** parameter for a disabled chip, so the feed keeps the result set it had rather than narrowing to an empty area. **The filter is now one shared mapping**: `resolveAreaFilter` in the new `src/shared/api/areaChips.ts` is the single function both feed screens use, so a narrowed feed can never come from a second, divergent mapping. The selection is a chip **id**, not a chip object, because the list is data-driven and a held chip could stop existing. **The two defects:** the chip's `height: 28` was unstated, so once the label moved into a variable the tap-target gate could not resolve the chip's box and reported it unmeasurable — the gate was right and the primitive was wrong; and the selected chip wore a flat violet rather than the prototype's `var(--grad-primary)`, which is now rendered through `expo-linear-gradient` as a **theme token** so it keeps AA contrast in both modes. **Five causal checks** confirm each guard fires, including the tap-target scanner's own brace tracking. The honest residue is recorded in the story file: the **Maestro flow** the Testing note asks for does not exist, the `neighborhood` selection comes from the Home search bar (unit `003` owns it), and the chip labels are the English area names. | [018] story 003 |
+
+| A6 | ✅ **FIXED** — the auto-refresh and pull-to-refresh story is `complete`. Three gaps closed, and **three real defects found on the way**. **(1) The Home screen polled the feed forever in the background.** `home.tsx` called `useAlerts(filter)` with **no guard**, while only `alerts.tsx` passed `enabled: !guard.isPaused` — so a backgrounded Home issued a feed request every 60 s, indefinitely, which is exactly what FR-ALERTS-2 forbids. The guard is now **intrinsic to the hook** (`useAlertsFeed`), so no caller can forget it; Home and Alerts read the *same* guard **out of the hook**, so the header can never show a reason the poll did not use. **(2) `refetchIntervalInBackground: false` is a no-op in React Native.** TanStack's `focusManager.isFocused()` reads `globalThis.document?.visibilityState`, and React Native has **no DOM `document`** — so it is *always* `true` and the flag never blocked anything. The **interval function** is what stops the timer (`() => (guard.isPaused ? false : ALERTS_REFRESH_INTERVAL_MS)`), and because the computed value changes when the guard changes, TanStack re-arms the timer at the moment the app returns to the foreground — the next interval is measured from *that* moment, so there is no catch-up burst. The flag is kept, but the **reason it does not work is recorded in the code** so a future change to `true` cannot look like a harmless edit. **(3) `enabled: false` also blocked the mount fetch** — `shouldLoadOnMount` requires `enabled !== false` — so a cold start while paused showed an **empty** feed instead of the cached page (AC #8 broken). The `enabled` option is gone entirely: it was a footgun, and the guard now lives where it belongs. **The race window is closed.** The interval function is only re-evaluated on a **render**, so between the native `appStateDidChange` event and React's commit a request could still slip out. The `queryFn` therefore refuses on a **live** check (`guard.isPausedNow()`), which reads the app-state source's `currentState` **getter** at the moment of the call. The refusal throws `RefreshPausedError`, and `alertsShowingCachedPage` classifies it — a **paused** refresh is a *state*, not a *failure*, so the feed never claims it failed. **(4) Reduce motion (AC #10).** The app had **zero** reduced-motion handling. `useReducedMotion()` wraps React Native's own `AccessibilityInfo` (**no new dependency** — RN 0.88 ships it), and `PulseDot` takes a `reduceMotion` prop: the dot goes **static** while its label and its `11 px / var(--ink-500) / weight 600` styling **stay unchanged**, because the setting asks for less movement, not for less information. The paused indicator remains distinct — a paused dot renders **no halo**, a reduced-motion dot renders a **frozen** one. **The new guards:** `refreshGuard.test.ts` (the pure pause rules, the unknown-battery rule, the 20 % boundary), `refreshGuard.dom.test.ts` (the live check), `alertsRefresh.dom.test.ts` (the real hook — one poll per 60 s, zero requests while backgrounded, the low-battery pause, an unknown battery *not* pausing, the pull, the coalescing, and the offline case), `feedHeader.test.ts` (21 source scans over both screens and the hook), and the interval constant pinned in `packages/shared`. **Two of the causal checks initially passed when they should have failed** — a request count cannot see a surviving timer, and the refusal read React state — so both gaps were closed with new tests (a **live**-interval recorder, and a race-window test that fires the app-state event *outside* `act`) rather than the checks being dropped. The honest residue is recorded in the story file: the **Maestro flow** the Testing note asks for does not exist; AC #1's "exactly once" is a **poll-event** count, not an RPC count, because a poll re-fetches every loaded page; and AC #7's coalescing is **order-dependent** (the story names the pull-first order, and that is what is tested). | [018] story 002 |
 
 ### 4.7 Moderation — unit `007-moderation`
 
@@ -1454,8 +1455,12 @@ shipped behaviour, or retire it as superseded.
        data-driven from `area_lookup`, the location chips are disabled
        without a fix, and the work found **two real defects** on the way
        (the unstated chip height, the flat violet in place of the
-       prototype's gradient). `006-alerts` has **two** stories left —
-       `002-auto-refresh-and-pull-to-refresh` and `004-flag-an-alert` —
+       prototype's gradient). ~~**`002-auto-refresh-and-pull-to-refresh`**~~ ✅
+       **DONE** — see §4.6 A6. The 60 s poll, the low-battery pause, the
+       pull-to-refresh and the reduced-motion dot all have guards, and the
+       work found **three real defects** on the way (the unguarded Home
+       poll, the React-Native no-op flag, the `enabled: false` mount-fetch
+       block). `006-alerts` has **one** story left — `004-flag-an-alert` —
        and after that `004-capture` (four) and `003-help-seek` (two, plus
        the one genuinely unbuilt story).
     6. **`002-personal-emergency-picker`** — one of the genuinely unbuilt
@@ -1669,3 +1674,4 @@ Dev accounts: `mod@nagar.local` / `citizen@nagar.local`, password
 | Q-7 | `002-dual-identifier-login`'s **AC7 and AC8** describe a login-screen OTP step that **W-1 removed** — the login screen is email-primary and password-only. They are **void, not unmet**: making them true would mean putting a second credential path back. Amend the criterion to describe the shipped behaviour, or retire it as superseded — the same call as `005-admin-skeleton-and-ci`'s AC2. | low |
 | Q-8 | `002-dual-identifier-login`'s **AC #4** names `VALIDATION_FAILED`; the codebase uses `AUTH_REQUIRED`, and the *same* code is returned for an unknown identifier (HTTP 401) and a wrong password (HTTP 400). The substance of the criterion holds — both paths fail alike, with no "user not found" signal — but the code name differs. | low |
 | Q-9 | **The job worklists are now service-role only.** Migration `036` revokes execute on `job_purge_deleted_accounts`, `job_purge_media_candidates` and `job_geocode_cache_evictions` from `anon` and `authenticated`, because they returned other users' rows and the previous `REVOKE … FROM public` did not remove Supabase's direct grants. If any *other* part of the platform is expected to call a worklist directly — a dashboard, a cron-invoked Edge Function that is not the service role — it must be re-granted explicitly. Today nothing is: the job runner is the only caller. | low |
+| Q-10 | **`usesCleartextTraffic: false`** in `app.json` is harmless under Expo Go, but a **native APK cannot reach the plain-HTTP LAN URL** the local stack serves on. Either the manifest allows cleartext for the dev profile, or the dev client must be pointed at an HTTPS tunnel. | medium |

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTheme, useThemeControls } from '../theme'
 import { AppBar } from './AppBar'
 import { AreaChipRow, type AreaChip } from './AreaChipRow'

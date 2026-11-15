@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import { Button, WizardScreen } from '@/shared/ui'
@@ -101,13 +101,6 @@ export default function AccountDeletedScreen() {
         </>
       }
     >
-      <View style={styles.noticeRow}>
-        <Icon name="delete" size={18} color={theme.palette.amber[600]} />
-        <Text style={[styles.noticeText, { color: theme.colors.ink[600] }]}>
-          {t('disabled.deletedBody')}
-        </Text>
-      </View>
-
       {/*
         The deadline. The fact comes from the account row, so it is the
         server's own clock rather than the device's — and the device's clock
@@ -137,7 +130,7 @@ export default function AccountDeletedScreen() {
         </View>
       ) : null}
 
-      <Text style={[styles.support, { color: theme.colors.ink[400] }]}>
+      <Text style={[styles.support, { color: theme.colors.textMuted }]}>
         {t('settings.deleteWarning')}
       </Text>
 
@@ -164,16 +157,6 @@ export default function AccountDeletedScreen() {
  */
 
 const styles = StyleSheet.create({
-  noticeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  noticeText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 20,
-  },
   deadlineCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',

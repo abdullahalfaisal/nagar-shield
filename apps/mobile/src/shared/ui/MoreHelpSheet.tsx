@@ -1,8 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { MORE_HELP_ROWS } from '@nagar-shield/shared'
 import { useTheme } from '../theme'
+import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { ManualDialGuidance } from './ManualDialGuidance'
 import { useDegradedHelp } from '../services/useDegradedHelp'
@@ -52,8 +53,6 @@ export function MoreHelpSheet({ visible, onClose, onOpenHotlineList }: MoreHelpS
   // through the same door, so they get the same guidance.
   const degradedHelp = useDegradedHelp()
 
-  if (!visible) return null
-
   const dial = async (phone: string) => {
     // The dial path is client-only: the OS dialler is pre-filled and the app
     // never places a call (C-1).
@@ -80,101 +79,73 @@ export function MoreHelpSheet({ visible, onClose, onOpenHotlineList }: MoreHelpS
   }
 
   return (
-    <View style={styles.scrim}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('common.close')}
-        style={styles.dismissArea}
-        onPress={onClose}
-      />
+    <BottomSheet visible={visible} onClose={onClose} title={t('help.moreHelpTitle')}>
+      {/* The manual-dial guidance — the same component the help cards
+          render. One surface, one behaviour. It is pinned above the list, so
+          a failed dial is never answered off screen. */}
+      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+        <ManualDialGuidance
+          number={degradedHelp.guidanceNumber}
+          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+          showOfflineNotice={degradedHelp.showOfflineNotice}
+        />
+      ) : null}
 
-      <View
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: theme.colors.surface.white,
-            paddingBottom: 20,
-          },
-        ]}
+      <ScrollView
+        style={styles.rowsScroll}
+        contentContainerStyle={styles.rows}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.handle, { backgroundColor: theme.colors.ink[200] }]} />
+        {/* The four prototype hotline rows, in the prototype's order.
+            The row itself dials the number; the trailing chevron opens the
+            hotline list, which carries the full curated set. */}
+        {PROTOTYPE_HOTLINE_IDS.map((id) => {
+          const row = MORE_HELP_ROWS.find((entry) => entry.id === id)
+          if (!row) return null
 
-        <Text style={[styles.title, { color: theme.colors.ink[950] }]}>
-          {t('help.moreHelpTitle')}
-        </Text>
+          return (
+            <SheetRow
+              key={id}
+              title={t(HOTLINE_LABEL_KEYS[id] ?? 'help.moreHelpTitle')}
+              number={row.phone}
+              accessibilityLabel={t('help.hotlineCallLabel', {
+                name: t(HOTLINE_LABEL_KEYS[id] ?? 'help.moreHelpTitle'),
+                number: row.phone,
+              })}
+              onPress={() => dial(row.phone)}
+              onOpenList={openHotlineList}
+              openListLabel={t('help.moreHelpOpenList')}
+            />
+          )
+        })}
 
-        <ScrollView
-          style={styles.rowsScroll}
-          contentContainerStyle={styles.rows}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* The four prototype hotline rows, in the prototype's order.
-              The row's call icon dials the number; the row itself opens the
-              hotline list, which carries the full curated set. */}
-          {PROTOTYPE_HOTLINE_IDS.map((id) => {
-            const row = MORE_HELP_ROWS.find((entry) => entry.id === id)
-            if (!row) return null
+        <SheetRow
+          title={t('help.nearestStation')}
+          subtitle={t('help.nearestStationSub')}
+          note={t('help.stationFallbackNote')}
+          onPress={openThanaLine}
+        />
 
-            return (
-              <SheetRow
-                key={id}
-                title={t(HOTLINE_LABEL_KEYS[id] ?? 'help.moreHelpTitle')}
-                number={row.phone}
-                onPress={() => dial(row.phone)}
-                onOpenList={openHotlineList}
-              />
-            )
-          })}
+        <SheetRow
+          title={t('help.stationMap')}
+          subtitle={t('help.stationMapSub')}
+          icon="map"
+          onPress={openStationMap}
+        />
+      </ScrollView>
 
-          <SheetRow
-            title={t('help.nearestStation')}
-            subtitle={t('help.nearestStationSub')}
-            note={t('help.stationFallbackNote')}
-            onPress={openThanaLine}
-          />
-
-          <SheetRow
-            title={t('help.stationMap')}
-            subtitle={t('help.stationMapSub')}
-            icon="map"
-            onPress={openStationMap}
-          />
-        </ScrollView>
-
-        {/* The manual-dial guidance — the same component the help cards
-            render. One surface, one behaviour. */}
-        {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
-          <ManualDialGuidance
-            number={degradedHelp.guidanceNumber}
-            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
-            showOfflineNotice={degradedHelp.showOfflineNotice}
-          />
-        ) : null}
-
-        <Text
-          accessibilityRole="button"
-          accessibilityLabel={t('help.wrongNumber')}
-          onPress={() => {
-            onClose()
-            router.push('/(app)/more-help')
-          }}
-          style={[styles.wrongNumber, { color: theme.palette.violet[700] }]}
-        >
-          {t('help.wrongNumber')}
-        </Text>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={onClose}
-          style={[styles.closeButton, { backgroundColor: theme.palette.violet[50] }]}
-        >
-          <Text style={[styles.closeText, { color: theme.palette.violet[700] }]}>
-            {t('common.close')}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
+      <Text
+        accessibilityRole="button"
+        accessibilityLabel={t('help.wrongNumber')}
+        onPress={() => {
+          onClose()
+          router.push('/(app)/more-help')
+        }}
+        style={[styles.wrongNumber, { color: theme.palette.violet[700] }]}
+      >
+        {t('help.wrongNumber')}
+      </Text>
+    </BottomSheet>
   )
 }
 
@@ -200,7 +171,9 @@ function SheetRow({
   subtitle,
   number,
   note,
-  icon = 'call',
+  icon = 'chevron_right',
+  accessibilityLabel,
+  openListLabel,
   onPress,
   onOpenList,
 }: {
@@ -209,13 +182,14 @@ function SheetRow({
   number?: string
   note?: string
   icon?: string
+  accessibilityLabel?: string
+  openListLabel?: string
   onPress: () => void
   /**
-   * When set, the row's trailing icon opens this surface instead of firing
-   * the call. The prototype's hotline rows carry a `call` icon; tapping the
-   * icon dials, and tapping the row opens the hotline list — the two are
-   * separate targets because the story says the row opens its category's own
-   * surface **and** the call affordance prefills the dialer.
+   * When set, the row body dials (`onPress`) and the trailing chevron opens
+   * this surface instead. Two targets, two accessibility labels: the story
+   * says the call affordance prefills the dialer **and** the row's category
+   * has its own surface.
    */
   onOpenList?: () => void
 }) {
@@ -225,8 +199,8 @@ function SheetRow({
     <View style={[styles.row, { backgroundColor: theme.colors.ink[50] }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${title}${number ? ` ${number}` : ''}`}
-        onPress={onOpenList ?? onPress}
+        accessibilityLabel={accessibilityLabel ?? title}
+        onPress={onPress}
         style={styles.rowHit}
       >
         <View style={styles.rowText}>
@@ -241,54 +215,26 @@ function SheetRow({
             <Text style={[styles.rowNote, { color: theme.colors.ink[400] }]}>{note}</Text>
           ) : null}
         </View>
+        {/* A navigation row has one target, so its icon is decoration inside
+            the same button. */}
+        {!onOpenList ? <Icon name={icon} size={20} color={theme.palette.violet[700]} /> : null}
       </Pressable>
 
-      {/* The trailing affordance. On a hotline row it is the call icon; on
-          the two navigation rows it is the icon the prototype shows. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={icon === 'call' ? `${title} ${number ?? ''}` : title}
-        onPress={onPress}
-        style={styles.rowIcon}
-      >
-        <Icon name={icon} size={20} color={theme.palette.violet[700]} />
-      </Pressable>
+      {onOpenList ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={openListLabel ?? title}
+          onPress={onOpenList}
+          style={styles.rowIcon}
+        >
+          <Icon name={icon} size={20} color={theme.palette.violet[700]} />
+        </Pressable>
+      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  dismissArea: {
-    flex: 1,
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    maxHeight: '88%',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
   rowsScroll: {
     flexGrow: 0,
   },
@@ -341,17 +287,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     minHeight: 48,
     textAlignVertical: 'center',
-  },
-  closeButton: {
-    marginTop: 16,
-    width: '100%',
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeText: {
-    fontWeight: '600',
-    fontSize: 15,
   },
 })

@@ -1,16 +1,26 @@
 import { Redirect } from 'expo-router'
 import { useAuthSession } from '@/shared/auth/useAuthSession'
-import { useAccountStatus } from '@/shared/auth/useAccountStatus'
 import { SplashView } from '@/shared/ui/SplashView'
 
 /**
  * Entry gate. Sends the user to onboarding, login, or the app depending on
  * the session. The prototype's Splash (screen 0) is a branded hold, not a
  * separate route — this screen plays that role.
+ *
+ * A signed-in user is handed to the `(app)` group, and **that group's layout
+ * is the one place that decides whether the app may open**: it holds the
+ * splash screen until the account check and the biometric gate have both
+ * answered, and redirects a disabled or deleted account, a locked app, or an
+ * unreadable lock to the right screen.
+ *
+ * This screen used to run its own account check as well. It rendered nothing
+ * protected, so the check added no safety here, but it ran the same request
+ * twice on every launch and, while it was in flight, sent the user on to Home
+ * without waiting for it — the duplicate gave the appearance of a check
+ * without the substance of one.
  */
 export default function Index() {
   const { session, loading } = useAuthSession()
-  const { status } = useAccountStatus(session?.user?.id)
 
   if (loading) {
     return <SplashView />
@@ -18,17 +28,6 @@ export default function Index() {
 
   if (!session) {
     return <Redirect href="/(auth)/welcome" />
-  }
-
-  // A disabled account never reaches the app: the database refuses its
-  // writes, so it goes straight to the explanation screen.
-  if (status === 'disabled') {
-    return <Redirect href="/(auth)/account-disabled" />
-  }
-
-  // A soft-deleted account can take itself back inside the 30-day window.
-  if (status === 'deleted') {
-    return <Redirect href="/(auth)/account-deleted" />
   }
 
   return <Redirect href="/(app)/home" />

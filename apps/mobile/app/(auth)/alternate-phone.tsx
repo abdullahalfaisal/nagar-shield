@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { readSignupDraft, stageSignupDraft } from '@/shared/auth/signupDraft'
 import { useTranslation } from 'react-i18next'
-import { alternatePhoneSchema, phoneSchema } from '@nagar-shield/shared'
+import { alternatePhoneSchema, bnDigitsToAscii, phoneSchema } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
 import { Button, EscapeLink, InputField, WizardScreen } from '@/shared/ui'
 import { Icon } from '@/shared/ui/Icon'
@@ -36,16 +37,12 @@ export default function AlternatePhoneScreen() {
   const theme = useTheme()
   const router = useRouter()
   const { t } = useTranslation()
-  const params = useLocalSearchParams<{
-    phone?: string
-    email?: string
-    password?: string
-  }>()
+  const draft = readSignupDraft()
 
   const [alternatePhone, setAlternatePhone] = useState('')
   const [error, setError] = useState<string | undefined>()
 
-  const primary = params.phone ?? ''
+  const primary = draft.phone
 
   /**
    * Validates the alternate number.
@@ -65,7 +62,7 @@ export default function AlternatePhoneScreen() {
 
     const parsed = alternatePhoneSchema.safeParse(trimmed)
     if (!parsed.success) {
-      setError(t('errors.validationFailed'))
+      setError(t('errors.phoneInvalid'))
       return undefined
     }
 
@@ -85,16 +82,9 @@ export default function AlternatePhoneScreen() {
     const validated = validate()
     if (validated === undefined) return
 
-    router.push({
-      pathname: '/(auth)/register',
-      params: {
-        phone: primary,
-        email: params.email ?? '',
-        password: params.password ?? '',
-        // Empty means "no alternate phone" — the register screen stores NULL.
-        alternatePhone: validated ?? '',
-      },
-    })
+    // Empty means "no alternate phone" — the register screen stores NULL.
+    stageSignupDraft({ alternatePhone: validated ?? '' })
+    router.push('/(auth)/register')
   }
 
   return (
@@ -115,7 +105,7 @@ export default function AlternatePhoneScreen() {
         label={t('auth.alternatePhoneLabel')}
         value={alternatePhone}
         onChangeText={(next) => {
-          setAlternatePhone(next)
+          setAlternatePhone(bnDigitsToAscii(next))
           // Clear a stale error as soon as the user edits the field, so the
           // message does not describe the previous input.
           if (error) setError(undefined)
@@ -123,6 +113,9 @@ export default function AlternatePhoneScreen() {
         placeholder={t('auth.phonePlaceholder')}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
+        autoComplete="tel-national"
+        returnKeyType="done"
+        onSubmitEditing={onContinue}
         icon="phone"
         error={error}
         helper={t('auth.alternatePhoneMustDiffer')}

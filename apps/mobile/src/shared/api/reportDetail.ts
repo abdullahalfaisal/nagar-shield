@@ -86,6 +86,7 @@ function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | nu
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
+    place: raw.place ?? undefined,
   }
 }
 
@@ -210,17 +211,40 @@ export async function updateCategory(
 }
 
 /**
- * Invalidates the report-detail cache.
+ * The cached reads a category change makes stale.
+ *
+ * The category shows on this report's own detail, on the public detail, on
+ * the card thumbnail, on every History row and on the feed. Refreshing only
+ * the first of those left History and the feed showing the old category until
+ * their one-minute stale window ran out.
+ */
+export function categoryChangeQueryKeys(reportId: string): Array<readonly unknown[]> {
+  return [
+    [...REPORT_DETAIL_KEY, reportId],
+    ['history'],
+    ['alerts'],
+    ['alert-detail', reportId],
+    ['alert-thumbnail', reportId],
+  ]
+}
+
+/**
+ * Invalidates what a category change made stale.
  *
  * Called after a successful category save so the detail screen re-reads the
  * row from the database rather than trusting the client's own copy — the
- * client is never the authority on what is stored.
+ * client is never the authority on what is stored — and so History and the
+ * feed show the new category straight away.
  */
 export function useInvalidateReport(): (reportId: string) => Promise<void> {
   const queryClient = useQueryClient()
 
   return async (reportId: string) => {
-    await queryClient.invalidateQueries({ queryKey: [...REPORT_DETAIL_KEY, reportId] })
+    await Promise.all(
+      categoryChangeQueryKeys(reportId).map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    )
   }
 }
 

@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollView, StyleSheet, View, type RefreshControlProps } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../theme'
 import { AppBar } from './AppBar'
 
@@ -15,6 +16,18 @@ interface ScreenProps {
   background?: string
   /** Extra bottom padding so a sticky CTA never covers the last row. */
   contentBottomPadding?: number
+  /**
+   * The pull-to-refresh control.
+   *
+   * **Optional** and **`undefined` by default**, so a screen that has no
+   * pull-to-refresh is unchanged — the `ScrollView` simply has no
+   * `refreshControl` prop at all.
+   *
+   * It is a prop rather than something `Screen` builds itself because the
+   * control needs the screen's own `refetch` and `isRefetching`, and
+   * `Screen` has no business knowing about the feed.
+   */
+  refreshControl?: React.ReactElement<RefreshControlProps>
 }
 
 /**
@@ -31,15 +44,22 @@ export function Screen({
   footer,
   background,
   contentBottomPadding = 0,
+  refreshControl,
 }: ScreenProps) {
   const theme = useTheme()
+  const insets = useSafeAreaInsets()
 
   const body = scroll ? (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={{ paddingBottom: contentBottomPadding + 24 }}
+      contentContainerStyle={{
+        // The footer adds the inset itself; a screen without one ends at the content, which
+        // would sit under the gesture bar.
+        paddingBottom: contentBottomPadding + 24 + (footer ? 0 : insets.bottom),
+      }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>
@@ -48,10 +68,21 @@ export function Screen({
   )
 
   return (
-    <View style={[styles.root, { backgroundColor: background ?? theme.colors.surface.lavender }]}>
+    <View
+      style={[
+        styles.root,
+        {
+          backgroundColor: background ?? theme.colors.surface.lavender,
+          // The app bar adds the top inset itself; without one the content would sit under the status bar.
+          paddingTop: title ? 0 : insets.top,
+        },
+      ]}
+    >
       {title ? <AppBar title={title} subtitle={subtitle} onBack={onBack} action={action} /> : null}
       {body}
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      {footer ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom }]}>{footer}</View>
+      ) : null}
     </View>
   )
 }

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
 
@@ -73,10 +73,13 @@ export function ChoiceChip({
   label,
   selected,
   onPress,
+  style,
 }: {
   label: string
   selected: boolean
   onPress: () => void
+  /** Lets a caller lay chips out as an equal-width grid (see HistoryFilterSheet). */
+  style?: StyleProp<ViewStyle>
 }) {
   const theme = useTheme()
 
@@ -91,6 +94,7 @@ export function ChoiceChip({
       hitSlop={4}
       style={[
         styles.chip,
+        style,
         {
           backgroundColor: selected ? theme.palette.violet[600] : theme.colors.surface.white,
           borderColor: selected ? theme.palette.violet[600] : theme.colors.ink[200],
@@ -166,6 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     minHeight: 40,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   checkRow: {

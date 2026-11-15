@@ -83,7 +83,7 @@ appId: com.nagarshield.app
     timeout: 30000
 
 - assertVisible:
-    text: "ক্যাপচার|Capture"
+    text: "অপরাধ রিপোর্ট|Report Crime"
 - assertVisible:
     text: "লোকেশন শেয়ার|Location sharing"
 
@@ -163,11 +163,11 @@ appId: com.nagarshield.app
 
 - extendedWaitUntil:
     visible:
-      text: "ক্যাপচার|Capture"
+      text: "অপরাধ রিপোর্ট|Report Crime"
     timeout: 15000
 
 - tapOn:
-    text: "ক্যাপচার|Capture"
+    text: "অপরাধ রিপোর্ট|Report Crime"
     index: 0
 
 # -----------------------------------------------------------------------------
@@ -179,16 +179,16 @@ appId: com.nagarshield.app
 
 - extendedWaitUntil:
     visible:
-      text: "ঘটনা ক্যাপচার করুন|Capture an incident"
+      text: "অপরাধ রিপোর্ট|Report Crime"
     timeout: 15000
 
-# The three media sources.
+# The media sources: the camera for a photo, the camera for a video, and the gallery.
 - assertVisible:
-    text: "ছবি তুলুন|Take a photo"
+    text: "ছবি তুলুন|Take photo"
 - assertVisible:
-    text: "ভিডিও ক্যাপচার করুন|Capture a video"
+    text: "ভিডিও করুন|Record video"
 - assertVisible:
-    text: "ফাইল আপলোড করুন|Upload a file"
+    text: "গ্যালারি থেকে বাছুন|Choose from gallery"
 
 # The anonymity toggle — the default state is "stay anonymous", and the
 # switch is the app's privacy control (FR-CAPTURE-1).

@@ -38,7 +38,10 @@ export function AdminShell({ children, active }: AdminShellProps) {
   return (
     <div className="shell">
       <nav className="rail" aria-label={copy.appTagline}>
-        <div className="railBrand">{copy.appName}</div>
+        <div className="railBrand">
+          <img src="/brand/app-icon-128.png" alt="" width={32} height={32} className="railMark" />
+          {copy.appName}
+        </div>
         <div className="railTagline">{copy.appTagline}</div>
 
         <Link

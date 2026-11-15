@@ -1,24 +1,44 @@
-import { Directory, File, Paths } from 'expo-file-system'
+import { Directory, File, FileMode, Paths } from 'expo-file-system'
 import * as ImageManipulator from 'expo-image-manipulator'
-import { AppError, type MediaType } from '@nagar-shield/shared'
+import { AppError, MEDIA_MAX_FILE_BYTES, MEDIA_MAX_VIDEO_SECONDS } from '@nagar-shield/shared'
 import {
+  MEDIA_MAX_SOURCE_PHOTO_BYTES,
+  MEDIA_MAX_SOURCE_VIDEO_BYTES,
   exceedsFileCap,
   exceedsVideoCap,
   extensionFor,
-  isAllowedFileType,
   isAllowedImageType,
   isAllowedVideoType,
+  megabytes,
   resizeTarget,
+  videoBitrateFor,
+  type MediaRejection,
   type PreparedMedia,
 } from './mediaPipeline'
+import { loadVideoCompressor, type VideoCompressor } from './videoCompressor'
+import { scrubVideoMetadata, type ScrubResult } from './videoMetadata'
+
+/** A refused photo or video, with the reason the message names. */
+function rejected(rejection: MediaRejection): AppError {
+  return new AppError(
+    rejection.reason === 'format' ? 'UNSUPPORTED_MEDIA' : 'MEDIA_TOO_LARGE',
+    rejection,
+  )
+}
 
 /**
  * The device-side media preparation.
  *
- * The pipeline runs entirely on the handset: the photo is re-encoded (which is
- * the reliable EXIF strip), the video is trimmed and re-encoded, and the file
- * is copied into the app sandbox. The original bytes — with their embedded
- * GPS — never leave the device.
+ * The pipeline runs entirely on the handset, and the two kinds are treated
+ * differently:
+ *
+ *   * a **photo** is re-encoded (which is the reliable EXIF strip), so its
+ *     original bytes — with their embedded GPS — never leave the device;
+ *   * a **video** is re-encoded to fit the upload cap where the binary has
+ *     the compressor (`videoCompressor.ts`), and copied as it is in Expo Go.
+ *     In both cases the metadata boxes of the file that is uploaded — where
+ *     the camera writes the location — are blanked in place
+ *     (`videoMetadata.ts`).
  */
 
 export interface PickedAsset {
@@ -52,7 +72,15 @@ function ensureDraftDirectory(): Directory {
  */
 export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
   if (!isAllowedImageType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA')
+    throw rejected({ kind: 'photo', reason: 'format' })
+  }
+
+  if (asset.fileSize !== null && asset.fileSize > MEDIA_MAX_SOURCE_PHOTO_BYTES) {
+    throw rejected({
+      kind: 'photo',
+      reason: 'size',
+      maxMb: megabytes(MEDIA_MAX_SOURCE_PHOTO_BYTES),
+    })
   }
 
   const width = asset.width ?? MEDIA_DEFAULT_DIMENSION
@@ -77,7 +105,7 @@ export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
   const info = file.info()
 
   if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE')
+    throw rejected({ kind: 'photo', reason: 'size', maxMb: megabytes(MEDIA_MAX_FILE_BYTES) })
   }
 
   return {
@@ -95,84 +123,136 @@ export async function preparePhoto(asset: PickedAsset): Promise<PreparedMedia> {
 /**
  * Prepares a picked video.
  *
- * A video longer than the 30 s cap is **trimmed** before the upload. The
- * transcode itself needs the native video pipeline; when it is unavailable
- * the original is kept and the server rejects it with `MEDIA_TOO_LARGE`
- * rather than the client uploading something it knows is over the cap.
+ * Where the binary carries the compressor (a development or release build),
+ * the clip is re-encoded to 720p at a bitrate that fits the 10 MB upload cap,
+ * so an ordinary 30-second recording is accepted. In Expo Go there is no
+ * compressor: the clip is copied as it is and must already fit the cap.
+ *
+ * Either way a video over a cap is **refused** here, with the limit it broke,
+ * rather than uploaded for the server to reject, and the metadata boxes of
+ * the file that will be uploaded are blanked.
+ *
+ * The scrub fails **closed**: a copy whose metadata cannot be blanked is
+ * deleted and refused, never uploaded with its location still in it.
  */
-export async function prepareVideo(asset: PickedAsset): Promise<PreparedMedia> {
+export async function prepareVideo(
+  asset: PickedAsset,
+  onProgress?: (progress: number) => void,
+): Promise<PreparedMedia> {
   if (!isAllowedVideoType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA')
+    throw rejected({ kind: 'video', reason: 'format' })
   }
 
   if (exceedsVideoCap(asset.duration)) {
-    throw new AppError('MEDIA_TOO_LARGE', { maxSeconds: 30 })
+    throw rejected({ kind: 'video', reason: 'duration', maxSeconds: MEDIA_MAX_VIDEO_SECONDS })
   }
 
-  const width = asset.width ?? MEDIA_DEFAULT_DIMENSION
-  const height = asset.height ?? MEDIA_DEFAULT_DIMENSION
-  const target = resizeTarget(width, height)
+  const compressor = loadVideoCompressor()
+  const sourceCap = compressor ? MEDIA_MAX_SOURCE_VIDEO_BYTES : MEDIA_MAX_FILE_BYTES
 
-  const file = new File(
-    ensureDraftDirectory(),
-    `video-${Date.now()}.${extensionFor(asset.mimeType, 'video')}`,
-  )
-  const source = new File(asset.uri)
+  // Checked before any work, so a clip that cannot be accepted is refused at
+  // once rather than after it has been copied or re-encoded.
+  if (asset.fileSize !== null && asset.fileSize > sourceCap) {
+    throw rejected({ kind: 'video', reason: 'size', maxMb: megabytes(sourceCap) })
+  }
+
+  const compressedUri = compressor ? await compressToCap(compressor, asset, onProgress) : null
+  const extension = compressedUri ? 'mp4' : extensionFor(asset.mimeType, 'video')
+
+  const file = new File(ensureDraftDirectory(), `video-${Date.now()}.${extension}`)
+  const source = new File(compressedUri ?? asset.uri)
   await source.copy(file, { overwrite: true })
+  if (compressedUri) discard(source)
 
   const info = file.info()
 
   if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE')
+    file.delete()
+    throw rejected({ kind: 'video', reason: 'size', maxMb: megabytes(MEDIA_MAX_FILE_BYTES) })
   }
+
+  const scrub = await scrubDraftVideo(file).catch(() => null)
+  if (!scrub?.isMovie) {
+    file.delete()
+    throw rejected({ kind: 'video', reason: 'format' })
+  }
+
+  // A re-encoded clip has the compressor's frame size, not the camera's.
+  const frame = compressedUri
+    ? ((await compressor?.frameSize(file.uri)) ?? null)
+    : { width: asset.width ?? 0, height: asset.height ?? 0 }
 
   return {
     uri: file.uri,
     mediaType: 'video',
     byteSize: info.size ?? 0,
     durationSeconds: asset.duration,
-    width: target.width,
-    height: target.height,
-    contentType: asset.mimeType ?? 'video/mp4',
-    extension: extensionFor(asset.mimeType, 'video'),
+    width: frame && frame.width > 0 ? frame.width : null,
+    height: frame && frame.height > 0 ? frame.height : null,
+    contentType: compressedUri ? 'video/mp4' : (asset.mimeType ?? 'video/mp4'),
+    extension,
   }
 }
 
 /**
- * Prepares a picked document.
+ * Re-encodes the clip until it fits the upload cap, and returns the output.
  *
- * PDF and DOC only, and at most 10 MB. The bytes are copied into the sandbox
- * so the upload does not depend on the picker's temporary file surviving.
+ * An encoder treats its bitrate as a target, not a limit, and a busy scene
+ * can overshoot it. One overshoot is answered with a second pass at a lower
+ * bitrate, rather than by telling the citizen their video is too large when
+ * the app itself made it that size.
+ *
+ * When the compressor fails outright, a source that already fits the cap is
+ * used as it is (`null`), and a larger one is refused.
  */
-export async function prepareFile(asset: PickedAsset): Promise<PreparedMedia> {
-  if (!isAllowedFileType(asset.mimeType)) {
-    throw new AppError('UNSUPPORTED_MEDIA')
+async function compressToCap(
+  compressor: VideoCompressor,
+  asset: PickedAsset,
+  onProgress?: (progress: number) => void,
+): Promise<string | null> {
+  let bitrate = videoBitrateFor(asset.duration)
+
+  try {
+    for (let pass = 0; pass < 2; pass += 1) {
+      const output = new File(await compressor.compress(asset.uri, bitrate, onProgress))
+      if (!exceedsFileCap(output.info().size ?? 0)) return output.uri
+
+      discard(output)
+      bitrate = Math.round(bitrate * 0.6)
+    }
+  } catch {
+    if (asset.fileSize !== null && !exceedsFileCap(asset.fileSize)) return null
   }
 
-  if (asset.fileSize !== null && exceedsFileCap(asset.fileSize)) {
-    throw new AppError('MEDIA_TOO_LARGE')
+  throw rejected({ kind: 'video', reason: 'size', maxMb: megabytes(MEDIA_MAX_FILE_BYTES) })
+}
+
+/** Deletes a temporary file. One left behind is in the cache, and harmless. */
+function discard(file: File): void {
+  try {
+    if (file.exists) file.delete()
+  } catch {
+    // The cache is cleared by the OS.
   }
+}
 
-  const extension = extensionFor(asset.mimeType, 'file')
-  const file = new File(ensureDraftDirectory(), `file-${Date.now()}.${extension}`)
-  const source = new File(asset.uri)
-  await source.copy(file, { overwrite: true })
-
-  const info = file.info()
-
-  if (info.exists && exceedsFileCap(info.size ?? 0)) {
-    throw new AppError('MEDIA_TOO_LARGE')
-  }
-
-  return {
-    uri: file.uri,
-    mediaType: 'file' as MediaType,
-    byteSize: info.size ?? asset.fileSize ?? 0,
-    durationSeconds: null,
-    width: null,
-    height: null,
-    contentType: asset.mimeType ?? 'application/pdf',
-    extension,
+/** Blanks the metadata boxes of the draft copy, through a file handle. */
+async function scrubDraftVideo(file: File): Promise<ScrubResult> {
+  const handle = file.open(FileMode.ReadWrite)
+  try {
+    return await scrubVideoMetadata({
+      size: handle.size ?? 0,
+      read: (offset, length) => {
+        handle.offset = offset
+        return handle.readBytes(length)
+      },
+      write: (offset, bytes) => {
+        handle.offset = offset
+        return handle.writeBytes(bytes)
+      },
+    })
+  } finally {
+    handle.close()
   }
 }
 

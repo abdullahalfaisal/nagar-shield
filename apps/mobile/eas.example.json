@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "release": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EAS_PROJECT_ID": "<your EAS project id>",
+        "APP_VERSION_CODE": "2",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://<your-project-ref>.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "<your Supabase anon key>",
+        "EXPO_PUBLIC_SMS_OTP_ENABLED": "false",
+        "EXPO_PUBLIC_MAP_TILE_URL": "https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=<your MapTiler key>",
+        "EXPO_PUBLIC_MAP_ATTRIBUTION": "\u00a9 MapTiler \u00a9 OpenStreetMap contributors"
+      }
+    }
+  }
+}

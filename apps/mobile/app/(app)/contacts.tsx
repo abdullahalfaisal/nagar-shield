@@ -1,10 +1,20 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { AppError, type EmergencyContact } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
-import { ContactAvatar, EmptyState, Icon, PrimaryStar, RelationshipPill, Screen } from '@/shared/ui'
+import {
+  ContactAvatar,
+  EmptyState,
+  Icon,
+  PrimaryStar,
+  RelationshipPill,
+  ManualDialGuidance,
+  Screen,
+  useToast,
+} from '@/shared/ui'
 import {
   deleteContact,
   makePrimary,
@@ -12,6 +22,7 @@ import {
   useInvalidateContacts,
 } from '@/shared/api/contacts'
 import { fromSupabaseError } from '@/shared/api/errors'
+import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
 import { errorCopy } from '@/shared/i18n/errorCopy'
 
 /**
@@ -51,13 +62,20 @@ import { errorCopy } from '@/shared/i18n/errorCopy'
 export default function ContactsScreen() {
   const theme = useTheme()
   const router = useRouter()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const insets = useSafeAreaInsets()
   const invalidate = useInvalidateContacts()
+  const toast = useToast()
 
-  const { data, isLoading } = useContacts()
+  const { data, isLoading, isError, refetch } = useContacts()
   const contacts = useMemo(() => data ?? [], [data])
 
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // The same degraded-help dial path the help screens use, so a device with no
+  // dialler shows the number to dial by hand instead of doing nothing.
+  const degradedHelp = useDegradedHelp()
+  const [guidanceHeight, setGuidanceHeight] = useState(0)
 
   const groups = useMemo(() => {
     const order: Array<EmergencyContact['groupName']> = ['family', 'friend', 'colleague', 'other']
@@ -83,11 +101,13 @@ export default function ContactsScreen() {
       setBusyId(contact.id)
       try {
         await makePrimary(contact.id)
-        await invalidate()
       } catch (error) {
         const appError = error instanceof AppError ? error : fromSupabaseError(error)
         Alert.alert(t('common.error'), errorCopy(t, appError.code))
       } finally {
+        // Even a failed change may have written part of itself, so the list is
+        // always re-read rather than left showing what the client assumed.
+        await invalidate().catch(() => undefined)
         setBusyId(null)
       }
     },
@@ -112,18 +132,21 @@ export default function ContactsScreen() {
             setBusyId(contact.id)
             try {
               await deleteContact(contact.id)
-              await invalidate()
+              toast.show({ message: t('contacts.deletedToast'), tone: 'success' })
             } catch (error) {
               const appError = error instanceof AppError ? error : fromSupabaseError(error)
               Alert.alert(t('common.error'), errorCopy(t, appError.code))
             } finally {
+              // Always refresh: a delete that went through must not leave its
+              // row on screen because a later step failed.
+              await invalidate().catch(() => undefined)
               setBusyId(null)
             }
           },
         },
       ])
     },
-    [invalidate, t],
+    [invalidate, t, toast],
   )
 
   // A contact may be primary, and the prompt appears only when the list is
@@ -131,84 +154,120 @@ export default function ContactsScreen() {
   const hasPrimary = contacts.some((contact) => contact.isPrimary)
 
   return (
-    <Screen
-      title={t('contacts.title')}
-      onBack={() => router.back()}
-      scroll
-      contentBottomPadding={100}
-    >
-      <Text style={[styles.intro, { color: theme.colors.ink[500] }]}>
-        {t('contacts.intro')}{' '}
-        <Text style={{ color: theme.palette.violet[700] }}>★ {t('contacts.primary')}</Text>{' '}
-        {t('contacts.introRest')}
-      </Text>
-
-      {isLoading ? (
-        <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
-          {t('common.loading')}
-        </Text>
-      ) : contacts.length === 0 ? (
-        <EmptyState
-          icon="contact_emergency"
-          title={t('contacts.empty')}
-          description={t('contacts.emptySub')}
-        />
-      ) : (
-        <>
-          {!hasPrimary ? (
-            <View style={[styles.notice, { backgroundColor: theme.palette.amber[50] }]}>
-              <Icon name="star" size={18} color={theme.palette.amber[600]} />
-              <Text style={[styles.noticeText, { color: theme.palette.amber[600] }]}>
-                {t('contacts.noPrimaryNotice')}
-              </Text>
+    <>
+      <Screen
+        title={t('contacts.title')}
+        onBack={() => router.back()}
+        scroll
+        contentBottomPadding={100}
+        footer={
+          // Pinned, so the number is on screen wherever the list is scrolled.
+          // The footer pads the sides, the guidance pads itself.
+          degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+            <View
+              style={styles.pinned}
+              onLayout={(event) => setGuidanceHeight(event.nativeEvent.layout.height)}
+            >
+              <ManualDialGuidance
+                number={degradedHelp.guidanceNumber}
+                showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+                showOfflineNotice={degradedHelp.showOfflineNotice}
+              />
             </View>
-          ) : null}
-
-          {groups.map(({ group, items }) => (
-            <View key={group}>
-              <Text style={[styles.groupTitle, { color: theme.colors.ink[500] }]}>
-                {groupLabel(group, t)} ({toBengaliDigits(String(items.length))})
-              </Text>
-              {items.map((contact) => (
-                <ContactRow
-                  key={contact.id}
-                  contact={contact}
-                  primaryLabel={t('contacts.primary')}
-                  editLabel={t('contacts.editCta')}
-                  deleteLabel={t('contacts.deleteCta')}
-                  busy={busyId === contact.id}
-                  onPress={() =>
-                    router.push({ pathname: '/(app)/contact-editor', params: { id: contact.id } })
-                  }
-                  onTogglePrimary={() => onTogglePrimary(contact)}
-                  onDelete={() => onDelete(contact)}
-                />
-              ))}
-            </View>
-          ))}
-        </>
-      )}
-
-      {/* `.fab` — the add-contact button. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('contacts.add')}
-        onPress={() => router.push('/(app)/contact-editor')}
-        style={[
-          styles.fab,
-          {
-            backgroundColor: theme.palette.green[500],
-            shadowColor: '#7C3AED',
-            shadowOpacity: 0.28,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 8 },
-            elevation: 8,
-          },
-        ]}
+          ) : undefined
+        }
       >
-        <Icon name="add" size={28} color="#FFFFFF" filled />
-      </Pressable>
-    </Screen>
+        <Text style={[styles.intro, { color: theme.colors.ink[500] }]}>
+          {t('contacts.intro')}{' '}
+          <Text style={{ color: theme.palette.violet[700] }}>★ {t('contacts.primary')}</Text>{' '}
+          {t('contacts.introRest')}
+        </Text>
+
+        {isLoading ? (
+          <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+            {t('common.loading')}
+          </Text>
+        ) : isError && !data ? (
+          // A failed load is not an empty list: "no contacts" with an add prompt
+          // would invite the user to save people who are already saved.
+          <EmptyState
+            icon="error"
+            title={t('contacts.loadFailed')}
+            description={t('contacts.loadFailedSub')}
+            action={{ label: t('common.retry'), onPress: () => void refetch() }}
+          />
+        ) : contacts.length === 0 ? (
+          <EmptyState
+            icon="contact_emergency"
+            title={t('contacts.empty')}
+            description={t('contacts.emptySub')}
+          />
+        ) : (
+          <>
+            {!hasPrimary ? (
+              <View style={[styles.notice, { backgroundColor: theme.palette.amber[50] }]}>
+                <Icon name="star" size={18} color={theme.palette.amber[600]} />
+                <Text style={[styles.noticeText, { color: theme.palette.amber[600] }]}>
+                  {t('contacts.noPrimaryNotice')}
+                </Text>
+              </View>
+            ) : null}
+
+            {groups.map(({ group, items }) => (
+              <View key={group}>
+                <Text style={[styles.groupTitle, { color: theme.colors.ink[500] }]}>
+                  {groupLabel(group, t)} (
+                  {i18n.language === 'bn' ? toBengaliDigits(String(items.length)) : items.length})
+                </Text>
+                {items.map((contact) => (
+                  <ContactRow
+                    key={contact.id}
+                    contact={contact}
+                    primaryLabel={t('contacts.primary')}
+                    editLabel={t('contacts.editCta')}
+                    deleteLabel={t('contacts.deleteCta')}
+                    busy={busyId === contact.id}
+                    onPress={() =>
+                      router.push({ pathname: '/(app)/contact-editor', params: { id: contact.id } })
+                    }
+                    onTogglePrimary={() => onTogglePrimary(contact)}
+                    onDelete={() => onDelete(contact)}
+                    onCall={() => {
+                      void degradedHelp.dial(contact.phone)
+                    }}
+                  />
+                ))}
+              </View>
+            ))}
+          </>
+        )}
+      </Screen>
+
+      {/* `.fab` — the add-contact button. A pinned sibling of the scroll, so it
+        stays on screen however long the list is. */}
+      {isError && !data ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('contacts.add')}
+          onPress={() => router.push('/(app)/contact-editor')}
+          style={[
+            styles.fab,
+            {
+              // Lifted above the pinned guidance so the two never overlap.
+              bottom: insets.bottom + 16 + (degradedHelp.showGuidance ? guidanceHeight : 0),
+              backgroundColor: theme.palette.green[500],
+              shadowColor: '#7C3AED',
+              shadowOpacity: 0.28,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 8,
+            },
+          ]}
+        >
+          <Icon name="add" size={28} color="#FFFFFF" filled />
+        </Pressable>
+      )}
+    </>
   )
 }
 
@@ -221,6 +280,7 @@ function ContactRow({
   onPress,
   onTogglePrimary,
   onDelete,
+  onCall,
 }: {
   contact: EmergencyContact
   primaryLabel: string
@@ -230,9 +290,10 @@ function ContactRow({
   onPress: () => void
   onTogglePrimary: () => void
   onDelete: () => void
+  onCall: () => void
 }) {
   const theme = useTheme()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   return (
     <View
@@ -253,7 +314,7 @@ function ContactRow({
         <ContactAvatar name={contact.name} group={contact.groupName} />
         <View style={styles.contactInfo}>
           <View style={styles.nameRow}>
-            <Text style={[styles.contactName, { color: theme.colors.ink[950] }]}>
+            <Text numberOfLines={1} style={[styles.contactName, { color: theme.colors.ink[950] }]}>
               {contact.name}
             </Text>
             <PrimaryStar
@@ -262,8 +323,8 @@ function ContactRow({
               accessibilityLabel={primaryLabel}
             />
           </View>
-          <Text style={[styles.contactPhone, { color: theme.colors.ink[500] }]}>
-            {formatPhone(contact.phone)}
+          <Text numberOfLines={1} style={[styles.contactPhone, { color: theme.colors.ink[500] }]}>
+            {formatPhone(contact.phone, i18n.language)}
           </Text>
           <RelationshipPill group={contact.groupName} label={groupLabel(contact.groupName, t)} />
         </View>
@@ -279,9 +340,16 @@ function ContactRow({
         >
           <Icon name="delete" size={20} color={theme.colors.ink[400]} />
         </Pressable>
-        <View style={[styles.contactAction, { backgroundColor: theme.palette.green[100] }]}>
-          <Icon name="call" size={20} color={theme.palette.green[600]} filled />
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${t('contacts.callCta')} ${contact.name}`}
+          onPress={onCall}
+          style={styles.callHit}
+        >
+          <View style={[styles.contactAction, { backgroundColor: theme.palette.green[100] }]}>
+            <Icon name="call" size={20} color={theme.palette.green[600]} filled />
+          </View>
+        </Pressable>
       </View>
     </View>
   )
@@ -306,15 +374,26 @@ export function toBengaliDigits(input: string): string {
   return input.replace(/[0-9]/g, (digit) => BENGALI_DIGITS[Number(digit)] ?? digit)
 }
 
-/** Formats `+8801712345678` as the prototype's `০১৭১২-৩৪৫৬৭৮`. */
-export function formatPhone(phone: string): string {
+/**
+ * Formats `+8801712345678` as `01712-345678`, in Bangla digits on a Bangla
+ * screen (`০১৭১২-৩৪৫৬৭৮`).
+ *
+ * The national number is the ten digits after `880` with the trunk `0` put
+ * back in front. It used to drop the first of those ten digits instead, so
+ * `+8801712345678` read `07123-45678`.
+ */
+export function formatPhone(phone: string, language: string = 'bn'): string {
   const digits = phone.replace(/\D/g, '').replace(/^880/, '')
   if (digits.length !== 10) return phone
-  const national = `0${digits.slice(1)}`
-  return toBengaliDigits(`${national.slice(0, 5)}-${national.slice(5)}`)
+  const national = `0${digits}`
+  const text = `${national.slice(0, 5)}-${national.slice(5)}`
+  return language === 'bn' ? toBengaliDigits(text) : text
 }
 
 const styles = StyleSheet.create({
+  pinned: {
+    marginHorizontal: -20,
+  },
   intro: {
     textAlign: 'center',
     paddingHorizontal: 24,
@@ -354,13 +433,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowAction: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  callHit: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
   contactInfo: {
     flex: 1,
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
@@ -369,15 +455,17 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 14,
     fontWeight: '600',
+    flexShrink: 1,
   },
   contactPhone: {
     fontSize: 12,
     marginTop: 1,
+    flexShrink: 1,
   },
   contactAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -402,7 +490,6 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 110,
     right: 20,
     width: 60,
     height: 60,

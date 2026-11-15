@@ -1,3 +1,4 @@
+import { toBengaliDigits } from '@/shared/utils/relativeTime'
 /**
  * The location snapshot payload.
  *
@@ -87,6 +88,35 @@ export function buildMapsUrl(lat: number, lng: number): string {
  * locale reads a Bangla date, an English locale reads an English one. The
  * `geo:` URI and the Maps URL are locale-independent.
  */
+/**
+ * The words in the message the contact receives. The default is English; the
+ * Location Sharing screen passes the app's language, so a Bangla user's contact
+ * gets a Bangla message, not an English one with a Bangla date.
+ */
+export interface SnapshotLabels {
+  title: string
+  titleNoLocation: string
+  taken: string
+  accuracy: string
+  /** The unit after the accuracy figure, e.g. `m`. */
+  meterUnit: string
+}
+
+export const DEFAULT_SNAPSHOT_LABELS: SnapshotLabels = {
+  title:
+    "I'm sharing my current location with you. I may be in trouble, or about to face trouble, and I feel I need to send you where I am right now. Please check on me.",
+  titleNoLocation:
+    "I'm trying to reach you, but I could not get my location. I may be in trouble — please check on me.",
+  taken: 'Taken',
+  accuracy: 'Accuracy',
+  meterUnit: 'm',
+}
+
+/** Latin digits in a Bangla message read as Bangla digits, like the rest of the app. */
+function localizeDigits(text: string, locale: string): string {
+  return locale === 'bn' ? toBengaliDigits(text) : text
+}
+
 export function formatCapturedAt(iso: string, locale: string): string {
   const captured = new Date(iso)
   if (Number.isNaN(captured.getTime())) return ''
@@ -117,7 +147,9 @@ export function buildSnapshotPayload(input: {
   accuracyM: number | null
   capturedAt: string
   locale?: string
+  labels?: SnapshotLabels
 }): SnapshotPayload {
+  const labels = input.labels ?? DEFAULT_SNAPSHOT_LABELS
   const lat = roundCoordinate(input.lat)
   const lng = roundCoordinate(input.lng)
 
@@ -130,12 +162,12 @@ export function buildSnapshotPayload(input: {
   const accuracyLine =
     input.accuracyM === null || input.accuracyM === undefined
       ? null
-      : `±${Math.round(input.accuracyM)} m`
+      : localizeDigits(`±${Math.round(input.accuracyM)} ${labels.meterUnit}`, input.locale ?? 'en')
 
   const lines = [
-    'Nagar Shield — my current location',
-    capturedAt ? `Taken: ${capturedAt}` : null,
-    accuracyLine ? `Accuracy: ${accuracyLine}` : null,
+    labels.title,
+    capturedAt ? `${labels.taken}: ${capturedAt}` : null,
+    accuracyLine ? `${labels.accuracy}: ${accuracyLine}` : null,
     geoUri,
     mapsUrl,
   ].filter((line): line is string => line !== null)
@@ -162,12 +194,14 @@ export function buildPayloadWithoutLocation(input: {
   capturedAt: string
   locale?: string
   note: string
+  labels?: SnapshotLabels
 }): SnapshotPayload {
+  const labels = input.labels ?? DEFAULT_SNAPSHOT_LABELS
   const capturedAt = formatCapturedAt(input.capturedAt, input.locale ?? 'en')
 
   const lines = [
-    'Nagar Shield — location sharing',
-    capturedAt ? `Taken: ${capturedAt}` : null,
+    labels.titleNoLocation,
+    capturedAt ? `${labels.taken}: ${capturedAt}` : null,
     input.note,
   ].filter((line): line is string => line !== null)
 

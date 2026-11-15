@@ -43,12 +43,15 @@ Deliver **station map and degradation** for unit `003-help-seek`. Stories: 2. Bo
 > evidence (Verification) instead, so inventing a separate artifact file
 > would be duplicating what already exists.
 >
-> **One limitation is recorded, not hidden.** The Android power-save
-> detection needs a native module that this build does not ship, so the
-> battery-saver warning ships as its static copy. The capability is a named
-> constant (`BATTERY_SAVER_DETECTION`) and the story records it as a known
-> limitation — the story's own specified degradation path, not a silent
-> no-op.
+> **A limitation was recorded, then resolved.** The Android power-save
+> detection was originally shipped with the capability hard-wired to
+> `'unavailable'` — the battery-saver warning rendered as its static copy
+> after every dial. `expo-battery` turned out to expose the read
+> (`isLowPowerModeEnabledAsync()` → `PowerManager.isPowerSaveMode`), so the
+> capability is now `'available'` and the warning only renders when power
+> saving is actually on — or when the read itself fails, which the static
+> copy still covers. The constant (`BATTERY_SAVER_DETECTION`) and the story's
+> degradation path are unchanged in shape.
 
 ### Expected Outputs
 

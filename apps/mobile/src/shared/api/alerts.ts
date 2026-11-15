@@ -13,6 +13,11 @@ import type {
 } from '@nagar-shield/shared'
 import { supabase } from '@/shared/api/supabase'
 import { fromSupabaseError } from '@/shared/api/errors'
+import {
+  RefreshPausedError,
+  useRefreshGuard,
+  type RefreshGuard,
+} from '@/shared/services/refreshGuard'
 
 /**
  * The public Alerts feed.
@@ -63,6 +68,7 @@ function toAreaHierarchy(raw: Partial<AreaHierarchy> | null): AreaHierarchy | nu
     city: raw.city ?? '',
     thana: raw.thana ?? '',
     neighborhood: raw.neighborhood ?? undefined,
+    place: raw.place ?? undefined,
   }
 }
 
@@ -119,21 +125,90 @@ export type AlertsFeedData = InfiniteData<Paginated<PublicReport>, string | null
  * The **cursor is the page parameter**, not part of the query key. The key
  * carries the area filter alone, so changing the chip starts a new feed at
  * page one while scrolling forward appends to the accumulated pages.
+ *
+ * ## The refresh guard is intrinsic to this hook
+ *
+ * The feed polls every 60 s, and it must stop when the device is unhealthy.
+ * The guard lives **here** rather than in each screen, because a guard a
+ * caller has to remember is a guard a caller will forget — and the Home
+ * screen did forget it, polling every 60 s in the background forever.
+ *
+ * Two levers stop the poll, and both are needed:
+ *
+ *   * the **interval function** stops the *timer*;
+ *   * the **`queryFn` refusal** stops the *request* (background only).
+ *
+ * The second one covers the race window between the native
+ * `appStateDidChange` event and React's commit of the new state: the timer
+ * can fire in that window, and a request issued then would go out even though
+ * the app is already backgrounded.
  */
-export function useAlerts(
-  query: AlertsFilter,
-  options?: { enabled?: boolean },
-): UseInfiniteQueryResult<AlertsFeedData, Error> {
-  return useInfiniteQuery({
+export function useAlertsFeed(query: AlertsFilter): AlertsFeedResult {
+  // ONE guard instance for this feed surface. The screen reads it from the
+  // hook's return value — it never calls `useRefreshGuard` itself, so the
+  // screen and the poll can never disagree about why the refresh is paused.
+  const guard = useRefreshGuard()
+
+  const result = useInfiniteQuery<
+    Paginated<PublicReport>,
+    Error,
+    AlertsFeedData,
+    ['alerts', AlertsFilter],
+    string | null
+  >({
     queryKey: ['alerts', query],
-    queryFn: ({ pageParam }) => fetchAlerts(query, pageParam ?? null),
+    queryFn: async ({ pageParam }) => {
+      // The **live** check, not `guard.isPaused`.
+      //
+      // `guard.isPaused` is React state, so it describes the last render. A
+      // native `appStateDidChange` that has not been committed yet is
+      // invisible to it — and a request issued in that window would go out
+      // after the app was already backgrounded.
+      //
+      // `isBackgroundedNow()` reads the app state source directly, so it sees
+      // the backgrounding the moment the native event arrives.
+      //
+      // Only the **background** refuses here. The battery and offline pauses
+      // belong to the automatic poll (the interval below): a first load, a
+      // pull, Retry or "Load more" is something the user asked for, and
+      // refusing it at 19 % battery left the feed unable to load at all.
+      if (guard.isBackgroundedNow()) throw new RefreshPausedError('background')
+      return fetchAlerts(query, pageParam ?? null)
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: options?.enabled ?? true,
-    // Auto-refresh every 60 s in the foreground (FR-ALERTS-2).
-    refetchInterval: ALERTS_REFRESH_INTERVAL_MS,
+    // The poll is foreground-only **by construction**.
+    //
+    // `refetchIntervalInBackground: false` is a **no-op in React Native**:
+    // TanStack's `focusManager.isFocused()` reads
+    // `globalThis.document?.visibilityState`, and React Native has no DOM
+    // `document`, so it is *always* `true`. The flag is kept because it is
+    // the correct thing to write — but it is **not** what stops the
+    // background poll. The **interval function** below is.
+    //
+    // (The root layout now also feeds `focusManager` the app state, so the flag
+    // does take effect; the interval function is still the guarantee.)
+    //
+    // The interval is a **function** so its computed value changes when the
+    // guard changes. TanStack re-arms the timer whenever the computed value
+    // changes (`queryObserver.js:149`), which re-arms it at the moment the
+    // app returns to the foreground — the next interval is measured from
+    // that moment, so there is no catch-up burst.
+    refetchInterval: () => (guard.isPaused ? false : ALERTS_REFRESH_INTERVAL_MS),
     refetchIntervalInBackground: false,
   })
+
+  return { ...result, guard }
+}
+
+/**
+ * The feed query's result, plus the guard that decided whether it may poll.
+ *
+ * The guard travels **with** the result so the screen cannot read a different
+ * guard's state than the one the poll is using.
+ */
+export type AlertsFeedResult = UseInfiniteQueryResult<AlertsFeedData, Error> & {
+  guard: RefreshGuard
 }
 
 /**
@@ -164,12 +239,36 @@ export function alertsItems(data: AlertsFeedData | undefined): PublicReport[] {
  * genuinely empty and the honest surface is the empty state, not an offline
  * notice over nothing.
  *
+ * ## A paused refresh is a state, not a failure
+ *
+ * The `queryFn` refuses to fetch while the guard says the refresh is paused,
+ * and that refusal is an `Error` — so the query lands in its error state. But
+ * a **paused** refresh is not a **failed** one: the feed keeps its cached
+ * page, and the header says *why* the refresh is paused. Reporting it as an
+ * offline failure would put an offline notice over a feed that is not offline
+ * — a false claim.
+ *
+ * So the paused refusal is classified and returns `false` early.
+ *
  * The rule lives here, next to `alertsItems`, so the two feed screens cannot
  * disagree about what "offline" means.
  */
 export function alertsShowingCachedPage(
-  query: Pick<UseInfiniteQueryResult<AlertsFeedData, Error>, 'isError' | 'data'>,
+  query: Pick<UseInfiniteQueryResult<AlertsFeedData, Error>, 'isError' | 'data' | 'error'>,
 ): boolean {
   if (!query.isError) return false
+  if (isRefreshPausedError(query.error)) return false
   return alertsItems(query.data).length > 0
+}
+
+/**
+ * Whether an error is the refresh guard's refusal rather than a real failure.
+ *
+ * The check is by **name**, not by `instanceof`: the error crosses the
+ * module boundary between the query layer and the screen layer, and an
+ * `instanceof` check fails across a duplicated module instance. The name is
+ * stable and is asserted by `refreshGuard.test.ts`.
+ */
+export function isRefreshPausedError(error: unknown): error is RefreshPausedError {
+  return error instanceof Error && error.name === 'RefreshPausedError' && 'reason' in error
 }

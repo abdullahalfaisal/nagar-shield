@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import { Button, WizardScreen } from '@/shared/ui'
@@ -14,7 +14,13 @@ import {
   recordBiometricAttempt,
   runBiometricPrompt,
 } from '@/shared/auth/biometricService'
+import { BIOMETRIC_FAILS_TO_DISABLE } from '@nagar-shield/shared'
 import { markGatePassed } from '@/shared/auth/useBiometricGate'
+import {
+  biometricCopyFor,
+  remainingBiometricAttempts,
+  type BiometricKind,
+} from '@/shared/auth/biometricCopy'
 
 /**
  * Screen — Biometric Gate.
@@ -49,8 +55,9 @@ export default function BiometricGateScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [available, setAvailable] = useState<boolean | null>(null)
-  const [kind, setKind] = useState<'fingerprint' | 'facial' | null>(null)
-  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null)
+  const [kind, setKind] = useState<BiometricKind>(null)
+  // The number of failures so far; "attempts left" is derived from it.
+  const [failCount, setFailCount] = useState<number | null>(null)
   const [disabled, setDisabled] = useState(false)
 
   // The prompt fires once when the screen opens. A re-fire is the user
@@ -58,11 +65,8 @@ export default function BiometricGateScreen() {
   // by state that would also flip on a re-render.
   const autoPrompted = useRef(false)
 
-  const prompt = async () => {
-    setBusy(true)
-    setError(undefined)
-
-    const outcome = await runBiometricPrompt(t('auth.biometricPrompt'))
+  const runPrompt = async (promptKind: BiometricKind) => {
+    const outcome = await runBiometricPrompt(t(biometricCopyFor(promptKind).promptKey))
 
     if (outcome === 'success') {
       try {
@@ -100,14 +104,13 @@ export default function BiometricGateScreen() {
     try {
       const result = await recordBiometricAttempt(false)
       await mirrorBiometricState(result)
-      setAttemptsLeft(result.failCount)
+      setFailCount(result.failCount)
 
       if (!result.biometricEnabled) {
         // Five failures in the window — the server has turned biometric
         // sign-in off for this account. The user is told why, then sent to
         // the password screen, which always works.
         setDisabled(true)
-        setBusy(false)
         return
       }
 
@@ -120,8 +123,23 @@ export default function BiometricGateScreen() {
       // right answer — the user must not be locked out by a network fault.
       setError(t('errors.network'))
     }
+  }
 
-    setBusy(false)
+  // `promptKind` is passed in because the first call runs from the mount
+  // effect, whose closure still sees `kind` as null.
+  const prompt = async (promptKind: BiometricKind = kind) => {
+    setBusy(true)
+    setError(undefined)
+
+    try {
+      await runPrompt(promptKind)
+    } catch {
+      // The prompt must never leave the screen stuck busy; the password
+      // screen is still one tap away.
+      setError(t('errors.internal'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   useEffect(() => {
@@ -140,7 +158,7 @@ export default function BiometricGateScreen() {
       // when the prompt is answered.
       const local = await readLocalBiometricState()
       if (active && local.failCount > 0) {
-        setAttemptsLeft(local.failCount)
+        setFailCount(local.failCount)
       }
 
       // No biometric on this device (or none enrolled): there is no gate to
@@ -152,7 +170,7 @@ export default function BiometricGateScreen() {
 
       if (!autoPrompted.current) {
         autoPrompted.current = true
-        void prompt()
+        void prompt(type)
       }
     })()
 
@@ -162,18 +180,19 @@ export default function BiometricGateScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const iconName = kind === 'facial' ? 'face' : 'fingerprint'
+  const copy = biometricCopyFor(kind)
+  const attemptsLeft = failCount === null ? 0 : remainingBiometricAttempts(failCount)
 
   // Once the server has auto-disabled biometric sign-in there is nothing to
   // retry — the only way forward is the password. The screen says so rather
   // than offering a button that cannot work.
-  const autoDisabled = disabled || (attemptsLeft !== null && attemptsLeft >= 5)
+  const autoDisabled = disabled || (failCount !== null && failCount >= BIOMETRIC_FAILS_TO_DISABLE)
 
   return (
     <WizardScreen
       eyebrow={t('common.appName')}
-      title={autoDisabled ? t('auth.biometricDisabled') : t('auth.biometricPrompt')}
-      subtitle={t('auth.biometricFallback')}
+      title={autoDisabled ? t('auth.biometricDisabled') : t(copy.promptKey)}
+      subtitle={autoDisabled ? undefined : t('auth.biometricSubtitle')}
       footer={
         autoDisabled ? (
           <Button
@@ -186,12 +205,12 @@ export default function BiometricGateScreen() {
         ) : (
           <>
             <Button
-              label={t('auth.biometricPrompt')}
+              label={failCount ? t('auth.biometricRetry') : t(copy.promptKey)}
               variant="primary"
               size="lg"
-              icon="fingerprint"
+              icon={copy.icon}
               disabled={busy || available === false}
-              onPress={prompt}
+              onPress={() => void prompt()}
             />
             <Button
               label={t('auth.biometricFallback')}
@@ -205,17 +224,23 @@ export default function BiometricGateScreen() {
       }
     >
       <View style={styles.badge}>
-        <Icon name={iconName} size={44} color={theme.palette.violet[600]} />
+        <Icon name={copy.icon} size={44} color={theme.palette.violet[600]} />
       </View>
 
-      {attemptsLeft !== null && attemptsLeft > 0 ? (
+      {failCount !== null && failCount > 0 && attemptsLeft > 0 ? (
         <Text style={[styles.attempts, { color: theme.colors.ink[500] }]}>
-          {t('auth.biometricFailed', { count: attemptsLeft })}
+          {t(copy.failedKey, { count: attemptsLeft })}
         </Text>
       ) : null}
 
       {error ? (
-        <Text style={[styles.error, { color: theme.palette.red[600] }]}>{error}</Text>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={[styles.error, { color: theme.palette.red[600] }]}
+        >
+          {error}
+        </Text>
       ) : null}
 
       {busy ? (

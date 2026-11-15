@@ -1,72 +1,70 @@
 import type { EmergencyContact } from '@nagar-shield/shared'
-import {
-  resolveAppUserContactIds,
-  writeLocationShare,
-  type SharePosition,
-} from '@/shared/api/locationShares'
-import { fireOsShare } from '@/shared/services/osShare'
+import { writeLocationShare, type SharePosition } from '@/shared/api/locationShares'
+import { fireOsShare, type OsShareOutcome } from '@/shared/services/osShare'
+import { fireSmsShare } from '@/shared/services/smsShare'
 import {
   buildPayloadWithoutLocation,
   buildSnapshotPayload,
-  type ShareChannel,
   type SnapshotPayload,
+  type SnapshotLabels,
 } from '@/shared/services/snapshotPayload'
 import { recordShareIntent } from '@/shared/services/shareTelemetry'
 
 /**
  * The Location Sharing fan-out.
  *
- * One confirm tap, N recipients, **one** snapshot.
+ * One confirm tap, N recipients, **one** snapshot, **one** message.
  *
  * The rules this implements
  * -----------------------
  *
- * **One fix for the whole fan-out.** The position is captured **once**
- * before the fan-out and the same payload is handed to every recipient.
- * Re-taking the fix per recipient would inflate the SLA and could produce
- * inconsistent coordinates inside a single share.
+ * **Nothing is sent by the app.** The phone's message composer opens with every
+ * recipient and the snapshot already in it, and the user taps Send. The user can
+ * instead choose the OS share sheet (WhatsApp, Messenger, …), which also opens
+ * once, and it is the fallback where the device has no message app. Either way
+ * the app hands the text over and stops: it cannot send an SMS silently, and
+ * there is no push channel to a recipient's app yet, so an in-app row would
+ * reach nobody and is not written as a "share".
  *
- * **Routing is per recipient, not per batch.** Each recipient is classified
- * independently: an app user gets a `location_shares` row with
- * `share_channel = 'app'`; everyone else gets the OS share sheet, fired
- * **once**. A recipient who is both a primary and an app user gets exactly
- * one row and no OS share.
+ * **One fix for the whole fan-out.** The position is captured **once**
+ * before the fan-out and the same payload goes to every recipient.
  *
  * **Deselection wins.** The per-contact checkboxes are authoritative at
- * confirm time. The fan-out is a **default selector**, not an override of
- * the user's explicit choice: a contact the user unchecked receives
- * nothing — no audit row, no OS share.
+ * confirm time: a contact the user unchecked is not in the message.
  *
- * **No duplicates.** The recipient list is de-duplicated by contact id
- * before anything is sent, so a contact that is both checked manually and
- * reached by the toggle still receives exactly one snapshot.
+ * **No duplicates.** The recipient list is de-duplicated by contact id, so a
+ * contact that is both checked manually and reached by the toggle is in the
+ * message once.
  *
- * **Nothing is claimed.** The summary says **shared** / **sent** and
- * reports the per-channel counts. It never says delivered, read, or seen,
- * because the app cannot know any of those (ADR-005).
+ * **Nothing is claimed.** The summary says **shared** / **sent** and never
+ * delivered, read, or seen, because the app cannot know any of those
+ * (ADR-005). A closed composer is reported as not sent.
  */
 
 /** One recipient's outcome. */
 export type RecipientOutcome =
-  /** The snapshot was handed to the in-app path and the row was written. */
-  | { contactId: string; channel: 'app'; status: 'shared' }
-  /** The sheet was presented. Whether it was sent is not the app's to know. */
+  /** The composer or sheet was presented. Whether it was sent is not the app's to know. */
   | { contactId: string; channel: 'os_share_sheet'; status: 'shared' }
-  /** The user dismissed the sheet. Nothing was sent. */
+  /** The user closed it without sending. Nothing was sent. */
   | { contactId: string; channel: 'os_share_sheet'; status: 'dismissed' }
-  /** The OS could not present the sheet. Nothing was sent. */
+  /** The OS could not present it. Nothing was sent. */
   | { contactId: string; channel: 'os_share_sheet'; status: 'failed' }
-  /** The in-app row could not be saved. The snapshot was not recorded. */
-  | { contactId: string; channel: 'app'; status: 'failed' }
 
 /** The fan-out's result. */
 export interface ShareResult {
   /** One entry per recipient, in the order they were processed. */
   outcomes: RecipientOutcome[]
-  /** How many recipients received a snapshot, by channel. */
-  shared: { app: number; os_share_sheet: number }
-  /** How many recipients did not, by channel. */
-  failed: { app: number; os_share_sheet: number }
+  /** How many recipients were handed a snapshot. */
+  shared: { os_share_sheet: number }
+  /** How many could not be, because the OS could not present anything. */
+  failed: { os_share_sheet: number }
+  /**
+   * What happened to the share as a whole. It is here because a share through
+   * other apps can have no recipient of ours (the user picks the person inside
+   * the app), so the counts above cannot tell a closed sheet from a sent one.
+   * `nothing` — there was nobody to send to and nothing was opened.
+   */
+  status: 'shared' | 'dismissed' | 'failed' | 'nothing'
   /** The elapsed milliseconds from the confirm tap to the intent firing. */
   elapsedMs: number
 }
@@ -89,6 +87,15 @@ export interface ShareLocationInput {
   startedAt: number
   /** The active locale, for the human-readable timestamp. */
   locale?: string
+  /** The words of the message the contact receives, in the app's language. */
+  labels?: SnapshotLabels
+  /**
+   * How the text leaves the app. `message` (the default) opens the phone's message
+   * composer with every recipient filled in; `apps` opens the OS share sheet, so
+   * the user can pick WhatsApp, Messenger or any other app and the person
+   * inside it.
+   */
+  via?: 'message' | 'apps'
 }
 
 /**
@@ -135,8 +142,7 @@ export function selectExplicitRecipients(
  * rather than an exception that stops the share.
  */
 export async function shareLocation(input: ShareLocationInput): Promise<ShareResult> {
-  // De-duplicate by contact id. A contact that is both checked manually and
-  // reached by the toggle must receive exactly one snapshot.
+  // De-duplicate by contact id.
   const seen = new Set<string>()
   const recipients = input.recipients.filter((contact) => {
     if (seen.has(contact.id)) return false
@@ -144,17 +150,17 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
     return true
   })
 
-  const outcomes: RecipientOutcome[] = []
-
-  if (recipients.length === 0) {
-    // Nothing to share with. No row is written and no sheet is fired, but
-    // the caller still gets a result — the screen says there is nobody to
-    // share with, and the clock is closed honestly.
+  // The share sheet needs no recipient of ours: the user picks the app and the
+  // person inside it. The message composer does need numbers.
+  if (recipients.length === 0 && input.via !== 'apps') {
+    // Nothing to share with. Nothing is opened or written, but the caller still
+    // gets a result, and the clock is closed honestly.
     const elapsedMs = Math.max(0, Math.round(Date.now() - input.startedAt))
     return {
-      outcomes,
-      shared: { app: 0, os_share_sheet: 0 },
-      failed: { app: 0, os_share_sheet: 0 },
+      outcomes: [],
+      shared: { os_share_sheet: 0 },
+      failed: { os_share_sheet: 0 },
+      status: 'nothing',
       elapsedMs,
     }
   }
@@ -167,69 +173,56 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
         accuracyM: input.position.accuracyM,
         capturedAt: new Date().toISOString(),
         locale: input.locale,
+        labels: input.labels,
       })
     : buildPayloadWithoutLocation({
         capturedAt: new Date().toISOString(),
         locale: input.locale,
+        labels: input.labels,
         note: input.withoutLocationNote,
       })
+
+  // One message to everybody. The share sheet opens instead when the user chose
+  // "other apps", or when the device has no message app.
+  let handoff: OsShareOutcome =
+    input.via === 'apps'
+      ? { status: 'unavailable' }
+      : await fireSmsShare(
+          recipients.map((contact) => contact.phone),
+          payload.message,
+        )
+  if (handoff.status === 'unavailable') {
+    handoff = await fireOsShare(payload.message)
+  }
+
+  const status = handoff.status === 'unavailable' ? 'failed' : handoff.status
+  const outcomes: RecipientOutcome[] = recipients.map((contact) => ({
+    contactId: contact.id,
+    channel: 'os_share_sheet',
+    status,
+  }))
 
   // The audit position: a null position for a share without a location.
   const auditPosition: SharePosition = input.position ?? { lat: null, lng: null, accuracyM: null }
 
-  // Which recipients are app users. A failed lookup answers "none
-  // confirmed", and every recipient then goes down the OS path — the
-  // direction that claims nothing and needs no network.
-  const appContactIds = new Set(
-    await resolveAppUserContactIds(recipients.map((contact) => contact.id)),
-  )
-
-  for (const contact of recipients) {
-    const isAppUser = appContactIds.has(contact.id)
-
-    if (isAppUser) {
+  // A record is kept only for a message that was actually opened for sending, one
+  // per recipient. It is best-effort: a failed record must not turn a handed-over
+  // snapshot into a "not sent".
+  if (status === 'shared') {
+    for (const contact of recipients) {
       try {
         await writeLocationShare({
           recipientContactId: contact.id,
           position: auditPosition,
-          channel: 'app',
+          channel: 'os_share_sheet',
         })
-        outcomes.push({ contactId: contact.id, channel: 'app', status: 'shared' })
       } catch {
-        // The in-app record could not be saved. The snapshot was **not**
-        // recorded — and no receipt is fabricated for this recipient.
-        outcomes.push({ contactId: contact.id, channel: 'app', status: 'failed' })
+        // Best-effort, see above.
       }
-      continue
-    }
-
-    // The OS share path. The sheet is fired **once** per non-app recipient.
-    const outcome = await fireOsShare(payload.message)
-
-    if (outcome.status === 'dismissed') {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'dismissed' })
-    } else if (outcome.status === 'unavailable') {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'failed' })
-    } else {
-      outcomes.push({ contactId: contact.id, channel: 'os_share_sheet', status: 'shared' })
-    }
-
-    // The audit row for an OS share-sheet recipient carries **no** contact
-    // id: the sheet may have gone to an app the user picked that has
-    // nothing to do with the contact list.
-    try {
-      await writeLocationShare({
-        recipientContactId: null,
-        position: auditPosition,
-        channel: 'os_share_sheet',
-      })
-    } catch {
-      // The audit row is best-effort. The share itself already happened, and
-      // a failed record must not turn a sent snapshot into a "not sent".
     }
   }
 
-  // The SLA clock closes when the last intent fired. The metric measures
+  // The SLA clock closes when the hand-over happened. The metric measures
   // **our** work only — never carrier delivery, never recipient open time.
   const finishedAt = Date.now()
   const elapsedMs = Math.max(0, Math.round(finishedAt - input.startedAt))
@@ -237,41 +230,20 @@ export async function shareLocation(input: ShareLocationInput): Promise<ShareRes
   await recordShareIntent({
     startedAt: input.startedAt,
     finishedAt,
-    channel: dominantChannel(outcomes),
+    channel: 'os_share_sheet',
     recipientCount: outcomes.length,
   })
 
   return {
     outcomes,
-    shared: {
-      app: countStatus(outcomes, 'app', 'shared'),
-      os_share_sheet: countStatus(outcomes, 'os_share_sheet', 'shared'),
-    },
-    failed: {
-      app: countStatus(outcomes, 'app', 'failed'),
-      os_share_sheet: countStatus(outcomes, 'os_share_sheet', 'failed'),
-    },
+    shared: { os_share_sheet: countStatus(outcomes, 'shared') },
+    failed: { os_share_sheet: countStatus(outcomes, 'failed') },
+    status,
     elapsedMs,
   }
 }
 
-/**
- * The channel the share is reported under.
- *
- * A fan-out that mixed both channels is reported as `app` when at least one
- * recipient went down the in-app path — the channel label on the metric is
- * the **first** thing the share did, not a claim about the others.
- */
-function dominantChannel(outcomes: RecipientOutcome[]): ShareChannel {
-  return outcomes.some((outcome) => outcome.channel === 'app') ? 'app' : 'os_share_sheet'
-}
-
-/** Counts the outcomes with a given channel and status. */
-function countStatus(
-  outcomes: RecipientOutcome[],
-  channel: 'app' | 'os_share_sheet',
-  status: 'shared' | 'failed',
-): number {
-  return outcomes.filter((outcome) => outcome.channel === channel && outcome.status === status)
-    .length
+/** Counts the outcomes with a given status. */
+function countStatus(outcomes: RecipientOutcome[], status: 'shared' | 'failed'): number {
+  return outcomes.filter((outcome) => outcome.status === status).length
 }

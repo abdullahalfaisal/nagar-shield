@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { ContactCaptureScreen } from '@/shared/wizard/ContactCaptureScreen'
 
@@ -26,7 +26,13 @@ export default function WizardContact1Screen() {
       highlight={t('wizardContacts.step1Highlight')}
       subtitle={t('wizardContacts.step1Subtitle')}
       cta={t('wizardContacts.saveCta')}
-      onBack={() => router.back()}
+      // Register drops the signup forms from the stack, so there is normally
+      // nothing behind this step — and Back must never reach a form that would
+      // submit the signup again. With nothing to go back to, Back leaves the
+      // wizard for the app entry, which sends the signed-in user Home; the
+      // contacts are recommended, not required.
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+      onSkip={() => router.push('/(auth)/contact-2')}
       onComplete={() => router.push('/(auth)/contact-2')}
     />
   )

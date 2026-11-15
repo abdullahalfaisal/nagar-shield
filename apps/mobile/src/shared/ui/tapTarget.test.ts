@@ -259,7 +259,9 @@ function localNumberOf(code: string, name: string): number | undefined {
   return Math.min(...numbers)
 }
 
-function numericProperty(styleText: string, property: string): number | undefined {
+function numericProperty(rawStyleText: string, property: string): number | undefined {
+  // A shadow's `shadowOffset: { width, height }` is a direction, not a box size.
+  const styleText = rawStyleText.replace(/shadowOffset\s*:\s*\{[^}]*\}/g, '')
   // `minHeight: 48` / `'minHeight': 48` / `minHeight: '48'`
   const match = new RegExp(
     `(?:^|[{,\\s])['"]?${property}['"]?\\s*:\\s*['"]?(\\d+(?:\\.\\d+)?)`,

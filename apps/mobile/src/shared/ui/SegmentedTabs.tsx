@@ -42,12 +42,13 @@ export function SegmentedTabs({ tabs, activeId, onSelect }: SegmentedTabsProps) 
             ]}
           >
             <Text
-              numberOfLines={1}
+              numberOfLines={2}
               style={[
                 styles.label,
                 {
                   color: active ? theme.colors.ink[950] : theme.colors.ink[500],
                   fontWeight: active ? '700' : '600',
+                  textAlign: 'center',
                 },
               ]}
             >
@@ -75,6 +76,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
+    paddingHorizontal: 2,
   },
   label: {
     fontSize: 13,

@@ -1,6 +1,8 @@
 import { Children, type ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
+import { toBengaliDigits } from '../utils/relativeTime'
 import { Icon } from './Icon'
 
 interface ListRowGroupProps {
@@ -53,6 +55,7 @@ export function ListRowGroup({ header, children }: ListRowGroupProps) {
 /** A simple text row used by the distribution counts list. */
 export function CountRow({ label, count }: { label: string; count: number }) {
   const theme = useTheme()
+  const { i18n } = useTranslation()
 
   return (
     <View style={styles.countRow}>
@@ -65,7 +68,7 @@ export function CountRow({ label, count }: { label: string; count: number }) {
             fontWeight: '700',
           }}
         >
-          {count}
+          {i18n.language === 'bn' ? toBengaliDigits(String(count)) : count}
         </Text>
       </View>
     </View>

@@ -212,7 +212,16 @@ function collectSourceFiles(): SourceFile[] {
   return files
 }
 
-const sourceFiles = collectSourceFiles()
+/**
+ * Files allowed to draw SVG shapes because they draw **icon glyphs**, not data.
+ * `LineIcon` is a set of a dozen Lucide icon outlines; it takes no data and
+ * draws no chart. The rule above is about charts, and this file is the one place
+ * an `<Svg>` shape is a pictogram.
+ */
+const ICON_GLYPH_FILES = new Set(['src/shared/ui/LineIcon.tsx'])
+
+const allSourceFiles = collectSourceFiles()
+const sourceFiles = allSourceFiles.filter((file) => !ICON_GLYPH_FILES.has(file.path))
 
 describe('the app ships no chart code', () => {
   it('reads a non-trivial number of source files — the scan is not vacuous', () => {

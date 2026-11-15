@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import { Button, WizardBadge, WizardScreen } from '@/shared/ui'
@@ -44,13 +44,16 @@ export default function WelcomeScreen() {
             <Text style={[styles.footnote, { color: theme.colors.ink[500] }]}>
               {t('auth.noAccount')}{' '}
             </Text>
-            <Text
+            <Pressable
               accessibilityRole="button"
               onPress={() => router.push('/(auth)/register')}
-              style={[styles.link, { color: theme.palette.violet[500] }]}
+              hitSlop={8}
+              style={styles.linkHit}
             >
-              {t('auth.createAccount')}
-            </Text>
+              <Text style={[styles.link, { color: theme.palette.violet[500] }]}>
+                {t('auth.createAccount')}
+              </Text>
+            </Pressable>
           </View>
         </>
       }
@@ -65,7 +68,7 @@ export default function WelcomeScreen() {
         </Text>
         <View style={styles.whatYouAdd}>
           <Text style={[styles.label, { color: theme.colors.ink[500] }]}>
-            {t('home.helpSubtitle')}
+            {t('auth.welcomeYouWillAdd')}
           </Text>
           <Text style={[styles.list, { color: theme.colors.ink[700] }]}>
             {t('auth.phoneLabel')} · {t('auth.alternatePhoneTitle')} · {t('more.emergencyContacts')}{' '}
@@ -139,5 +142,9 @@ const styles = StyleSheet.create({
   link: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  linkHit: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
 })

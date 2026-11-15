@@ -1,4 +1,9 @@
-import { fetchPublicAlertDetail, signAlertMediaUrls } from '@/shared/api/alertDetail'
+import {
+  SIGNED_URL_RENEW_MS,
+  fetchPublicAlertDetail,
+  signAlertMediaUrls,
+  signedUrlsAreStale,
+} from '@/shared/api/alertDetail'
 
 /**
  * The public alert detail.
@@ -180,5 +185,16 @@ describe('signing the alert media', () => {
   it('returns nothing for no media', async () => {
     await expect(signAlertMediaUrls([])).resolves.toEqual({})
     expect(mockSignMediaUrl).not.toHaveBeenCalled()
+  })
+})
+
+describe('signedUrlsAreStale', () => {
+  it('trusts a link signed a moment ago', () => {
+    expect(signedUrlsAreStale(1_000, 1_000 + 60_000)).toBe(false)
+  })
+
+  it('renews before the ten-minute link expires', () => {
+    expect(SIGNED_URL_RENEW_MS).toBeLessThan(10 * 60_000)
+    expect(signedUrlsAreStale(0, SIGNED_URL_RENEW_MS)).toBe(true)
   })
 })

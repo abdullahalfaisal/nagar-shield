@@ -57,7 +57,16 @@ describe('the dial path', () => {
   it('opens the OS dialler with a tel: intent', async () => {
     await openDialer('999')
 
-    expect(canOpenUrl).toHaveBeenCalledWith('tel:999')
+    expect(openUrl).toHaveBeenCalledWith('tel:999')
+  })
+
+  it('does not gate the dialler behind canOpenURL', async () => {
+    // Android 11+ answers false for `tel:` without a declared query, even
+    // though the dialler opens fine.
+    canOpenUrl.mockResolvedValue(false as never)
+
+    await expect(openDialer('999')).resolves.toBe(true)
+    expect(canOpenUrl).not.toHaveBeenCalled()
     expect(openUrl).toHaveBeenCalledWith('tel:999')
   })
 
@@ -82,17 +91,9 @@ describe('the dial path', () => {
     if (xhrSpy) expect(xhrSpy).not.toHaveBeenCalled()
   })
 
-  it('reports the dialler as unreachable when the intent does not resolve', async () => {
-    // The OS has no `tel:` handler, or the user disabled the dialler app.
-    canOpenUrl.mockResolvedValue(false as never)
-
-    await expect(openDialer('999')).resolves.toBe(false)
-    // The caller renders the manual-dial guidance — never an unhandled error.
-    expect(openUrl).not.toHaveBeenCalled()
-  })
-
   it('reports the dialler as unreachable when the intent throws', async () => {
-    canOpenUrl.mockResolvedValue(true as never)
+    // The OS has no `tel:` handler, or the user disabled the dialler app. The
+    // caller renders the manual-dial guidance — never an unhandled error.
     openUrl.mockRejectedValue(new Error('no activity found') as never)
 
     await expect(openDialer('999')).resolves.toBe(false)

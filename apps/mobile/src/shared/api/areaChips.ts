@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { supabase } from '@/shared/api/supabase'
 import { fromSupabaseError } from '@/shared/api/errors'
@@ -117,6 +118,8 @@ export function buildAreaChips(options: {
   labels: { all: string; division: string; city: string }
   /** The reference areas the chip row offers. */
   areas: AreaLookupRow[]
+  /** `bn` labels each area chip with its Bangla name. */
+  language?: string
 }): AreaChip[] {
   const chips: AreaChip[] = [{ id: 'all', label: options.labels.all, value: null }]
 
@@ -143,7 +146,7 @@ export function buildAreaChips(options: {
   for (const area of options.areas) {
     chips.push({
       id: `area:${area.id}`,
-      label: area.name,
+      label: options.language === 'bn' && area.name_bn ? area.name_bn : area.name,
       value: {
         division: area.division,
         city: area.city,
@@ -209,6 +212,8 @@ export function useAreaChips(
   cityLabel: string,
 ): AreaChip[] {
   const { data: areas } = useAreaLookup()
+  const { i18n } = useTranslation()
+  const language = i18n.language
   const { state: fixState } = useCurrentFix()
 
   const lat = fixState.status === 'ready' ? fixState.fix.lat : null
@@ -231,6 +236,7 @@ export function useAreaChips(
       currentArea,
       labels: { all: allLabel, division: divisionLabel, city: cityLabel },
       areas: areas ?? [],
+      language,
     })
-  }, [areas, geocode, allLabel, divisionLabel, cityLabel])
+  }, [areas, geocode, allLabel, divisionLabel, cityLabel, language])
 }

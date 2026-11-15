@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { SEEK_FALLBACK_NUMBER } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
 import { Button, Icon, ManualDialGuidance, Screen, WrongNumberSheet } from '@/shared/ui'
 import { useNearestThana } from '@/shared/api/stations'
 import { useDegradedHelp } from '@/shared/services/useDegradedHelp'
-import { resolveOrigin, useCurrentFix } from '@/shared/services/location'
+import { useCurrentFix } from '@/shared/services/location'
 
 /**
  * The thana line.
@@ -37,9 +37,13 @@ export default function ThanaLineScreen() {
   // The fix is requested **just-in-time** — when the thana line opens. It is
   // never requested at app open and never on the panic path.
   const { state } = useCurrentFix()
-  const { origin, isFallback } = useMemo(() => resolveOrigin(state), [state])
 
-  const { data, isLoading, error } = useNearestThana(origin.lat, origin.lng, 10)
+  // No station is looked up, or shown, until the fix is known. Querying the
+  // Dhaka-centre fallback would put a Dhaka station behind a live call button
+  // for a user who is somewhere else. Until then the target is 999.
+  const fix = state.status === 'ready' ? state.fix : null
+
+  const { data, isLoading, error } = useNearestThana(fix?.lat ?? null, fix?.lng ?? null, 10)
 
   const [reporting, setReporting] = useState(false)
 
@@ -62,123 +66,140 @@ export default function ThanaLineScreen() {
         : (station.name ?? '')
 
   return (
-    <Screen title={t('help.thanaTitle')} onBack={() => router.back()}>
-      {isLoading ? (
-        <View style={styles.block}>
-          <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
-            {t('common.loading')}
+    <>
+      <Screen title={t('help.thanaTitle')} onBack={() => router.back()}>
+        {isLoading ? (
+          <View style={styles.block}>
+            <Text style={[styles.loading, { color: theme.colors.ink[500] }]}>
+              {t('common.loading')}
+            </Text>
+          </View>
+        ) : null}
+
+        {state.status === 'loading' ? (
+          <Text style={[styles.hint, { color: theme.colors.ink[500] }]}>
+            {t('location.locating')}
           </Text>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* The fallback banner. It renders BEFORE the call affordance, so the
+        {/* The fallback banner. It renders BEFORE the call affordance, so the
           user sees the explanation and the target together. */}
-      {fallback ? (
-        <View
-          accessibilityRole="alert"
-          style={[
-            styles.banner,
-            {
-              backgroundColor: theme.palette.amber[50],
-              borderColor: theme.palette.amber[100],
-            },
-          ]}
-        >
-          <Icon name="info" size={20} color={theme.palette.amber[600]} filled />
-          <View style={styles.bannerBody}>
-            <Text style={[styles.bannerTitle, { color: theme.colors.ink[950] }]}>
-              {t('help.thanaFallbackTitle')}
+        {fallback ? (
+          <View
+            accessibilityRole="alert"
+            style={[
+              styles.banner,
+              {
+                backgroundColor: theme.palette.amber[50],
+                borderColor: theme.palette.amber[100],
+              },
+            ]}
+          >
+            <Icon name="info" size={20} color={theme.palette.amber[600]} filled />
+            <View style={styles.bannerBody}>
+              <Text style={[styles.bannerTitle, { color: theme.colors.ink[950] }]}>
+                {t('help.thanaFallbackTitle')}
+              </Text>
+              <Text style={[styles.bannerText, { color: theme.colors.ink[500] }]}>
+                {t('help.thanaFallback')}
+              </Text>
+              <Text style={[styles.bannerText, { color: theme.colors.ink[500] }]}>
+                {t('help.thanaManual')}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {error ? (
+          <View
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.banner,
+              {
+                backgroundColor: theme.palette.red[50],
+                borderColor: theme.palette.red[100],
+              },
+            ]}
+          >
+            <Icon name="error" size={20} color={theme.palette.red[600]} filled />
+            <View style={styles.bannerBody}>
+              <Text style={[styles.bannerText, { color: theme.colors.ink[700] }]}>
+                {t('help.thanaManual')}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {station && stationName ? (
+          <View style={styles.block}>
+            <Text style={[styles.stationName, { color: theme.colors.ink[950] }]}>
+              {stationName}
             </Text>
-            <Text style={[styles.bannerText, { color: theme.colors.ink[500] }]}>
-              {t('help.thanaFallback')}
-            </Text>
-            <Text style={[styles.bannerText, { color: theme.colors.ink[500] }]}>
-              {t('help.thanaManual')}
+            {station.distanceKm !== null ? (
+              <Text style={[styles.distance, { color: theme.colors.ink[500] }]}>
+                {t('help.thanaDistance', { distance: station.distanceKm })}
+              </Text>
+            ) : null}
+            <Text style={[styles.number, { color: theme.palette.violet[700] }]}>
+              {station.phone}
             </Text>
           </View>
+        ) : null}
+
+        {state.status === 'denied' || state.status === 'unavailable' ? (
+          <Text style={[styles.hint, { color: theme.colors.ink[500] }]}>
+            {t('help.thanaLocationDenied')}
+          </Text>
+        ) : null}
+
+        {/* The side spacing sits on a wrapper: `Button` is full width, so a
+          margin on the button itself pushed it past the right edge. */}
+        <View style={styles.call}>
+          <Button
+            label={`${t('help.callNow')} · ${target}`}
+            onPress={() => {
+              void degradedHelp.dial(target)
+            }}
+            accessibilityLabel={
+              stationName
+                ? t('help.thanaCallLabel', { name: stationName })
+                : t('help.hotlineCallLabel', {
+                    name: SEEK_FALLBACK_NUMBER,
+                    number: SEEK_FALLBACK_NUMBER,
+                  })
+            }
+          />
         </View>
-      ) : null}
 
-      {error ? (
-        <View
-          accessibilityRole="alert"
-          style={[
-            styles.banner,
-            {
-              backgroundColor: theme.palette.red[50],
-              borderColor: theme.palette.red[100],
-            },
-          ]}
-        >
-          <Icon name="error" size={20} color={theme.palette.red[600]} filled />
-          <View style={styles.bannerBody}>
-            <Text style={[styles.bannerText, { color: theme.colors.ink[700] }]}>
-              {t('help.thanaManual')}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {station && stationName ? (
-        <View style={styles.block}>
-          <Text style={[styles.stationName, { color: theme.colors.ink[950] }]}>{stationName}</Text>
-          {station.distanceKm !== null ? (
-            <Text style={[styles.distance, { color: theme.colors.ink[500] }]}>
-              {t('help.thanaDistance', { distance: station.distanceKm })}
-            </Text>
-          ) : null}
-          <Text style={[styles.number, { color: theme.palette.violet[700] }]}>{station.phone}</Text>
-        </View>
-      ) : null}
-
-      {isFallback && !fallback ? (
-        <Text style={[styles.hint, { color: theme.colors.ink[500] }]}>
-          {t('help.thanaLocationDenied')}
-        </Text>
-      ) : null}
-
-      <Button
-        label={`${t('help.callNow')} · ${target}`}
-        onPress={() => {
-          void degradedHelp.dial(target)
-        }}
-        style={styles.call}
-        accessibilityLabel={
-          stationName
-            ? t('help.thanaCallLabel', { name: stationName })
-            : t('help.hotlineCallLabel', {
-                name: SEEK_FALLBACK_NUMBER,
-                number: SEEK_FALLBACK_NUMBER,
-              })
-        }
-      />
-
-      {/* The manual-dial guidance — the same component every help entry point
+        {/* The manual-dial guidance — the same component every help entry point
           renders. The thana line is no exception: the dial target is on
           screen, and if the dialler did not open the user still needs the
           number. */}
-      {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
-        <ManualDialGuidance
-          number={degradedHelp.guidanceNumber}
-          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
-          showOfflineNotice={degradedHelp.showOfflineNotice}
-        />
-      ) : null}
+        {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
+          <ManualDialGuidance
+            number={degradedHelp.guidanceNumber}
+            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+            showOfflineNotice={degradedHelp.showOfflineNotice}
+          />
+        ) : null}
 
-      {station ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('help.wrongNumberTitle')}
-          onPress={() => setReporting(true)}
-          style={styles.reportLink}
-        >
-          <Icon name="report" size={16} color={theme.palette.amber[600]} />
-          <Text style={[styles.reportText, { color: theme.palette.violet[700] }]}>
-            {t('help.wrongNumber')}
-          </Text>
-        </Pressable>
-      ) : null}
+        {station ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('help.wrongNumberTitle')}
+            onPress={() => setReporting(true)}
+            style={styles.reportLink}
+          >
+            <Icon name="report" size={16} color={theme.palette.amber[600]} />
+            <Text style={[styles.reportText, { color: theme.palette.violet[700] }]}>
+              {t('help.wrongNumber')}
+            </Text>
+          </Pressable>
+        ) : null}
+      </Screen>
 
+      {/* The sheet is a Modal, so it lives beside the screen, not in its scroll. */}
       <WrongNumberSheet
         visible={reporting}
         onClose={() => setReporting(false)}
@@ -186,7 +207,7 @@ export default function ThanaLineScreen() {
         entryId={station?.id ?? ''}
         entryName={stationName ?? undefined}
       />
-    </Screen>
+    </>
   )
 }
 

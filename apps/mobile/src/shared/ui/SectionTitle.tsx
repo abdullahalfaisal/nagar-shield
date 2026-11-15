@@ -1,5 +1,13 @@
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native'
 import { useTheme } from '../theme'
+import { usePressGuard } from './usePressGuard'
 
 interface SectionTitleProps {
   title: string
@@ -57,11 +65,30 @@ export function QuickActionGrid({ children }: { children: React.ReactNode }) {
   return <View style={styles.grid}>{children}</View>
 }
 
+const GRID_PADDING = 20
+const GRID_GAP = 10
+
+/**
+ * The card width that fits the screen: two columns on a phone, four on a
+ * tablet. A percentage width cannot do this — three cards at 31.6% plus two
+ * 10 dp gaps overflow the row on any phone under ~425 dp, so the third card
+ * wrapped onto its own line.
+ */
+function useCardWidth(): number {
+  const { width } = useWindowDimensions()
+  // Two columns on a phone, four on a tablet. The quick-action grid holds four
+  // cards, so two columns lay it out as a clean 2×2 (three would leave one alone).
+  const columns = width < 600 ? 2 : 4
+  const inner = width - GRID_PADDING * 2 - GRID_GAP * (columns - 1)
+  return Math.floor(inner / columns)
+}
+
 export function ActionCard({
   icon,
   label,
   sub,
   tone = 'purple',
+  compact = false,
   onPress,
   style,
 }: {
@@ -69,20 +96,29 @@ export function ActionCard({
   label: string
   sub?: string
   tone?: 'purple' | 'red' | 'green' | 'amber' | 'sky'
+  /**
+   * A low, row-shaped card — icon beside the label, no sub-line. For a screen
+   * that needs the grid to stay short so something else can scroll below it.
+   */
+  compact?: boolean
   onPress?: () => void
   style?: ViewStyle
 }) {
   const theme = useTheme()
   const { bg, fg } = actionTone(tone, theme)
+  const cardWidth = useCardWidth()
+  const press = usePressGuard(onPress)
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={press}
       style={({ pressed }) => [
         styles.card,
+        compact && styles.cardCompact,
         {
+          width: cardWidth,
           backgroundColor: theme.colors.surface.white,
           borderColor: theme.colors.ink[100],
           borderRadius: theme.radius.xl,
@@ -91,8 +127,9 @@ export function ActionCard({
         style,
       ]}
     >
-      <View style={[styles.cardIcon, { backgroundColor: bg }]}>
+      <View style={[styles.cardIcon, compact && styles.cardIconCompact, { backgroundColor: bg }]}>
         <Text
+          allowFontScaling={false}
           style={{
             fontSize: 22,
             color: fg,
@@ -103,7 +140,10 @@ export function ActionCard({
         </Text>
       </View>
       <Text
+        numberOfLines={2}
         style={{
+          flexShrink: 1,
+          textAlign: compact ? 'left' : 'center',
           fontSize: 12,
           fontWeight: theme.typography.weight.semibold,
           color: theme.colors.ink[950],
@@ -112,9 +152,11 @@ export function ActionCard({
       >
         {label}
       </Text>
-      {sub ? (
+      {sub && !compact ? (
         <Text
+          numberOfLines={2}
           style={{
+            textAlign: 'center',
             fontSize: 10.5,
             fontWeight: theme.typography.weight.medium,
             color: theme.colors.ink[500],
@@ -158,8 +200,8 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    paddingHorizontal: 20,
+    gap: GRID_GAP,
+    paddingHorizontal: GRID_PADDING,
   },
   action: {
     // The 48 dp tap target for a 13 dp label (FR-UX-4). The padding is
@@ -170,11 +212,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    width: '31.6%',
     borderWidth: 1,
     paddingVertical: 16,
     paddingHorizontal: 8,
     alignItems: 'center',
+  },
+  cardCompact: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  cardIconCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    marginBottom: 0,
   },
   cardIcon: {
     width: 44,

@@ -86,11 +86,14 @@ export function useFlagReport() {
   return useMutation({
     mutationFn: ({ reportId, reason }: { reportId: string; reason: FlagReason }) =>
       flagReport(reportId, reason),
-    onSuccess: (outcome) => {
+    onSuccess: (outcome, variables) => {
       // The 3-flag threshold removes the report from the public feed, so the
       // feed has to be re-read after every successful flag.
       if (outcome.status === 'ok' && outcome.reportHidden) {
         void queryClient.invalidateQueries({ queryKey: ['alerts'] })
+        // An open detail screen would otherwise keep showing the report that
+        // has just been hidden.
+        void queryClient.invalidateQueries({ queryKey: ['alert-detail', variables.reportId] })
       }
     },
   })

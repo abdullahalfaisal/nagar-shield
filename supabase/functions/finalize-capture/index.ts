@@ -22,7 +22,7 @@
  */
 
 import { checkMediaCaps, finalizeCaptureSchema } from '../_shared/contracts.ts'
-import { resolveArea } from '../_shared/area.ts'
+import { chosenArea, resolveArea, type AreaResolution } from '../_shared/area.ts'
 import { authenticateCaller, CallerError } from '../_shared/auth.ts'
 import { authorToken } from '../_shared/vendor/storage/index.ts'
 import {
@@ -112,14 +112,38 @@ Deno.serve(async (request) => {
       return successResponse(existing, 200, true)
     }
 
-    // The area is resolved server-side. The online backup is attempted at
-    // most once and a failure degrades rather than fails.
-    const resolution = await resolveArea(
-      createUserClient(callerToken(request)),
-      serviceClient,
-      input.lat,
-      input.lng,
-    )
+    // The area. A chosen area is read from the reference list and replaces the
+    // device's position; otherwise the area is resolved from the position,
+    // with the online backup attempted at most once and a failure degrading
+    // rather than failing.
+    let lat = input.lat
+    let lng = input.lng
+    let resolution: AreaResolution
+
+    if (input.area_id) {
+      const chosen = await chosenArea(serviceClient, input.area_id)
+      if (!chosen) {
+        return errorResponse('VALIDATION_FAILED', undefined, {
+          fields: [{ path: 'area_id', message: 'Unknown area' }],
+        })
+      }
+      lat = chosen.lat
+      lng = chosen.lng
+      resolution = { area: chosen.area, source: 'chosen' }
+    } else {
+      resolution = await resolveArea(
+        createUserClient(callerToken(request)),
+        serviceClient,
+        lat,
+        lng,
+      )
+    }
+
+    // The place detail rides in the area hierarchy, so every surface that
+    // shows the area can show it too.
+    const areaHierarchy = input.place_detail
+      ? { ...resolution.area, place: input.place_detail }
+      : resolution.area
 
     const { data, error } = await callerClient.rpc('finalize_capture', {
       p_client_request_id: input.client_request_id,
@@ -129,13 +153,13 @@ Deno.serve(async (request) => {
       p_duration_seconds: input.duration_seconds,
       p_width: input.width,
       p_height: input.height,
-      p_lat: input.lat,
-      p_lng: input.lng,
+      p_lat: lat,
+      p_lng: lng,
       p_captured_at: input.captured_at,
       p_description: input.description,
       p_public_visibility: input.public_visibility,
       p_category: input.category,
-      p_area_hierarchy: resolution.area,
+      p_area_hierarchy: areaHierarchy,
     })
 
     if (error) {
@@ -157,7 +181,7 @@ Deno.serve(async (request) => {
 
     const payload = {
       report_id: reportId,
-      area_hierarchy: resolution.area,
+      area_hierarchy: areaHierarchy,
       moderation_status: 'visible',
     }
 

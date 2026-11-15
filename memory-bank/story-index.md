@@ -6,7 +6,7 @@
 > The Status column is derived from each story file's `implemented`
 > frontmatter, which is the authoritative source.
 >
-> **43 complete · 10 partial · 1 planned.** The index is reconciled against the
+> **44 complete · 9 partial · 1 planned.** The index is reconciled against the
 > story files on disk: 54 files, 54 rows, no duplicates, no orphans.
 >
 > **`partial`** means the feature ships and works, but at least one acceptance
@@ -50,7 +50,7 @@
 | 005-location-permission-degradation | Location permission degradation | 005-location | 017-location | should | complete |
 | 001-alerts-feed-list | Alerts feed list | 006-alerts | 018-alerts | must | complete |
 | 003-area-filter-chips | Area filter chips | 006-alerts | 018-alerts | must | complete |
-| 002-auto-refresh-and-pull-to-refresh | Auto-refresh + pull-to-refresh | 006-alerts | 019-alerts | must | partial |
+| 002-auto-refresh-and-pull-to-refresh | Auto-refresh + pull-to-refresh | 006-alerts | 019-alerts | must | complete |
 | 004-flag-an-alert | Flag an alert | 006-alerts | 019-alerts | must | partial |
 | 005-author-auto-hide | Author auto-hide (5 flags / 24 h) | 006-alerts | 019-alerts | should | complete |
 | 006-history-list | History list | 006-alerts | 020-alerts | must | complete |

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
-import { alertsItems, alertsShowingCachedPage, fetchAlerts, useAlerts } from './alerts'
+import { alertsItems, alertsShowingCachedPage, fetchAlerts, useAlertsFeed } from './alerts'
 import { supabase } from '@/shared/api/supabase'
+import { RefreshPausedError } from '@/shared/services/refreshGuard'
 
 /**
  * The Alerts feed is **cursor-paginated**.
@@ -14,7 +15,7 @@ import { supabase } from '@/shared/api/supabase'
  * page was unreachable. The user saw a short feed with no indication that
  * more existed.
  *
- * These tests drive the **real hook** — `useAlerts` — so the guard cannot
+ * These tests drive the **real hook** — `useAlertsFeed` — so the guard cannot
  * drift from the code it guards:
  *
  *   1. **The cursor is followed.** `fetchNextPage` asks the RPC for the next
@@ -29,7 +30,71 @@ jest.mock('@/shared/api/supabase', () => ({
   supabase: { rpc: jest.fn() },
 }))
 
+/**
+ * The refresh guard reads the battery and the network.
+ *
+ * The hook now **owns** the guard, so every test of it needs the two native
+ * modules to resolve to a healthy device. The mocks are **idempotent**
+ * (`mockResolvedValue`, not `mockResolvedValueOnce`): the guard polls every
+ * 15 s, so a one-shot mock would run out and the guard would fall back to
+ * "unknown".
+ */
+jest.mock('expo-battery', () => ({
+  getBatteryLevelAsync: jest.fn(),
+}))
+
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(),
+}))
+
+/**
+ * `AppState` is a native module.
+ *
+ * React Native 0.88 exposes `AppState` as a **lazy getter** on the module,
+ * and reading it without the native bridge throws
+ * *"__fbBatchedBridgeConfig is not set"*. The jsdom project has no bridge, so
+ * the mock supplies the module the guard actually uses.
+ *
+ * The state is a **variable** so a test can background the app.
+ */
+let mockAppState = 'active'
+const mockAppStateListeners = new Set<(state: string) => void>()
+
+jest.mock('react-native', () => ({
+  __esModule: true,
+  AppState: {
+    get currentState() {
+      return mockAppState
+    },
+    addEventListener: jest.fn((_event: string, listener: (state: string) => void) => {
+      mockAppStateListeners.add(listener)
+      return {
+        remove: () => {
+          mockAppStateListeners.delete(listener)
+        },
+      }
+    }),
+  },
+}))
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Battery = require('expo-battery')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Network = require('expo-network')
+
 const rpc = supabase.rpc as jest.MockedFunction<typeof supabase.rpc>
+
+/** Puts the device in a healthy state: charged, online, foregrounded. */
+function healthyDevice() {
+  Battery.getBatteryLevelAsync.mockReset()
+  Battery.getBatteryLevelAsync.mockResolvedValue(1)
+  Network.getNetworkStateAsync.mockReset()
+  Network.getNetworkStateAsync.mockResolvedValue({
+    isConnected: true,
+    isInternetReachable: true,
+  })
+  mockAppState = 'active'
+}
 
 /** One page of the RPC's envelope. */
 function envelope(items: Array<Record<string, unknown>>, nextCursor: string | null) {
@@ -116,9 +181,10 @@ describe('fetchAlerts', () => {
   })
 })
 
-describe('useAlerts', () => {
+describe('useAlertsFeed', () => {
   beforeEach(() => {
     rpc.mockReset()
+    healthyDevice()
   })
 
   it('follows the cursor and puts the second page into the feed', async () => {
@@ -126,7 +192,7 @@ describe('useAlerts', () => {
     rpc.mockResolvedValueOnce(envelope([row('a'), row('b')], 'cursor-1') as never)
     rpc.mockResolvedValueOnce(envelope([row('c')], null) as never)
 
-    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+    const { result } = renderHook(() => useAlertsFeed({}), { wrapper: wrapper() })
 
     await waitFor(() => expect(result.current.data?.pages.length).toBe(1))
 
@@ -147,7 +213,7 @@ describe('useAlerts', () => {
   it('reports that there is no next page when the RPC returns no cursor', async () => {
     rpc.mockResolvedValue(envelope([row('a')], null) as never)
 
-    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+    const { result } = renderHook(() => useAlertsFeed({}), { wrapper: wrapper() })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
@@ -157,7 +223,7 @@ describe('useAlerts', () => {
   it('reports that there is a next page when the RPC returns a cursor', async () => {
     rpc.mockResolvedValue(envelope([row('a')], 'cursor-1') as never)
 
-    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+    const { result } = renderHook(() => useAlertsFeed({}), { wrapper: wrapper() })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
@@ -168,7 +234,7 @@ describe('useAlerts', () => {
     rpc.mockResolvedValueOnce(envelope([row('a')], 'cursor-1') as never)
     rpc.mockResolvedValueOnce(envelope([row('b')], null) as never)
 
-    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+    const { result } = renderHook(() => useAlertsFeed({}), { wrapper: wrapper() })
 
     await waitFor(() => expect(result.current.data?.pages.length).toBe(1))
 
@@ -185,7 +251,7 @@ describe('useAlerts', () => {
     rpc.mockResolvedValue(envelope([row('a')], null) as never)
 
     const { result, rerender } = renderHook(
-      ({ filter }: { filter: { division?: string } }) => useAlerts(filter),
+      ({ filter }: { filter: { division?: string } }) => useAlertsFeed(filter),
       { wrapper: wrapper(), initialProps: { filter: {} as { division?: string } } },
     )
 
@@ -255,30 +321,47 @@ describe('alertsShowingCachedPage', () => {
   }
 
   it('is true when the query failed and a cached page survives', () => {
-    expect(alertsShowingCachedPage({ isError: true, data: cached })).toBe(true)
+    expect(alertsShowingCachedPage({ isError: true, data: cached, error: new Error('boom') })).toBe(
+      true,
+    )
   })
 
   it('is false when the query succeeded', () => {
     // A healthy feed shows no offline notice — the notice would be a lie.
-    expect(alertsShowingCachedPage({ isError: false, data: cached })).toBe(false)
+    expect(alertsShowingCachedPage({ isError: false, data: cached, error: null })).toBe(false)
   })
 
   it('is false on a cold start with no network and no cache', () => {
     // There is nothing to show, so the empty state is the honest surface.
-    expect(alertsShowingCachedPage({ isError: true, data: undefined })).toBe(false)
+    expect(alertsShowingCachedPage({ isError: true, data: undefined, error: null })).toBe(false)
   })
 
   it('is false when the cached pages hold no rows', () => {
     // A cache of an empty page is not "the last results".
     const empty = { pages: [{ items: [], nextCursor: null }], pageParams: [null] }
 
-    expect(alertsShowingCachedPage({ isError: true, data: empty })).toBe(false)
+    expect(alertsShowingCachedPage({ isError: true, data: empty, error: null })).toBe(false)
+  })
+
+  it('is false when the refresh was paused rather than failed', () => {
+    // A **paused** refresh is a state, not a failure. The feed keeps its
+    // cached page and the header says why the refresh is paused — so an
+    // offline notice would be a false claim about a feed that is not
+    // offline.
+    expect(
+      alertsShowingCachedPage({
+        isError: true,
+        data: cached,
+        error: new RefreshPausedError('offline'),
+      }),
+    ).toBe(false)
   })
 })
 
 describe('the feed keeps its rows when the next request fails', () => {
   beforeEach(() => {
     rpc.mockReset()
+    healthyDevice()
   })
 
   it('keeps the cached page and reports the error', async () => {
@@ -288,7 +371,7 @@ describe('the feed keeps its rows when the next request fails', () => {
     rpc.mockResolvedValueOnce(envelope([row('a')], null) as never)
     rpc.mockRejectedValueOnce(new Error('network down') as never)
 
-    const { result } = renderHook(() => useAlerts({}), { wrapper: wrapper() })
+    const { result } = renderHook(() => useAlertsFeed({}), { wrapper: wrapper() })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
@@ -300,7 +383,11 @@ describe('the feed keeps its rows when the next request fails', () => {
     expect(alertsItems(result.current.data).map((report) => report.id)).toEqual(['a'])
     // And the rule agrees: this is the cached-page case.
     expect(
-      alertsShowingCachedPage({ isError: result.current.isError, data: result.current.data }),
+      alertsShowingCachedPage({
+        isError: result.current.isError,
+        data: result.current.data,
+        error: result.current.error,
+      }),
     ).toBe(true)
   })
 })

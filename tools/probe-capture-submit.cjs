@@ -131,18 +131,18 @@ function authorTokenFor(userId) {
 }
 
 /** Uploads a tiny valid PNG into the private bucket, as the signed-in user. */
-async function uploadMedia(token, storagePath, bytes) {
+async function uploadMedia(token, storagePath, bytes, { upsert = true } = {}) {
   const response = await fetch(`${API_URL}/storage/v1/object/${MEDIA_BUCKET}/${storagePath}`, {
     method: 'POST',
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${token}`,
       'Content-Type': 'image/png',
-      'x-upsert': 'true',
+      'x-upsert': upsert ? 'true' : 'false',
     },
     body: bytes,
   })
-  return { status: response.status }
+  return { status: response.status, text: await response.text().catch(() => '') }
 }
 
 /** Calls the `finalize-capture` Edge Function with the caller's JWT. */
@@ -244,6 +244,25 @@ async function main() {
     'the client uploads the media straight to the private bucket',
     upload.status === 200 || upload.status === 201,
     `HTTP ${upload.status}`,
+  )
+
+  // A retry after a lost confirmation uploads the same path again. The app
+  // must not ask for "replace": the bucket has no UPDATE policy, so that is
+  // refused and the retry could never reach the (idempotent) finalize call.
+  // Without "replace" the answer is a plain duplicate, which the app treats as
+  // "already uploaded".
+  const replaced = await uploadMedia(token, storagePath, bytes, { upsert: true })
+  record(
+    'a repeated upload that asks to replace the object is refused (no UPDATE policy)',
+    replaced.status >= 400,
+    `HTTP ${replaced.status} ${replaced.text.slice(0, 120)}`,
+  )
+
+  const repeated = await uploadMedia(token, storagePath, bytes, { upsert: false })
+  record(
+    'a repeated upload that does not ask to replace answers a duplicate',
+    repeated.status === 409 || /duplicate|already exists/i.test(repeated.text),
+    `HTTP ${repeated.status} ${repeated.text.slice(0, 160)}`,
   )
 
   const payload = {
@@ -415,6 +434,19 @@ async function main() {
     `HTTP ${badMediaType.status}`,
   )
 
+  // Evidence is a photo or a video: a document is refused even though `file`
+  // is still a value of the enum (older reports carry it).
+  const documentMedia = await finalizeCapture(token, {
+    ...payload,
+    client_request_id: randomUUID(),
+    media_type: 'file',
+  })
+  record(
+    'a document attachment is refused with UNSUPPORTED_MEDIA',
+    documentMedia.status >= 400 && documentMedia.text.includes('UNSUPPORTED_MEDIA'),
+    `HTTP ${documentMedia.status} ${documentMedia.text.slice(0, 120)}`,
+  )
+
   // --- (7) The payload is validated -------------------------------------------
 
   const noLat = await finalizeCapture(token, { ...payload, lat: undefined })
@@ -433,7 +465,97 @@ async function main() {
     `HTTP ${anonymous.status}`,
   )
 
-  await cleanupProbeRows([clientRequestId])
+  // --- (9) A chosen area replaces the detected one -----------------------------
+
+  const areaRead = await fetch(
+    `${API_URL}/rest/v1/area_lookup?name=eq.Mirpur&select=id,thana,centroid`,
+    { headers: { apikey: anonKey, Authorization: `Bearer ${token}` } },
+  )
+  const mirpur = (await areaRead.json().catch(() => []))[0]
+  const chosenRequestId = randomUUID()
+  const chosenPath = `reports/${authorToken}/${chosenRequestId}/${chosenRequestId}.png`
+  await uploadMedia(token, chosenPath, bytes)
+
+  // The device says Khilkhet; the citizen says Mirpur, near a landmark.
+  const chosen = await finalizeCapture(token, {
+    ...payload,
+    client_request_id: chosenRequestId,
+    storage_path: chosenPath,
+    area_id: mirpur?.id,
+    place_detail: '  Road 10, near the bus stand  ',
+  })
+  const chosenArea = chosen.body?.data?.area_hierarchy
+
+  record('a capture with a chosen area is accepted', chosen.status === 200, `HTTP ${chosen.status}`)
+  record(
+    'the chosen area replaces the one the position would resolve to',
+    chosenArea?.thana === 'Mirpur',
+    `area=${JSON.stringify(chosenArea)}`,
+  )
+  record(
+    'the place detail is kept with the area, trimmed',
+    chosenArea?.place === 'Road 10, near the bus stand',
+    `place=${chosenArea?.place}`,
+  )
+
+  const chosenRows = await readReports(
+    token,
+    `?client_request_id=eq.${chosenRequestId}&select=area_hierarchy,lat,lng`,
+  )
+  const [centroidLng, centroidLat] = mirpur?.centroid?.coordinates ?? []
+  record(
+    "the report is filed at the chosen area's centroid, not the device position",
+    chosenRows.rows[0]?.lat === centroidLat && chosenRows.rows[0]?.lng === centroidLng,
+    `row=${chosenRows.rows[0]?.lat},${chosenRows.rows[0]?.lng} centroid=${centroidLat},${centroidLng}`,
+  )
+
+  const unknownArea = await finalizeCapture(token, {
+    ...payload,
+    client_request_id: randomUUID(),
+    area_id: randomUUID(),
+  })
+  record(
+    'an area that is not in the reference list is refused with VALIDATION_FAILED',
+    unknownArea.status === 400,
+    `HTTP ${unknownArea.status}`,
+  )
+
+  // --- (10) Only a photo has a dimension cap ---------------------------------
+
+  // A video is uploaded at its own size, so a full-HD clip within the byte
+  // and second caps is accepted. A photo is resized on the device, so one
+  // wider than the cap is still refused.
+  const videoRequestId = randomUUID()
+  const videoPath = `reports/${authorToken}/${videoRequestId}/${videoRequestId}.mp4`
+  await uploadMedia(token, videoPath, bytes)
+  const fullHdVideo = await finalizeCapture(token, {
+    ...payload,
+    client_request_id: videoRequestId,
+    storage_path: videoPath,
+    media_type: 'video',
+    duration_seconds: 12,
+    width: 1920,
+    height: 1080,
+  })
+  record(
+    'a full-HD video within the caps is accepted at its own size',
+    fullHdVideo.status === 200,
+    `HTTP ${fullHdVideo.status} ${fullHdVideo.text.slice(0, 120)}`,
+  )
+
+  const widePhoto = await finalizeCapture(token, {
+    ...payload,
+    client_request_id: randomUUID(),
+    width: 1920,
+    height: 1080,
+  })
+  record(
+    'a photo wider than the dimension cap is refused with MEDIA_TOO_LARGE',
+    widePhoto.status >= 400 && widePhoto.text.includes('MEDIA_TOO_LARGE'),
+    `HTTP ${widePhoto.status} ${widePhoto.text.slice(0, 120)}`,
+  )
+
+  await cleanupProbeRows([clientRequestId, chosenRequestId, videoRequestId])
 
   const afterCleanup = await readReports(
     token,

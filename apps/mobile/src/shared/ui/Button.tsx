@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../theme'
+import { Icon } from './Icon'
+import { usePressGuard } from './usePressGuard'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'emergency' | 'ghost'
 export type ButtonSize = 'md' | 'lg'
@@ -36,6 +38,8 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme()
   const isLarge = size === 'lg'
+  // A double tap runs the action once.
+  const press = usePressGuard(onPress)
 
   const height = isLarge ? 56 : 52
   const fontSize = isLarge ? theme.typography.size.xl : theme.typography.size.body
@@ -43,11 +47,11 @@ export function Button({
 
   const content = (
     <View style={styles.content}>
-      {icon ? (
-        <Text style={[styles.icon, { color: iconColor(variant, theme) }]}>{icon}</Text>
-      ) : null}
+      {/* A Material Symbols ligature name, drawn with the icon font. As plain
+          text it printed the name itself ("ios_share") next to the label. */}
+      {icon ? <Icon name={icon} size={20} color={iconColor(variant, theme)} filled /> : null}
       <Text
-        numberOfLines={1}
+        numberOfLines={2}
         style={[
           styles.label,
           {
@@ -63,7 +67,10 @@ export function Button({
   )
 
   const base: ViewStyle = {
-    height,
+    // A floor, not a fixed height: a long Bengali label wraps to a second line
+    // and the button grows instead of truncating it.
+    minHeight: height,
+    justifyContent: 'center',
     borderRadius,
     width: fullWidth ? '100%' : undefined,
     alignSelf: fullWidth ? 'stretch' : 'flex-start',
@@ -78,7 +85,7 @@ export function Button({
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={onPress}
+        onPress={press}
         testID={testID}
         style={({ pressed }) => [base, pressed && styles.pressed, style]}
       >
@@ -101,7 +108,7 @@ export function Button({
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ disabled }}
         disabled={disabled}
-        onPress={onPress}
+        onPress={press}
         testID={testID}
         style={({ pressed }) => [base, pressed && styles.pressed, style]}
       >
@@ -128,7 +135,7 @@ export function Button({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={press}
       testID={testID}
       style={({ pressed }) => [
         base,
@@ -156,21 +163,22 @@ function iconColor(variant: ButtonVariant, theme: ReturnType<typeof useTheme>): 
 
 const styles = StyleSheet.create({
   fill: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-  },
-  icon: {
-    fontSize: 18,
-    fontWeight: '400',
+    paddingHorizontal: 16,
   },
   label: {
+    flexShrink: 1,
+    textAlign: 'center',
     letterSpacing: -0.01,
   },
   pressed: {

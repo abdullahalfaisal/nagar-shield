@@ -121,6 +121,14 @@ and the **live** fix's coordinates. When there is no fix it renders the
 fabricated street. The prototype's hardcoded **বাড়ি ১২, রোড ৭, বসুন্ধরা R/A,
 ঢাকা** and **23.7806° N, 90.4066° E** are nowhere in the bundle.
 
+The card also carries a **"Refresh my location"** re-detect button — the same
+affordance the Capture screen's redetect uses — shown once a position exists.
+It re-takes the GPS fix in place, and the fresh fix replaces whatever the map
+and card show, **including manually typed coordinates**: the never-auto-replace
+rule protects a manual entry from the *automatic* fix, but an explicit tap is
+itself the choice to go back to the GPS. A failed tap is toasted, not
+swallowed — a button that visibly did nothing reads as broken.
+
 ### The selection model
 
 `selected` is a `Record<contactId, boolean>`. The toggle is a **default

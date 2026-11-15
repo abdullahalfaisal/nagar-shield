@@ -1,8 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../theme'
+import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
+import { KeyboardScroll } from './KeyboardScroll'
 
 interface WizardScreenProps {
   children: React.ReactNode
@@ -34,64 +38,76 @@ export function WizardScreen({
 }: WizardScreenProps) {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   const body = <View style={styles.body}>{children}</View>
 
+  const footerNode = footer ? (
+    <View style={[styles.sticky, { paddingBottom: 22 + insets.bottom }]}>{footer}</View>
+  ) : null
+
   return (
-    <View style={[styles.screen, { backgroundColor: theme.colors.surface.lavender }]}>
-      {step > 0 ? (
-        <View style={styles.progress}>
-          {Array.from({ length: totalSteps }).map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.seg,
-                {
-                  backgroundColor:
-                    index + 1 < step
-                      ? theme.palette.violet[600]
-                      : index + 1 === step
-                        ? theme.palette.violet[400]
-                        : theme.colors.ink[200],
-                },
-              ]}
-            />
-          ))}
-        </View>
-      ) : null}
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: theme.colors.surface.lavender, paddingTop: insets.top },
+      ]}
+    >
+      <KeyboardScroll footer={footerNode}>
+        {step > 0 ? (
+          <View style={styles.progress}>
+            {Array.from({ length: totalSteps }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.seg,
+                  {
+                    backgroundColor:
+                      index + 1 < step
+                        ? theme.palette.violet[600]
+                        : index + 1 === step
+                          ? theme.palette.violet[400]
+                          : theme.colors.ink[200],
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        ) : null}
 
-      {step > 0 ? (
-        <View style={styles.stepLabel}>
-          <Text style={[styles.stepLabelText, { color: theme.colors.ink[500] }]}>
-            Setup ·{' '}
-            <Text style={{ color: theme.palette.violet[700] }}>
-              Step {step} of {totalSteps}
+        {step > 0 ? (
+          <View style={styles.stepLabel}>
+            <Text style={[styles.stepLabelText, { color: theme.colors.ink[500] }]}>
+              {t('auth.setupLabel')} ·{' '}
+              <Text style={{ color: theme.palette.violet[700] }}>
+                {t('auth.stepOf', { current: step, total: totalSteps })}
+              </Text>
             </Text>
-          </Text>
-        </View>
-      ) : null}
+          </View>
+        ) : null}
 
-      {eyebrow ? (
-        <View style={styles.eyebrow}>
-          <View style={[styles.eyebrowDot, { backgroundColor: theme.palette.violet[600] }]} />
-          <Text style={[styles.eyebrowText, { color: theme.palette.violet[700] }]}>{eyebrow}</Text>
-        </View>
-      ) : null}
+        {eyebrow ? (
+          <View style={styles.eyebrow}>
+            <View style={[styles.eyebrowDot, { backgroundColor: theme.palette.violet[600] }]} />
+            <Text style={[styles.eyebrowText, { color: theme.palette.violet[700] }]}>
+              {eyebrow}
+            </Text>
+          </View>
+        ) : null}
 
-      {title ? (
-        <View style={styles.hero}>
-          <Text style={[styles.heroTitle, { color: theme.colors.ink[950] }]}>{title}</Text>
-          {subtitle ? (
-            <Text style={[styles.heroSubtitle, { color: theme.colors.ink[600] }]}>{subtitle}</Text>
-          ) : null}
-        </View>
-      ) : null}
+        {title ? (
+          <View style={styles.hero}>
+            <Text style={[styles.heroTitle, { color: theme.colors.ink[950] }]}>{title}</Text>
+            {subtitle ? (
+              <Text style={[styles.heroSubtitle, { color: theme.colors.ink[600] }]}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
-      {scroll ? <View style={styles.scrollBody}>{body}</View> : body}
-
-      {footer ? (
-        <View style={[styles.sticky, { paddingBottom: 22 + insets.bottom }]}>{footer}</View>
-      ) : null}
+        {scroll ? <View style={styles.scrollBody}>{body}</View> : body}
+      </KeyboardScroll>
     </View>
   )
 }
@@ -109,6 +125,15 @@ export function WizardBadge({
 }) {
   const theme = useTheme()
   const colors = tone === 'success' ? theme.gradients.success : theme.gradients.primary
+
+  // The default badge is the app's own mark; the other steps keep their glyph.
+  if (icon === 'shield' && tone === 'primary') {
+    return (
+      <View style={styles.brandBadge}>
+        <BrandMark size={88} radius={24} />
+      </View>
+    )
+  }
 
   return (
     <LinearGradient
@@ -134,6 +159,22 @@ export function WizardBadge({
 /** `.wizard-sticky .escape` — the muted text action under the primary CTA. */
 export function EscapeLink({ label, onPress }: { label: string; onPress?: () => void }) {
   const theme = useTheme()
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+
+  // On a tiny screen the footer plus the keyboard leaves no room for the
+  // fields, so the secondary link steps aside while the keyboard is up. The
+  // primary CTA stays.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
+
+  if (keyboardVisible) return null
+
   return (
     // A `Pressable` rather than a `Text` with an `onPress`, so the link has a
     // real 48 dp box. The label itself is unchanged.
@@ -220,6 +261,14 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingHorizontal: 24,
     gap: 8,
+  },
+  brandBadge: {
+    marginBottom: 18,
+    shadowColor: '#7C3AED',
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   badge: {
     width: 88,

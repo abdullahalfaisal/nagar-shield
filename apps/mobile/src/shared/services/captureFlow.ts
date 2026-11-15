@@ -1,12 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   AppError,
   CAPTURE_DESCRIPTION_MAX_LENGTH,
   type PublicVisibility,
+  type ReportCategory,
 } from '@nagar-shield/shared'
 import { newClientRequestId, type PreparedMedia } from './mediaPipeline'
-import { prepareFile, preparePhoto, prepareVideo, type PickedAsset } from './prepareMedia'
+import { preparePhoto, prepareVideo, type PickedAsset } from './prepareMedia'
 import { enqueueUploadBounded } from './uploadQueue'
+import { currentUserId } from './sessionUser'
 import { submitCapture, type CaptureResult } from './submitCapture'
 
 /**
@@ -14,7 +16,7 @@ import { submitCapture, type CaptureResult } from './submitCapture'
  *
  * The order is fixed and it never traps the user:
  *
- *   1. pick the asset (camera / gallery / file)
+ *   1. pick the asset (camera / gallery)
  *   2. sanitise it on the device (EXIF strip, resize, cap checks)
  *   3. upload the bytes and finalize the report
  *   4. on a **transport** failure, hand the payload to the offline queue and
@@ -42,6 +44,12 @@ export interface CaptureDraft {
    * authoritative.
    */
   areaHint?: string | null
+  /** The incident type, or null when the citizen leaves it for later. */
+  category?: ReportCategory | null
+  /** An area chosen from the list instead of the detected position. */
+  areaId?: string | null
+  /** A road, shop or landmark typed with the chosen area. */
+  placeDetail?: string | null
 }
 
 /**
@@ -109,22 +117,21 @@ export function composeDescription(
   return `${body} ${suffix}`
 }
 
-/** The media kinds the Capture screen offers. */
-export type MediaKind = 'photo' | 'video' | 'file'
+/** The media kinds the Capture screen offers: evidence is a photo or a video. */
+export type MediaKind = 'photo' | 'video'
 
-/** Prepares a picked asset for upload. */
+/**
+ * Prepares a picked asset for upload.
+ *
+ * `onProgress` reports a video's compression, from 0 to 1. A photo is ready
+ * too quickly to report on.
+ */
 export async function preparePickedMedia(
   kind: MediaKind,
   asset: PickedAsset,
+  onProgress?: (progress: number) => void,
 ): Promise<PreparedMedia> {
-  switch (kind) {
-    case 'photo':
-      return preparePhoto(asset)
-    case 'video':
-      return prepareVideo(asset)
-    case 'file':
-      return prepareFile(asset)
-  }
+  return kind === 'video' ? prepareVideo(asset, onProgress) : preparePhoto(asset)
 }
 
 /**
@@ -154,12 +161,16 @@ export async function submitDraft(input: {
       capturedAt: input.draft.capturedAt,
       description,
       publicVisibility: input.draft.publicVisibility,
-      category: null,
+      category: input.draft.category ?? null,
+      areaId: input.draft.areaId ?? null,
+      placeDetail: input.draft.placeDetail ?? null,
     })
 
     return { status: 'sent', result }
   } catch (error) {
     if (!isTransportFailure(error)) {
+      // Seen in the Metro log while developing; the user sees the failure banner.
+      if (__DEV__) console.warn('[capture] submit failed', error)
       throw error
     }
 
@@ -173,12 +184,17 @@ export async function submitDraft(input: {
     // land twice.
     const { dropped } = await enqueueUploadBounded({
       clientRequestId,
+      // Only this user's session will send it.
+      authorId: await currentUserId(),
       media: input.media,
       lat: input.draft.lat,
       lng: input.draft.lng,
       capturedAt: input.draft.capturedAt,
       description,
       publicVisibility: input.draft.publicVisibility,
+      category: input.draft.category ?? null,
+      areaId: input.draft.areaId ?? null,
+      placeDetail: input.draft.placeDetail ?? null,
     })
 
     return { status: 'queued', droppedOldest: dropped !== null }
@@ -192,9 +208,17 @@ export async function submitDraft(input: {
  * the retry, so it is never queued.
  */
 export function isTransportFailure(error: unknown): boolean {
+  // A `TypeError` is a bug in the app (a missing API, an undefined value)
+  // unless it is the one React Native's `fetch` throws for a dropped
+  // connection. Queuing a bug hid it as "saved on device", and the retry hit
+  // the same bug forever.
+  if (error instanceof TypeError) return NETWORK_TYPE_ERROR.test(error.message)
   if (!(error instanceof AppError)) return true
   return error.code === 'INTERNAL'
 }
+
+const NETWORK_TYPE_ERROR =
+  /network request failed|network error|failed to fetch|timed? ?out|aborted/i
 
 export interface UseCaptureSubmitResult {
   /** `true` while a submit is in flight. */
@@ -212,7 +236,16 @@ export function useCaptureSubmit(): UseCaptureSubmitResult {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<AppError | null>(null)
 
+  // Whether a submit is running. A ref, not the state above: two taps in the
+  // same moment both read the state before the first one's update has
+  // rendered, and each submit makes its own request id, so the second would
+  // file a second report.
+  const inFlight = useRef(false)
+
   const submit = useCallback(async (input: { media: PreparedMedia; draft: CaptureDraft }) => {
+    if (inFlight.current) return { status: 'cancelled' } as CaptureOutcome
+    inFlight.current = true
+
     setIsSubmitting(true)
     setError(null)
 
@@ -222,6 +255,7 @@ export function useCaptureSubmit(): UseCaptureSubmitResult {
       setError(caught instanceof AppError ? caught : new AppError('INTERNAL'))
       return { status: 'cancelled' } as CaptureOutcome
     } finally {
+      inFlight.current = false
       setIsSubmitting(false)
     }
   }, [])

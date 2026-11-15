@@ -6,7 +6,7 @@ import {
   setSessionPersistencePolicy,
   windowForRememberMe,
 } from '@/shared/api/session-storage'
-import { clearQueue } from '@/shared/services/uploadQueue'
+import { clearQueue, ownQueueCount } from '@/shared/services/uploadQueue'
 
 /**
  * Authentication operations.
@@ -19,6 +19,19 @@ import { clearQueue } from '@/shared/services/uploadQueue'
  * called from the UI while the flag is off; the code is retained so the flag
  * can be turned on without a refactor.
  */
+
+/**
+ * The detail that marks an `AUTH_REQUIRED` as "the credentials were wrong"
+ * rather than "the session ended". The code stays `AUTH_REQUIRED` because the
+ * upload-queue drain treats that code as retryable; only the login screen
+ * reads the detail, to say the credentials are wrong instead of "Please sign
+ * in again", which tells someone who just typed a password nothing useful.
+ */
+export const INVALID_CREDENTIALS = { reason: 'invalid_credentials' } as const
+
+export function isInvalidCredentials(error: AppError): boolean {
+  return error.code === 'AUTH_REQUIRED' && error.details?.reason === INVALID_CREDENTIALS.reason
+}
 
 export interface SignupParams {
   email: string
@@ -66,14 +79,14 @@ async function resolveEmail(identifier: string): Promise<string> {
     // The RPC raises `AUTH_REQUIRED` for an unknown identifier. Surface it as
     // the same generic failure a wrong password produces.
     if (error.code === '42501' || error.code === 'P0002') {
-      throw new AppError('AUTH_REQUIRED')
+      throw new AppError('AUTH_REQUIRED', INVALID_CREDENTIALS)
     }
     throw fromSupabaseError(error)
   }
 
   const email = (data as { email?: string } | null)?.email
   if (!email) {
-    throw new AppError('AUTH_REQUIRED')
+    throw new AppError('AUTH_REQUIRED', INVALID_CREDENTIALS)
   }
 
   return email
@@ -130,7 +143,9 @@ export async function signUp({ email, password, phone, fullName }: SignupParams)
     }
 
     if (/already registered|already exists/i.test(error.message)) {
-      throw new AppError('CONFLICT')
+      // The field lets the register screen say "this email is already
+      // registered" instead of the generic conflict text.
+      throw new AppError('CONFLICT', { field: 'email' })
     }
     throw fromSupabaseError(error)
   }
@@ -179,7 +194,7 @@ export async function logIn({ identifier, password, rememberMe }: LoginParams): 
     // behind would expire the *next* session against a window nobody chose.
     clearSessionPersistencePolicy()
     if (/invalid login credentials/i.test(error.message)) {
-      throw new AppError('AUTH_REQUIRED')
+      throw new AppError('AUTH_REQUIRED', INVALID_CREDENTIALS)
     }
     throw fromSupabaseError(error)
   }
@@ -188,10 +203,34 @@ export async function logIn({ identifier, password, rememberMe }: LoginParams): 
     // FR-AUTH-2 — extend the session window to 30 days.
     // Supabase rotates the refresh token on demand; `refreshSession` with the
     // stored refresh token keeps the session alive for the full window.
-    const { error: extendError } = await supabase.auth.refreshSession()
-    if (extendError) {
-      // Not fatal — the user is signed in; the session simply uses the
-      // default lifetime.
+    //
+    // **The failure here must not cost the user their sign-in.**
+    //
+    // `supabase-js`'s `refreshSession` reads the session from **storage**,
+    // and a session it cannot find is treated as invalid: `auth-js` calls
+    // `_removeSession()`, which emits `SIGNED_OUT` and clears the session the
+    // sign-in had just created. The user is bounced straight back to the
+    // welcome screen after a *successful* sign-in, with no error shown.
+    //
+    // So the session is checked **before** the refresh, and the refresh is
+    // only attempted when there is one to refresh. A device whose store
+    // could not hold the session keeps the session it has — in memory, for
+    // this launch — which is the story's own edge case:
+    //
+    // > | SecureStore is unavailable on the device | Session persistence
+    // > degrades to memory-only, the app still runs for the current session
+    //
+    // The 30-day window cannot be honoured without a stored refresh token,
+    // so the session simply uses its default lifetime instead. That is the
+    // correct outcome: the alternative is signing the user out.
+    const { data: sessionData } = await supabase.auth.getSession()
+
+    if (sessionData.session) {
+      const { error: extendError } = await supabase.auth.refreshSession()
+      if (extendError) {
+        // Not fatal — the user is signed in; the session simply uses the
+        // default lifetime.
+      }
     }
   }
 }
@@ -199,23 +238,44 @@ export async function logIn({ identifier, password, rememberMe }: LoginParams): 
 /**
  * Signs the user out.
  *
- * The offline upload queue is **discarded** on the way out. A queued item is
- * scoped to the session that created it: it must never be uploaded under
- * another account, or one citizen's evidence would land in another citizen's
- * history. The number of discarded items is returned so the caller can warn
- * the user — evidence that was never sent is evidence the user still needs to
- * know about.
+ * The user's unsent reports are **kept**. A queued report records who made it
+ * and only that user's session sends it (see `uploadQueue.ts`), so another
+ * account that signs in on this phone cannot send it or see it, and it is still
+ * waiting when its author signs in again. Discarding it here used to lose
+ * evidence that had never been sent, on one tap, with the warning shown after
+ * the loss. `keptUploads` is returned so the caller can tell the user where
+ * their reports are.
+ *
+ * `discardUploads` is for deleting the account: there is no one left to send
+ * them for, and their files should not stay on the phone.
+ *
+ * A sign-out that fails because the phone is offline is still a sign-out. The
+ * session is removed from the phone before the server is asked to revoke it,
+ * and the revoke is what fails; reporting that as an error left the user on
+ * the signed-in screens with no session behind them.
  */
-export async function logOut(): Promise<{ discardedUploads: number }> {
-  const discardedUploads = await clearQueue()
+export async function logOut(
+  options: { discardUploads?: boolean } = {},
+): Promise<{ keptUploads: number; discardedUploads: number }> {
+  const { data: before } = await supabase.auth.getSession()
+  const userId = before.session?.user.id ?? null
 
   const { error } = await supabase.auth.signOut()
-  if (error) throw fromSupabaseError(error)
+  if (error) {
+    const { data: after } = await supabase.auth.getSession()
+    if (after.session) throw fromSupabaseError(error)
+  }
 
   // The next session must not inherit this one's window.
   clearSessionPersistencePolicy()
 
-  return { discardedUploads }
+  if (!userId) return { keptUploads: 0, discardedUploads: 0 }
+
+  if (options.discardUploads) {
+    return { keptUploads: 0, discardedUploads: await clearQueue(userId) }
+  }
+
+  return { keptUploads: await ownQueueCount(userId), discardedUploads: 0 }
 }
 
 /**

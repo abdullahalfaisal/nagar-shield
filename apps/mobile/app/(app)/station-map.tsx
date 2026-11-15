@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter } from '@/shared/navigation/useSafeRouter'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { STATIONS, type StationEntry } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
@@ -41,6 +42,7 @@ import { useRefreshGuard } from '@/shared/services/refreshGuard'
 export default function StationMapScreen() {
   const theme = useTheme()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
 
   // The fix is requested **just-in-time**, when the map opens. It is never
@@ -94,6 +96,40 @@ export default function StationMapScreen() {
 
   const selectedName = selected ? displayName(selected) : null
 
+  const stationRows = stations.map((station) => (
+    <View key={station.id} style={styles.listItem}>
+      <ListRow
+        title={displayName(station)}
+        subtitle={station.phone}
+        icon="location_on"
+        tone={
+          station.stationType === 'police'
+            ? 'purple'
+            : station.stationType === 'hospital'
+              ? 'red'
+              : 'amber'
+        }
+        showArrow={false}
+        onPress={() => setSelected(station)}
+        trailing={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('help.stationMapCallLabel', {
+              name: displayName(station),
+              number: station.phone,
+            })}
+            onPress={() => {
+              void degradedHelp.dial(station.phone)
+            }}
+            style={styles.rowCall}
+          >
+            <Icon name="call" size={18} color={theme.palette.violet[700]} filled />
+          </Pressable>
+        }
+      />
+    </View>
+  ))
+
   return (
     <Screen
       title={t('help.stationMapTitle')}
@@ -107,6 +143,8 @@ export default function StationMapScreen() {
         markers={markers}
         userLocation={isFallback ? null : { lat: origin.lat, lng: origin.lng }}
         overlayAlign="top"
+        items={stationRows}
+        insetBottom={!(degradedHelp.showGuidance && degradedHelp.guidanceNumber)}
         overlay={
           <View style={styles.overlayStack}>
             <View
@@ -139,6 +177,7 @@ export default function StationMapScreen() {
             {isOffline ? (
               <View
                 accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
                 style={[
                   styles.offlineNotice,
                   {
@@ -217,51 +256,18 @@ export default function StationMapScreen() {
             </Pressable>
           </View>
         ) : null}
-
-        <View style={styles.list}>
-          {stations.map((station) => (
-            <ListRow
-              key={station.id}
-              title={displayName(station)}
-              subtitle={station.phone}
-              icon="location_on"
-              tone={
-                station.stationType === 'police'
-                  ? 'purple'
-                  : station.stationType === 'hospital'
-                    ? 'red'
-                    : 'amber'
-              }
-              showArrow={false}
-              onPress={() => setSelected(station)}
-              trailing={
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('help.stationMapCallLabel', {
-                    name: displayName(station),
-                    number: station.phone,
-                  })}
-                  onPress={() => {
-                    void degradedHelp.dial(station.phone)
-                  }}
-                  style={styles.rowCall}
-                >
-                  <Icon name="call" size={18} color={theme.palette.violet[700]} filled />
-                </Pressable>
-              }
-            />
-          ))}
-        </View>
       </StationMap>
 
       {/* The manual-dial guidance — the same component every help entry point
           renders. */}
       {degradedHelp.showGuidance && degradedHelp.guidanceNumber ? (
-        <ManualDialGuidance
-          number={degradedHelp.guidanceNumber}
-          showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
-          showOfflineNotice={degradedHelp.showOfflineNotice}
-        />
+        <View style={{ paddingBottom: insets.bottom }}>
+          <ManualDialGuidance
+            number={degradedHelp.guidanceNumber}
+            showPowerSaveWarning={degradedHelp.showPowerSaveWarning}
+            showOfflineNotice={degradedHelp.showOfflineNotice}
+          />
+        </View>
       ) : null}
     </Screen>
   )
@@ -297,7 +303,7 @@ const styles = StyleSheet.create({
   },
   offlineText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 16,
   },
   legend: {
@@ -331,7 +337,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   legendHint: {
-    fontSize: 10,
+    fontSize: 12,
     marginTop: 8,
     lineHeight: 15,
   },
@@ -384,9 +390,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  list: {
+  listItem: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
   },
   rowCall: {
     width: 48,

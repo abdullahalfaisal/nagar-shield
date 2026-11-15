@@ -1,4 +1,4 @@
-import { AppError, type ApiErrorCode } from '@nagar-shield/shared'
+import { AppError, emailSchema, phoneSchema, type ApiErrorCode } from '@nagar-shield/shared'
 import { parseErrorBody } from '@/shared/api/errors'
 import { supabaseAnonKey, supabaseUrl } from '@/shared/services/submitCapture'
 
@@ -46,6 +46,81 @@ export interface PasswordResetVerifyResult {
   expiresIn: number | undefined
 }
 
+/** How long a request may take before it is abandoned. */
+export const RESET_REQUEST_TIMEOUT_MS = 15_000
+
+/**
+ * The code's validity window. The server enforces it; the client only mirrors
+ * it, counting from the moment the code was requested.
+ */
+export const OTP_VALIDITY_SECONDS = 10 * 60
+
+/**
+ * A transport failure: the device is offline, the host is unreachable, or the
+ * request ran out of time. It is its own type so the screens can say "you are
+ * offline" instead of the generic "something went wrong" — which implies a
+ * fault the user cannot tell from a server bug.
+ */
+export class PasswordResetNetworkError extends Error {
+  constructor() {
+    super('password-reset request failed in transit')
+    this.name = 'PasswordResetNetworkError'
+  }
+}
+
+/** True for a transport failure of either reset request. */
+export function isResetNetworkError(error: unknown): boolean {
+  return error instanceof PasswordResetNetworkError
+}
+
+/**
+ * Posts to the Edge Function with a time limit.
+ *
+ * Without the limit a request that never answers leaves the button on
+ * "Submitting" for as long as the OS keeps the socket. `fetch` rejects with a
+ * `TypeError` when the network is down and the abort raises an `AbortError`;
+ * both become one `PasswordResetNetworkError`.
+ */
+async function postToResetFunction(payload: Record<string, string>) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), RESET_REQUEST_TIMEOUT_MS)
+
+  try {
+    return await fetch(`${supabaseUrl()}/functions/v1/password-reset`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof TypeError || (error as { name?: string } | null)?.name === 'AbortError') {
+      throw new PasswordResetNetworkError()
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Seconds left in the code's validity window.
+ *
+ * `issuedAt` is when the code was requested, in epoch milliseconds. A missing
+ * value means the issue time is unknown (the hand-off was lost), and the
+ * window is then assumed to start now — the server still decides.
+ */
+export function remainingValiditySeconds(
+  issuedAt: number | undefined,
+  now: number = Date.now(),
+): number {
+  if (issuedAt === undefined) return OTP_VALIDITY_SECONDS
+  const elapsed = Math.floor((now - issuedAt) / 1000)
+  return Math.min(OTP_VALIDITY_SECONDS, Math.max(0, OTP_VALIDITY_SECONDS - elapsed))
+}
+
 /**
  * Requests a reset code for an identifier.
  *
@@ -61,14 +136,7 @@ export interface PasswordResetVerifyResult {
 export async function sendPasswordResetOtp(
   identifier: string,
 ): Promise<PasswordResetRequestResult> {
-  const response = await fetch(`${supabaseUrl()}/functions/v1/password-reset`, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ identifier: identifier.trim() }),
-  })
+  const response = await postToResetFunction({ identifier: identifier.trim() })
 
   const body = await response.json().catch(() => null)
 
@@ -106,17 +174,10 @@ export async function verifyPasswordResetOtp(
   code: string,
   newPassword: string,
 ): Promise<PasswordResetVerifyResult> {
-  const response = await fetch(`${supabaseUrl()}/functions/v1/password-reset`, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey(),
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      identifier: identifier.trim(),
-      code: code.trim(),
-      new_password: newPassword,
-    }),
+  const response = await postToResetFunction({
+    identifier: identifier.trim(),
+    code: code.trim(),
+    new_password: newPassword,
   })
 
   const body = await response.json().catch(() => null)
@@ -168,6 +229,42 @@ export function readAttemptsRemaining(error: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+/**
+ * Whether the text looks like a phone number or an email address.
+ *
+ * Only a format check, so an obvious typo is caught before a request: the
+ * server resolves the identifier and gives the same answer for an unknown
+ * one, so this says nothing about whether an account exists.
+ */
+export function isValidResetIdentifier(value: string): boolean {
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return false
+  return trimmed.includes('@')
+    ? emailSchema.safeParse(trimmed).success
+    : phoneSchema.safeParse(trimmed).success
+}
+
+/**
+ * Whether to announce the validity countdown to a screen reader at this
+ * second. Announcing every tick would drown out everything else, so it is
+ * said at a few milestones only.
+ */
+export function isValidityMilestone(seconds: number): boolean {
+  return seconds === OTP_VALIDITY_SECONDS / 2 || seconds === 60 || seconds === 0
+}
+
+/**
+ * Why the user was sent back to the code step. It travels as a route param —
+ * a KEY, never text, so the message is rendered in the current language and a
+ * param holds nothing sensitive.
+ */
+export type ResetNotice = 'wrong' | 'rateLimited'
+
+/** Reads a route param as a notice key; anything unknown is no notice. */
+export function parseResetNotice(value: unknown): ResetNotice | undefined {
+  return value === 'wrong' || value === 'rateLimited' ? value : undefined
+}
+
 /** True when the rejection is the cooldown. */
 export function isRateLimited(error: unknown): boolean {
   return error instanceof AppError && (error.code as ApiErrorCode) === 'OTP_RATE_LIMIT'
@@ -193,6 +290,12 @@ export function isRateLimited(error: unknown): boolean {
 interface PendingReset {
   identifier: string
   code: string
+  /**
+   * When the code was requested, in epoch milliseconds. It rides the hand-off
+   * so the validity countdown on the code step keeps the real time instead of
+   * restarting at 10:00 every time the screen mounts.
+   */
+  issuedAt?: number
 }
 
 let pendingReset: PendingReset | null = null
@@ -204,8 +307,12 @@ let pendingReset: PendingReset | null = null
  * the newest challenge is the only valid one anyway, so keeping the older one
  * would be keeping a code the server has already superseded.
  */
-export function stagePasswordReset(identifier: string, code: string): void {
-  pendingReset = { identifier: identifier.trim(), code }
+export function stagePasswordReset(identifier: string, code: string, issuedAt?: number): void {
+  pendingReset = {
+    identifier: identifier.trim(),
+    code,
+    ...(issuedAt !== undefined ? { issuedAt } : {}),
+  }
 }
 
 /**

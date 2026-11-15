@@ -40,8 +40,27 @@ export interface AccountStatusState {
    */
   recoverableUntil: string | null
   loading: boolean
+  /**
+   * Whether the first check for this user has finished — answered, failed,
+   * or run past `ACCOUNT_STATUS_SETTLE_MS`.
+   *
+   * The signed-in layout holds the splash screen until this is true. Before,
+   * it rendered Home while the first check was still in flight, so a disabled
+   * account saw the app — and its queries and queued uploads fired — before
+   * the redirect. `status` alone cannot say this: `unknown` also means "the
+   * check failed", and a failed check must still let the user in.
+   */
+  settled: boolean
   refresh: () => Promise<void>
 }
+
+/**
+ * The longest the first check may hold the splash screen. A network that
+ * hangs instead of failing must not keep the user out of the app; past this
+ * the app opens as it does for a failed check, and a late `disabled` answer
+ * still redirects when it arrives.
+ */
+export const ACCOUNT_STATUS_SETTLE_MS = 4_000
 
 /**
  * Watches the account's lifecycle for the signed-in user.
@@ -54,6 +73,9 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
   const [disabledAt, setDisabledAt] = useState<string | null>(null)
   const [recoverableUntil, setRecoverableUntil] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // The user id whose first check has finished. Kept as the id rather than a
+  // boolean so a different account is never treated as already checked.
+  const [settledFor, setSettledFor] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(async () => {
     if (!userId) {
@@ -81,6 +103,7 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
       // disabled account's writes anyway.
     } finally {
       setLoading(false)
+      setSettledFor(userId)
     }
   }, [userId])
 
@@ -93,6 +116,11 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
       return
     }
     void refresh()
+
+    const settleTimer = setTimeout(() => setSettledFor(userId), ACCOUNT_STATUS_SETTLE_MS)
+    return () => {
+      clearTimeout(settleTimer)
+    }
   }, [userId, refresh])
 
   // (2) The app returns to the foreground.
@@ -108,7 +136,10 @@ export function useAccountStatus(userId: string | undefined): AccountStatusState
     }
   }, [refresh])
 
-  return { status, disabledAt, recoverableUntil, loading, refresh }
+  // Signed out, there is nothing to wait for.
+  const settled = userId === undefined || settledFor === userId
+
+  return { status, disabledAt, recoverableUntil, loading, settled, refresh }
 }
 
 /**
