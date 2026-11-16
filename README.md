@@ -9,6 +9,40 @@ two apps consume it rather than copying it, so the mobile app, the admin
 console, and the Edge Functions validate the same payloads and speak the same
 error codes.
 
+## The app
+
+The mobile app (`apps/mobile`) is what citizens use. The home screen shows
+recent alerts near you, with a red Emergency help button on top and the five
+main actions in a bar at the bottom.
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-home.jpg" alt="Home" width="200"><br><sub>Home</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-report-crime.jpg" alt="Report Crime" width="200"><br><sub>Report a crime</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-emergency-help.jpg" alt="Emergency help" width="200"><br><sub>Emergency help</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-nearest-station.jpg" alt="Nearest station map" width="200"><br><sub>Nearest station</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-crime-history.jpg" alt="Crime history" width="200"><br><sub>Crime history</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-location-sharing.jpg" alt="Location sharing" width="200"><br><sub>Location sharing</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-emergency-contacts.jpg" alt="Emergency contacts" width="200"><br><sub>Emergency contacts</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/mobile-settings.jpg" alt="Settings" width="200"><br><sub>Settings</sub></td>
+  </tr>
+</table>
+
+- **Home:** recent alerts for your area, filtered by a searchable area picker.
+- **Report a crime:** a photo or a short video, an optional category and a short
+  description.
+- **Emergency help:** one tap to call police, medical or fire, or your trusted
+  contacts.
+- **Nearest station:** a map of police stations, hospitals and fire stations,
+  with their phone numbers.
+- **Crime history:** reports near you and your own, on a list and a map.
+- **Location sharing:** send where you are to people you trust.
+- **Emergency contacts:** the people your personal emergency call reaches first.
+- **Settings:** language (Bangla or English), dark theme, biometric sign-in and
+  permissions.
+
 ## The moderator console
 
 The repository also ships a web console for moderators (`apps/admin`). It is
