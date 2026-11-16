@@ -1,5 +1,5 @@
 import { Children, useEffect, useState, type ReactNode } from 'react'
-import { Alert, Share, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native'
 import Constants from 'expo-constants'
 import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,7 @@ import { useTheme, useThemeControls } from '@/shared/theme'
 import { Button, Icon, ListRow, PermissionRow, Screen, Toggle } from '@/shared/ui'
 import { BottomSheet } from '@/shared/ui/BottomSheet'
 import { setLocale } from '@/shared/i18n'
+import { appFont } from '@/shared/theme/appFont'
 import { logOut } from '@/shared/auth/authService'
 import { useSignOut } from '@/shared/auth/useSignOut'
 import { softDeleteAccount } from '@/shared/api/account'
@@ -48,6 +49,7 @@ export default function SettingsScreen() {
 
   const [biometric, setBiometric] = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [languageOpen, setLanguageOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | undefined>()
@@ -179,9 +181,7 @@ export default function SettingsScreen() {
             background: theme.palette.violet[100],
             color: theme.palette.violet[700],
           }}
-          onPress={() => {
-            void setLocale(isBangla ? 'en' : 'bn')
-          }}
+          onPress={() => setLanguageOpen(true)}
         />
         <ListRow
           icon="dark_mode"
@@ -313,6 +313,65 @@ export default function SettingsScreen() {
         <Icon name="logout" size={20} color={theme.palette.red[600]} />
         {t('more.logout')}
       </Text>
+
+      {/* The language choice. A tap on the row only opens this; the language
+          changes when the user picks one of the two. Each option is written in
+          its own language, so it can be found whichever one is on. */}
+      <BottomSheet
+        visible={languageOpen}
+        title={t('settings.language')}
+        helper={t('settings.languageHelper')}
+        onClose={() => setLanguageOpen(false)}
+      >
+        <View style={styles.languageOptions}>
+          {(
+            [
+              { id: 'bn', label: t('settings.languageBangla') },
+              { id: 'en', label: t('settings.languageEnglish') },
+            ] as const
+          ).map((option) => {
+            const selected = (isBangla ? 'bn' : 'en') === option.id
+
+            return (
+              <Pressable
+                key={option.id}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={option.label}
+                onPress={() => {
+                  setLanguageOpen(false)
+                  if (!selected) void setLocale(option.id)
+                }}
+                style={({ pressed }) => [
+                  styles.languageOption,
+                  {
+                    backgroundColor: selected
+                      ? theme.palette.violet[100]
+                      : theme.colors.surface.lavender,
+                    borderColor: selected ? theme.palette.violet[600] : 'transparent',
+                    opacity: pressed ? 0.7 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.languageLabel,
+                    {
+                      color: selected ? theme.palette.violet[700] : theme.colors.ink[950],
+                      fontFamily: appFont('bold', option.id),
+                    },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {selected ? (
+                  <Icon name="check_circle" size={22} color={theme.palette.violet[600]} />
+                ) : null}
+              </Pressable>
+            )
+          })}
+        </View>
+      </BottomSheet>
 
       {/*
         The delete confirmation. It states plainly what happens and — more
@@ -463,6 +522,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 8,
+  },
+  languageOptions: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 56,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  languageLabel: {
+    fontSize: 17,
   },
   deleteBody: {
     fontSize: 13,

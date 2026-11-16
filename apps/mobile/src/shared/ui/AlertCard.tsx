@@ -151,7 +151,7 @@ export function AlertCard({ report, relativeTime, onPress, onFlag }: AlertCardPr
               {categoryLabel}
             </Text>
             <View style={styles.areaRow}>
-              <SolidIcon name="pin" size={14} color={meta} />
+              <SolidIcon name="pin" size={12} color={meta} />
               <Text
                 style={[
                   styles.area,
@@ -494,11 +494,17 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginTop: 2,
+    // The pin glyph has empty space inside its box, so the row is pulled left
+    // until the pin lines up with the category name above it.
+    marginLeft: -2,
+    // A little softer than the category name, so the place reads as the
+    // secondary line.
+    opacity: 0.9,
   },
   area: {
     flexShrink: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
   },
   description: {
     fontSize: 14,

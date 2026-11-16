@@ -184,6 +184,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     minHeight: 28,
+    // The pin glyph has empty space inside its box, so the row is pulled left
+    // until the pin lines up with the date above it.
+    marginLeft: -3,
   },
   area: {
     flexShrink: 1,

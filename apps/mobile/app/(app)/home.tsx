@@ -36,7 +36,7 @@ const HOME_FEED_CARD_LIMIT = 5
  *   - greeting block with the sun icon and the date
  *   - the `more_horiz` action button
  *   - the settings button
- *   - the six quick-action cards
+ *   - the five quick-action cards
  *   - the auto-refresh indicator
  *   - the area chip row
  *   - the Alerts feed cards
@@ -198,6 +198,13 @@ export default function HomeScreen() {
             color: 'sky',
             label: t('home.quickContacts'),
             onPress: () => router.push('/(app)/contacts'),
+          },
+          {
+            key: 'stations',
+            icon: 'map',
+            color: 'pink',
+            label: t('home.quickStations'),
+            onPress: () => router.push('/(app)/station-map'),
           },
         ]}
       />

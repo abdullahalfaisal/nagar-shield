@@ -1,5 +1,6 @@
 import { useState, type ComponentRef, type Ref } from 'react'
 import {
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -7,6 +8,7 @@ import {
   type KeyboardTypeOptions,
   type TextInputProps,
 } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
 import { Icon } from './Icon'
 
@@ -61,7 +63,11 @@ export function InputField({
   inputRef,
 }: InputFieldProps) {
   const theme = useTheme()
+  const { t } = useTranslation()
   const [focused, setFocused] = useState(false)
+  // A password field gets an eye button; the text is hidden again whenever the
+  // field is rebuilt, so a shown password never outlives the screen.
+  const [revealed, setRevealed] = useState(false)
 
   const floated = focused || value.length > 0
   const borderColor = error
@@ -105,7 +111,7 @@ export function InputField({
           // two strings on top of each other.
           placeholder={floated ? placeholder : undefined}
           placeholderTextColor={theme.colors.textMuted}
-          secureTextEntry={secureTextEntry}
+          secureTextEntry={secureTextEntry && !revealed}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoComplete={autoComplete}
@@ -126,9 +132,27 @@ export function InputField({
               paddingTop: floated ? 20 : 18,
               paddingBottom: floated ? 6 : 8,
               paddingLeft: icon ? 0 : 16,
+              paddingRight: secureTextEntry ? 0 : 16,
             },
           ]}
         />
+
+        {secureTextEntry ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? t('auth.hidePassword') : t('auth.showPassword')}
+            accessibilityState={{ selected: revealed }}
+            onPress={() => setRevealed((shown) => !shown)}
+            hitSlop={{ top: 4, bottom: 4 }}
+            style={styles.eye}
+          >
+            <Icon
+              name={revealed ? 'visibility_off' : 'visibility'}
+              size={22}
+              color={revealed ? theme.palette.violet[500] : theme.colors.ink[400]}
+            />
+          </Pressable>
+        ) : null}
 
         <Text
           pointerEvents="none"
@@ -185,6 +209,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     paddingRight: 16,
+  },
+  eye: {
+    width: 48,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   leadingIcon: {
     marginLeft: 14,

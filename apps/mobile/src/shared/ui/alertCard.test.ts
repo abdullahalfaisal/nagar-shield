@@ -300,11 +300,11 @@ describe('the card’s box model', () => {
     expect(cardCode()).toContain('numberOfLines={DESCRIPTION_LINES}')
   })
 
-  it('uses the type scale: title 16, description 14 / 21, meta 13', () => {
+  it('uses the type scale: title 16, description 14 / 21, area 12, time 13', () => {
     expect(styles.category.fontSize).toBe(16)
     expect(styles.description.fontSize).toBe(14)
     expect(styles.description.lineHeight).toBe(21)
-    expect(styles.area.fontSize).toBe(13)
+    expect(styles.area.fontSize).toBe(12)
     expect(styles.time.fontSize).toBe(13)
   })
 

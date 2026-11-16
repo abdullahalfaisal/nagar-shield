@@ -95,7 +95,7 @@ export default function HelpAlertScreen() {
           <View style={styles.headerTitleRow}>
             <Icon name="emergency" size={22} color={theme.palette.red[600]} />
             <Text style={[styles.headerTitle, { color: theme.palette.red[600] }]}>
-              {t('help.police')} · {t('home.helpTitle')}
+              {t('home.helpTitle')}
             </Text>
           </View>
           <Text style={[styles.headerSubtitle, { color: theme.colors.ink[500] }]}>

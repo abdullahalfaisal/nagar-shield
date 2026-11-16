@@ -68,7 +68,7 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.surface.lavender }]}>
-      <KeyboardScroll contentStyle={[styles.content, { paddingTop: 40 + insets.top }]}>
+      <KeyboardScroll revealEnd contentStyle={[styles.content, { paddingTop: 24 + insets.top }]}>
         <View style={styles.brand}>
           <Brand name={t('common.appName')} tagline={t('common.brandTagline')} />
         </View>
@@ -82,58 +82,63 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        <InputField
-          label={t('auth.identifierLabel')}
-          value={identifier}
-          // Bangla digits in a phone number are converted as they are typed; an
-          // email has none, so it passes through unchanged.
-          onChangeText={(next) => setIdentifier(bnDigitsToAscii(next))}
-          placeholder={t('auth.emailPlaceholder')}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="username"
-          textContentType="username"
-          returnKeyType="next"
-          icon="mail"
-          helper={t('auth.loginSubtitle')}
-          testID="login-identifier"
-        />
-
-        <InputField
-          label={t('auth.passwordLabel')}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete="password"
-          textContentType="password"
-          icon="lock"
-          onSubmitEditing={onSubmit}
-          returnKeyType="go"
-          testID="login-password"
-        />
-
-        <View style={styles.rememberRow}>
-          <Toggle
-            value={rememberMe}
-            onValueChange={setRememberMe}
-            accessibilityLabel={t('auth.rememberMe')}
+        <View style={styles.field}>
+          <InputField
+            label={t('auth.identifierLabel')}
+            value={identifier}
+            // Bangla digits in a phone number are converted as they are typed; an
+            // email has none, so it passes through unchanged.
+            onChangeText={(next) => setIdentifier(bnDigitsToAscii(next))}
+            placeholder={t('auth.emailPlaceholder')}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="username"
+            textContentType="username"
+            returnKeyType="next"
+            icon="mail"
+            testID="login-identifier"
           />
-          <Text style={[styles.rememberLabel, { color: theme.colors.ink[600] }]}>
-            {t('auth.rememberMe')}
-          </Text>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/(auth)/forgot-password')}
-          hitSlop={8}
-          style={styles.forgotHit}
-        >
-          <Text style={[styles.forgotLink, { color: theme.palette.violet[700] }]}>
-            {t('auth.forgotPassword')}
-          </Text>
-        </Pressable>
+        <View style={styles.field}>
+          <InputField
+            label={t('auth.passwordLabel')}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="password"
+            textContentType="password"
+            icon="lock"
+            onSubmitEditing={onSubmit}
+            returnKeyType="go"
+            testID="login-password"
+          />
+        </View>
+
+        <View style={styles.optionsRow}>
+          <View style={styles.rememberRow}>
+            <Toggle
+              value={rememberMe}
+              onValueChange={setRememberMe}
+              accessibilityLabel={t('auth.rememberMe')}
+            />
+            <Text style={[styles.rememberLabel, { color: theme.colors.ink[600] }]}>
+              {t('auth.rememberMe')}
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/(auth)/forgot-password')}
+            hitSlop={8}
+            style={styles.forgotHit}
+          >
+            <Text style={[styles.forgotLink, { color: theme.palette.violet[700] }]}>
+              {t('auth.forgotPassword')}
+            </Text>
+          </Pressable>
+        </View>
 
         {/*
           The banner sits just above the button, not at the top of the form:
@@ -190,22 +195,25 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 24,
   },
   brand: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   hero: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
+  },
+  field: {
+    marginBottom: 8,
   },
   heroTitle: {
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.6,
     lineHeight: 32,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   heroSubtitle: {
     fontSize: 14,
@@ -217,18 +225,22 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    flexShrink: 1,
   },
   rememberLabel: {
     fontSize: 14,
     marginLeft: 8,
   },
   forgotHit: {
-    alignSelf: 'flex-end',
     minHeight: 44,
     justifyContent: 'center',
   },
@@ -242,13 +254,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   cta: {
-    marginTop: 16,
+    marginTop: 8,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 8,
   },
   footerText: {
     fontSize: 14,
