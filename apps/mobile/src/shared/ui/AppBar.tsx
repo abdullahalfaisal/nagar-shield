@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useTranslation } from 'react-i18next'
 import { useTheme } from '../theme'
+import { BackButton } from './BackButton'
 import { Icon } from './Icon'
 import { usePressGuard } from './usePressGuard'
 
@@ -40,7 +40,6 @@ export function AppBar({
 }: AppBarProps) {
   const theme = useTheme()
   const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
   const pressBack = usePressGuard(onBack)
   const pressAction = usePressGuard(action?.onPress)
 
@@ -60,21 +59,9 @@ export function AppBar({
       ]}
     >
       {onBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.back')}
-          onPress={pressBack}
-          hitSlop={8}
-          style={({ pressed }) => [
-            styles.iconButton,
-            { borderRadius: theme.radius.md },
-            pressed && { backgroundColor: theme.palette.violet[50] },
-          ]}
-        >
-          <Icon name="arrow_back" size={22} color={theme.palette.violet[700]} />
-        </Pressable>
+        <BackButton onPress={pressBack} />
       ) : (
-        <View style={styles.iconButton} />
+        <View style={styles.backSlot} />
       )}
 
       <View style={centered ? styles.centeredTitle : styles.titleBlock}>
@@ -147,6 +134,10 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backSlot: {
+    width: 48,
+    height: 48,
   },
   badgeDot: {
     position: 'absolute',

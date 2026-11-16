@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     gap: 14,
     minHeight: 72,
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     shadowOpacity: 0.28,

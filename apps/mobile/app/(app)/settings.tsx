@@ -21,6 +21,9 @@ import {
   type PermissionSnapshot,
 } from '@/shared/services/permissions'
 
+/** Where "Share the app" sends people. */
+const APP_SHARE_URL = 'https://github.com/abdullahalfaisal/nagar-shield'
+
 /**
  * Screen 16 — Settings.
  *
@@ -147,8 +150,11 @@ export default function SettingsScreen() {
 
   return (
     <Screen title={t('settings.title')} onBack={() => router.back()} scroll>
-      {/* `.profile-card` */}
-      <View
+      {/* `.profile-card`: opens the profile. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('profile.title')}
+        onPress={() => router.push('/(app)/profile')}
         style={[
           styles.profileCard,
           {
@@ -168,7 +174,8 @@ export default function SettingsScreen() {
             {displayEmail}
           </Text>
         </View>
-      </View>
+        <Icon name="arrow_forward_ios" size={18} color={theme.colors.ink[400]} />
+      </Pressable>
 
       {/* Preferences */}
       <Section title={t('settings.preferences')}>
@@ -280,7 +287,12 @@ export default function SettingsScreen() {
           tone="green"
           title={t('settings.shareApp')}
           showArrow={false}
-          onPress={() => void Share.share({ message: t('common.appName') })}
+          onPress={() =>
+            void Share.share({
+              message: `${t('common.appName')}
+${APP_SHARE_URL}`,
+            })
+          }
         />
       </Section>
 

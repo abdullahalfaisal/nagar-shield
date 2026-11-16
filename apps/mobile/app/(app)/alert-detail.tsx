@@ -35,7 +35,7 @@ import { toBengaliDigits, formatRelativeTimeForLocale } from '@/shared/utils/rel
  * The **public** alert detail.
  *
  * `006-alerts / 009-alert-detail-screen` — the surface the feed card's
- * `✎ বিস্তারিত দেখুন` link opens, and the surface the History map's marker
+ * `বিস্তারিত দেখুন` link opens, and the surface the History map's marker
  * tap opens. The two entry points render the identical surface.
  *
  * There are two distinct surfaces behind the prototype's `21a`

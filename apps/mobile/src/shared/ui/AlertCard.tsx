@@ -460,7 +460,7 @@ export const styles = StyleSheet.create({
   body: {
     // The whole card is the target; this is the floor the tap-target gate reads.
     minHeight: 48,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 0,
     paddingHorizontal: 16,
   },
@@ -509,7 +509,7 @@ export const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     lineHeight: 21,
-    marginTop: 12,
+    marginTop: 8,
   },
   mediaFrame: {
     // The photo inside is taller and carries the top margin; this is the
@@ -517,8 +517,8 @@ export const styles = StyleSheet.create({
     minHeight: 48,
   },
   media: {
-    marginTop: 12,
-    height: 112,
+    marginTop: 8,
+    height: 96,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -563,8 +563,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginTop: 12,
-    minHeight: 48,
+    marginTop: 8,
+    minHeight: 36,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   timeRow: {

@@ -343,15 +343,18 @@ describe('both feed screens render the one row', () => {
   const APP_DIR = join(__dirname, '..', '..', '..', 'app')
 
   const FEED_SCREENS = [
-    { name: 'the Alerts screen', path: join(APP_DIR, '(app)', 'alerts.tsx') },
-    { name: "the Home screen's feed block", path: join(APP_DIR, '(app)', 'home.tsx') },
+    { name: 'the Alerts screen', path: join(APP_DIR, '(app)', 'alerts.tsx'), row: '<AreaChipRow' },
+    {
+      name: "the Home screen's feed block",
+      path: join(APP_DIR, '(app)', 'home.tsx'),
+      row: '<AreaDropdown',
+    },
   ]
 
-  it.each(FEED_SCREENS)('$name renders exactly one chip row', ({ path }) => {
+  it.each(FEED_SCREENS)('$name renders exactly one chip row', ({ path, row }) => {
     const code = codeOf(path)
 
-    const rows = code.match(/<AreaChipRow/g) ?? []
-    expect(rows).toHaveLength(1)
+    expect(code.split(row).length - 1).toBe(1)
   })
 
   it.each(FEED_SCREENS)('$name builds its chips from the shared list', ({ path }) => {

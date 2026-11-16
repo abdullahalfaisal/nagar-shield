@@ -13,7 +13,7 @@ import { signMediaUrl } from '@/shared/api/reportDetail'
  * The **public** alert detail.
  *
  * `006-alerts / 009-alert-detail-screen` — the surface behind the feed card's
- * `✎ বিস্তারিত দেখুন` link.
+ * `বিস্তারিত দেখুন` link.
  *
  * Two distinct surfaces live behind the prototype's `21a`
  * ---------------------------------------------------

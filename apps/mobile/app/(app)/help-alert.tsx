@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
+import { BackButton } from '@/shared/ui/BackButton'
 import { Icon } from '@/shared/ui/Icon'
 import { ManualDialGuidance } from '@/shared/ui/ManualDialGuidance'
 import { MoreHelpSheet } from '@/shared/ui/MoreHelpSheet'
@@ -83,14 +84,7 @@ export default function HelpAlertScreen() {
           },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.back')}
-          onPress={() => router.back()}
-          style={styles.backBtn}
-        >
-          <Icon name="arrow_back" size={22} color={theme.palette.violet[700]} />
-        </Pressable>
+        <BackButton onPress={() => router.back()} />
         <View style={styles.headerText}>
           <View style={styles.headerTitleRow}>
             <Icon name="emergency" size={22} color={theme.palette.red[600]} />
@@ -299,12 +293,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  backBtn: {
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerText: {
     flex: 1,

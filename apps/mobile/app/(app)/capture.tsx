@@ -28,6 +28,7 @@ import {
 } from '@nagar-shield/shared'
 import { useTheme } from '@/shared/theme'
 import {
+  BackButton,
   BottomSheet,
   Button,
   KeyboardScroll,
@@ -496,14 +497,7 @@ export default function CaptureScreen() {
           },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.back')}
-          onPress={requestClose}
-          style={[styles.backBtn, { backgroundColor: theme.colors.surface.white }]}
-        >
-          <SolidIcon name="chevronLeft" size={24} color={theme.colors.ink[700]} />
-        </Pressable>
+        <BackButton onPress={requestClose} />
         <View style={styles.appBarText}>
           <Text
             numberOfLines={1}
@@ -1596,14 +1590,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingBottom: 8,
-  },
-  backBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...surfaceShadow,
   },
   appBarText: {
     flex: 1,

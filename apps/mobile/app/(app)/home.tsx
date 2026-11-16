@@ -1,19 +1,18 @@
 import { useCallback, useState } from 'react'
 import { FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from '@/shared/navigation/useSafeRouter'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/shared/theme'
 import {
   AlertCard,
   AlertFeedSkeleton,
-  AreaChipRow,
+  AreaDropdown,
   EmptyState,
   HelpBanner,
   HomeHeader,
   OfflineNotice,
   PulseDot,
-  QuickActionRow,
+  HomeNavBar,
 } from '@/shared/ui'
 import { alertsLoadFailed } from '@/shared/api/alertsLoadState'
 import { alertsItems, alertsShowingCachedPage, useAlertsFeed } from '@/shared/api/alerts'
@@ -36,7 +35,7 @@ const HOME_FEED_CARD_LIMIT = 5
  *   - greeting block with the sun icon and the date
  *   - the `more_horiz` action button
  *   - the settings button
- *   - the five quick-action cards
+ *   - the bottom bar with the five quick actions
  *   - the auto-refresh indicator
  *   - the area chip row
  *   - the Alerts feed cards
@@ -49,7 +48,6 @@ export default function HomeScreen() {
   const router = useRouter()
   const { t, i18n } = useTranslation()
   const lang = i18n.language
-  const insets = useSafeAreaInsets()
 
   // The chip row is **data-driven** — the reference areas come from the
   // `area_lookup` table, not from a hardcoded array in this file.
@@ -168,47 +166,6 @@ export default function HomeScreen() {
         onPress={() => router.push('/(app)/help-alert')}
       />
 
-      <QuickActionRow
-        actions={[
-          {
-            key: 'capture',
-            icon: 'camera',
-            color: 'violet',
-            solid: true,
-            label: t('home.quickReport'),
-            onPress: () => router.push('/(app)/capture'),
-          },
-          {
-            key: 'location',
-            icon: 'pin',
-            color: 'green',
-            label: t('home.quickLocation'),
-            onPress: () => router.push('/(app)/location-sharing'),
-          },
-          {
-            key: 'history',
-            icon: 'history',
-            color: 'amber',
-            label: t('home.quickHistory'),
-            onPress: () => router.push('/(app)/history'),
-          },
-          {
-            key: 'contacts',
-            icon: 'call',
-            color: 'sky',
-            label: t('home.quickContacts'),
-            onPress: () => router.push('/(app)/contacts'),
-          },
-          {
-            key: 'stations',
-            icon: 'map',
-            color: 'pink',
-            label: t('home.quickStations'),
-            onPress: () => router.push('/(app)/station-map'),
-          },
-        ]}
-      />
-
       {/* The reports header: what the list is, and whether it is live. The area
           filters stay above the list because they decide what it shows. */}
       <View style={styles.refreshRow}>
@@ -250,12 +207,12 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <AreaChipRow chips={chips} activeId={chipId} onSelect={(entry) => setChipId(entry.id)} />
+      <AreaDropdown chips={chips} activeId={chipId} onSelect={(entry) => setChipId(entry.id)} />
 
       {/* The reports list — the only part of the screen that scrolls. */}
       <FlatList
         style={styles.feed}
-        contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         data={items}
         keyExtractor={(report) => report.id}
         showsVerticalScrollIndicator={false}
@@ -300,6 +257,41 @@ export default function HomeScreen() {
           )
         }
       />
+      <HomeNavBar
+        actions={[
+          {
+            key: 'location',
+            icon: 'locate',
+            label: t('home.quickLocation'),
+            onPress: () => router.push('/(app)/location-sharing'),
+          },
+          {
+            key: 'history',
+            icon: 'history',
+            label: t('home.quickHistory'),
+            onPress: () => router.push('/(app)/history'),
+          },
+          {
+            key: 'capture',
+            icon: 'camera',
+            primary: true,
+            label: t('home.quickReport'),
+            onPress: () => router.push('/(app)/capture'),
+          },
+          {
+            key: 'contacts',
+            icon: 'phoneCall',
+            label: t('home.quickContacts'),
+            onPress: () => router.push('/(app)/contacts'),
+          },
+          {
+            key: 'stations',
+            icon: 'mapPinned',
+            label: t('home.quickStations'),
+            onPress: () => router.push('/(app)/station-map'),
+          },
+        ]}
+      />
     </Screen>
   )
 }
@@ -335,8 +327,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     marginHorizontal: 20,
-    marginTop: 24,
-    marginBottom: 8,
+    marginTop: 4,
+    marginBottom: 0,
   },
   titleGroup: {
     flexDirection: 'row',
@@ -359,7 +351,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   seeAll: {
-    minHeight: 48,
+    minHeight: 36,
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
