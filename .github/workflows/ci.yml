@@ -268,7 +268,7 @@ jobs:
       # migration in filename order against a fresh one. A migration with a
       # syntax error fails here, with nothing deployed anywhere.
       - name: replay every migration against a local stack
-        run: npx supabase start && npx supabase db reset --local
+        run: supabase start && supabase db reset --local
 
       # The drift guard: the reference data in Postgres must match the JSON
       # the mobile bundle ships, byte for byte.
@@ -289,7 +289,7 @@ jobs:
 
       - name: the container logs on failure
         if: failure()
-        run: npx supabase status || docker logs supabase_db_nagar-shield || true
+        run: supabase status || docker logs supabase_db_nagar-shield || true
 
   # ---------------------------------------------------------------------------
   # The Maestro flow check.
@@ -356,7 +356,7 @@ jobs:
           version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: start the local stack
-        run: npx supabase start
+        run: supabase start
 
       # The edge runtime reads `supabase/functions/.env`, which is committed
       # and carries no credential. It points the mail transport at the local

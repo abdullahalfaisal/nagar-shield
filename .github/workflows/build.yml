@@ -73,7 +73,7 @@ jobs:
       # is sideloaded, and there is no Play Store dependency.
       - name: build the preview APK
         id: build
-        run: eas build -p android --profile preview --platform android --non-interactive --wait
+        run: eas build --profile preview --platform android --non-interactive --wait
 
       - name: download the APK
         uses: actions/upload-artifact@v4
