@@ -9,6 +9,30 @@ two apps consume it rather than copying it, so the mobile app, the admin
 console, and the Edge Functions validate the same payloads and speak the same
 error codes.
 
+## The moderator console
+
+The repository also ships a web console for moderators (`apps/admin`). It is
+where flagged reports are reviewed and where accounts and help numbers are
+managed.
+
+| Public feed                                            | Wrong numbers                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------- |
+| ![Public feed](docs/screenshots/admin-public-feed.png) | ![Wrong-number reports](docs/screenshots/admin-wrong-numbers.png) |
+| **Users**                                              | **Action log**                                                    |
+| ![Users](docs/screenshots/admin-users.png)             | ![Moderation action log](docs/screenshots/admin-action-log.png)   |
+
+- **Review queue:** reports hidden after being flagged, with Approve and
+  Decline buttons.
+- **Public feed:** hide any published report, and show it again.
+- **Declined:** undo a decline within 7 days.
+- **Wrong numbers:** hotline and station numbers that people reported, with
+  Mark fixed, Dismiss and Reopen.
+- **Users:** every account, with Disable, Enable and Restore for deleted
+  accounts. Phone and email are masked in the list.
+- **Action log:** an append-only record of every decision.
+
+Run it with `pnpm admin`. Sign in with a moderator account.
+
 ## Prerequisites
 
 | Tool         | Version     | Notes                                                                                                         |
