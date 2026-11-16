@@ -1,7 +1,6 @@
 import {
   authorAutoHideBadge,
   formatAreaLine,
-  formatCategoryAccent,
   formatCategoryLabel,
   formatDecisionLabel,
   formatFlagReason,
@@ -11,10 +10,10 @@ import {
   formatTimestampShort,
   isAuthorAutoHide,
   isInAuthorAutoHideGroup,
+  maskEmail,
   maskPhone,
   maskUploaderIdentity,
 } from '@/lib/format'
-import { REPORT_CATEGORIES } from '@nagar-shield/shared'
 
 /**
  * The console's display rules.
@@ -74,9 +73,9 @@ describe('maskUploaderIdentity', () => {
 
 describe('formatHideReason', () => {
   it('labels every hide reason', () => {
-    expect(formatHideReason('flag_threshold')).toContain('3-flag')
-    expect(formatHideReason('author_auto_hide')).toContain('Author auto-hide')
-    expect(formatHideReason('both')).toContain('Both rules')
+    expect(formatHideReason('flag_threshold')).toContain('3 flags')
+    expect(formatHideReason('author_auto_hide')).toContain('Author flagged')
+    expect(formatHideReason('both')).toContain('3 flags and author')
     expect(formatHideReason('manual')).toContain('moderator')
   })
 })
@@ -128,47 +127,24 @@ describe('the author-auto-hide badge', () => {
   })
 })
 
+describe('maskEmail', () => {
+  it('keeps the first letter and the domain', () => {
+    expect(maskEmail('amina@example.com')).toBe('a•••@example.com')
+  })
+
+  it('renders a dash for a missing or malformed email', () => {
+    expect(maskEmail(null)).toBe('—')
+    expect(maskEmail('not-an-email')).toBe('—')
+  })
+})
+
 describe('formatCategoryLabel', () => {
   it('returns null for an uncategorised report', () => {
     expect(formatCategoryLabel(null)).toBeNull()
   })
 
-  it('returns the bilingual label for a category', () => {
-    const label = formatCategoryLabel('theft')
-    expect(label).toBeTruthy()
-    expect(label).toContain('—')
-  })
-})
-
-describe('formatCategoryAccent', () => {
-  it('gives every category an accent family', () => {
-    // All eleven, and none of them falls through to the neutral family
-    // except `other` — which is the neutral one by definition.
-    for (const category of REPORT_CATEGORIES) {
-      const accent = formatCategoryAccent(category)
-
-      expect(accent).toBeTruthy()
-      expect(['violet', 'red', 'amber', 'green', 'sky', 'neutral']).toContain(accent)
-    }
-  })
-
-  it('gives an uncategorised report the neutral accent', () => {
-    expect(formatCategoryAccent(null)).toBe('neutral')
-  })
-
-  it('gives an unknown category the neutral accent', () => {
-    // The category arrives from the server as a plain string. A server that
-    // grows a new category before the console learns it must not crash the
-    // tile.
-    expect(formatCategoryAccent('a_category_from_the_future' as never)).toBe('neutral')
-  })
-
-  it('separates violence from property crime', () => {
-    // The tile is a **second** signal, and it has to carry information. If
-    // every category shared a family the tile would be decoration.
-    expect(formatCategoryAccent('assault')).toBe('red')
-    expect(formatCategoryAccent('theft')).toBe('violet')
-    expect(formatCategoryAccent('assault')).not.toBe(formatCategoryAccent('theft'))
+  it('returns the English label for a category', () => {
+    expect(formatCategoryLabel('theft')).toBe('Theft')
   })
 })
 

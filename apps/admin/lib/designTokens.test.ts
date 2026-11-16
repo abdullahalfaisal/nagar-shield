@@ -223,28 +223,3 @@ describe('the console uses the design tokens', () => {
     expect(offenders).toEqual([])
   })
 })
-
-describe('the category accent tile introduces no new colour', () => {
-  it('takes its colours from the token file', () => {
-    // The tile is the newest surface in the console, and the story that
-    // asked for it (`002`) also has to live with `001`'s "no new hex value"
-    // rule. The tile therefore names **tokens**, not colours.
-    const css = readFileSync(join(ADMIN_ROOT, TOKEN_FILE), 'utf8')
-
-    const tileBlock = css.slice(css.indexOf('.categoryTile {'))
-
-    for (const match of tileBlock.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)) {
-      expect(tokens.has(match[1] as string)).toBe(true)
-    }
-  })
-
-  it('gives the tile a class for every accent family', () => {
-    // The families the mapping can produce. A family with no CSS class
-    // would render as an unstyled tile — no colour, no border.
-    const css = readFileSync(join(ADMIN_ROOT, TOKEN_FILE), 'utf8')
-
-    for (const family of ['Violet', 'Red', 'Amber', 'Green', 'Sky', 'Neutral']) {
-      expect(css).toContain(`.categoryTile${family} {`)
-    }
-  })
-})

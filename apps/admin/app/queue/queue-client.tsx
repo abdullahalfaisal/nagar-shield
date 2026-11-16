@@ -6,19 +6,17 @@ import { useRouter } from 'next/navigation'
 import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
 import { toAppError, type QueueItem } from '@/lib/api'
 import { useModerationQueue } from '@/lib/queries'
-import type { ReportCategory } from '@nagar-shield/shared'
 import {
   authorAutoHideBadge,
   formatAreaLine,
-  formatCategoryAccent,
   formatCategoryLabel,
-  formatFlagReason,
   formatHideReason,
   formatRelativeTime,
   isInAuthorAutoHideGroup,
-  maskUploaderIdentity,
   type QueueGroup,
 } from '@/lib/format'
+import type { ReportCategory } from '@nagar-shield/shared'
+import { DecisionButtons } from '@/app/decision-buttons'
 import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@/app/admin-shell'
 
 /**
@@ -76,7 +74,10 @@ export function QueueClient() {
 
   // Every page loaded so far, flattened. The rows are appended, never
   // replaced — the cursor guarantees no duplicate and no skipped row.
-  const items: QueueItem[] = (data?.pages ?? []).flatMap((page) => page.items)
+  // Reports a moderator hid by hand are managed on the Public feed page.
+  const items: QueueItem[] = (data?.pages ?? [])
+    .flatMap((page) => page.items)
+    .filter((item) => item.hideReason !== 'manual')
 
   // The group is a slice over the rows already loaded. It never issues a
   // second request — the server returned one page and the group narrows it.
@@ -97,12 +98,7 @@ export function QueueClient() {
             The group filter. It is a **label**, not an action: it narrows the
             rows already on screen and never writes anything.
           */}
-          <div
-            className="row"
-            role="group"
-            aria-label={copy.queueGroupAll}
-            style={{ flexWrap: 'wrap', gap: 8 }}
-          >
+          <div className="row rowWrap" role="group" aria-label={copy.queueGroupAll}>
             <button
               type="button"
               className={group === 'all' ? 'button buttonPrimary' : 'button buttonSecondary'}
@@ -133,18 +129,36 @@ export function QueueClient() {
             <EmptyState title={copy.queueGroupEmptyTitle} body={copy.queueGroupEmptyBody} />
           ) : null}
 
-          {visibleItems.map((item) => (
-            <QueueRow key={item.id} item={item} />
-          ))}
+          {visibleItems.length > 0 ? (
+            <div className="card cardFlush">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{copy.queueColumnTime}</th>
+                    <th>{copy.queueColumnCategory}</th>
+                    <th>{copy.queueColumnArea}</th>
+                    <th>{copy.queueColumnDescription}</th>
+                    <th>{copy.queueColumnFlags}</th>
+                    <th>{copy.queueColumnReason}</th>
+                    <th>{copy.queueColumnActions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleItems.map((item) => (
+                    <QueueRow key={item.id} item={item} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           {!isLoading && items.length > 0 ? (
             hasNextPage ? (
               <button
                 type="button"
-                className="button buttonSecondary"
+                className="button buttonSecondary buttonStart"
                 onClick={() => void queue.fetchNextPage()}
                 disabled={isFetchingNextPage}
-                style={{ alignSelf: 'flex-start' }}
               >
                 {isFetchingNextPage ? copy.queueLoading : copy.queueLoadMore}
               </button>
@@ -158,115 +172,34 @@ export function QueueClient() {
   )
 }
 
-/**
- * One queue row.
- *
- * It reuses the mobile alert card's visual pattern: a category accent tile,
- * the area / category / description / time lines, the 14 px radius, and the
- * card shadow. It is a **derived** layout, not a port of a prototype screen.
- */
+/** One queue row. The whole row opens the report; the category is the real link. */
 function QueueRow({ item }: { item: QueueItem }) {
   const copy = getCopy(DEFAULT_ADMIN_LOCALE)
-
-  const categoryLabel = formatCategoryLabel(item.category as never)
-  const areaLine = formatAreaLine(item.areaHierarchy)
-  const uploader = item.uploader
-    ? maskUploaderIdentity({
-        fullName: item.uploader.fullName,
-        phone: item.uploader.phone,
-      })
-    : '—'
-
-  const flagReasons = Array.from(new Set(item.flags.map((flag) => flag.reason)))
-
-  // The badge the server's `hide_reason` earned. `null` for a report that
-  // reached its own 3-flag threshold on its own.
+  const router = useRouter()
   const badge = authorAutoHideBadge(item.hideReason)
+  const href = `/queue/${item.id}`
 
   return (
-    <Link
-      href={`/queue/${item.id}`}
-      className="card cardAccent stackGapSm"
-      style={{ padding: '14px 16px', textDecoration: 'none', display: 'block' }}
-      aria-label={`${categoryLabel ?? copy.queueTitle} — ${areaLine}`}
-    >
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <p className="muted" style={{ marginBottom: 2 }}>
-            {areaLine}
-          </p>
-          <div className="row" style={{ gap: 10 }}>
-            {/*
-              The category's accent tile, beside its name. The tile is a
-              second signal, not the only one — the category's name is right
-              there, and the tile is decorative.
-            */}
-            <span
-              className={`categoryTile categoryTile${formatCategoryAccent(
-                item.category as ReportCategory | null,
-              )}`}
-              aria-hidden="true"
-            />
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-950)' }}>
-              {categoryLabel ?? copy.detailUncategorised}
-            </p>
-          </div>
-          {item.description ? (
-            <p className="muted" style={{ marginTop: 4, color: 'var(--ink-600)' }}>
-              {item.description}
-            </p>
-          ) : null}
-          <p className="muted" style={{ marginTop: 6 }}>
-            {formatRelativeTime(item.capturedAt)}
-          </p>
-        </div>
-
-        <div className="stackGapSm" style={{ alignItems: 'flex-end' }}>
-          {/*
-            The two counts are shown **separately** and separately labelled:
-            the report's own flag count and the author's 24 h count come from
-            different joins, and a report can show 0 on one and 5 on the
-            other. Collapsing them into one number would make the two
-            indistinguishable.
-          */}
-          <span className="chip">
-            {copy.queueOwnFlagCount.replace('{{count}}', String(item.flagCount))}
-          </span>
-          {badge ? (
-            <span className="chip chipWarning">
-              {badge === 'both' ? copy.queueBadgeBoth : copy.queueBadgeAuthorAutoHide}
-            </span>
-          ) : (
-            <span className="chip chipWarning">{formatHideReason(item.hideReason)}</span>
-          )}
-        </div>
-      </div>
-
-      {badge ? (
-        <div className="stackGapSm" style={{ marginTop: 10 }}>
-          <span className="chip chipMuted">
-            {copy.queueAuthorFlagCount.replace('{{count}}', String(item.authorFlags24h))}
-          </span>
-          {/* The badge explains the cause in words — it is never colour alone. */}
-          <p className="muted" style={{ color: 'var(--ink-600)' }}>
-            {copy.queueAuthorAutoHideExplanation}
-          </p>
-        </div>
-      ) : null}
-
-      {flagReasons.length > 0 ? (
-        <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-          {flagReasons.map((reason) => (
-            <span key={reason} className="chip chipMuted">
-              {formatFlagReason(reason)}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      <p className="muted" style={{ marginTop: 10 }}>
-        {copy.queueUploader}: {uploader}
-      </p>
-    </Link>
+    <tr className="rowLink" onClick={() => router.push(href)}>
+      <td className="nowrap">{formatRelativeTime(item.capturedAt)}</td>
+      <td>
+        <Link href={href} className="itemTitle" onClick={(event) => event.stopPropagation()}>
+          {formatCategoryLabel(item.category as ReportCategory | null) ?? copy.detailUncategorised}
+        </Link>
+      </td>
+      <td>{formatAreaLine(item.areaHierarchy)}</td>
+      <td className="tableNote">{item.description ?? '—'}</td>
+      <td>{item.flagCount}</td>
+      <td>
+        {badge
+          ? badge === 'both'
+            ? copy.queueBadgeBoth
+            : copy.queueBadgeAuthorAutoHide
+          : formatHideReason(item.hideReason)}
+      </td>
+      <td onClick={(event) => event.stopPropagation()}>
+        <DecisionButtons reportId={item.id} />
+      </td>
+    </tr>
   )
 }

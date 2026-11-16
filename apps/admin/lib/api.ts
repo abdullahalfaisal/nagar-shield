@@ -99,7 +99,14 @@ export interface AuditAction {
   moderatorId: string | null
   moderatorDisplayName: string | null
   targetUserId: string | null
-  decision: 'restore' | 'remove' | 'disable_user'
+  decision:
+    | 'restore'
+    | 'remove'
+    | 'disable_user'
+    | 'hide'
+    | 'enable_user'
+    | 'restore_account'
+    | 'undo_remove'
   note: string
   createdAt: string
 }
@@ -119,6 +126,48 @@ export interface AccountRow {
   deletedAt: string | null
   createdAt: string
   reportCount: number
+}
+
+export interface AccountPage {
+  items: AccountRow[]
+  nextCursor: string | null
+}
+
+export interface VisibleReport {
+  id: string
+  category: string | null
+  description: string | null
+  areaHierarchy: QueueItem['areaHierarchy']
+  capturedAt: string
+  /** True when a moderator hid the report by hand. */
+  hidden: boolean
+}
+
+export interface DeclinedReport {
+  id: string
+  category: string | null
+  description: string | null
+  areaHierarchy: QueueItem['areaHierarchy']
+  capturedAt: string
+  declinedAt: string
+}
+
+export type WrongNumberStatus = 'pending' | 'reviewed' | 'rejected'
+
+export interface WrongNumberReport {
+  id: string
+  entryType: 'station' | 'hotline'
+  entryId: string
+  reason: string
+  details: string | null
+  status: WrongNumberStatus
+  createdAt: string
+  anonymous: boolean
+}
+
+export interface VisibleReportPage {
+  items: VisibleReport[]
+  nextCursor: string | null
 }
 
 // -----------------------------------------------------------------------------
@@ -408,9 +457,183 @@ export async function searchAccounts(client: SupabaseClient, query: string): Pro
   return items
 }
 
+/** A page of every account, newest first. */
+export async function fetchAccountList(
+  client: SupabaseClient,
+  options: { cursor?: string | null; limit?: number } = {},
+): Promise<AccountPage> {
+  const { data, error } = await client.rpc('moderator_list_users', {
+    p_cursor: options.cursor ?? null,
+    p_limit: options.limit ?? 50,
+  })
+
+  if (error) throw toAppError(error)
+
+  const envelope = asRecord(data)
+  const items = Array.isArray(envelope.items) ? envelope.items.map(toAccountRow) : []
+
+  return { items, nextCursor: asString(envelope.next_cursor) }
+}
+
+/** A page of the public feed: shown reports and the ones a moderator hid by hand. */
+export async function fetchVisibleReports(
+  client: SupabaseClient,
+  options: { cursor?: string | null; limit?: number } = {},
+): Promise<VisibleReportPage> {
+  const { data, error } = await client.rpc('moderator_feed_reports', {
+    p_cursor: options.cursor ?? null,
+    p_limit: options.limit ?? 20,
+  })
+
+  if (error) throw toAppError(error)
+
+  const envelope = asRecord(data)
+  const items = Array.isArray(envelope.items)
+    ? envelope.items.map((raw): VisibleReport => {
+        const record = asRecord(raw)
+        return {
+          id: asString(record.id) ?? '',
+          category: asString(record.category),
+          description: asString(record.description),
+          areaHierarchy: (record.area_hierarchy as VisibleReport['areaHierarchy']) ?? null,
+          capturedAt: asString(record.captured_at) ?? '',
+          hidden: record.hidden === true,
+        }
+      })
+    : []
+
+  return { items, nextCursor: asString(envelope.next_cursor) }
+}
+
 // -----------------------------------------------------------------------------
 // The writes
 // -----------------------------------------------------------------------------
+
+/** Reports declined in the last 7 days, which can still be undone. */
+export async function fetchDeclinedReports(client: SupabaseClient): Promise<DeclinedReport[]> {
+  const { data, error } = await client.rpc('moderator_declined_reports', { p_limit: 50 })
+
+  if (error) throw toAppError(error)
+
+  const envelope = asRecord(data)
+  return Array.isArray(envelope.items)
+    ? envelope.items.map((raw): DeclinedReport => {
+        const record = asRecord(raw)
+        return {
+          id: asString(record.id) ?? '',
+          category: asString(record.category),
+          description: asString(record.description),
+          areaHierarchy: (record.area_hierarchy as DeclinedReport['areaHierarchy']) ?? null,
+          capturedAt: asString(record.captured_at) ?? '',
+          declinedAt: asString(record.declined_at) ?? '',
+        }
+      })
+    : []
+}
+
+/** Reports of wrong hotline and station numbers. */
+export async function fetchWrongNumbers(
+  client: SupabaseClient,
+  status: WrongNumberStatus | null,
+): Promise<WrongNumberReport[]> {
+  const { data, error } = await client.rpc('moderator_wrong_number_reports', {
+    p_status: status,
+    p_limit: 100,
+  })
+
+  if (error) throw toAppError(error)
+
+  const envelope = asRecord(data)
+  return Array.isArray(envelope.items)
+    ? envelope.items.map((raw): WrongNumberReport => {
+        const record = asRecord(raw)
+        return {
+          id: asString(record.id) ?? '',
+          entryType: record.entry_type === 'station' ? 'station' : 'hotline',
+          entryId: asString(record.entry_id) ?? '',
+          reason: asString(record.reason) ?? '',
+          details: asString(record.details),
+          status: (asString(record.status) as WrongNumberStatus) ?? 'pending',
+          createdAt: asString(record.created_at) ?? '',
+          anonymous: record.anonymous === true,
+        }
+      })
+    : []
+}
+
+/** Calls a moderator RPC that takes a target id and a note. */
+async function callNoted(
+  client: SupabaseClient,
+  fn: string,
+  args: Record<string, string>,
+  note: string,
+): Promise<void> {
+  const trimmed = note.trim()
+
+  if (trimmed.length === 0) {
+    throw new AppError('VALIDATION_FAILED', { field: 'note' })
+  }
+
+  const { error } = await client.rpc(fn, { ...args, p_note: trimmed })
+
+  if (error) throw toAppError(error)
+}
+
+/** Re-enables a disabled account. */
+export function enableAccount(
+  client: SupabaseClient,
+  input: { userId: string; note: string },
+): Promise<void> {
+  return callNoted(client, 'moderation_enable_user', { p_user_id: input.userId }, input.note)
+}
+
+/** Restores a soft-deleted account inside its 30-day window. */
+export function restoreDeletedAccount(
+  client: SupabaseClient,
+  input: { userId: string; note: string },
+): Promise<void> {
+  return callNoted(client, 'moderation_restore_account', { p_user_id: input.userId }, input.note)
+}
+
+/** Puts a declined report back in the review queue. */
+export function undoDecline(
+  client: SupabaseClient,
+  input: { reportId: string; note: string },
+): Promise<void> {
+  return callNoted(client, 'moderation_undo_decline', { p_report_id: input.reportId }, input.note)
+}
+
+/** Sets a wrong-number report to pending, reviewed or rejected. */
+export async function resolveWrongNumber(
+  client: SupabaseClient,
+  input: { id: string; status: WrongNumberStatus },
+): Promise<void> {
+  const { error } = await client.rpc('moderator_resolve_wrong_number', {
+    p_report_id: input.id,
+    p_status: input.status,
+  })
+
+  if (error) throw toAppError(error)
+}
+
+/** Takes a published report out of the public feed. */
+export async function hideReport(
+  client: SupabaseClient,
+  input: { reportId: string; note: string },
+): Promise<void> {
+  const note = input.note.trim()
+
+  if (note.length === 0) {
+    throw new AppError('VALIDATION_FAILED', { field: 'note' })
+  }
+
+  const { error } = await client.rpc('moderation_hide', {
+    p_report_id: input.reportId,
+    p_note: note,
+  })
+
+  if (error) throw toAppError(error)
+}
 
 /**
  * The restore / remove decision.

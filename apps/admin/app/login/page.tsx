@@ -94,29 +94,19 @@ export default function LoginPage() {
 
   return (
     <main className="main">
-      <div className="page" style={{ maxWidth: 480, paddingTop: 80 }}>
-        <form className="card" style={{ padding: 28 }} onSubmit={handleSubmit}>
-          <img
-            src="/brand/app-icon-128.png"
-            alt=""
-            width={56}
-            height={56}
-            style={{ borderRadius: 14, marginBottom: 16 }}
-          />
-          <h1 className="pageTitle" style={{ fontSize: 20 }}>
-            {copy.loginTitle}
-          </h1>
-          <p className="pageSubtitle" style={{ marginBottom: 24 }}>
-            {copy.loginSubtitle}
-          </p>
+      <div className="page narrow">
+        <form className="card stack" onSubmit={handleSubmit}>
+          <img src="/brand/app-icon-128.png" alt="" width={56} height={56} className="loginMark" />
+          <h1 className="pageTitle">{copy.loginTitle}</h1>
+          <p className="pageSubtitle">{copy.loginSubtitle}</p>
 
           {error ? (
-            <div className="banner bannerDanger" role="alert" style={{ marginBottom: 16 }}>
+            <div className="banner bannerDanger" role="alert">
               {error}
             </div>
           ) : null}
 
-          <div style={{ marginBottom: 16 }}>
+          <div>
             <label className="fieldLabel" htmlFor="moderator-email">
               {copy.loginEmail}
             </label>
@@ -131,7 +121,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: 24 }}>
+          <div>
             <label className="fieldLabel" htmlFor="moderator-password">
               {copy.loginPassword}
             </label>
@@ -146,12 +136,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="button buttonPrimary"
-            style={{ width: '100%' }}
-            disabled={submitting}
-          >
+          <button type="submit" className="button buttonPrimary buttonFull" disabled={submitting}>
             {submitting ? copy.loginSubmitting : copy.loginSubmit}
           </button>
         </form>

@@ -9,17 +9,13 @@ import { submitDecision, fetchReportDetail } from '@/lib/api'
 import { ReportDetailClient } from '@/app/queue/[reportId]/report-detail-client'
 
 /**
- * The decision panel.
+ * The Approve / Decline buttons.
  *
- * The panel is the last gate before an audit row is written, and the rules it
- * enforces are the ones the story cares about:
- *
- *   * a decision requires a **note** — the submit is blocked with a blank one,
- *     and the note field is where the error goes;
- *   * the note is **trimmed** before it is sent, so a note of spaces is a
- *     blank note, not a note;
- *   * the error branches are distinct — a `CONFLICT` is a conflict, and a
- *     `VALIDATION_FAILED` is the note field, not the banner.
+ *   * Approve restores the report straight away;
+ *   * Decline asks once more, then removes it;
+ *   * a blank note is replaced by a default note, because the audit log needs
+ *     one, and a typed note is trimmed;
+ *   * the error branches are distinct, and the raw driver message never shows.
  *
  * The panel is tested through the page, because the panel is not exported and
  * the page is what a moderator actually loads. The page's own reads are
@@ -77,95 +73,43 @@ function renderPanel() {
   )
 }
 
-/** The decision form's submit button. */
-function submitButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: copy.decisionSubmit }) as HTMLButtonElement
-}
+const approveButton = () => screen.getByRole('button', { name: copy.decisionApprove })
+const declineButton = () => screen.getByRole('button', { name: copy.decisionDecline })
 
-/** The note textarea. */
-function noteField(): HTMLTextAreaElement {
-  return screen.getByLabelText(copy.decisionNote) as HTMLTextAreaElement
+async function ready() {
+  renderPanel()
+  await waitFor(() => expect(screen.getByLabelText(copy.decisionNoteOptional)).toBeInTheDocument())
 }
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockedSubmitDecision.mockResolvedValue(undefined)
-  // The page renders the panel only once the detail has loaded, so the read
-  // has to resolve for the decision to be reachable at all.
   mockedFetchReportDetail.mockResolvedValue(DETAIL)
 })
 
-describe('the decision panel blocks a decision with no note', () => {
-  it('keeps the submit disabled while the note is empty', async () => {
-    renderPanel()
+describe('Approve', () => {
+  it('restores the report with the default note when no note is typed', async () => {
+    await ready()
 
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    expect(submitButton()).toBeDisabled()
-  })
-
-  it('keeps the submit disabled when the note is only whitespace', async () => {
-    // A note of spaces is a blank note. The panel trims before it decides,
-    // so the whitespace never reaches the server.
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: '   \n  ' } })
-
-    expect(submitButton()).toBeDisabled()
-  })
-
-  it('enables the submit once the note has content', async () => {
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'Restored after verification.' } })
-
-    expect(submitButton()).toBeEnabled()
-  })
-
-  it('shows the note error in the note field, not the banner', async () => {
-    // A blank note is a field problem, and the field is where the moderator
-    // is looking. The banner is for the server's refusals.
-    //
-    // The refusal is reached through the **server**: the panel sends the
-    // note, the server enforces the same rule the panel did, and the code
-    // comes back as `VALIDATION_FAILED`. The panel puts it in the note
-    // field, where the local refusal would have put it.
-    mockedSubmitDecision.mockRejectedValue(new AppError('VALIDATION_FAILED'))
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
-
-    const fieldError = await screen.findByText(copy.decisionNoteRequired)
-    expect(fieldError).toBeInTheDocument()
-    // The note field is marked invalid for assistive tech.
-    expect(noteField()).toHaveAttribute('aria-invalid', 'true')
-    // The error is in the field, not the banner. The field error is the
-    // **only** alert on screen — a banner would be a second one.
-    const alerts = screen.getAllByRole('alert')
-    expect(alerts).toHaveLength(1)
-    expect(alerts[0]).toBe(fieldError)
-  })
-})
-
-describe('the decision panel sends a trimmed note', () => {
-  it('trims the note before it reaches the server', async () => {
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: '  Spaced note.  ' } })
-    fireEvent.click(submitButton())
+    fireEvent.click(approveButton())
 
     await waitFor(() => expect(mockedSubmitDecision).toHaveBeenCalledTimes(1))
+    expect(mockedSubmitDecision).toHaveBeenCalledWith(expect.anything(), {
+      reportId: 'report-1',
+      decision: 'restore',
+      note: copy.decisionDefaultApprove,
+    })
+  })
 
+  it('sends a typed note, trimmed', async () => {
+    await ready()
+
+    fireEvent.change(screen.getByLabelText(copy.decisionNoteOptional), {
+      target: { value: '  Spaced note.  ' },
+    })
+    fireEvent.click(approveButton())
+
+    await waitFor(() => expect(mockedSubmitDecision).toHaveBeenCalledTimes(1))
     expect(mockedSubmitDecision).toHaveBeenCalledWith(expect.anything(), {
       reportId: 'report-1',
       decision: 'restore',
@@ -173,100 +117,92 @@ describe('the decision panel sends a trimmed note', () => {
     })
   })
 
-  it('sends the report id of the report on screen, and one report only', async () => {
-    renderPanel()
+  it('treats a note of spaces as no note', async () => {
+    await ready()
 
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
+    fireEvent.change(screen.getByLabelText(copy.decisionNoteOptional), { target: { value: '   ' } })
+    fireEvent.click(approveButton())
 
     await waitFor(() => expect(mockedSubmitDecision).toHaveBeenCalledTimes(1))
+    const [, input] = mockedSubmitDecision.mock.calls[0] as [unknown, { note: string }]
+    expect(input.note).toBe(copy.decisionDefaultApprove)
+  })
+})
 
+describe('Decline', () => {
+  it('asks before it removes anything', async () => {
+    await ready()
+
+    fireEvent.click(declineButton())
+
+    expect(screen.getByText(copy.decisionDeclineConfirm)).toBeInTheDocument()
+    expect(mockedSubmitDecision).not.toHaveBeenCalled()
+  })
+
+  it('removes the report after the second click', async () => {
+    await ready()
+
+    fireEvent.click(declineButton())
+    fireEvent.click(screen.getByRole('button', { name: copy.decisionDeclineYes }))
+
+    await waitFor(() => expect(mockedSubmitDecision).toHaveBeenCalledTimes(1))
     const [, input] = mockedSubmitDecision.mock.calls[0] as [
       unknown,
       { reportId: string; decision: string; note: string },
     ]
     expect(input.reportId).toBe('report-1')
+    expect(input.decision).toBe('remove')
+    expect(input.note).toBe(copy.decisionDefaultDecline)
     // One report, one row. There is no list of ids anywhere.
     expect(Object.keys(input).sort()).toEqual(['decision', 'note', 'reportId'])
   })
+
+  it('does nothing when the moderator cancels', async () => {
+    await ready()
+
+    fireEvent.click(declineButton())
+    fireEvent.click(screen.getByRole('button', { name: copy.decisionCancel }))
+
+    expect(mockedSubmitDecision).not.toHaveBeenCalled()
+    expect(approveButton()).toBeInTheDocument()
+  })
 })
 
-describe('the decision panel error branches', () => {
+describe('the error branches', () => {
+  async function approveWith(error: unknown) {
+    mockedSubmitDecision.mockRejectedValue(error)
+    await ready()
+    fireEvent.click(approveButton())
+  }
+
   it('shows the conflict copy for a CONFLICT', async () => {
-    mockedSubmitDecision.mockRejectedValue(new AppError('CONFLICT'))
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
+    await approveWith(new AppError('CONFLICT'))
 
     expect(await screen.findByText(copy.errorConflict)).toBeInTheDocument()
   })
 
   it('shows the generic permission copy for a FORBIDDEN', async () => {
-    mockedSubmitDecision.mockRejectedValue(new AppError('FORBIDDEN'))
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
+    await approveWith(new AppError('FORBIDDEN'))
 
     expect(await screen.findByText(copy.errorForbidden)).toBeInTheDocument()
   })
 
   it('shows the sign-in copy for an expired session', async () => {
-    mockedSubmitDecision.mockRejectedValue(new AppError('AUTH_REQUIRED'))
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
+    await approveWith(new AppError('AUTH_REQUIRED'))
 
     expect(await screen.findByText(copy.errorAuthRequired)).toBeInTheDocument()
   })
 
   it('collapses an unknown code to the generic copy', async () => {
-    // A code the console does not know can still arrive from the wire:
-    // `parseErrorBody` casts the server's string to `ApiErrorCode` without
-    // checking it, so a server that grows a new code reaches the screen as
-    // an unknown one. The mapper's default branch is what absorbs that.
-    mockedSubmitDecision.mockRejectedValue({
-      code: 'SOMETHING_NEW',
-      message: 'a code from a newer server',
-      httpStatus: 500,
-    })
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
+    await approveWith({ code: 'SOMETHING_NEW', message: 'a newer server', httpStatus: 500 })
 
     expect(await screen.findByText(copy.errorGeneric)).toBeInTheDocument()
   })
 
   it('never shows the raw driver message', async () => {
-    // The panel switches on the stable code and renders localized copy. The
-    // driver's own text must not reach the screen.
-    mockedSubmitDecision.mockRejectedValue(
+    await approveWith(
       new AppError('INTERNAL', { message: 'postgres: relation "reports" does not exist' }),
     )
-
-    renderPanel()
-
-    await waitFor(() => expect(screen.getByLabelText(copy.decisionNote)).toBeInTheDocument())
-
-    fireEvent.change(noteField(), { target: { value: 'A note.' } })
-    fireEvent.click(submitButton())
 
     expect(await screen.findByText(copy.errorGeneric)).toBeInTheDocument()
     expect(screen.queryByText(/postgres/)).not.toBeInTheDocument()

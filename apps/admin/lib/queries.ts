@@ -12,17 +12,31 @@ import {
 } from '@tanstack/react-query'
 import {
   disableAccount,
+  enableAccount,
+  fetchAccountList,
   fetchAuditTrail,
+  fetchDeclinedReports,
   fetchModerationQueue,
   fetchReportDetail,
+  fetchVisibleReports,
+  fetchWrongNumbers,
   getBrowserClient,
+  hideReport,
+  resolveWrongNumber,
+  restoreDeletedAccount,
   searchAccounts,
   submitDecision,
   toAppError,
+  undoDecline,
+  type AccountPage,
   type AccountRow,
   type AuditPage,
+  type DeclinedReport,
+  type WrongNumberReport,
+  type WrongNumberStatus,
   type QueuePage,
   type ReportDetail,
+  type VisibleReportPage,
 } from '@/lib/api'
 import { getCopy, DEFAULT_ADMIN_LOCALE } from '@/lib/copy'
 
@@ -74,6 +88,18 @@ export const AUDIT_QUERY_KEY = ['admin', 'audit'] as const
 
 /** The account lookup. */
 export const USERS_QUERY_KEY = ['admin', 'users'] as const
+
+/** The full account list. */
+export const USER_LIST_QUERY_KEY = ['admin', 'user-list'] as const
+
+/** The reports shown in the public feed. */
+export const VISIBLE_REPORTS_QUERY_KEY = ['admin', 'visible-reports'] as const
+
+/** Reports declined in the last 7 days. */
+export const DECLINED_QUERY_KEY = ['admin', 'declined'] as const
+
+/** Wrong-number reports. The status filter is the last segment. */
+export const WRONG_NUMBERS_QUERY_KEY = ['admin', 'wrong-numbers'] as const
 
 /** The page size for both cursor-paginated feeds. */
 export const PAGE_SIZE = 20
@@ -196,9 +222,198 @@ export function useAccountSearch(query: string): UseQueryResult<AccountRow[], Er
   })
 }
 
+/** Every account, newest first, appended page by page. */
+export function useAccountList(): UseInfiniteQueryResult<
+  InfiniteData<AccountPage, string | null>,
+  Error
+> {
+  return useInfiniteQuery({
+    queryKey: USER_LIST_QUERY_KEY,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      try {
+        return await fetchAccountList(getBrowserClient(), { cursor: pageParam, limit: 50 })
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  })
+}
+
+/** The reports currently shown in the public feed. */
+export function useVisibleReports(): UseInfiniteQueryResult<
+  InfiniteData<VisibleReportPage, string | null>,
+  Error
+> {
+  return useInfiniteQuery({
+    queryKey: VISIBLE_REPORTS_QUERY_KEY,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      try {
+        return await fetchVisibleReports(getBrowserClient(), {
+          cursor: pageParam,
+          limit: PAGE_SIZE,
+        })
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  })
+}
+
+/** Reports declined in the last 7 days. */
+export function useDeclinedReports(): UseQueryResult<DeclinedReport[], Error> {
+  return useQuery({
+    queryKey: DECLINED_QUERY_KEY,
+    queryFn: async () => {
+      try {
+        return await fetchDeclinedReports(getBrowserClient())
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+  })
+}
+
+/** Wrong-number reports, optionally for one status. */
+export function useWrongNumbers(
+  status: WrongNumberStatus | null,
+): UseQueryResult<WrongNumberReport[], Error> {
+  return useQuery({
+    queryKey: [...WRONG_NUMBERS_QUERY_KEY, status ?? 'all'],
+    queryFn: async () => {
+      try {
+        return await fetchWrongNumbers(getBrowserClient(), status)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+  })
+}
+
 // -----------------------------------------------------------------------------
 // The writes
 // -----------------------------------------------------------------------------
+
+/** Re-enables a disabled account. */
+export function useEnableAccount(): UseMutationResult<
+  void,
+  Error,
+  { userId: string; note: string }
+> {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input) => {
+      try {
+        await enableAccount(getBrowserClient(), input)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: USER_LIST_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
+    },
+  })
+}
+
+/** Restores a deleted account inside its 30-day window. */
+export function useRestoreDeletedAccount(): UseMutationResult<
+  void,
+  Error,
+  { userId: string; note: string }
+> {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input) => {
+      try {
+        await restoreDeletedAccount(getBrowserClient(), input)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: USER_LIST_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
+    },
+  })
+}
+
+/** Puts a declined report back in the review queue. */
+export function useUndoDecline(): UseMutationResult<
+  void,
+  Error,
+  { reportId: string; note: string }
+> {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input) => {
+      try {
+        await undoDecline(getBrowserClient(), input)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: DECLINED_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
+    },
+  })
+}
+
+/** Sets a wrong-number report to pending, reviewed or rejected. */
+export function useResolveWrongNumber(): UseMutationResult<
+  void,
+  Error,
+  { id: string; status: WrongNumberStatus }
+> {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input) => {
+      try {
+        await resolveWrongNumber(getBrowserClient(), input)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: WRONG_NUMBERS_QUERY_KEY })
+    },
+  })
+}
+
+/** Takes a published report out of the public feed. */
+export function useHideReport(): UseMutationResult<
+  void,
+  Error,
+  { reportId: string; note: string }
+> {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input) => {
+      try {
+        await hideReport(getBrowserClient(), input)
+      } catch (caught) {
+        throw toAppError(caught)
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: VISIBLE_REPORTS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
+    },
+  })
+}
 
 /**
  * The restore / remove decision.
@@ -227,6 +442,8 @@ export function useSubmitDecision(): UseMutationResult<
     },
     onSuccess: async (_result, variables) => {
       await queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: VISIBLE_REPORTS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: DECLINED_QUERY_KEY })
       await queryClient.invalidateQueries({
         queryKey: [...REPORT_DETAIL_QUERY_KEY, variables.reportId],
       })
@@ -258,6 +475,7 @@ export function useDisableAccount(): UseMutationResult<
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: USER_LIST_QUERY_KEY })
       await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY })
     },
   })

@@ -21,7 +21,15 @@ import { AdminShell, EmptyState, ErrorBanner, PageHeader, SkeletonList } from '@
  * carries a report's coordinates, description, or media.
  */
 
-type DecisionFilter = 'all' | 'restore' | 'remove' | 'disable_user'
+type DecisionFilter =
+  | 'all'
+  | 'restore'
+  | 'remove'
+  | 'disable_user'
+  | 'hide'
+  | 'enable_user'
+  | 'restore_account'
+  | 'undo_remove'
 
 export function AuditClient() {
   const copy = getCopy(DEFAULT_ADMIN_LOCALE)
@@ -60,13 +68,12 @@ export function AuditClient() {
           <ErrorBanner message={error} />
 
           <div className="row">
-            <label className="fieldLabel" htmlFor="audit-filter" style={{ marginBottom: 0 }}>
+            <label className="fieldLabel noMargin" htmlFor="audit-filter">
               {copy.auditFilterDecision}
             </label>
             <select
               id="audit-filter"
-              className="select"
-              style={{ width: 220 }}
+              className="select selectAuto"
               value={filter}
               onChange={(event) => setFilter(event.target.value as DecisionFilter)}
             >
@@ -74,6 +81,10 @@ export function AuditClient() {
               <option value="restore">{copy.auditDecisionRestore}</option>
               <option value="remove">{copy.auditDecisionRemove}</option>
               <option value="disable_user">{copy.auditDecisionDisableUser}</option>
+              <option value="enable_user">{copy.auditDecisionEnableUser}</option>
+              <option value="hide">{copy.auditDecisionHide}</option>
+              <option value="undo_remove">{copy.auditDecisionUndoRemove}</option>
+              <option value="restore_account">{copy.auditDecisionRestoreAccount}</option>
             </select>
           </div>
 
@@ -84,7 +95,7 @@ export function AuditClient() {
           ) : null}
 
           {!isLoading && items.length > 0 ? (
-            <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card cardFlush">
               <table className="table">
                 <thead>
                   <tr>
@@ -124,10 +135,9 @@ export function AuditClient() {
             hasNextPage ? (
               <button
                 type="button"
-                className="button buttonSecondary"
+                className="button buttonSecondary buttonStart"
                 onClick={() => void trail.fetchNextPage()}
                 disabled={isFetchingNextPage}
-                style={{ alignSelf: 'flex-start' }}
               >
                 {copy.auditLoadMore}
               </button>
@@ -149,20 +159,16 @@ export function AuditClient() {
  * **current** state — the trail itself carries no snapshot.
  */
 function renderTarget(action: AuditAction, copy: ReturnType<typeof getCopy>) {
-  if (action.targetUserId) {
-    return (
-      <Link href={`/users?target=${encodeURIComponent(action.targetUserId)}`} className="link">
-        {action.targetUserId.slice(0, 8)}
-      </Link>
-    )
-  }
-
   if (action.reportId) {
     return (
       <Link href={`/queue/${action.reportId}`} className="link">
         {action.reportId.slice(0, 8)}
       </Link>
     )
+  }
+
+  if (action.targetUserId) {
+    return <span title={action.targetUserId}>{action.targetUserId.slice(0, 8)}</span>
   }
 
   return <span className="muted">{copy.auditReportUnavailable}</span>

@@ -199,10 +199,7 @@ describe('the console has no bulk action', () => {
   })
 
   it('decides one report at a time, through the per-report decision', () => {
-    const decision = readFileSync(
-      join(__dirname, '..', 'app', 'queue', '[reportId]', 'report-detail-client.tsx'),
-      'utf8',
-    )
+    const decision = readFileSync(join(__dirname, '..', 'app', 'decision-buttons.tsx'), 'utf8')
     const code = stripProse(decision)
 
     // The per-report decision is the only decision path. It writes one row.

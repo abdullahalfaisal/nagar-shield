@@ -73,28 +73,13 @@ export function MediaPreview({ media }: { media: QueueMedia }) {
             controls
             playsInline
             onError={() => setFailed(true)}
-            style={{ width: '100%', borderRadius: 'var(--r-sm)' }}
+            className="mediaFill"
           />
         ) : (
-          <img
-            src={url as string}
-            alt=""
-            onError={() => setFailed(true)}
-            style={{ width: '100%', borderRadius: 'var(--r-sm)', display: 'block' }}
-          />
+          <img src={url as string} alt="" onError={() => setFailed(true)} className="mediaFill" />
         )
       ) : (
-        <div
-          className="muted"
-          style={{
-            padding: '24px 16px',
-            textAlign: 'center',
-            border: '1px solid var(--ink-200)',
-            borderRadius: 'var(--r-sm)',
-            background: 'var(--ink-50)',
-          }}
-          role="note"
-        >
+        <div className="muted mediaMissing" role="note">
           {copy.detailMediaUnavailable}
         </div>
       )}
@@ -106,10 +91,9 @@ export function MediaPreview({ media }: { media: QueueMedia }) {
       {failed ? (
         <button
           type="button"
-          className="button buttonSecondary"
+          className="button buttonSecondary buttonStart"
           onClick={() => void request()}
           disabled={requesting}
-          style={{ alignSelf: 'flex-start' }}
         >
           {copy.detailMediaRetry}
         </button>

@@ -1,18 +1,18 @@
-/**
- * The console's user-facing strings.
- *
- * The admin is an **internal** tool, so it does not start a second i18n system
- * — but every string is still declared in **both** locales here, with Bangla
- * first, and the shared mobile bundle stays the citizen-facing surface. The
- * console's copy is deliberately short: a moderator reads a queue, not prose.
- */
+/** The console's user-facing strings. */
 
-export type AdminLocale = 'bn' | 'en'
+export type AdminLocale = 'en'
 
 export interface AdminCopy {
   appName: string
   appTagline: string
+  navGroupModeration: string
+  navGroupHelp: string
+  navGroupPeople: string
+  navGroupRecords: string
   navQueue: string
+  navFeed: string
+  navDeclined: string
+  navNumbers: string
   navUsers: string
   navAudit: string
   signOut: string
@@ -36,6 +36,13 @@ export interface AdminCopy {
   queueEnd: string
   queueLoading: string
   queueUploader: string
+  queueColumnActions: string
+  queueColumnTime: string
+  queueColumnCategory: string
+  queueColumnArea: string
+  queueColumnDescription: string
+  queueColumnFlags: string
+  queueColumnReason: string
   queueGroupAll: string
   queueGroupAuthorAutoHide: string
   queueGroupEmptyTitle: string
@@ -71,6 +78,16 @@ export interface AdminCopy {
   detailNoPriorActions: string
 
   decisionHeading: string
+  decisionApprove: string
+  decisionDecline: string
+  decisionApproveHint: string
+  decisionDeclineHint: string
+  decisionDeclineConfirm: string
+  decisionDeclineYes: string
+  decisionCancel: string
+  decisionNoteOptional: string
+  decisionDefaultApprove: string
+  decisionDefaultDecline: string
   decisionRestore: string
   decisionRemove: string
   decisionRemoveWarning: string
@@ -81,6 +98,68 @@ export interface AdminCopy {
   decisionSubmitting: string
   decisionConfirmRemove: string
 
+  feedTitle: string
+  feedSubtitle: string
+  feedEmptyTitle: string
+  feedEmptyBody: string
+  feedStatusShown: string
+  feedStatusHidden: string
+  feedColumnStatus: string
+  feedShow: string
+  feedDefaultShowNote: string
+  feedHide: string
+  feedHideConfirm: string
+  feedHideYes: string
+  feedDefaultNote: string
+  usersColumnName: string
+  usersColumnContact: string
+  usersColumnRole: string
+  usersColumnReports: string
+  usersColumnStatus: string
+  usersColumnJoined: string
+  usersColumnAction: string
+  usersStatusActive: string
+  usersDisableConfirm: string
+  usersDefaultNote: string
+  usersEnable: string
+  usersEnableConfirm: string
+  usersEnableYes: string
+  usersDefaultEnableNote: string
+  usersStatusDeleted: string
+  usersRestore: string
+  usersRestoreConfirm: string
+  usersRestoreYes: string
+  usersDefaultRestoreNote: string
+  declinedTitle: string
+  declinedSubtitle: string
+  declinedEmptyTitle: string
+  declinedEmptyBody: string
+  declinedColumnTime: string
+  declinedUndo: string
+  declinedUndoConfirm: string
+  declinedUndoYes: string
+  declinedDefaultNote: string
+  numbersTitle: string
+  numbersSubtitle: string
+  numbersEmptyTitle: string
+  numbersEmptyBody: string
+  numbersFilterPending: string
+  numbersFilterReviewed: string
+  numbersFilterRejected: string
+  numbersFilterAll: string
+  numbersColumnEntry: string
+  numbersColumnReason: string
+  numbersColumnStatus: string
+  numbersHotline: string
+  numbersStation: string
+  numbersUnknownEntry: string
+  numbersAnonymous: string
+  numbersMarkFixed: string
+  numbersDismiss: string
+  numbersReopen: string
+  numbersStatusPending: string
+  numbersStatusReviewed: string
+  numbersStatusRejected: string
   usersTitle: string
   usersSubtitle: string
   usersSearchLabel: string
@@ -110,6 +189,10 @@ export interface AdminCopy {
   auditDecisionRestore: string
   auditDecisionRemove: string
   auditDecisionDisableUser: string
+  auditDecisionHide: string
+  auditDecisionEnableUser: string
+  auditDecisionRestoreAccount: string
+  auditDecisionUndoRemove: string
   auditDecisionUnknown: string
   auditEmptyTitle: string
   auditEmptyBody: string
@@ -126,129 +209,17 @@ export interface AdminCopy {
   errorNotFound: string
 }
 
-const bn: AdminCopy = {
-  appName: 'নগর শিল্ড',
-  appTagline: 'মডারেশন কনসোল',
-  navQueue: 'কিউ',
-  navUsers: 'ব্যবহারকারী',
-  navAudit: 'অ্যাকশন লগ',
-  signOut: 'সাইন আউট',
-
-  loginTitle: 'মডারেটর সাইন ইন',
-  loginSubtitle: 'শুধুমাত্র মডারেটর অ্যাকাউন্টে অ্যাক্সেস আছে।',
-  loginEmail: 'ইমেইল',
-  loginPassword: 'পাসওয়ার্ড',
-  loginSubmit: 'সাইন ইন',
-  loginSubmitting: 'সাইন ইন হচ্ছে…',
-  loginBackToQueue: 'কিউ-তে ফিরে যান',
-
-  accessOnlyTitle: 'শুধুমাত্র মডারেটর অ্যাক্সেস',
-  accessOnlyBody: 'এই অ্যাকাউন্টের মডারেশন অনুমতি নেই।',
-
-  queueTitle: 'পর্যালোচনার অপেক্ষায়',
-  queueSubtitle: 'ফ্ল্যাগ হওয়া রিপোর্ট',
-  queueEmptyTitle: 'কিউ খালি',
-  queueEmptyBody: 'এই মুহূর্তে পর্যালোচনার জন্য কোনো রিপোর্ট নেই।',
-  queueLoadMore: 'আরও দেখুন',
-  queueEnd: 'সব রিপোর্ট দেখানো হয়েছে',
-  queueLoading: 'কিউ লোড হচ্ছে…',
-  queueUploader: 'লেখক',
-  queueGroupAll: 'সব অপেক্ষমাণ',
-  queueGroupAuthorAutoHide: 'লেখকের নিয়মে লুকানো',
-  queueGroupEmptyTitle: 'এই দলে কোনো রিপোর্ট নেই',
-  queueGroupEmptyBody: 'লেখকের নিয়মে লুকানো কোনো রিপোর্ট এই মুহূর্তে নেই।',
-  queueBadgeAuthorAutoHide: 'লেখক-স্বয়ংক্রিয় লুকানো',
-  queueBadgeBoth: 'লেখকের নিয়ম ও ৩ ফ্ল্যাগ',
-  queueAuthorFlagCount: 'লেখকের ২৪ ঘণ্টার ফ্ল্যাগ: {{count}}',
-  queueOwnFlagCount: 'নিজের ফ্ল্যাগ: {{count}}',
-  queueAuthorAutoHideExplanation:
-    'এই রিপোর্টটি নিজের ফ্ল্যাগের সংখ্যার কারণে নয়, বরং লেখকের ২৪ ঘণ্টায় ৫টি বা তার বেশি রিপোর্ট ফ্ল্যাগ হওয়ায় স্বয়ংক্রিয়ভাবে লুকানো হয়েছে।',
-
-  detailTitle: 'রিপোর্ট পর্যালোচনা',
-  detailMedia: 'মিডিয়া',
-  detailNoMedia: 'কোনো মিডিয়া নেই',
-  detailMediaUnavailable: 'মিডিয়াটি দেখা যাচ্ছে না',
-  detailMediaRetry: 'আবার চেষ্টা করুন',
-  detailArea: 'এলাকা',
-  detailCategory: 'ক্যাটাগরি',
-  detailUncategorised: 'শ্রেণিবদ্ধ নয়',
-  detailDescription: 'বিবরণ',
-  detailCapturedAt: 'ক্যাপচারের সময়',
-  detailFlags: 'ফ্ল্যাগের কারণ',
-  detailFlagReporter: 'ফ্ল্যাগ করেছেন',
-  detailUploader: 'আপলোডকারীর পরিচয়',
-  detailUploaderId: 'প্রোফাইল আইডি',
-  detailUploaderPhone: 'ফোন',
-  detailUploaderEmail: 'ইমেইল',
-  detailUploaderRole: 'ভূমিকা',
-  detailUploaderState: 'অ্যাকাউন্টের অবস্থা',
-  detailStateActive: 'সক্রিয়',
-  detailStateDisabled: 'নিষ্ক্রিয়',
-  detailPriorActions: 'আগের সিদ্ধান্ত',
-  detailAutoHideBanner:
-    'এই রিপোর্টটি লেখকের নিয়মে লুকানো হয়েছে — ২৪ ঘণ্টায় ৫টি ফ্ল্যাগ হওয়ায়।',
-  detailNoPriorActions: 'এই রিপোর্টে আগের কোনো সিদ্ধান্ত নেই।',
-
-  decisionHeading: 'সিদ্ধান্ত',
-  decisionRestore: 'ফিরিয়ে আনুন',
-  decisionRemove: 'সরান',
-  decisionRemoveWarning: 'সরানো স্থায়ী — রিপোর্টটি আর কখনো সাধারণ ফিডে দেখাবে না।',
-  decisionNote: 'নোট',
-  decisionNotePlaceholder: 'কেন এই সিদ্ধান্ত নিলেন লিখুন',
-  decisionNoteRequired: 'সিদ্ধান্তের নোট আবশ্যক',
-  decisionSubmit: 'সিদ্ধান্ত জমা দিন',
-  decisionSubmitting: 'জমা দেওয়া হচ্ছে…',
-  decisionConfirmRemove: 'স্থায়ীভাবে সরান',
-
-  usersTitle: 'ব্যবহারকারী',
-  usersSubtitle: 'ফোন, ইমেইল বা প্রোফাইল আইডি দিয়ে খুঁজুন',
-  usersSearchLabel: 'খুঁজুন',
-  usersSearchPlaceholder: '+8801••••••• বা ইমেইল বা UUID',
-  usersSearchSubmit: 'খুঁজুন',
-  usersEmptyTitle: 'কোনো অ্যাকাউন্ট পাওয়া যায়নি',
-  usersEmptyBody: 'ফোন, ইমেইল বা প্রোফাইল আইডি দিয়ে হুবহু মিলিয়ে খুঁজুন।',
-  usersReportCount: '{{count}}টি রিপোর্ট',
-  usersDisable: 'নিষ্ক্রিয় করুন',
-  usersDisableHeading: 'অ্যাকাউন্ট নিষ্ক্রিয় করুন',
-  usersDisableReason: 'কারণ',
-  usersDisableReasonPlaceholder: 'কেন এই অ্যাকাউন্ট নিষ্ক্রিয় করছেন লিখুন',
-  usersDisableSubmit: 'নিষ্ক্রিয় করুন',
-  usersDisableSubmitting: 'নিষ্ক্রিয় করা হচ্ছে…',
-  usersDisableForbidden: 'একজন মডারেটরকে নিষ্ক্রিয় করা যায় না।',
-  usersDisabledBadge: 'নিষ্ক্রিয়',
-
-  auditTitle: 'মডারেশন অ্যাকশন লগ',
-  auditSubtitle: 'প্রতিটি সিদ্ধান্তের অপরিবর্তনীয় রেকর্ড',
-  auditFilterDecision: 'সিদ্ধান্ত',
-  auditFilterAll: 'সব',
-  auditColumnTarget: 'লক্ষ্য',
-  auditColumnModerator: 'মডারেটর',
-  auditColumnDecision: 'সিদ্ধান্ত',
-  auditColumnNote: 'নোট',
-  auditColumnTimestamp: 'সময়',
-  auditDecisionRestore: 'ফিরিয়ে আনা',
-  auditDecisionRemove: 'সরানো',
-  auditDecisionDisableUser: 'ব্যবহারকারী নিষ্ক্রিয়',
-  auditDecisionUnknown: 'অজানা',
-  auditEmptyTitle: 'কোনো মডারেশন সিদ্ধান্ত রেকর্ড করা হয়নি',
-  auditEmptyBody: 'সিদ্ধান্ত নেওয়ার পর এখানে দেখা যাবে।',
-  auditLoadMore: 'আরও দেখুন',
-  auditEnd: 'সব রেকর্ড দেখানো হয়েছে',
-  auditModeratorDeleted: 'মডারেটর অ্যাকাউন্ট মুছে ফেলা হয়েছে',
-  auditReportUnavailable: 'রিপোর্ট আর নেই',
-
-  errorGeneric: 'কিছু একটা সমস্যা হয়েছে।',
-  errorForbidden: 'আপনার এই কাজটি করার অনুমতি নেই।',
-  errorAuthRequired: 'আবার সাইন ইন করুন।',
-  errorValidation: 'কিছু তথ্য সঠিক নয়।',
-  errorConflict: 'এটি বর্তমান অবস্থার সাথে সঙ্ঘাত করছে।',
-  errorNotFound: 'যা খুঁজছেন তা পাওয়া যায়নি।',
-}
-
 const en: AdminCopy = {
   appName: 'Nagar Shield',
   appTagline: 'Moderation console',
-  navQueue: 'Queue',
+  navGroupModeration: 'Moderation',
+  navGroupHelp: 'Help numbers',
+  navGroupPeople: 'People',
+  navGroupRecords: 'Records',
+  navQueue: 'Review queue',
+  navFeed: 'Public feed',
+  navDeclined: 'Declined',
+  navNumbers: 'Wrong numbers',
   navUsers: 'Users',
   navAudit: 'Action log',
   signOut: 'Sign out',
@@ -264,22 +235,29 @@ const en: AdminCopy = {
   accessOnlyTitle: 'Moderator access only',
   accessOnlyBody: 'This account has no moderation permission.',
 
-  queueTitle: 'Waiting for review',
-  queueSubtitle: 'Flagged reports',
-  queueEmptyTitle: 'The queue is clear',
-  queueEmptyBody: 'No report is waiting for review right now.',
+  queueTitle: 'Review queue',
+  queueSubtitle: 'Reports hidden after being flagged',
+  queueEmptyTitle: 'Nothing to review',
+  queueEmptyBody: 'Flagged reports will appear here.',
   queueLoadMore: 'Load more',
-  queueEnd: 'Every report is shown',
-  queueLoading: 'Loading the queue…',
+  queueEnd: 'End of list',
+  queueLoading: 'Loading…',
   queueUploader: 'Uploader',
-  queueGroupAll: 'All pending',
-  queueGroupAuthorAutoHide: 'Author auto-hidden',
-  queueGroupEmptyTitle: 'Nothing in this group',
-  queueGroupEmptyBody: 'No report is currently hidden by the author rule.',
-  queueBadgeAuthorAutoHide: 'Author auto-hidden',
-  queueBadgeBoth: 'Author rule and 3 flags',
+  queueColumnActions: 'Action',
+  queueColumnTime: 'Reported',
+  queueColumnCategory: 'Category',
+  queueColumnArea: 'Area',
+  queueColumnDescription: 'Description',
+  queueColumnFlags: 'Flags',
+  queueColumnReason: 'Hidden because',
+  queueGroupAll: 'All',
+  queueGroupAuthorAutoHide: 'Author flagged',
+  queueGroupEmptyTitle: 'Nothing here',
+  queueGroupEmptyBody: 'No reports are hidden because of their author.',
+  queueBadgeAuthorAutoHide: 'Author flagged',
+  queueBadgeBoth: '3 flags and author',
   queueAuthorFlagCount: "Author's flags in 24 h: {{count}}",
-  queueOwnFlagCount: 'Own flags: {{count}}',
+  queueOwnFlagCount: '{{count}}',
   queueAuthorAutoHideExplanation:
     'This report was hidden automatically because its author had 5 or more reports flagged in the last 24 hours — not because the report itself reached 3 flags.',
 
@@ -309,6 +287,16 @@ const en: AdminCopy = {
   detailNoPriorActions: 'No earlier decision on this report.',
 
   decisionHeading: 'Decision',
+  decisionApprove: 'Approve',
+  decisionDecline: 'Decline',
+  decisionApproveHint: 'Approve puts the report back in the public feed.',
+  decisionDeclineHint: 'Decline removes the report for good.',
+  decisionDeclineConfirm: 'Remove this report for good?',
+  decisionDeclineYes: 'Yes, decline',
+  decisionCancel: 'Cancel',
+  decisionNoteOptional: 'Note (optional)',
+  decisionDefaultApprove: 'Approved by moderator',
+  decisionDefaultDecline: 'Declined by moderator',
   decisionRestore: 'Restore',
   decisionRemove: 'Remove',
   decisionRemoveWarning: 'Removal is permanent — the report never returns to the public feed.',
@@ -319,10 +307,72 @@ const en: AdminCopy = {
   decisionSubmitting: 'Submitting…',
   decisionConfirmRemove: 'Remove permanently',
 
+  feedTitle: 'Public feed',
+  feedSubtitle: 'Hide a report from the public, or show it again',
+  feedEmptyTitle: 'No reports in the feed',
+  feedEmptyBody: 'Published reports will appear here.',
+  feedStatusShown: 'Shown',
+  feedStatusHidden: 'Hidden',
+  feedColumnStatus: 'Status',
+  feedShow: 'Show',
+  feedDefaultShowNote: 'Shown by moderator',
+  feedHide: 'Hide',
+  feedHideConfirm: 'Hide this report from the public feed?',
+  feedHideYes: 'Yes, hide',
+  feedDefaultNote: 'Hidden by moderator',
+  usersColumnName: 'Name',
+  usersColumnContact: 'Contact',
+  usersColumnRole: 'Role',
+  usersColumnReports: 'Reports',
+  usersColumnStatus: 'Status',
+  usersColumnJoined: 'Joined',
+  usersColumnAction: 'Action',
+  usersStatusActive: 'Active',
+  usersDisableConfirm: 'Disable this account?',
+  usersDefaultNote: 'Disabled by moderator',
+  usersEnable: 'Enable',
+  usersEnableConfirm: 'Let this account sign in and post again?',
+  usersEnableYes: 'Yes, enable',
+  usersDefaultEnableNote: 'Enabled by moderator',
+  usersStatusDeleted: 'Deleted',
+  usersRestore: 'Restore',
+  usersRestoreConfirm: 'Restore this deleted account?',
+  usersRestoreYes: 'Yes, restore',
+  usersDefaultRestoreNote: 'Restored by moderator',
+  declinedTitle: 'Declined reports',
+  declinedSubtitle: 'Declined in the last 7 days. Undo puts a report back in the review queue.',
+  declinedEmptyTitle: 'Nothing declined recently',
+  declinedEmptyBody: 'Reports you decline will appear here for 7 days.',
+  declinedColumnTime: 'Declined',
+  declinedUndo: 'Undo',
+  declinedUndoConfirm: 'Put this report back in the review queue?',
+  declinedUndoYes: 'Yes, undo',
+  declinedDefaultNote: 'Decline undone by moderator',
+  numbersTitle: 'Wrong numbers',
+  numbersSubtitle: 'People report hotline and station numbers that look wrong.',
+  numbersEmptyTitle: 'No reports',
+  numbersEmptyBody: 'Wrong-number reports will appear here.',
+  numbersFilterPending: 'Pending',
+  numbersFilterReviewed: 'Fixed',
+  numbersFilterRejected: 'Dismissed',
+  numbersFilterAll: 'All',
+  numbersColumnEntry: 'Number',
+  numbersColumnReason: 'Reason',
+  numbersColumnStatus: 'Status',
+  numbersHotline: 'Hotline',
+  numbersStation: 'Station',
+  numbersUnknownEntry: 'Unknown entry',
+  numbersAnonymous: 'Anonymous',
+  numbersMarkFixed: 'Mark fixed',
+  numbersDismiss: 'Dismiss',
+  numbersReopen: 'Reopen',
+  numbersStatusPending: 'Pending',
+  numbersStatusReviewed: 'Fixed',
+  numbersStatusRejected: 'Dismissed',
   usersTitle: 'Users',
-  usersSubtitle: 'Search by phone, email, or profile id',
+  usersSubtitle: 'Everyone with an account. Search to see full contact details.',
   usersSearchLabel: 'Search',
-  usersSearchPlaceholder: '+8801•••••••, an email, or a UUID',
+  usersSearchPlaceholder: 'Exact phone, email or ID',
   usersSearchSubmit: 'Search',
   usersEmptyTitle: 'No account matched',
   usersEmptyBody: 'Search by an exact phone, email, or profile id.',
@@ -348,6 +398,10 @@ const en: AdminCopy = {
   auditDecisionRestore: 'Restored',
   auditDecisionRemove: 'Removed',
   auditDecisionDisableUser: 'User disabled',
+  auditDecisionHide: 'Hidden',
+  auditDecisionEnableUser: 'User enabled',
+  auditDecisionRestoreAccount: 'Account restored',
+  auditDecisionUndoRemove: 'Decline undone',
   auditDecisionUnknown: 'Unknown',
   auditEmptyTitle: 'No moderation decisions recorded yet',
   auditEmptyBody: 'A decision appears here as soon as it is made.',
@@ -364,11 +418,10 @@ const en: AdminCopy = {
   errorNotFound: 'We could not find that.',
 }
 
-const BUNDLES: Record<AdminLocale, AdminCopy> = { bn, en }
+const BUNDLES: Record<AdminLocale, AdminCopy> = { en }
 
 export function getCopy(locale: AdminLocale): AdminCopy {
   return BUNDLES[locale]
 }
 
-/** The console's default locale. Bangla is the product's primary language. */
-export const DEFAULT_ADMIN_LOCALE: AdminLocale = 'bn'
+export const DEFAULT_ADMIN_LOCALE: AdminLocale = 'en'

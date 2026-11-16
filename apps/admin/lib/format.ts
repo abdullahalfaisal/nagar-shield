@@ -44,6 +44,14 @@ export function maskPhone(phone: string | null | undefined): string {
   return `${prefix}${'•'.repeat(3)}${visibleTail}`
 }
 
+/** Masks an email for browsing lists: `a•••@example.com`. */
+export function maskEmail(email: string | null | undefined): string {
+  if (!email) return '—'
+  const at = email.indexOf('@')
+  if (at < 1) return '—'
+  return `${email.slice(0, 1)}•••${email.slice(at)}`
+}
+
 /**
  * The masked uploader handle for the queue list.
  *
@@ -93,60 +101,7 @@ export function formatAreaLine(
 export function formatCategoryLabel(category: ReportCategory | null): string | null {
   if (!category) return null
   const label = REPORT_CATEGORY_LABELS[category]
-  return `${label.bn} — ${label.en}`
-}
-
-/**
- * The category's accent **token family**.
- *
- * The console renders a category accent tile, and the tile's colour comes
- * from the design-token custom properties in `globals.css` — never from a
- * hex literal. Story `001` requires the console to be built from the
- * web-safe CSS custom-property subset of `docs/design/design-tokens.md`, with
- * **no new hex value**, so the shared package's per-category hex map
- * (`REPORT_CATEGORY_ACCENTS`) is deliberately *not* used here: those values
- * come from the prototype's alert card and are not in the token set.
- *
- * Instead each of the eleven categories is assigned one of the five accent
- * families the token subset actually has — violet, red, amber, green, sky.
- * The tile is therefore a **token reference**, and the CSS owns the colour.
- *
- * The assignment is by kind rather than by hue-matching: violence is red,
- * property crime is violet, emergencies are amber, medical is green, and
- * fraud and suspicion are sky. An uncategorised report gets the neutral
- * ink, which is what the tile falls back to.
- */
-export type CategoryAccentFamily = 'violet' | 'red' | 'amber' | 'green' | 'sky' | 'neutral'
-
-const CATEGORY_ACCENTS: Record<ReportCategory, CategoryAccentFamily> = {
-  // Property crime — violet, the brand family.
-  theft: 'violet',
-  vandalism: 'violet',
-  // Violence against a person — red.
-  assault: 'red',
-  robbery: 'red',
-  harassment: 'red',
-  // Emergencies — amber.
-  accident: 'amber',
-  fire: 'amber',
-  // Medical — green.
-  medical: 'green',
-  // Deception and suspicion — sky.
-  fraud: 'sky',
-  suspicious: 'sky',
-  // Everything else — the neutral ink.
-  other: 'neutral',
-}
-
-/**
- * The accent family for a report's category.
- *
- * An unknown or absent category gets the neutral family — the tile still
- * renders, in the same ink the rest of the console uses for "nothing here".
- */
-export function formatCategoryAccent(category: ReportCategory | null): CategoryAccentFamily {
-  if (!category) return 'neutral'
-  return CATEGORY_ACCENTS[category] ?? 'neutral'
+  return label.en
 }
 
 /**
@@ -159,32 +114,36 @@ export function formatCategoryAccent(category: ReportCategory | null): CategoryA
  */
 export function formatFlagReason(reason: FlagReason | string): string {
   const labels: Record<FlagReason, string> = {
-    misinformation: 'ভুল তথ্য — Misinformation',
-    harassment: 'উত্যন্তকরণ — Harassment',
-    duplicate: 'ডুপ্লিকেট — Duplicate',
-    off_topic: 'অপ্রাসঙ্গিক — Off topic',
-    other: 'অন্যান্য — Other',
+    misinformation: 'Misinformation',
+    harassment: 'Harassment',
+    duplicate: 'Duplicate',
+    off_topic: 'Off topic',
+    other: 'Other',
   }
   return labels[reason as FlagReason] ?? reason
 }
 
 /** The decision label for the audit trail. Unknown values never crash. */
 export function formatDecisionLabel(decision: string): string {
-  const labels: Record<ModerationDecision, string> = {
-    restore: 'ফিরিয়ে আনা — Restored',
-    remove: 'সরানো — Removed',
-    disable_user: 'ব্যবহারকারী নিষ্ক্রিয় — User disabled',
+  const labels: Record<ModerationDecision | string, string> = {
+    restore: 'Restored',
+    remove: 'Removed',
+    disable_user: 'User disabled',
+    hide: 'Hidden',
+    enable_user: 'User enabled',
+    restore_account: 'Account restored',
+    undo_remove: 'Decline undone',
   }
-  return labels[decision as ModerationDecision] ?? 'অজানা — Unknown'
+  return labels[decision] ?? 'Unknown'
 }
 
 /** The hide-reason badge text. `manual` is a moderator's earlier decision. */
 export function formatHideReason(reason: HideReason): string {
   const labels: Record<HideReason, string> = {
-    flag_threshold: '৩টি ফ্ল্যাগের সীমায় লুকানো — 3-flag threshold',
-    author_auto_hide: 'লেখকের নিয়মে লুকানো — Author auto-hide',
-    both: 'ফ্ল্যাগ ও লেখকের নিয়মে লুকানো — Both rules',
-    manual: 'মডারেটরের আগে লুকানো — Hidden by a moderator',
+    flag_threshold: '3 flags',
+    author_auto_hide: 'Author flagged 5+ times',
+    both: '3 flags and author flagged',
+    manual: 'Hidden by moderator',
   }
   return labels[reason]
 }
@@ -277,12 +236,12 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
   const deltaMs = now.getTime() - parsed.getTime()
   const minutes = Math.round(deltaMs / 60_000)
 
-  if (minutes < 1) return 'এইমাত্র · just now'
-  if (minutes < 60) return `${minutes} মিনিট আগে · ${minutes} min ago`
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
   if (minutes < 60 * 24) {
     const hours = Math.floor(minutes / 60)
-    return `${hours} ঘণ্টা আগে · ${hours} h ago`
+    return `${hours} h ago`
   }
   const days = Math.floor(minutes / (60 * 24))
-  return `${days} দিন আগে · ${days} d ago`
+  return `${days} d ago`
 }
