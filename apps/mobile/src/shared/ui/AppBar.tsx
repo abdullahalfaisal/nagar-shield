@@ -58,11 +58,7 @@ export function AppBar({
         },
       ]}
     >
-      {onBack ? (
-        <BackButton onPress={pressBack} />
-      ) : (
-        <View style={styles.backSlot} />
-      )}
+      {onBack ? <BackButton onPress={pressBack} /> : <View style={styles.backSlot} />}
 
       <View style={centered ? styles.centeredTitle : styles.titleBlock}>
         <Text
